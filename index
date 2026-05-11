@@ -1,0 +1,895 @@
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Plan de Producción Semanal</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#fff;--bg2:#f5f5f4;--bg3:#eeede9;
+  --text:#1a1a1a;--text2:#6b6b6b;--text3:#aaa;
+  --border:rgba(0,0,0,0.10);--border2:rgba(0,0,0,0.20);
+  --radius:8px;--radius-lg:12px;
+  --green:#1D9E75;--green-bg:#E1F5EE;
+  --blue:#378ADD;--blue-bg:#E6F1FB;
+  --amber:#BA7517;--amber-bg:#FAEEDA;
+  --red:#E24B4A;--red-bg:#FCEBEB;
+  --purple:#534AB7;--purple-bg:#EEEDFE;
+  --today-bg:rgba(55,138,221,0.07);--today-head:rgba(55,138,221,0.13);
+}
+@media(prefers-color-scheme:dark){:root{
+  --bg:#1c1c1b;--bg2:#262624;--bg3:#2e2e2c;
+  --text:#f0efec;--text2:#999;--text3:#555;
+  --border:rgba(255,255,255,0.10);--border2:rgba(255,255,255,0.20);
+}}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh}
+header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100}
+.logo{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.logo i{color:var(--blue);font-size:20px}
+.logo .sub{font-weight:400;font-size:13px;color:var(--text2)}
+.status-dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;margin-right:5px;transition:background .3s}
+.status-dot.online{background:var(--green)}.status-dot.saving{background:var(--amber);animation:pulse .8s infinite}.status-dot.error{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.status-label{font-size:12px;color:var(--text2);display:flex;align-items:center}
+.main{max-width:1300px;margin:0 auto;padding:1.5rem}
+.app-card{background:var(--bg);border-radius:var(--radius-lg);border:0.5px solid var(--border);overflow:hidden;margin-bottom:1.5rem}
+.tabs{display:flex;gap:2px;border-bottom:0.5px solid var(--border);padding:0 1rem;background:var(--bg);overflow-x:auto}
+.tab{padding:11px 16px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-1px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;transition:color .15s}
+.tab.active{color:var(--text);border-bottom-color:var(--text)}
+.tab:hover:not(.active){color:var(--text)}
+.section{display:none}.section.active{display:block}
+.pad{padding:1.5rem}
+.toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;gap:8px}
+.week-nav{display:flex;align-items:center;gap:8px}
+.week-label{font-size:14px;font-weight:500;min-width:240px;text-align:center}
+.btn{padding:7px 14px;font-size:13px;font-weight:500;border:0.5px solid var(--border2);border-radius:var(--radius);background:transparent;cursor:pointer;color:var(--text);display:inline-flex;align-items:center;gap:6px;transition:background .12s}
+.btn:hover{background:var(--bg2)}.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-xs{padding:3px 8px;font-size:11px}
+.btn-primary{background:var(--text);color:var(--bg);border-color:var(--text)}.btn-primary:hover{opacity:.85;background:var(--text)}
+.btn-pdf{background:var(--green);color:#fff;border-color:var(--green)}.btn-pdf:hover{opacity:.85;background:var(--green)}
+.btn-danger{color:var(--red);border-color:rgba(226,75,74,.3)}.btn-danger:hover{background:var(--red-bg)}
+.btn-purple{background:var(--purple);color:#fff;border-color:var(--purple)}.btn-purple:hover{opacity:.85;background:var(--purple)}
+.btns{display:flex;gap:6px;flex-wrap:wrap}
+.add-bar{background:var(--bg2);border-radius:var(--radius-lg);padding:1rem;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:1rem}
+.add-bar input,.add-bar select{padding:6px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)}
+.add-bar input{width:140px}.add-bar input.wide{width:180px}.add-bar select{width:115px}
+.grid-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1rem}
+.grid-scroll{overflow-x:auto}
+.plan-grid{border-collapse:collapse;width:100%;min-width:780px;font-size:13px}
+.plan-grid th{padding:9px 10px;font-weight:500;font-size:12px;color:var(--text2);white-space:nowrap;border-bottom:0.5px solid var(--border);background:var(--bg2);text-align:center}
+.plan-grid th.left{text-align:left}
+.plan-grid td{padding:7px 10px;border-bottom:0.5px solid var(--border);vertical-align:middle;background:var(--bg)}
+.plan-grid tbody tr:last-child td{border-bottom:none}
+.plan-grid tbody tr:hover td{background:var(--bg2)}
+.plan-grid td.day-cell{text-align:center;padding:4px 6px}
+.plan-grid td.total-cell{font-weight:600;text-align:center;background:var(--bg2)}
+.day-input{width:64px;padding:4px 6px;font-size:13px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text);text-align:center}
+.day-input:focus{border-color:var(--border2);outline:none}
+.day-input.has-val{background:var(--bg2);font-weight:500}
+.prod-input{width:100%;padding:4px 6px;font-size:13px;border:0.5px solid transparent;border-radius:var(--radius);background:transparent;color:var(--text)}
+.prod-input:focus{border-color:var(--border2);background:var(--bg);outline:none}
+.area-tag{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.area-sep td{border-top:2px solid var(--border2)!important}
+.today-col{background:var(--today-bg)!important}
+.today-head{color:var(--blue)!important;background:var(--today-head)!important}
+.totals-row td{background:var(--bg2)!important;font-weight:600;font-size:12px;color:var(--text2);border-top:2px solid var(--border2)!important}
+.totals-row td.grand{font-weight:700;color:var(--text);font-size:13px}
+.metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:1.25rem}
+.metric{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem}
+.metric-label{font-size:12px;color:var(--text2);margin-bottom:4px}
+.metric-val{font-size:22px;font-weight:600}
+.good{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-ok{background:var(--green-bg);color:#0F6E56}
+.badge-warn{background:var(--amber-bg);color:#854F0B}
+.badge-bad{background:var(--red-bg);color:#A32D2D}
+.alert{padding:10px 15px;border-radius:var(--radius);font-size:13px;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
+.alert-ok{background:var(--green-bg);color:#0F6E56;border:0.5px solid #9FE1CB}
+.alert-info{background:var(--blue-bg);color:#185FA5;border:0.5px solid #B5D4F4}
+.alert-err{background:var(--red-bg);color:#A32D2D;border:0.5px solid #F09595}
+.real-sel{display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap}
+.real-sel label{font-size:13px;color:var(--text2)}
+.real-sel select,.real-sel input[type=date]{padding:6px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)}
+.chart-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1rem}
+.chart-wrap{position:relative;width:100%;height:280px}
+.spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
+.spinner-dark{border-color:rgba(0,0,0,.15);border-top-color:var(--text2)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:3rem;color:var(--text2);font-size:14px}
+.empty i{font-size:32px;display:block;margin-bottom:10px;color:var(--text3)}
+.sel-inline{width:100%;padding:3px 5px;font-size:12px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)}
+.loading-overlay{position:absolute;inset:0;background:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;border-radius:var(--radius-lg);z-index:10;font-size:13px;color:var(--text2);gap:8px}
+@media(prefers-color-scheme:dark){.loading-overlay{background:rgba(28,28,27,.75)}}
+
+/* RECETAS */
+.receta-prod-list{display:flex;flex-direction:column;gap:1px;border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1rem}
+.receta-prod-row{background:var(--bg);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:background .1s;gap:8px}
+.receta-prod-row:hover{background:var(--bg2)}
+.receta-prod-row.active{background:var(--blue-bg)}
+.receta-prod-name{font-size:13px;font-weight:500}
+.receta-prod-meta{font-size:12px;color:var(--text2)}
+.receta-detail{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1rem}
+.receta-title{font-size:15px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
+.ingr-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:1rem}
+.ingr-table th{text-align:left;padding:7px 10px;font-size:12px;font-weight:500;color:var(--text2);border-bottom:0.5px solid var(--border);background:var(--bg)}
+.ingr-table td{padding:7px 10px;border-bottom:0.5px solid var(--border);background:var(--bg)}
+.ingr-table tbody tr:last-child td{border-bottom:none}
+.ingr-table input{padding:4px 7px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:100%}
+.add-ingr-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.add-ingr-bar input,.add-ingr-bar select{padding:5px 9px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)}
+.add-ingr-bar input{width:160px}.add-ingr-bar input.num{width:90px}.add-ingr-bar select{width:100px}
+
+/* CONSUMO */
+.consumo-header{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:1.5rem;padding:1rem;background:var(--bg2);border-radius:var(--radius-lg)}
+.consumo-header label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px}
+.consumo-header select,.consumo-header input[type=date]{padding:7px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)}
+.consumo-table{width:100%;border-collapse:collapse;font-size:13px}
+.consumo-table th{text-align:left;padding:9px 12px;font-size:12px;font-weight:500;color:var(--text2);border-bottom:0.5px solid var(--border);background:var(--bg2);white-space:nowrap}
+.consumo-table th.right{text-align:right}
+.consumo-table td{padding:9px 12px;border-bottom:0.5px solid var(--border);background:var(--bg);vertical-align:middle}
+.consumo-table tbody tr:last-child td{border-bottom:none}
+.consumo-table tr:hover td{background:var(--bg2)}
+.consumo-table td.right{text-align:right;font-weight:600}
+.consumo-table td.muted{color:var(--text2);font-size:12px}
+.ingr-chip{display:inline-block;padding:2px 8px;background:var(--purple-bg);color:var(--purple);border-radius:20px;font-size:11px;font-weight:600}
+.prod-breakdown{font-size:12px;color:var(--text2);margin-top:4px}
+.bar-bg{width:100%;height:6px;background:var(--bg2);border-radius:3px;overflow:hidden;margin-top:4px}
+.bar-fill{height:100%;border-radius:3px;background:var(--purple);transition:width .4s}
+.section-subtitle{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:10px;padding-bottom:6px;border-bottom:0.5px solid var(--border)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <i class="ti ti-building-factory-2"></i>
+    <span>Plan de Producción</span>
+    <span class="sub">— Control Semanal</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <div class="status-label"><span class="status-dot" id="status-dot"></span><span id="status-text">Conectando...</span></div>
+    <div style="font-size:12px;color:var(--text2)" id="header-date"></div>
+  </div>
+</header>
+
+<div class="main">
+ <div class="app-card">
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('plan')"><i class="ti ti-calendar"></i> Planificación</button>
+    <button class="tab" onclick="showTab('real')"><i class="ti ti-clipboard-list"></i> Producción real</button>
+    <button class="tab" onclick="showTab('compare')"><i class="ti ti-chart-bar"></i> Comparación</button>
+    <button class="tab" onclick="showTab('recetas')"><i class="ti ti-notebook"></i> Recetas</button>
+    <button class="tab" onclick="showTab('consumo')"><i class="ti ti-package"></i> Consumo MP</button>
+  </div>
+  <div class="pad">
+
+    <!-- PLANIFICACIÓN -->
+    <div id="tab-plan" class="section active">
+      <div class="toolbar">
+        <div class="week-nav">
+          <button class="btn btn-sm" onclick="changeWeek(-1)"><i class="ti ti-chevron-left"></i></button>
+          <span class="week-label" id="plan-week-label"></span>
+          <button class="btn btn-sm" onclick="changeWeek(1)"><i class="ti ti-chevron-right"></i></button>
+        </div>
+        <div class="btns">
+          <button class="btn btn-pdf" id="btn-pdf" onclick="generatePDF()"><i class="ti ti-file-type-pdf"></i> Exportar PDF</button>
+          <button class="btn btn-primary" id="btn-save-plan" onclick="savePlan()"><i class="ti ti-device-floppy"></i> Guardar plan</button>
+        </div>
+      </div>
+      <div class="add-bar">
+        <input type="text" id="new-area" placeholder="Área" list="areas-dl"/>
+        <datalist id="areas-dl"></datalist>
+        <input class="wide" type="text" id="new-prod" placeholder="Producto / tarea" list="prods-dl"/>
+        <datalist id="prods-dl"></datalist>
+        <select id="new-unit"><option>unidades</option><option>kg</option><option>litros</option><option>cajas</option><option>metros</option><option>horas</option><option>lotes</option><option>pallets</option><option>camiones</option></select>
+        <button class="btn btn-primary" onclick="addRow()"><i class="ti ti-plus"></i> Agregar producto</button>
+      </div>
+      <div style="position:relative">
+        <div class="grid-card"><div class="grid-scroll" id="grid-wrap"></div></div>
+        <div id="plan-loading" class="loading-overlay" style="display:none"><span class="spinner spinner-dark"></span> Cargando...</div>
+      </div>
+      <div id="plan-msg" style="display:none" class="alert alert-ok"><i class="ti ti-check"></i> Plan guardado.</div>
+      <div id="plan-err" style="display:none" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="plan-err-txt"></span></div>
+      <div id="pdf-msg" style="display:none" class="alert alert-info"></div>
+    </div>
+
+    <!-- PRODUCCIÓN REAL -->
+    <div id="tab-real" class="section">
+      <div class="real-sel">
+        <label>Semana:</label>
+        <select id="real-week-sel" onchange="loadAndRenderReal()"></select>
+      </div>
+      <div id="real-no-plan" class="alert alert-info" style="display:none"><i class="ti ti-info-circle"></i> No hay plan guardado para esta semana.</div>
+      <div style="position:relative">
+        <div class="grid-card" id="real-card" style="display:none"><div class="grid-scroll" id="real-grid-wrap"></div></div>
+        <div id="real-loading" class="loading-overlay" style="display:none"><span class="spinner spinner-dark"></span> Cargando...</div>
+      </div>
+      <div id="real-actions" style="display:none;justify-content:flex-end;gap:8px;margin-top:8px">
+        <button class="btn btn-primary" id="btn-save-real" onclick="saveReal()"><i class="ti ti-device-floppy"></i> Guardar producción</button>
+      </div>
+      <div id="real-msg" style="display:none;margin-top:8px" class="alert alert-ok"><i class="ti ti-check"></i> Producción guardada.</div>
+      <div id="real-err" style="display:none;margin-top:8px" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="real-err-txt"></span></div>
+    </div>
+
+    <!-- COMPARACIÓN -->
+    <div id="tab-compare" class="section">
+      <div class="real-sel">
+        <label>Semana:</label>
+        <select id="cmp-week-sel" onchange="loadAndRenderCompare()"></select>
+      </div>
+      <div id="compare-content"></div>
+    </div>
+
+    <!-- RECETAS -->
+    <div id="tab-recetas" class="section">
+      <div class="toolbar">
+        <div>
+          <div style="font-size:16px;font-weight:600">Recetas de productos</div>
+          <div style="font-size:13px;color:var(--text2);margin-top:2px">Definí los ingredientes por unidad producida</div>
+        </div>
+        <button class="btn btn-primary" id="btn-save-recetas" onclick="saveRecetas()"><i class="ti ti-device-floppy"></i> Guardar recetas</button>
+      </div>
+      <div style="display:grid;grid-template-columns:280px 1fr;gap:1.5rem;align-items:start">
+        <div>
+          <div class="section-subtitle">Productos del plan</div>
+          <div id="receta-prod-list"><div class="empty"><i class="ti ti-package-off"></i>Guardá primero un plan con productos.</div></div>
+        </div>
+        <div id="receta-detail-wrap">
+          <div class="empty"><i class="ti ti-arrow-left"></i>Seleccioná un producto para editar su receta.</div>
+        </div>
+      </div>
+      <div id="recetas-msg" style="display:none" class="alert alert-ok"><i class="ti ti-check"></i> Recetas guardadas.</div>
+    </div>
+
+    <!-- CONSUMO MP -->
+    <div id="tab-consumo" class="section">
+      <div style="font-size:16px;font-weight:600;margin-bottom:4px">Consumo de materias primas</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:1.5rem">Calculado automáticamente a partir del plan y las recetas</div>
+      <div class="consumo-header">
+        <div>
+          <label>Modo</label>
+          <select id="consumo-modo" onchange="renderConsumo()">
+            <option value="semana">Por semana</option>
+            <option value="rango">Rango de fechas</option>
+          </select>
+        </div>
+        <div id="consumo-semana-wrap">
+          <label>Semana</label>
+          <select id="consumo-week-sel" onchange="renderConsumo()"></select>
+        </div>
+        <div id="consumo-rango-wrap" style="display:none;gap:8px;align-items:flex-end">
+          <div><label>Desde</label><input type="date" id="consumo-desde" onchange="renderConsumo()"/></div>
+          <div><label>Hasta</label><input type="date" id="consumo-hasta" onchange="renderConsumo()"/></div>
+        </div>
+        <div>
+          <label>Filtrar ingrediente</label>
+          <input type="text" id="consumo-filtro" placeholder="Buscar..." onInput="renderConsumo()" style="padding:7px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:180px"/>
+        </div>
+      </div>
+      <div id="consumo-content"></div>
+    </div>
+
+  </div>
+ </div>
+</div>
+
+<script>
+// ── SUPABASE ────────────────────────────────────────────────────
+const SB_URL='https://ugmjfvgjumpnvbfskcgl.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnbWpmdmdqdW1wbnZiZnNrY2dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MjU4OTIsImV4cCI6MjA5NDEwMTg5Mn0.fmf7Isp5rDi10mq0VjahWRCgl6J4mD8-ib89DKWtPLs';
+const HDR={'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY};
+
+async function sbGet(table,filter=''){
+  const r=await fetch(`${SB_URL}/rest/v1/${table}?${filter}`,{headers:HDR});
+  if(!r.ok)throw new Error(await r.text());
+  return r.json();
+}
+async function sbUpsert(table,data){
+  const r=await fetch(`${SB_URL}/rest/v1/${table}`,{
+    method:'POST',
+    headers:{...HDR,'Prefer':'resolution=merge-duplicates,return=minimal'},
+    body:JSON.stringify(data)
+  });
+  if(!r.ok)throw new Error(await r.text());
+}
+
+// ── CONSTANTES ──────────────────────────────────────────────────
+const DAYS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+const UNITS=['unidades','kg','litros','cajas','metros','horas','lotes','pallets','camiones'];
+const ACOLORS=['#185FA5','#0F6E56','#993C1D','#993556','#854F0B','#3B6D11','#534AB7','#5F5E5A'];
+const ABGS=['#E6F1FB','#E1F5EE','#FAECE7','#FBEAF0','#FAEEDA','#EAF3DE','#EEEDFE','#F1EFE8'];
+
+// ── UTILS ───────────────────────────────────────────────────────
+function weekKey(d){const dt=new Date(d);dt.setHours(0,0,0,0);dt.setDate(dt.getDate()-((dt.getDay()+6)%7));return dt.toISOString().slice(0,10)}
+function weekLabel(k){const d=new Date(k+'T00:00:00');const e=new Date(d);e.setDate(e.getDate()+6);const f=x=>x.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'});return`Sem ${weekNum(d)} — ${f(d)} al ${f(e)} ${d.getFullYear()}`}
+function weekNum(d){const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const dn=dt.getUTCDay()||7;dt.setUTCDate(dt.getUTCDate()+4-dn);const ys=new Date(Date.UTC(dt.getUTCFullYear(),0,1));return Math.ceil((((dt-ys)/86400000)+1)/7)}
+function addW(k,n){const d=new Date(k+'T00:00:00');d.setDate(d.getDate()+n*7);return weekKey(d)}
+function dayDate(wk,di){const d=new Date(wk+'T00:00:00');d.setDate(d.getDate()+di);return d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'})}
+function todayCol(wk){const d=new Date();const w=new Date(wk+'T00:00:00');const diff=Math.floor((d-w)/86400000);return(diff>=0&&diff<=6)?diff:-1}
+function getAreas(rows){return[...new Set(rows.map(r=>r.area||'Sin área'))]}
+function aColor(a,areas){return ACOLORS[areas.indexOf(a)%ACOLORS.length]}
+function aBg(a,areas){return ABGS[areas.indexOf(a)%ABGS.length]}
+function fmt(n){return n>0?n.toLocaleString('es-AR'):'—'}
+function fmtNum(n){return Math.round(n*100)/100}
+function flash(id){const m=document.getElementById(id);m.style.display='flex';setTimeout(()=>m.style.display='none',3000)}
+function setStatus(s,t){document.getElementById('status-dot').className='status-dot '+s;document.getElementById('status-text').textContent=t}
+
+// ── ESTADO ──────────────────────────────────────────────────────
+const W0=weekKey(new Date());
+const st={week:W0,plans:{},reals:{},recetas:{},edit:{},semanas:[]};
+
+// ── INIT ────────────────────────────────────────────────────────
+document.getElementById('header-date').textContent=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+async function init(){
+  setStatus('saving','Conectando...');
+  try{
+    const [planes,reales,recRow]=await Promise.all([
+      sbGet('planes','select=semana&order=semana.desc'),
+      sbGet('produccion_real','select=semana&order=semana.desc'),
+      sbGet('recetas','select=datos').catch(()=>[])
+    ]);
+    const semSet=new Set([...planes.map(p=>p.semana),...reales.map(r=>r.semana),W0]);
+    st.semanas=[...semSet].sort();
+    if(recRow.length)st.recetas=recRow[0].datos||{};
+    await loadPlan(W0);
+    setStatus('online','Conectado');
+  }catch(e){
+    setStatus('error','Sin conexión');
+    console.error(e);
+  }
+  renderGrid();
+  updateProdDatalist();
+}
+
+async function loadPlan(wk){
+  if(st.plans[wk]!==undefined)return;
+  try{const d=await sbGet('planes',`semana=eq.${wk}&select=filas`);st.plans[wk]=d.length?d[0].filas:[];}
+  catch(e){st.plans[wk]=[];}
+}
+async function loadReal(wk){
+  if(st.reals[wk]!==undefined)return;
+  try{const d=await sbGet('produccion_real',`semana=eq.${wk}&select=datos`);st.reals[wk]=d.length?d[0].datos:{};}
+  catch(e){st.reals[wk]={};}
+}
+
+// ── TABS ────────────────────────────────────────────────────────
+function showTab(t){
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['plan','real','compare','recetas','consumo'][i]===t));
+  document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));
+  document.getElementById('tab-'+t).classList.add('active');
+  if(t==='real'){popSel('real-week-sel');loadAndRenderReal()}
+  if(t==='compare'){popSel('cmp-week-sel');loadAndRenderCompare()}
+  if(t==='recetas')renderRecetas()
+  if(t==='consumo'){popSelConsumo();renderConsumo()}
+}
+function popSel(id){
+  const sel=document.getElementById(id);const cur=sel.value||st.week;
+  const weeks=new Set([...st.semanas,st.week]);
+  sel.innerHTML='';[...weeks].sort().reverse().forEach(w=>{const o=document.createElement('option');o.value=w;o.textContent=weekLabel(w);sel.appendChild(o)});
+  sel.value=cur;
+}
+function popSelConsumo(){
+  popSel('consumo-week-sel');
+  // set default dates = current week
+  const d1=new Date(st.week+'T00:00:00');
+  const d2=new Date(d1);d2.setDate(d2.getDate()+6);
+  document.getElementById('consumo-desde').value=st.week;
+  document.getElementById('consumo-hasta').value=d2.toISOString().slice(0,10);
+}
+
+// ── PLANIFICACIÓN ───────────────────────────────────────────────
+function changeWeek(n){
+  st.week=addW(st.week,n);
+  const loading=document.getElementById('plan-loading');
+  loading.style.display='flex';
+  loadPlan(st.week).then(()=>{loading.style.display='none';renderGrid()});
+}
+function getEdit(){
+  if(!st.edit[st.week])st.edit[st.week]=st.plans[st.week]?JSON.parse(JSON.stringify(st.plans[st.week])):[];
+  return st.edit[st.week];
+}
+function renderGrid(){
+  document.getElementById('plan-week-label').textContent=weekLabel(st.week);
+  const rows=getEdit();
+  const areas=getAreas(rows);
+  const dl=document.getElementById('areas-dl');dl.innerHTML='';
+  areas.forEach(a=>{const o=document.createElement('option');o.value=a;dl.appendChild(o)});
+  const wrap=document.getElementById('grid-wrap');
+  if(!rows.length){wrap.innerHTML='<div class="empty"><i class="ti ti-table-off"></i>Agregá productos arriba para comenzar.</div>';return}
+  const tc=todayCol(st.week);
+  let h=`<table class="plan-grid"><thead><tr>
+    <th class="left" style="width:110px">Área</th>
+    <th class="left" style="width:170px">Producto / tarea</th>
+    <th class="left" style="width:90px">Unidad</th>`;
+  DAYS.forEach((d,i)=>{h+=`<th class="${i===tc?'today-head':''}" style="width:76px">${d.slice(0,3)}<br><span style="font-size:10px;font-weight:400">${dayDate(st.week,i)}</span></th>`});
+  h+=`<th style="width:68px">Total</th><th style="width:38px"></th></tr></thead><tbody>`;
+  const grouped={};
+  rows.forEach((r,idx)=>{const a=r.area||'Sin área';if(!grouped[a])grouped[a]=[];grouped[a].push({...r,_i:idx})});
+  let dayT=Array(7).fill(0),grand=0;
+  Object.entries(grouped).forEach(([area,items],gi)=>{
+    const col=aColor(area,areas),bg=aBg(area,areas);
+    items.forEach((r,ri)=>{
+      const rowTotal=(r.days||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
+      grand+=rowTotal;(r.days||Array(7).fill(0)).forEach((v,di)=>{dayT[di]+=(v||0)});
+      h+=`<tr class="${ri===0&&gi>0?'area-sep':''}">`;
+      if(ri===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="area-tag" style="background:${bg};color:${col}">${area}</span></td>`;
+      h+=`<td><input class="prod-input" value="${r.producto}" onchange="upField(${r._i},'producto',this.value)"/></td>`;
+      h+=`<td><select class="sel-inline" onchange="upField(${r._i},'unidad',this.value)">${UNITS.map(u=>`<option${u===r.unidad?' selected':''}>${u}</option>`).join('')}</select></td>`;
+      for(let di=0;di<7;di++){
+        const v=(r.days&&r.days[di])||0;
+        h+=`<td class="day-cell${di===tc?' today-col':''}"><input class="day-input${v>0?' has-val':''}" type="number" min="0" value="${v||''}" placeholder="—" onchange="upDay(${r._i},${di},this.value);this.classList.toggle('has-val',this.value!='')"/></td>`;
+      }
+      h+=`<td class="total-cell">${fmt(rowTotal)}</td>`;
+      h+=`<td style="text-align:center"><button class="btn btn-sm btn-danger" onclick="removeRow(${r._i})"><i class="ti ti-trash"></i></button></td></tr>`;
+    });
+  });
+  h+=`<tr class="totals-row"><td></td><td style="padding-left:10px;font-size:12px">Total diario</td><td></td>`;
+  dayT.forEach((v,i)=>{h+=`<td class="day-cell${i===tc?' today-col':''}" style="text-align:center">${fmt(v)}</td>`});
+  h+=`<td class="day-cell grand">${fmt(grand)}</td><td></td></tr></tbody></table>`;
+  wrap.innerHTML=h;
+}
+function upField(i,f,v){getEdit()[i][f]=v}
+function upDay(i,di,v){
+  const rows=getEdit();if(!rows[i].days)rows[i].days=Array(7).fill(0);
+  rows[i].days[di]=parseFloat(v)||0;updateDayTotals();
+}
+function updateDayTotals(){
+  const rows=getEdit();const dayT=Array(7).fill(0);let grand=0;
+  rows.forEach(r=>{(r.days||[]).forEach((v,k)=>{dayT[k]+=(v||0);grand+=(v||0)})});
+  const trow=document.querySelector('.totals-row');if(!trow)return;
+  const cells=trow.querySelectorAll('td');
+  dayT.forEach((v,i)=>{if(cells[3+i])cells[3+i].textContent=fmt(v)});
+  if(cells[10])cells[10].textContent=fmt(grand);
+}
+function removeRow(i){const rows=getEdit();rows.splice(i,1);st.edit[st.week]=rows;renderGrid()}
+function addRow(){
+  const a=document.getElementById('new-area').value.trim();
+  const p=document.getElementById('new-prod').value.trim();
+  const u=document.getElementById('new-unit').value;
+  if(!a){document.getElementById('new-area').focus();return}
+  if(!p){document.getElementById('new-prod').focus();return}
+  const rows=getEdit();rows.push({area:a,producto:p,unidad:u,days:Array(7).fill(0)});
+  st.edit[st.week]=rows;
+  document.getElementById('new-prod').value='';
+  document.getElementById('new-area').value='';
+  renderGrid();
+}
+async function savePlan(){
+  const btn=document.getElementById('btn-save-plan');
+  btn.innerHTML='<span class="spinner"></span> Guardando...';btn.disabled=true;
+  setStatus('saving','Guardando...');
+  try{
+    const rows=JSON.parse(JSON.stringify(getEdit()));
+    await sbUpsert('planes',{semana:st.week,filas:rows,updated_at:new Date().toISOString()});
+    st.plans[st.week]=rows;
+    if(!st.semanas.includes(st.week))st.semanas.push(st.week);
+    updateProdDatalist();
+    setStatus('online','Guardado ✓');flash('plan-msg');
+  }catch(e){
+    setStatus('error','Error');
+    document.getElementById('plan-err-txt').textContent=e.message;flash('plan-err');
+  }
+  btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar plan';btn.disabled=false;
+}
+function updateProdDatalist(){
+  // Junta todos los productos de todos los planes cargados
+  const all=new Set();
+  Object.values(st.plans).forEach(rows=>(rows||[]).forEach(r=>r.producto&&all.add(r.producto)));
+  const dl=document.getElementById('prods-dl');if(!dl)return;
+  dl.innerHTML='';[...all].forEach(p=>{const o=document.createElement('option');o.value=p;dl.appendChild(o)});
+}
+
+// ── PRODUCCIÓN REAL ─────────────────────────────────────────────
+async function loadAndRenderReal(){
+  const wk=document.getElementById('real-week-sel').value;if(!wk)return;
+  document.getElementById('real-loading').style.display='flex';
+  await loadPlan(wk);await loadReal(wk);
+  document.getElementById('real-loading').style.display='none';
+  renderReal();
+}
+function renderReal(){
+  const wk=document.getElementById('real-week-sel').value;if(!wk)return;
+  const plan=st.plans[wk];
+  const noplan=document.getElementById('real-no-plan');
+  const card=document.getElementById('real-card');
+  const actions=document.getElementById('real-actions');
+  if(!plan||!plan.length){noplan.style.display='flex';card.style.display='none';actions.style.display='none';return}
+  noplan.style.display='none';card.style.display='block';actions.style.display='flex';
+  const real=st.reals[wk]||{};
+  const areas=getAreas(plan);
+  const tc=todayCol(wk);
+  let h=`<div style="overflow-x:auto"><table class="plan-grid"><thead><tr>
+    <th class="left" style="width:110px">Área</th><th class="left" style="width:160px">Producto</th><th class="left" style="width:80px">Unidad</th>`;
+  DAYS.forEach((d,i)=>{h+=`<th class="${i===tc?'today-head':''}" colspan="2" style="text-align:center;font-size:11px">${d.slice(0,3)} ${dayDate(wk,i)}</th>`});
+  h+=`<th style="width:65px">Plan</th><th style="width:65px">Real</th></tr>
+  <tr style="background:var(--bg2)"><th></th><th></th><th></th>`;
+  DAYS.forEach((_,i)=>{
+    h+=`<th style="font-size:10px;font-weight:400;color:var(--text2);text-align:center;padding:3px${i===tc?';background:var(--today-head)':''}">Plan</th>`;
+    h+=`<th style="font-size:10px;font-weight:400;color:var(--green);text-align:center;padding:3px${i===tc?';background:var(--today-head)':''}">Real</th>`;
+  });
+  h+=`<th></th><th></th></tr></thead><tbody>`;
+  const grouped={};
+  plan.forEach((r,idx)=>{const a=r.area||'Sin área';if(!grouped[a])grouped[a]=[];grouped[a].push({...r,_i:idx})});
+  Object.entries(grouped).forEach(([area,items],gi)=>{
+    const col=aColor(area,areas),bg=aBg(area,areas);
+    items.forEach((r,ri)=>{
+      const rdays=real[r._i]||Array(7).fill(0);
+      const tp=(r.days||[]).reduce((a,b)=>a+(b||0),0);
+      const tr2=rdays.reduce((a,b)=>a+(b||0),0);
+      h+=`<tr class="${ri===0&&gi>0?'area-sep':''}">`;
+      if(ri===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="area-tag" style="background:${bg};color:${col}">${area}</span></td>`;
+      h+=`<td style="font-weight:500">${r.producto}</td><td style="font-size:12px;color:var(--text2)">${r.unidad}</td>`;
+      for(let di=0;di<7;di++){
+        const pv=(r.days&&r.days[di])||0;
+        const rv=(real[r._i]&&real[r._i][di])||0;
+        h+=`<td class="day-cell${di===tc?' today-col':''}" style="font-size:12px;color:var(--text2)">${pv>0?pv:'—'}</td>`;
+        h+=`<td class="day-cell${di===tc?' today-col':''}"><input class="day-input${rv>0?' has-val':''}" type="number" min="0" value="${rv||''}" placeholder="—" onchange="upReal('${wk}',${r._i},${di},this.value);this.classList.toggle('has-val',this.value!='')" style="border-color:rgba(29,158,117,.3)"/></td>`;
+      }
+      h+=`<td class="total-cell" style="font-size:12px">${fmt(tp)}</td>`;
+      h+=`<td class="total-cell" style="color:var(--green)">${fmt(tr2)}</td></tr>`;
+    });
+  });
+  h+=`</tbody></table></div>`;
+  document.getElementById('real-grid-wrap').innerHTML=h;
+}
+function upReal(wk,i,di,v){
+  if(!st.reals[wk])st.reals[wk]={};
+  if(!st.reals[wk][i])st.reals[wk][i]=Array(7).fill(0);
+  st.reals[wk][i][di]=parseFloat(v)||0;
+}
+async function saveReal(){
+  const wk=document.getElementById('real-week-sel').value;
+  const btn=document.getElementById('btn-save-real');
+  btn.innerHTML='<span class="spinner"></span> Guardando...';btn.disabled=true;
+  setStatus('saving','Guardando...');
+  try{
+    await sbUpsert('produccion_real',{semana:wk,datos:JSON.parse(JSON.stringify(st.reals[wk]||{})),updated_at:new Date().toISOString()});
+    if(!st.semanas.includes(wk))st.semanas.push(wk);
+    setStatus('online','Guardado ✓');flash('real-msg');
+  }catch(e){
+    setStatus('error','Error');
+    document.getElementById('real-err-txt').textContent=e.message;flash('real-err');
+  }
+  btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar producción';btn.disabled=false;
+}
+
+// ── COMPARACIÓN ─────────────────────────────────────────────────
+async function loadAndRenderCompare(){
+  const wk=document.getElementById('cmp-week-sel').value;if(!wk)return;
+  document.getElementById('compare-content').innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
+  await loadPlan(wk);await loadReal(wk);renderCompare();
+}
+let cChart=null;
+function renderCompare(){
+  const wk=document.getElementById('cmp-week-sel').value;
+  const el=document.getElementById('compare-content');
+  if(!wk){el.innerHTML='';return}
+  const plan=st.plans[wk];
+  if(!plan||!plan.length){el.innerHTML='<div class="alert alert-info"><i class="ti ti-info-circle"></i> No hay plan para esta semana.</div>';return}
+  const real=st.reals[wk]||{};
+  const areas=getAreas(plan);
+  let tp=0,tr2=0,cumple=0;
+  plan.forEach((r,i)=>{const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);const rv=(real[i]||[]).reduce((a,b)=>a+(b||0),0);tp+=pv;tr2+=rv;if(rv>=pv&&pv>0)cumple++});
+  const pct=tp>0?Math.round(tr2/tp*100):0;
+  const cls=pct>=90?'good':pct>=70?'warn':'bad';
+  const conPlan=plan.filter(r=>(r.days||[]).some(v=>v>0)).length;
+  let html=`<div class="metric-grid">
+    <div class="metric"><div class="metric-label">Cumplimiento global</div><div class="metric-val ${cls}">${pct}%</div></div>
+    <div class="metric"><div class="metric-label">Total planificado</div><div class="metric-val">${tp.toLocaleString('es-AR')}</div></div>
+    <div class="metric"><div class="metric-label">Total producido</div><div class="metric-val">${tr2.toLocaleString('es-AR')}</div></div>
+    <div class="metric"><div class="metric-label">Ítems cumplidos</div><div class="metric-val">${cumple}/${conPlan}</div></div>
+  </div>`;
+  const tc=todayCol(wk);
+  html+=`<div class="grid-card"><div style="overflow-x:auto"><table class="plan-grid"><thead><tr>
+    <th class="left" style="width:110px">Área</th><th class="left" style="width:160px">Producto</th>`;
+  DAYS.forEach((d,i)=>{html+=`<th class="${i===tc?'today-head':''}" colspan="2" style="font-size:11px">${d.slice(0,3)}</th>`});
+  html+=`<th>Plan</th><th>Real</th><th style="width:50px">%</th><th style="width:72px">Estado</th></tr>
+  <tr style="background:var(--bg2)"><th></th><th></th>`;
+  DAYS.forEach((_,i)=>{
+    html+=`<th style="font-size:10px;font-weight:400;color:var(--text2);text-align:center;padding:3px${i===tc?';background:var(--today-head)':''}">P</th>`;
+    html+=`<th style="font-size:10px;font-weight:400;color:var(--green);text-align:center;padding:3px${i===tc?';background:var(--today-head)':''}">R</th>`;
+  });
+  html+=`<th></th><th></th><th></th><th></th></tr></thead><tbody>`;
+  const grouped={};
+  plan.forEach((r,idx)=>{const a=r.area||'Sin área';if(!grouped[a])grouped[a]=[];grouped[a].push({...r,_i:idx})});
+  Object.entries(grouped).forEach(([area,items],gi)=>{
+    const col=aColor(area,areas),bg=aBg(area,areas);
+    items.forEach((r,ri)=>{
+      const tp2=(r.days||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
+      const tr3=(real[r._i]||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
+      const p=tp2>0?Math.round(tr3/tp2*100):0;
+      const badge=p>=90?'<span class="badge badge-ok">OK</span>':p>=70?'<span class="badge badge-warn">Parcial</span>':'<span class="badge badge-bad">Bajo</span>';
+      html+=`<tr class="${ri===0&&gi>0?'area-sep':''}">`;
+      if(ri===0)html+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="area-tag" style="background:${bg};color:${col}">${area}</span></td>`;
+      html+=`<td style="font-weight:500;font-size:12px">${r.producto}</td>`;
+      for(let di=0;di<7;di++){
+        const pv=(r.days&&r.days[di])||0;const rv=(real[r._i]&&real[r._i][di])||0;
+        const ok=pv>0&&rv>=pv,low=pv>0&&rv>0&&rv<pv,zero=pv>0&&rv===0;
+        const cbg=ok?'rgba(29,158,117,.1)':low?'rgba(186,117,23,.1)':zero?'rgba(226,75,74,.07)':'';
+        html+=`<td class="day-cell${di===tc?' today-col':''}" style="font-size:11px;color:var(--text2)">${pv>0?pv:'—'}</td>`;
+        html+=`<td class="day-cell${di===tc?' today-col':''}" style="font-size:11px;font-weight:${rv>0?'600':'400'};color:${ok?'var(--green)':low?'var(--amber)':zero&&pv>0?'var(--red)':'var(--text2)'};background:${cbg}">${rv>0?rv:'—'}</td>`;
+      }
+      html+=`<td class="total-cell" style="font-size:12px">${fmt(tp2)}</td><td class="total-cell" style="color:var(--green);font-size:12px">${fmt(tr3)}</td>`;
+      html+=`<td style="text-align:center;font-size:12px;font-weight:600">${tp2>0?p+'%':'—'}</td><td>${tp2>0?badge:'—'}</td></tr>`;
+    });
+  });
+  html+=`</tbody></table></div></div>`;
+  const areaStats=[];
+  Object.entries(grouped).forEach(([area,items])=>{
+    let ap=0,ar=0;items.forEach(r=>{ap+=(r.days||[]).reduce((a,b)=>a+(b||0),0);ar+=(real[r._i]||[]).reduce((a,b)=>a+(b||0),0)});
+    areaStats.push({area,ap,ar});
+  });
+  html+=`<div class="chart-card"><div class="chart-wrap"><canvas id="cmpChart" role="img" aria-label="Plan vs real por área">Datos.</canvas></div>
+    <div style="display:flex;gap:16px;margin-top:12px;font-size:12px;color:var(--text2);justify-content:center">
+      <span><span style="width:10px;height:10px;border-radius:2px;background:#378ADD;display:inline-block;margin-right:4px"></span>Planificado</span>
+      <span><span style="width:10px;height:10px;border-radius:2px;background:#1D9E75;display:inline-block;margin-right:4px"></span>Real</span>
+    </div></div>`;
+  el.innerHTML=html;
+  if(cChart){cChart.destroy();cChart=null}
+  setTimeout(()=>{
+    const isDark=matchMedia('(prefers-color-scheme: dark)').matches;const tc2=isDark?'#ccc':'#555';
+    cChart=new Chart(document.getElementById('cmpChart'),{type:'bar',
+      data:{labels:areaStats.map(s=>s.area),datasets:[
+        {label:'Planificado',data:areaStats.map(s=>s.ap),backgroundColor:'#B5D4F4',borderColor:'#378ADD',borderWidth:1.5},
+        {label:'Real',data:areaStats.map(s=>s.ar),backgroundColor:'#9FE1CB',borderColor:'#1D9E75',borderWidth:1.5}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{x:{ticks:{color:tc2,font:{size:12}},grid:{display:false}},y:{ticks:{color:tc2},grid:{color:isDark?'rgba(255,255,255,.07)':'rgba(0,0,0,.06)'}}}}
+    });
+  },100);
+}
+
+// ── RECETAS ─────────────────────────────────────────────────────
+// st.recetas = { "Galletitas Dulces": [ {ingrediente, cantidad, unidad}, ... ], ... }
+let activeRecProd=null;
+
+function getAllProducts(){
+  const all=new Set();
+  Object.values(st.plans).forEach(rows=>(rows||[]).forEach(r=>r.producto&&all.add(r.producto)));
+  // también los que ya tienen receta cargada
+  Object.keys(st.recetas).forEach(p=>all.add(p));
+  return [...all].sort();
+}
+
+function renderRecetas(){
+  const prods=getAllProducts();
+  const list=document.getElementById('receta-prod-list');
+  if(!prods.length){list.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Guardá primero un plan con productos.</div>';return}
+  let h='';
+  prods.forEach(p=>{
+    const ingrs=st.recetas[p]||[];
+    const active=p===activeRecProd;
+    h+=`<div class="receta-prod-row${active?' active':''}" onclick="selectRecProd('${p.replace(/'/g,"\\'")}')">
+      <div>
+        <div class="receta-prod-name">${p}</div>
+        <div class="receta-prod-meta">${ingrs.length?ingrs.length+' ingrediente'+(ingrs.length!==1?'s':''):'Sin receta'}</div>
+      </div>
+      <i class="ti ti-chevron-right" style="color:var(--text3);font-size:14px"></i>
+    </div>`;
+  });
+  list.innerHTML=h;
+  if(activeRecProd)renderRecetaDetail(activeRecProd);
+}
+
+function selectRecProd(p){
+  activeRecProd=p;
+  renderRecetas();
+}
+
+function renderRecetaDetail(p){
+  const ingrs=st.recetas[p]||[];
+  const wrap=document.getElementById('receta-detail-wrap');
+  let h=`<div class="receta-detail">
+    <div class="receta-title"><i class="ti ti-notebook" style="color:var(--purple)"></i>${p}</div>
+    <table class="ingr-table">
+      <thead><tr><th>Ingrediente / Materia prima</th><th style="width:110px">Cantidad por unidad</th><th style="width:100px">Unidad</th><th style="width:40px"></th></tr></thead>
+      <tbody id="ingr-tbody-${CSS.escape(p)}">`;
+  ingrs.forEach((ing,i)=>{
+    h+=`<tr>
+      <td><input value="${ing.ingrediente}" onchange="upIngr('${p.replace(/'/g,"\\'")}',${i},'ingrediente',this.value)" list="ingr-dl"/></td>
+      <td><input type="number" min="0" step="0.001" value="${ing.cantidad}" onchange="upIngr('${p.replace(/'/g,"\\'")}',${i},'cantidad',this.value)" style="width:100px;text-align:right"/></td>
+      <td><select onchange="upIngr('${p.replace(/'/g,"\\'")}',${i},'unidad',this.value)" style="width:100%">
+        ${['kg','g','litros','ml','unidades','cajas','sobres','latas','bolsas','metros'].map(u=>`<option${u===ing.unidad?' selected':''}>${u}</option>`).join('')}
+      </select></td>
+      <td><button class="btn btn-xs btn-danger" onclick="removeIngr('${p.replace(/'/g,"\\'")}',${i})"><i class="ti ti-trash"></i></button></td>
+    </tr>`;
+  });
+  h+=`</tbody></table>
+    <datalist id="ingr-dl"></datalist>
+    <div class="add-ingr-bar">
+      <input type="text" id="new-ingr-name-${CSS.escape(p)}" placeholder="Ingrediente" class="wide" list="ingr-dl"/>
+      <input type="number" min="0" step="0.001" id="new-ingr-qty-${CSS.escape(p)}" placeholder="Cantidad" class="num"/>
+      <select id="new-ingr-unit-${CSS.escape(p)}">
+        ${['kg','g','litros','ml','unidades','cajas','sobres','latas','bolsas','metros'].map(u=>`<option>${u}</option>`).join('')}
+      </select>
+      <button class="btn btn-primary btn-sm" onclick="addIngr('${p.replace(/'/g,"\\'")}')"><i class="ti ti-plus"></i> Agregar</button>
+    </div>
+  </div>`;
+  wrap.innerHTML=h;
+  // populate ingr datalist con ingredientes ya usados
+  const allIngr=new Set();
+  Object.values(st.recetas).forEach(arr=>arr.forEach(i=>allIngr.add(i.ingrediente)));
+  const dl=document.getElementById('ingr-dl');
+  [...allIngr].forEach(i=>{const o=document.createElement('option');o.value=i;dl.appendChild(o)});
+}
+
+function upIngr(prod,i,field,val){
+  if(!st.recetas[prod])st.recetas[prod]=[];
+  st.recetas[prod][i][field]=field==='cantidad'?parseFloat(val)||0:val;
+}
+function removeIngr(prod,i){
+  st.recetas[prod].splice(i,1);
+  renderRecetaDetail(prod);
+  renderRecetas();
+}
+function addIngr(prod){
+  const esc=CSS.escape(prod);
+  const name=document.getElementById(`new-ingr-name-${esc}`).value.trim();
+  const qty=parseFloat(document.getElementById(`new-ingr-qty-${esc}`).value)||0;
+  const unit=document.getElementById(`new-ingr-unit-${esc}`).value;
+  if(!name)return;
+  if(!st.recetas[prod])st.recetas[prod]=[];
+  st.recetas[prod].push({ingrediente:name,cantidad:qty,unidad:unit});
+  renderRecetaDetail(prod);
+  renderRecetas();
+}
+async function saveRecetas(){
+  const btn=document.getElementById('btn-save-recetas');
+  btn.innerHTML='<span class="spinner"></span> Guardando...';btn.disabled=true;
+  setStatus('saving','Guardando...');
+  try{
+    await sbUpsert('recetas',{id:1,datos:JSON.parse(JSON.stringify(st.recetas)),updated_at:new Date().toISOString()});
+    setStatus('online','Guardado ✓');flash('recetas-msg');
+  }catch(e){
+    setStatus('error','Error');alert('Error al guardar recetas: '+e.message);
+  }
+  btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar recetas';btn.disabled=false;
+}
+
+// ── CONSUMO ──────────────────────────────────────────────────────
+document.getElementById('consumo-modo').addEventListener('change',function(){
+  document.getElementById('consumo-semana-wrap').style.display=this.value==='semana'?'block':'none';
+  document.getElementById('consumo-rango-wrap').style.display=this.value==='rango'?'flex':'none';
+  renderConsumo();
+});
+
+async function renderConsumo(){
+  const modo=document.getElementById('consumo-modo').value;
+  const el=document.getElementById('consumo-content');
+  const filtro=document.getElementById('consumo-filtro').value.trim().toLowerCase();
+
+  // Determinar qué semanas incluir
+  let semanas=[];
+  if(modo==='semana'){
+    const wk=document.getElementById('consumo-week-sel').value;
+    if(wk)semanas=[wk];
+  } else {
+    const desde=document.getElementById('consumo-desde').value;
+    const hasta=document.getElementById('consumo-hasta').value;
+    if(!desde||!hasta){el.innerHTML='<div class="alert alert-info"><i class="ti ti-info-circle"></i> Seleccioná el rango de fechas.</div>';return}
+    // incluir todas las semanas que caen dentro del rango
+    semanas=st.semanas.filter(w=>{
+      const wEnd=addW(w,1); // lunes siguiente
+      return w<=hasta&&wEnd>desde;
+    });
+    if(!semanas.length)semanas=[weekKey(new Date(desde))];
+  }
+
+  // cargar planes que falten
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Calculando...</div>';
+  await Promise.all(semanas.map(w=>loadPlan(w)));
+
+  // CALCULAR consumo: para cada semana, cada producto × total planificado × receta
+  // consumoMap: { "Harina|kg": { total, unidad, desglose:[{semana,producto,cantidad}] } }
+  const consumoMap={};
+
+  semanas.forEach(wk=>{
+    const plan=st.plans[wk]||[];
+    plan.forEach(r=>{
+      const totalProd=(r.days||[]).reduce((a,b)=>a+(b||0),0);
+      if(!totalProd)return;
+      const receta=st.recetas[r.producto]||[];
+      receta.forEach(ing=>{
+        const consumo=fmtNum(ing.cantidad*totalProd);
+        const key=ing.ingrediente+'|'+ing.unidad;
+        if(!consumoMap[key])consumoMap[key]={ingrediente:ing.ingrediente,unidad:ing.unidad,total:0,desglose:[]};
+        consumoMap[key].total=fmtNum(consumoMap[key].total+consumo);
+        consumoMap[key].desglose.push({semana:wk,producto:r.producto,totalProd,consumo});
+      });
+    });
+  });
+
+  const items=Object.values(consumoMap).filter(i=>!filtro||i.ingrediente.toLowerCase().includes(filtro));
+  items.sort((a,b)=>b.total-a.total);
+
+  if(!items.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>'+(Object.keys(consumoMap).length?'Ningún ingrediente coincide con el filtro.':'No hay recetas cargadas o el plan está vacío para este período.')+'</div>';
+    return;
+  }
+
+  const maxTotal=Math.max(...items.map(i=>i.total));
+  const periodoLabel=modo==='semana'?weekLabel(semanas[0]):`${semanas.length} semana${semanas.length!==1?'s':''} (${semanas[0]} → ${semanas[semanas.length-1]})`;
+
+  let html=`<div class="metric-grid">
+    <div class="metric"><div class="metric-label">Período</div><div style="font-size:14px;font-weight:600;margin-top:2px">${periodoLabel}</div></div>
+    <div class="metric"><div class="metric-label">Ingredientes distintos</div><div class="metric-val">${items.length}</div></div>
+    <div class="metric"><div class="metric-label">Semanas incluidas</div><div class="metric-val">${semanas.length}</div></div>
+    <div class="metric"><div class="metric-label">Productos con receta</div><div class="metric-val">${Object.keys(st.recetas).length}</div></div>
+  </div>`;
+
+  html+=`<div class="grid-card"><table class="consumo-table">
+    <thead><tr>
+      <th style="width:40px">#</th>
+      <th>Ingrediente / Materia prima</th>
+      <th class="right" style="width:130px">Total a consumir</th>
+      <th style="width:60px">Unidad</th>
+      <th>Detalle por producto</th>
+    </tr></thead><tbody>`;
+
+  items.forEach((item,idx)=>{
+    const pct=maxTotal>0?Math.round(item.total/maxTotal*100):0;
+    // agrupar desglose por producto
+    const porProd={};
+    item.desglose.forEach(d=>{
+      if(!porProd[d.producto])porProd[d.producto]={prod:d.producto,consumo:0};
+      porProd[d.producto].consumo=fmtNum(porProd[d.producto].consumo+d.consumo);
+    });
+    const detalle=Object.values(porProd).sort((a,b)=>b.consumo-a.consumo)
+      .map(d=>`<span style="margin-right:8px"><b>${d.prod}</b>: ${d.consumo.toLocaleString('es-AR')} ${item.unidad}</span>`)
+      .join('');
+    html+=`<tr>
+      <td style="color:var(--text3);font-size:12px">${idx+1}</td>
+      <td>
+        <span class="ingr-chip">${item.ingrediente}</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
+      </td>
+      <td class="right" style="font-size:16px">${item.total.toLocaleString('es-AR')}</td>
+      <td class="muted">${item.unidad}</td>
+      <td class="muted">${detalle||'—'}</td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div>`;
+  el.innerHTML=html;
+}
+
+// ── PDF ──────────────────────────────────────────────────────────
+async function generatePDF(){
+  const rows=st.edit[st.week]||st.plans[st.week]||[];
+  if(!rows.length){showPdfMsg('No hay ítems en el plan para exportar.');return}
+  const btn=document.getElementById('btn-pdf');
+  btn.innerHTML='<span class="spinner"></span> Generando...';btn.disabled=true;
+  showPdfMsg('Preparando PDF...');
+  const wk=st.week;
+  const data={semana:weekLabel(wk),dias:DAYS.map((d,i)=>d+' '+dayDate(wk,i)),filas:rows.map(r=>({area:r.area||'Sin área',producto:r.producto,unidad:r.unidad,dias:r.days||Array(7).fill(0),total:(r.days||[]).reduce((a,b)=>a+(b||0),0)}))};
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,
+        messages:[{role:'user',content:`Generá código Python completo usando reportlab para PDF de planificación semanal.
+Datos: ${JSON.stringify(data)}
+Requisitos: A4 apaisado, título "Plan de Producción Semanal" + semana, fecha, tabla Área/Producto/Unidad/${DAYS.join('/')}/Total, agrupar por área con fondo suave, fila totales, header azul oscuro #1B3A6B texto blanco, filas alternadas, pie de página. Guardar como "plan_produccion_semanal.pdf". Solo código Python, sin markdown.`}]})});
+    const d=await resp.json();
+    const code=d.content.map(b=>b.text||'').join('').replace(/```python|```/g,'').trim();
+    const blob=new Blob([code],{type:'text/plain'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download='generar_pdf.py';a.click();
+    showPdfMsg('✓ Script descargado. Ejecutá: python generar_pdf.py','ok');
+  }catch(e){showPdfMsg('Error al generar el script.')}
+  btn.innerHTML='<i class="ti ti-file-type-pdf"></i> Exportar PDF';btn.disabled=false;
+}
+function showPdfMsg(msg,type){
+  const el=document.getElementById('pdf-msg');
+  el.className='alert '+(type==='ok'?'alert-ok':'alert-info');
+  el.innerHTML=`<i class="ti ti-${type==='ok'?'check':'loader'}"></i> ${msg}`;
+  el.style.display='flex';
+  if(type==='ok')setTimeout(()=>el.style.display='none',5000);
+}
+
+// ── START ────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
