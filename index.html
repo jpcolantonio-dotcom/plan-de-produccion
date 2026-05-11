@@ -184,7 +184,8 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.
         <datalist id="areas-dl"></datalist>
         <input class="wide" type="text" id="new-prod" placeholder="Producto / tarea" list="prods-dl"/>
         <datalist id="prods-dl"></datalist>
-        <select id="new-unit"><option>unidades</option><option>kg</option><option>litros</option><option>cajas</option><option>metros</option><option>horas</option><option>lotes</option><option>pallets</option><option>camiones</option></select>
+        <input id="new-unit" list="units-dl" placeholder="Unidad" style="width:120px"/>
+        <datalist id="units-dl"></datalist>
         <button class="btn btn-primary" onclick="addRow()"><i class="ti ti-plus"></i> Agregar producto</button>
       </div>
       <div style="position:relative">
@@ -298,7 +299,7 @@ async function sbUpsert(table,data){
 
 // ── CONSTANTES ──────────────────────────────────────────────────
 const DAYS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
-const UNITS=['unidades','kg','litros','cajas','metros','horas','lotes','pallets','camiones'];
+const UNITS=['unidades','docenas','kg','g','litros','ml','cajas','metros','horas','lotes','pallets','camiones','bolsas','paquetes','atados','rollos','piezas'];
 const ACOLORS=['#185FA5','#0F6E56','#993C1D','#993556','#854F0B','#3B6D11','#534AB7','#5F5E5A'];
 const ABGS=['#E6F1FB','#E1F5EE','#FAECE7','#FBEAF0','#FAEEDA','#EAF3DE','#EEEDFE','#F1EFE8'];
 
@@ -418,7 +419,7 @@ function renderGrid(){
       h+=`<tr class="${ri===0&&gi>0?'area-sep':''}">`;
       if(ri===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="area-tag" style="background:${bg};color:${col}">${area}</span></td>`;
       h+=`<td><input class="prod-input" value="${r.producto}" onchange="upField(${r._i},'producto',this.value)"/></td>`;
-      h+=`<td><select class="sel-inline" onchange="upField(${r._i},'unidad',this.value)">${UNITS.map(u=>`<option${u===r.unidad?' selected':''}>${u}</option>`).join('')}</select></td>`;
+      h+=`<td><input class="sel-inline" value="${r.unidad}" list="units-dl" onchange="upField(${r._i},'unidad',this.value)" style="width:100%;padding:3px 5px;font-size:12px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`;
       for(let di=0;di<7;di++){
         const v=(r.days&&r.days[di])||0;
         h+=`<td class="day-cell${di===tc?' today-col':''}"><input class="day-input${v>0?' has-val':''}" type="number" min="0" value="${v||''}" placeholder="—" onchange="upDay(${r._i},${di},this.value);this.classList.toggle('has-val',this.value!='')"/></td>`;
@@ -476,11 +477,13 @@ async function savePlan(){
   btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar plan';btn.disabled=false;
 }
 function updateProdDatalist(){
-  // Junta todos los productos de todos los planes cargados
   const all=new Set();
   Object.values(st.plans).forEach(rows=>(rows||[]).forEach(r=>r.producto&&all.add(r.producto)));
-  const dl=document.getElementById('prods-dl');if(!dl)return;
-  dl.innerHTML='';[...all].forEach(p=>{const o=document.createElement('option');o.value=p;dl.appendChild(o)});
+  const dl=document.getElementById('prods-dl');if(dl){dl.innerHTML='';[...all].forEach(p=>{const o=document.createElement('option');o.value=p;dl.appendChild(o)})}
+  // unidades: fijas + las ya usadas en planes
+  const uAll=new Set(UNITS);
+  Object.values(st.plans).forEach(rows=>(rows||[]).forEach(r=>r.unidad&&uAll.add(r.unidad)));
+  const udl=document.getElementById('units-dl');if(udl){udl.innerHTML='';[...uAll].forEach(u=>{const o=document.createElement('option');o.value=u;udl.appendChild(o)})}
 }
 
 // ── PRODUCCIÓN REAL ─────────────────────────────────────────────
