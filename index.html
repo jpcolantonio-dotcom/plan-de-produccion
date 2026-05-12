@@ -2,30 +2,15 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Plan de Producción</title>
+<title>Plan de Produccion</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#fff;--bg2:#f5f5f4;--bg3:#eeede9;
-  --text:#1a1a1a;--text2:#6b6b6b;--text3:#bbb;
-  --border:rgba(0,0,0,0.10);--border2:rgba(0,0,0,0.20);
-  --radius:8px;--radius-lg:12px;
-  --green:#1D9E75;--green-bg:#E1F5EE;
-  --blue:#378ADD;--blue-bg:#E6F1FB;
-  --amber:#BA7517;--amber-bg:#FAEEDA;
-  --red:#E24B4A;--red-bg:#FCEBEB;
-  --purple:#534AB7;--purple-bg:#EEEDFE;
-  --today-bg:rgba(55,138,221,0.07);--today-head:rgba(55,138,221,0.13);
-}
-@media(prefers-color-scheme:dark){:root{
-  --bg:#1c1c1b;--bg2:#262624;--bg3:#2e2e2c;
-  --text:#f0efec;--text2:#999;--text3:#555;
-  --border:rgba(255,255,255,0.10);--border2:rgba(255,255,255,0.20);
-}}
+:root{--bg:#fff;--bg2:#f5f5f4;--bg3:#eeede9;--text:#1a1a1a;--text2:#6b6b6b;--text3:#bbb;--border:rgba(0,0,0,.10);--border2:rgba(0,0,0,.20);--radius:8px;--radius-lg:12px;--green:#1D9E75;--green-bg:#E1F5EE;--blue:#378ADD;--blue-bg:#E6F1FB;--amber:#BA7517;--amber-bg:#FAEEDA;--red:#E24B4A;--red-bg:#FCEBEB;--purple:#534AB7;--purple-bg:#EEEDFE;--today-bg:rgba(55,138,221,.07);--today-head:rgba(55,138,221,.13)}
+@media(prefers-color-scheme:dark){:root{--bg:#1c1c1b;--bg2:#262624;--bg3:#2e2e2c;--text:#f0efec;--text2:#999;--text3:#555;--border:rgba(255,255,255,.10);--border2:rgba(255,255,255,.20)}}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh}
-header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100}
+header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100}
 .logo{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .logo i{color:var(--blue);font-size:20px}
 .logo .sub{font-weight:400;font-size:13px;color:var(--text2)}
@@ -34,8 +19,8 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .status-label{font-size:12px;color:var(--text2);display:flex;align-items:center}
 .main{max-width:1350px;margin:0 auto;padding:1.5rem}
-.app-card{background:var(--bg);border-radius:var(--radius-lg);border:0.5px solid var(--border);overflow:hidden;margin-bottom:1.5rem}
-.tabs{display:flex;gap:2px;border-bottom:0.5px solid var(--border);padding:0 1rem;background:var(--bg);overflow-x:auto}
+.app-card{background:var(--bg);border-radius:var(--radius-lg);border:.5px solid var(--border);overflow:hidden;margin-bottom:1.5rem}
+.tabs{display:flex;gap:2px;border-bottom:.5px solid var(--border);padding:0 1rem;background:var(--bg);overflow-x:auto}
 .tab{padding:11px 16px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-1px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;transition:color .15s}
 .tab.active{color:var(--text);border-bottom-color:var(--text)}
 .tab:hover:not(.active){color:var(--text)}
@@ -44,7 +29,7 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.
 .toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap;gap:8px}
 .week-nav{display:flex;align-items:center;gap:8px}
 .week-label{font-size:14px;font-weight:500;min-width:240px;text-align:center}
-.btn{padding:7px 14px;font-size:13px;font-weight:500;border:0.5px solid var(--border2);border-radius:var(--radius);background:transparent;cursor:pointer;color:var(--text);display:inline-flex;align-items:center;gap:6px;transition:background .12s}
+.btn{padding:7px 14px;font-size:13px;font-weight:500;border:.5px solid var(--border2);border-radius:var(--radius);background:transparent;cursor:pointer;color:var(--text);display:inline-flex;align-items:center;gap:6px;transition:background .12s}
 .btn:hover{background:var(--bg2)}.btn:disabled{opacity:.45;cursor:not-allowed}
 .btn-sm{padding:5px 10px;font-size:12px}.btn-xs{padding:3px 8px;font-size:11px}
 .btn-primary{background:var(--text);color:var(--bg);border-color:var(--text)}.btn-primary:hover{opacity:.85;background:var(--text)}
@@ -52,22 +37,22 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.
 .btn-danger{color:var(--red);border-color:rgba(226,75,74,.3)}.btn-danger:hover{background:var(--red-bg)}
 .btns{display:flex;gap:6px;flex-wrap:wrap}
 .add-bar{background:var(--bg2);border-radius:var(--radius-lg);padding:1rem;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:1rem}
-.add-bar input,.add-bar select{padding:6px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)}
+.add-bar input,.add-bar select{padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)}
 .add-bar input{width:150px}.add-bar input.wide{width:190px}
-.grid-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1rem}
+.grid-card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1rem}
 .grid-scroll{overflow-x:auto}
 .plan-grid{border-collapse:collapse;width:100%;min-width:820px;font-size:13px}
-.plan-grid th{padding:9px 10px;font-weight:500;font-size:12px;color:var(--text2);white-space:nowrap;border-bottom:0.5px solid var(--border);background:var(--bg2);text-align:center}
+.plan-grid th{padding:9px 10px;font-weight:500;font-size:12px;color:var(--text2);white-space:nowrap;border-bottom:.5px solid var(--border);background:var(--bg2);text-align:center}
 .plan-grid th.left{text-align:left}
-.plan-grid td{padding:7px 10px;border-bottom:0.5px solid var(--border);vertical-align:middle;background:var(--bg)}
+.plan-grid td{padding:7px 10px;border-bottom:.5px solid var(--border);vertical-align:middle;background:var(--bg)}
 .plan-grid tbody tr:last-child td{border-bottom:none}
 .plan-grid tbody tr:hover td{background:var(--bg2)}
 .plan-grid td.day-cell{text-align:center;padding:4px 6px}
 .plan-grid td.total-cell{font-weight:600;text-align:center;background:var(--bg2)}
-.day-input{width:62px;padding:4px 6px;font-size:13px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text);text-align:center}
+.day-input{width:62px;padding:4px 6px;font-size:13px;border:.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text);text-align:center}
 .day-input:focus{border-color:var(--border2);outline:none}
 .day-input.has-val{background:var(--bg2);font-weight:500}
-.prod-input{width:100%;padding:4px 6px;font-size:13px;border:0.5px solid transparent;border-radius:var(--radius);background:transparent;color:var(--text)}
+.prod-input{width:100%;padding:4px 6px;font-size:13px;border:.5px solid transparent;border-radius:var(--radius);background:transparent;color:var(--text)}
 .prod-input:focus{border-color:var(--border2);background:var(--bg);outline:none}
 .area-tag{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
 .emp-tag{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
@@ -79,22 +64,20 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.
 .totals-row td{background:var(--bg2)!important;font-weight:600;font-size:12px;color:var(--text2);border-top:2px solid var(--border2)!important}
 .totals-row td.grand{font-weight:700;color:var(--text);font-size:13px}
 .metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:1.25rem}
-.metric{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem}
+.metric{background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem}
 .metric-label{font-size:12px;color:var(--text2);margin-bottom:4px}
 .metric-val{font-size:22px;font-weight:600}
 .good{color:var(--green)}.warn{color:var(--amber)}.bad{color:var(--red)}
 .badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
-.badge-ok{background:var(--green-bg);color:#0F6E56}
-.badge-warn{background:var(--amber-bg);color:#854F0B}
-.badge-bad{background:var(--red-bg);color:#A32D2D}
+.badge-ok{background:var(--green-bg);color:#0F6E56}.badge-warn{background:var(--amber-bg);color:#854F0B}.badge-bad{background:var(--red-bg);color:#A32D2D}
 .alert{padding:10px 15px;border-radius:var(--radius);font-size:13px;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
-.alert-ok{background:var(--green-bg);color:#0F6E56;border:0.5px solid #9FE1CB}
-.alert-info{background:var(--blue-bg);color:#185FA5;border:0.5px solid #B5D4F4}
-.alert-err{background:var(--red-bg);color:#A32D2D;border:0.5px solid #F09595}
+.alert-ok{background:var(--green-bg);color:#0F6E56;border:.5px solid #9FE1CB}
+.alert-info{background:var(--blue-bg);color:#185FA5;border:.5px solid #B5D4F4}
+.alert-err{background:var(--red-bg);color:#A32D2D;border:.5px solid #F09595}
 .real-sel{display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap}
 .real-sel label{font-size:13px;color:var(--text2)}
-.real-sel select,.real-sel input[type=date]{padding:6px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)}
-.chart-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1rem}
+.real-sel select,.real-sel input[type=date]{padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)}
+.chart-card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1rem}
 .chart-wrap{position:relative;width:100%;height:280px}
 .spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite}
 .spinner-dark{border-color:rgba(0,0,0,.15);border-top-color:var(--text2)}
@@ -104,445 +87,449 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.
 .loading-overlay{position:absolute;inset:0;background:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;border-radius:var(--radius-lg);z-index:10;font-size:13px;color:var(--text2);gap:8px}
 @media(prefers-color-scheme:dark){.loading-overlay{background:rgba(28,28,27,.75)}}
 .emp-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1.25rem}
-.emp-pill{padding:5px 14px;font-size:12px;font-weight:500;border-radius:20px;border:0.5px solid var(--border2);cursor:pointer;background:transparent;color:var(--text2);display:inline-flex;align-items:center;gap:5px}
+.emp-pill{padding:5px 14px;font-size:12px;font-weight:500;border-radius:20px;border:.5px solid var(--border2);cursor:pointer;background:transparent;color:var(--text2);display:inline-flex;align-items:center;gap:5px}
 .emp-pill:hover{background:var(--bg2)}
-.emp-pill.active{color:#fff;border-color:transparent}
-.maestro-layout{display:grid;grid-template-columns:270px 1fr;gap:1.5rem;align-items:start}
-.emp-list{border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
-.emp-list-row{background:var(--bg);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;border-bottom:0.5px solid var(--border);gap:8px}
-.emp-list-row:last-child{border-bottom:none}
-.emp-list-row:hover{background:var(--bg2)}
-.emp-list-row.active{background:var(--blue-bg)}
-.emp-name{font-size:13px;font-weight:600}
-.emp-meta{font-size:12px;color:var(--text2)}
-.prod-table{width:100%;border-collapse:collapse;font-size:13px}
-.prod-table th{text-align:left;padding:8px 10px;font-size:12px;font-weight:500;color:var(--text2);border-bottom:0.5px solid var(--border);background:var(--bg2)}
-.prod-table td{padding:8px 10px;border-bottom:0.5px solid var(--border);vertical-align:middle;background:var(--bg)}
-.prod-table tbody tr:last-child td{border-bottom:none}
-.prod-table tr:hover td{background:var(--bg2)}
-.prod-table input{padding:4px 7px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:100%}
-.receta-prod-list{border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
-.receta-prod-row{background:var(--bg);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;border-bottom:0.5px solid var(--border);gap:8px}
-.receta-prod-row:last-child{border-bottom:none}
-.receta-prod-row:hover{background:var(--bg2)}
-.receta-prod-row.active{background:var(--blue-bg)}
-.receta-detail{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem}
-.ingr-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:1rem}
-.ingr-table th{text-align:left;padding:7px 10px;font-size:12px;font-weight:500;color:var(--text2);border-bottom:0.5px solid var(--border);background:var(--bg)}
-.ingr-table td{padding:7px 10px;border-bottom:0.5px solid var(--border);background:var(--bg)}
-.ingr-table tbody tr:last-child td{border-bottom:none}
-.ingr-table input{padding:4px 7px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:100%}
-.add-ingr-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.add-ingr-bar input,.add-ingr-bar select{padding:5px 9px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)}
-.add-ingr-bar input{width:160px}.add-ingr-bar input.num{width:90px}
-.consumo-header{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:1.5rem;padding:1rem;background:var(--bg2);border-radius:var(--radius-lg)}
-.consumo-header label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px}
-.consumo-header select,.consumo-header input[type=date]{padding:7px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)}
-.consumo-table{width:100%;border-collapse:collapse;font-size:13px}
-.consumo-table th{text-align:left;padding:9px 12px;font-size:12px;font-weight:500;color:var(--text2);border-bottom:0.5px solid var(--border);background:var(--bg2)}
-.consumo-table td{padding:9px 12px;border-bottom:0.5px solid var(--border);background:var(--bg);vertical-align:middle}
-.consumo-table tbody tr:last-child td{border-bottom:none}
-.consumo-table tr:hover td{background:var(--bg2)}
-.consumo-table td.muted{color:var(--text2);font-size:12px}
-.ingr-chip{display:inline-block;padding:2px 8px;background:var(--purple-bg);color:var(--purple);border-radius:20px;font-size:11px;font-weight:600}
-.bar-bg{width:100%;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden;margin-top:4px}
+/* MAESTRO */
+.maestro-cols{display:grid;grid-template-columns:215px 215px 1fr;gap:1rem;align-items:start}
+.mc-title{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
+.m-list{border:.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:8px;min-height:48px}
+.m-row{background:var(--bg);padding:9px 12px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;border-bottom:.5px solid var(--border);gap:6px;transition:background .1s}
+.m-row:last-child{border-bottom:none}
+.m-row:hover{background:var(--bg2)}
+.m-row.sel{background:var(--blue-bg);font-weight:500}
+.m-name{font-size:13px;font-weight:500;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.m-meta{font-size:11px;color:var(--text2)}
+/* PROD TABLE */
+.ptbl{width:100%;border-collapse:collapse;font-size:13px}
+.ptbl th{text-align:left;padding:8px 10px;font-size:12px;font-weight:500;color:var(--text2);border-bottom:.5px solid var(--border);background:var(--bg2)}
+.ptbl td{padding:8px 10px;border-bottom:.5px solid var(--border);vertical-align:middle;background:var(--bg)}
+.ptbl tbody tr:last-child td{border-bottom:none}
+.ptbl tr:hover td{background:var(--bg2)}
+.ptbl input{padding:4px 7px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:100%}
+/* RECETAS */
+.rlist{border:.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.rrow{background:var(--bg);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;border-bottom:.5px solid var(--border);gap:8px}
+.rrow:last-child{border-bottom:none}
+.rrow:hover{background:var(--bg2)}
+.rrow.sel{background:var(--blue-bg)}
+.rdetail{background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem}
+.itbl{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:1rem}
+.itbl th{text-align:left;padding:7px 10px;font-size:12px;font-weight:500;color:var(--text2);border-bottom:.5px solid var(--border);background:var(--bg)}
+.itbl td{padding:7px 10px;border-bottom:.5px solid var(--border);background:var(--bg)}
+.itbl tbody tr:last-child td{border-bottom:none}
+.itbl input{padding:4px 7px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:100%}
+/* CONSUMO */
+.chdr{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:1.5rem;padding:1rem;background:var(--bg2);border-radius:var(--radius-lg)}
+.chdr label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px}
+.chdr select,.chdr input[type=date]{padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)}
+.ctbl{width:100%;border-collapse:collapse;font-size:13px}
+.ctbl th{text-align:left;padding:9px 12px;font-size:12px;font-weight:500;color:var(--text2);border-bottom:.5px solid var(--border);background:var(--bg2)}
+.ctbl td{padding:9px 12px;border-bottom:.5px solid var(--border);background:var(--bg);vertical-align:middle}
+.ctbl tbody tr:last-child td{border-bottom:none}
+.ctbl tr:hover td{background:var(--bg2)}
+.ctbl td.muted{color:var(--text2);font-size:12px}
+.ichip{display:inline-block;padding:2px 8px;background:var(--purple-bg);color:var(--purple);border-radius:20px;font-size:11px;font-weight:600}
+.bar-bg{width:100%;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:4px}
 .bar-fill{height:100%;border-radius:3px;background:var(--purple)}
 </style>
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Producción</span><span class="sub">— Control Semanal</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span></div>
   <div style="display:flex;align-items:center;gap:16px">
-    <div class="status-label"><span class="status-dot" id="status-dot"></span><span id="status-text">Conectando...</span></div>
-    <div style="font-size:12px;color:var(--text2)" id="header-date"></div>
+    <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
+    <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
   </div>
 </header>
-<div class="main">
- <div class="app-card">
-  <div class="tabs">
-    <button class="tab active" onclick="showTab('plan')"><i class="ti ti-calendar"></i> Planificación</button>
-    <button class="tab" onclick="showTab('real')"><i class="ti ti-clipboard-list"></i> Producción real</button>
-    <button class="tab" onclick="showTab('compare')"><i class="ti ti-chart-bar"></i> Comparación</button>
-    <button class="tab" onclick="showTab('recetas')"><i class="ti ti-notebook"></i> Recetas</button>
-    <button class="tab" onclick="showTab('consumo')"><i class="ti ti-package"></i> Consumo MP</button>
-    <button class="tab" onclick="showTab('maestro')"><i class="ti ti-building"></i> Maestro</button>
+<div class="main"><div class="app-card">
+<div class="tabs">
+  <button class="tab active" onclick="T('plan')"><i class="ti ti-calendar"></i> Planificacion</button>
+  <button class="tab" onclick="T('real')"><i class="ti ti-clipboard-list"></i> Produccion real</button>
+  <button class="tab" onclick="T('cmp')"><i class="ti ti-chart-bar"></i> Comparacion</button>
+  <button class="tab" onclick="T('rec')"><i class="ti ti-notebook"></i> Recetas</button>
+  <button class="tab" onclick="T('con')"><i class="ti ti-package"></i> Consumo MP</button>
+  <button class="tab" onclick="T('mae')"><i class="ti ti-building"></i> Maestro</button>
+</div>
+<div class="pad">
+
+<!-- PLAN -->
+<div id="tab-plan" class="section active">
+  <div class="toolbar">
+    <div class="week-nav">
+      <button class="btn btn-sm" onclick="changeWeek(-1)"><i class="ti ti-chevron-left"></i></button>
+      <span class="week-label" id="wlabel"></span>
+      <button class="btn btn-sm" onclick="changeWeek(1)"><i class="ti ti-chevron-right"></i></button>
+    </div>
+    <div class="btns">
+      <button class="btn btn-pdf" id="btnpdf" onclick="genPDF()"><i class="ti ti-file-type-pdf"></i> PDF</button>
+      <button class="btn btn-primary" id="btnsave" onclick="savePlan()"><i class="ti ti-device-floppy"></i> Guardar plan</button>
+    </div>
   </div>
-  <div class="pad">
-
-    <!-- PLANIFICACIÓN -->
-    <div id="tab-plan" class="section active">
-      <div class="toolbar">
-        <div class="week-nav">
-          <button class="btn btn-sm" onclick="changeWeek(-1)"><i class="ti ti-chevron-left"></i></button>
-          <span class="week-label" id="plan-week-label"></span>
-          <button class="btn btn-sm" onclick="changeWeek(1)"><i class="ti ti-chevron-right"></i></button>
-        </div>
-        <div class="btns">
-          <button class="btn btn-pdf" id="btn-pdf" onclick="generatePDF()"><i class="ti ti-file-type-pdf"></i> Exportar PDF</button>
-          <button class="btn btn-primary" id="btn-save-plan" onclick="savePlan()"><i class="ti ti-device-floppy"></i> Guardar plan</button>
-        </div>
-      </div>
-      <div id="plan-emp-pills" class="emp-pills"></div>
-      <div class="add-bar">
-        <span style="font-size:13px;color:var(--text2);white-space:nowrap">Agregar al plan:</span>
-        <select id="sel-emp-add" style="padding:6px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)" onchange="renderAddProdsSelect()">
-          <option value="">-- Empresa --</option>
-        </select>
-        <select id="sel-prod-add" style="padding:6px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);min-width:180px">
-          <option value="">-- Producto --</option>
-        </select>
-        <button class="btn btn-primary" onclick="addRowFromMaestro()"><i class="ti ti-plus"></i> Agregar</button>
-        <button class="btn" onclick="addAllFromEmpresa()" title="Agregar todos los de la empresa"><i class="ti ti-packages"></i> Todos</button>
-      </div>
-      <div style="position:relative">
-        <div class="grid-card"><div class="grid-scroll" id="grid-wrap"></div></div>
-        <div id="plan-loading" class="loading-overlay" style="display:none"><span class="spinner spinner-dark"></span> Cargando...</div>
-      </div>
-      <div id="plan-msg" style="display:none" class="alert alert-ok"><i class="ti ti-check"></i> Plan guardado.</div>
-      <div id="plan-err" style="display:none" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="plan-err-txt"></span></div>
-      <div id="pdf-msg" style="display:none" class="alert alert-info"></div>
-    </div>
-
-    <!-- PRODUCCIÓN REAL -->
-    <div id="tab-real" class="section">
-      <div class="real-sel">
-        <label>Semana:</label><select id="real-week-sel" onchange="loadAndRenderReal()"></select>
-        <label>Empresa:</label><select id="real-emp-sel" onchange="renderReal()"><option value="all">Todas</option></select>
-      </div>
-      <div id="real-no-plan" class="alert alert-info" style="display:none"><i class="ti ti-info-circle"></i> No hay plan para esta semana.</div>
-      <div style="position:relative">
-        <div class="grid-card" id="real-card" style="display:none"><div class="grid-scroll" id="real-grid-wrap"></div></div>
-        <div id="real-loading" class="loading-overlay" style="display:none"><span class="spinner spinner-dark"></span> Cargando...</div>
-      </div>
-      <div id="real-actions" style="display:none;justify-content:flex-end;gap:8px;margin-top:8px">
-        <button class="btn btn-primary" id="btn-save-real" onclick="saveReal()"><i class="ti ti-device-floppy"></i> Guardar producción</button>
-      </div>
-      <div id="real-msg" style="display:none;margin-top:8px" class="alert alert-ok"><i class="ti ti-check"></i> Producción guardada.</div>
-      <div id="real-err" style="display:none;margin-top:8px" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="real-err-txt"></span></div>
-    </div>
-
-    <!-- COMPARACIÓN -->
-    <div id="tab-compare" class="section">
-      <div class="real-sel">
-        <label>Semana:</label><select id="cmp-week-sel" onchange="loadAndRenderCompare()"></select>
-        <label>Empresa:</label><select id="cmp-emp-sel" onchange="renderCompare()"><option value="all">Todas</option></select>
-      </div>
-      <div id="compare-content"></div>
-    </div>
-
-    <!-- RECETAS -->
-    <div id="tab-recetas" class="section">
-      <div class="toolbar">
-        <div><div style="font-size:16px;font-weight:600">Recetas</div><div style="font-size:13px;color:var(--text2)">Ingredientes por unidad producida</div></div>
-        <button class="btn btn-primary" id="btn-save-recetas" onclick="saveRecetas()"><i class="ti ti-device-floppy"></i> Guardar recetas</button>
-      </div>
-      <div style="display:grid;grid-template-columns:270px 1fr;gap:1.5rem">
-        <div>
-          <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Productos</div>
-          <div id="receta-prod-list" class="receta-prod-list"><div class="empty"><i class="ti ti-package-off"></i>Agregá productos en Maestro.</div></div>
-        </div>
-        <div id="receta-detail-wrap"><div class="empty"><i class="ti ti-arrow-left"></i>Seleccioná un producto.</div></div>
-      </div>
-      <div id="recetas-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Recetas guardadas.</div>
-    </div>
-
-    <!-- CONSUMO MP -->
-    <div id="tab-consumo" class="section">
-      <div style="font-size:16px;font-weight:600;margin-bottom:4px">Consumo de materias primas</div>
-      <div style="font-size:13px;color:var(--text2);margin-bottom:1.5rem">Calculado del plan × recetas</div>
-      <div class="consumo-header">
-        <div><label>Modo</label><select id="consumo-modo" onchange="toggleConsumoModo();renderConsumo()"><option value="semana">Por semana</option><option value="rango">Rango de fechas</option></select></div>
-        <div id="consumo-semana-wrap"><label>Semana</label><select id="consumo-week-sel" onchange="renderConsumo()"></select></div>
-        <div id="consumo-rango-wrap" style="display:none;gap:8px;align-items:flex-end">
-          <div><label>Desde</label><input type="date" id="consumo-desde" onchange="renderConsumo()"/></div>
-          <div><label>Hasta</label><input type="date" id="consumo-hasta" onchange="renderConsumo()"/></div>
-        </div>
-        <div><label>Empresa</label><select id="consumo-emp-sel" onchange="renderConsumo()"><option value="all">Todas</option></select></div>
-        <div><label>Buscar</label><input type="text" id="consumo-filtro" placeholder="Ingrediente..." oninput="renderConsumo()" style="padding:7px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:150px"/></div>
-      </div>
-      <div id="consumo-content"></div>
-    </div>
-
-    <!-- MAESTRO -->
-    <div id="tab-maestro" class="section">
-      <div class="toolbar">
-        <div><div style="font-size:16px;font-weight:600">Maestro de empresas y productos</div><div style="font-size:13px;color:var(--text2)">Definí empresas, áreas y productos</div></div>
-      </div>
-      <div class="maestro-layout">
-        <div>
-          <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Empresas</div>
-          <div id="emp-list" class="emp-list"></div>
-          <div class="add-bar" style="margin-top:10px;flex-direction:column;align-items:stretch;gap:8px">
-            <input type="text" id="new-emp-name" placeholder="Nombre de la empresa" style="width:100%"/>
-            <div style="display:flex;gap:8px;align-items:center">
-              <label style="font-size:12px;color:var(--text2)">Color:</label>
-              <input type="color" id="new-emp-color" value="#378ADD" style="width:40px;height:32px;border:none;cursor:pointer;border-radius:4px"/>
-              <button class="btn btn-primary" style="flex:1" onclick="addEmpresa()"><i class="ti ti-plus"></i> Agregar empresa</button>
-            </div>
-          </div>
-        </div>
-        <div id="maestro-detail"><div class="empty"><i class="ti ti-arrow-left"></i>Seleccioná una empresa.</div></div>
-      </div>
-      <div id="maestro-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
-      <div id="maestro-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="maestro-err-txt"></span></div>
-    </div>
-
+  <div id="epills" class="emp-pills"></div>
+  <div class="add-bar">
+    <span style="font-size:13px;color:var(--text2);white-space:nowrap">Agregar:</span>
+    <select id="semp" onchange="onEmp()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Empresa</option></select>
+    <select id="sarea" onchange="onArea()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Area</option></select>
+    <select id="sprod" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);min-width:160px"><option value="">Producto</option></select>
+    <button class="btn btn-primary" onclick="addFromMaestro()"><i class="ti ti-plus"></i> Agregar</button>
+    <button class="btn" onclick="addAllEmp()"><i class="ti ti-packages"></i> Todos</button>
   </div>
- </div>
+  <div style="position:relative">
+    <div class="grid-card"><div class="grid-scroll" id="grid"></div></div>
+    <div id="gload" class="loading-overlay" style="display:none"><span class="spinner spinner-dark"></span> Cargando...</div>
+  </div>
+  <div id="pmsg" style="display:none" class="alert alert-ok"><i class="ti ti-check"></i> Plan guardado.</div>
+  <div id="perr" style="display:none" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="perrtxt"></span></div>
+  <div id="pdfmsg" style="display:none" class="alert alert-info"></div>
 </div>
 
+<!-- REAL -->
+<div id="tab-real" class="section">
+  <div class="real-sel">
+    <label>Semana:</label><select id="rwsel" onchange="loadReal2()"></select>
+    <label>Empresa:</label><select id="resel" onchange="renderReal()"><option value="all">Todas</option></select>
+  </div>
+  <div id="rnop" class="alert alert-info" style="display:none"><i class="ti ti-info-circle"></i> No hay plan para esta semana.</div>
+  <div style="position:relative">
+    <div class="grid-card" id="rcard" style="display:none"><div class="grid-scroll" id="rgrid"></div></div>
+    <div id="rload" class="loading-overlay" style="display:none"><span class="spinner spinner-dark"></span> Cargando...</div>
+  </div>
+  <div id="ract" style="display:none;justify-content:flex-end;gap:8px;margin-top:8px">
+    <button class="btn btn-primary" id="btnsaver" onclick="saveReal()"><i class="ti ti-device-floppy"></i> Guardar produccion</button>
+  </div>
+  <div id="rmsg" style="display:none;margin-top:8px" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
+  <div id="rerr" style="display:none;margin-top:8px" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="rerrtxt"></span></div>
+</div>
+
+<!-- COMPARACION -->
+<div id="tab-cmp" class="section">
+  <div class="real-sel">
+    <label>Semana:</label><select id="cwsel" onchange="loadCmp()"></select>
+    <label>Empresa:</label><select id="cesel" onchange="renderCmp()"><option value="all">Todas</option></select>
+  </div>
+  <div id="ccon"></div>
+</div>
+
+<!-- RECETAS -->
+<div id="tab-rec" class="section">
+  <div class="toolbar">
+    <div><div style="font-size:16px;font-weight:600">Recetas</div><div style="font-size:13px;color:var(--text2)">Ingredientes por unidad producida</div></div>
+    <button class="btn btn-primary" id="btnsaverec" onclick="saveRecetas()"><i class="ti ti-device-floppy"></i> Guardar recetas</button>
+  </div>
+  <div style="display:grid;grid-template-columns:270px 1fr;gap:1.5rem">
+    <div>
+      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Productos</div>
+      <div id="rplist" class="rlist"><div class="empty"><i class="ti ti-package-off"></i>Agrega productos en Maestro.</div></div>
+    </div>
+    <div id="rdetail"><div class="empty"><i class="ti ti-arrow-left"></i>Selecciona un producto.</div></div>
+  </div>
+  <div id="recmsg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Recetas guardadas.</div>
+</div>
+
+<!-- CONSUMO -->
+<div id="tab-con" class="section">
+  <div style="font-size:16px;font-weight:600;margin-bottom:4px">Consumo de materias primas</div>
+  <div style="font-size:13px;color:var(--text2);margin-bottom:1.5rem">Calculado del plan x recetas</div>
+  <div class="chdr">
+    <div><label>Modo</label><select id="cmodo" onchange="toggleCModo();renderCon()"><option value="semana">Por semana</option><option value="rango">Rango fechas</option></select></div>
+    <div id="cswrap"><label>Semana</label><select id="cswsel" onchange="renderCon()"></select></div>
+    <div id="crwrap" style="display:none;gap:8px;align-items:flex-end">
+      <div><label>Desde</label><input type="date" id="cfrom" onchange="renderCon()"/></div>
+      <div><label>Hasta</label><input type="date" id="cto" onchange="renderCon()"/></div>
+    </div>
+    <div><label>Empresa</label><select id="ceesel" onchange="renderCon()"><option value="all">Todas</option></select></div>
+    <div><label>Buscar</label><input type="text" id="cfilt" placeholder="Ingrediente..." oninput="renderCon()" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:150px"/></div>
+  </div>
+  <div id="ccon2"></div>
+</div>
+
+<!-- MAESTRO -->
+<div id="tab-mae" class="section">
+  <div class="toolbar">
+    <div><div style="font-size:16px;font-weight:600">Maestro</div><div style="font-size:13px;color:var(--text2)">Empresas &rarr; Areas &rarr; Productos</div></div>
+  </div>
+  <div class="maestro-cols">
+    <div>
+      <div class="mc-title">1. Empresas</div>
+      <div id="emplist" class="m-list"><div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Sin empresas.</div></div>
+      <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+        <input type="text" id="nemp" placeholder="Nombre empresa" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:100%"/>
+        <div style="display:flex;gap:6px;align-items:center">
+          <label style="font-size:12px;color:var(--text2)">Color:</label>
+          <input type="color" id="nempcolor" value="#378ADD" style="width:36px;height:30px;border:none;cursor:pointer;border-radius:4px"/>
+          <button class="btn btn-primary btn-sm" style="flex:1" onclick="addEmpresa()"><i class="ti ti-plus"></i> Agregar</button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="mc-title">2. Areas</div>
+      <div id="arealist" class="m-list"><div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Selecciona empresa</div></div>
+      <div id="areaadd" style="display:none;margin-top:8px">
+        <div style="display:flex;gap:6px">
+          <input type="text" id="narea" placeholder="Nombre del area" style="flex:1;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+          <button class="btn btn-primary btn-sm" onclick="addArea()"><i class="ti ti-plus"></i></button>
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="mc-title">3. Productos</div>
+      <div id="proddetail"><div style="padding:2rem;text-align:center;font-size:13px;color:var(--text2)"><i class="ti ti-arrow-left" style="display:block;font-size:24px;margin-bottom:6px;color:var(--text3)"></i>Selecciona un area</div></div>
+    </div>
+  </div>
+  <div id="maemsg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
+  <div id="maeerr" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="maeErrtxt"></span></div>
+</div>
+
+</div></div></div>
 <script>
-const SB_URL='https://ugmjfvgjumpnvbfskcgl.supabase.co';
-const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnbWpmdmdqdW1wbnZiZnNrY2dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MjU4OTIsImV4cCI6MjA5NDEwMTg5Mn0.fmf7Isp5rDi10mq0VjahWRCgl6J4mD8-ib89DKWtPLs';
-const HDR={'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY};
-async function sbGet(t,f=''){const r=await fetch(`${SB_URL}/rest/v1/${t}?${f}`,{headers:HDR});if(!r.ok)throw new Error(await r.text());return r.json()}
-async function sbUpsert(t,d){const r=await fetch(`${SB_URL}/rest/v1/${t}`,{method:'POST',headers:{...HDR,'Prefer':'resolution=merge-duplicates,return=representation'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json()}
-async function sbInsert(t,d){const r=await fetch(`${SB_URL}/rest/v1/${t}`,{method:'POST',headers:{...HDR,'Prefer':'return=representation'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json()}
-async function sbPatch(t,id,d){const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:{...HDR,'Prefer':'return=minimal'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text())}
-async function sbDel(t,id){const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:HDR});if(!r.ok)throw new Error(await r.text())}
+const SB='https://ugmjfvgjumpnvbfskcgl.supabase.co';
+const SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnbWpmdmdqdW1wbnZiZnNrY2dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MjU4OTIsImV4cCI6MjA5NDEwMTg5Mn0.fmf7Isp5rDi10mq0VjahWRCgl6J4mD8-ib89DKWtPLs';
+const H={'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK};
+const get=async(t,f='')=>{const r=await fetch(`${SB}/rest/v1/${t}?${f}`,{headers:H});if(!r.ok)throw new Error(await r.text());return r.json()};
+const upsert=async(t,d)=>{const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=representation'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json()};
+const ins=async(t,d)=>{const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:{...H,'Prefer':'return=representation'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json()};
+const pat=async(t,id,d)=>{const r=await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text())};
+const del=async(t,id)=>{const r=await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:H});if(!r.ok)throw new Error(await r.text())};
 
-const DAYS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+const DAYS=['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo'];
 const UNITS=['unidades','docenas','kg','g','litros','ml','cajas','metros','horas','lotes','pallets','camiones','bolsas','paquetes','atados','rollos','piezas'];
-const ACOLORS=['#185FA5','#0F6E56','#993C1D','#993556','#854F0B','#3B6D11','#534AB7','#5F5E5A'];
-const ABGS=['#E6F1FB','#E1F5EE','#FAECE7','#FBEAF0','#FAEEDA','#EAF3DE','#EEEDFE','#F1EFE8'];
+const AC=['#185FA5','#0F6E56','#993C1D','#993556','#854F0B','#3B6D11','#534AB7','#5F5E5A'];
+const AB=['#E6F1FB','#E1F5EE','#FAECE7','#FBEAF0','#FAEEDA','#EAF3DE','#EEEDFE','#F1EFE8'];
 
-function weekKey(d){const dt=new Date(d);dt.setHours(0,0,0,0);dt.setDate(dt.getDate()-((dt.getDay()+6)%7));return dt.toISOString().slice(0,10)}
-function weekLabel(k){const d=new Date(k+'T00:00:00');const e=new Date(d);e.setDate(e.getDate()+6);const f=x=>x.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'});return`Sem ${weekNum(d)} — ${f(d)} al ${f(e)} ${d.getFullYear()}`}
-function weekNum(d){const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const dn=dt.getUTCDay()||7;dt.setUTCDate(dt.getUTCDate()+4-dn);const ys=new Date(Date.UTC(dt.getUTCFullYear(),0,1));return Math.ceil((((dt-ys)/86400000)+1)/7)}
-function addW(k,n){const d=new Date(k+'T00:00:00');d.setDate(d.getDate()+n*7);return weekKey(d)}
-function dayDate(wk,di){const d=new Date(wk+'T00:00:00');d.setDate(d.getDate()+di);return d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'})}
-function todayCol(wk){const d=new Date();const w=new Date(wk+'T00:00:00');const diff=Math.floor((d-w)/86400000);return(diff>=0&&diff<=6)?diff:-1}
-function getAreas(rows){return[...new Set(rows.map(r=>r.area||'Sin área'))]}
-function aColor(a,areas){return ACOLORS[areas.indexOf(a)%ACOLORS.length]}
-function aBg(a,areas){return ABGS[areas.indexOf(a)%ABGS.length]}
-function fmt(n){return n>0?n.toLocaleString('es-AR'):'—'}
-function fmtN(n){return Math.round(n*100)/100}
-function flash(id){const m=document.getElementById(id);m.style.display='flex';setTimeout(()=>m.style.display='none',3000)}
-function setStatus(s,t){document.getElementById('status-dot').className='status-dot '+s;document.getElementById('status-text').textContent=t}
-function hexRgba(hex,a){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g},${b},${a})`}
-function empColor(eid){const e=st.empresas.find(x=>x.id===eid);return e?e.color:'#888'}
-function empName(eid){const e=st.empresas.find(x=>x.id===eid);return e?e.nombre:''}
+const wk=d=>{const dt=new Date(d);dt.setHours(0,0,0,0);dt.setDate(dt.getDate()-((dt.getDay()+6)%7));return dt.toISOString().slice(0,10)};
+const wlb=k=>{const d=new Date(k+'T00:00:00');const e=new Date(d);e.setDate(e.getDate()+6);const f=x=>x.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'});return`Sem ${wnum(d)} - ${f(d)} al ${f(e)} ${d.getFullYear()}`};
+const wnum=d=>{const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const dn=dt.getUTCDay()||7;dt.setUTCDate(dt.getUTCDate()+4-dn);const ys=new Date(Date.UTC(dt.getUTCFullYear(),0,1));return Math.ceil((((dt-ys)/86400000)+1)/7)};
+const addW=(k,n)=>{const d=new Date(k+'T00:00:00');d.setDate(d.getDate()+n*7);return wk(d)};
+const ddate=(wk2,di)=>{const d=new Date(wk2+'T00:00:00');d.setDate(d.getDate()+di);return d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'})};
+const tc=wk2=>{const d=new Date();const w=new Date(wk2+'T00:00:00');const diff=Math.floor((d-w)/86400000);return(diff>=0&&diff<=6)?diff:-1};
+const gas=rows=>[...new Set(rows.map(r=>r.area||'SA'))];
+const ac=(a,as)=>AC[as.indexOf(a)%AC.length];
+const ab=(a,as)=>AB[as.indexOf(a)%AB.length];
+const fmt=n=>n>0?n.toLocaleString('es-AR'):'--';
+const fn=n=>Math.round(n*100)/100;
+const fl=id=>{const m=document.getElementById(id);m.style.display='flex';setTimeout(()=>m.style.display='none',3000)};
+const ss=(s,t)=>{document.getElementById('sdot').className='status-dot '+s;document.getElementById('stxt').textContent=t};
+const rgba=(hex,a)=>{try{const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g},${b},${a})`}catch{return`rgba(100,100,100,${a})`}};
+const ec=eid=>{const e=st.E.find(x=>x.id===eid);return e?e.color:'#888'};
+const en=eid=>{const e=st.E.find(x=>x.id===eid);return e?e.nombre:''};
 
-const W0=weekKey(new Date());
-const st={week:W0,plans:{},reals:{},recetas:{},edit:{},semanas:[],empresas:[],productos:[],planEmpFilter:'all',activeEmpId:null};
+const W0=wk(new Date());
+const st={w:W0,P:{},R:{},Rec:{},Ed:{},Sem:[],E:[],A:[],Pr:[],ef:'all',aeid:null,aaid:null};
 
-document.getElementById('header-date').textContent=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+document.getElementById('hdate').textContent=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
 async function init(){
-  setStatus('saving','Conectando...');
+  ss('saving','Conectando...');
   try{
-    const [planes,reales,recRow,emps,prods]=await Promise.all([
-      sbGet('planes','select=semana&order=semana.desc'),
-      sbGet('produccion_real','select=semana&order=semana.desc'),
-      sbGet('recetas','select=datos').catch(()=>[]),
-      sbGet('empresas','order=nombre.asc'),
-      sbGet('productos','order=area.asc,nombre.asc')
+    const[pl,re,rr,em,ar,pr]=await Promise.all([
+      get('planes','select=semana&order=semana.desc'),
+      get('produccion_real','select=semana&order=semana.desc'),
+      get('recetas','select=datos').catch(()=>[]),
+      get('empresas','order=nombre.asc'),
+      get('areas','order=nombre.asc'),
+      get('productos','order=nombre.asc')
     ]);
-    const semSet=new Set([...planes.map(p=>p.semana),...reales.map(r=>r.semana),W0]);
-    st.semanas=[...semSet].sort();
-    if(recRow.length)st.recetas=recRow[0].datos||{};
-    st.empresas=emps; st.productos=prods;
-    await loadPlan(W0);
-    setStatus('online','Conectado');
-    updateEmpSels();
-  }catch(e){setStatus('error','Sin conexión');console.error(e)}
-  renderGrid(); renderEmpPills();
+    const ss2=new Set([...pl.map(p=>p.semana),...re.map(r=>r.semana),W0]);
+    st.Sem=[...ss2].sort();
+    if(rr.length)st.Rec=rr[0].datos||{};
+    st.E=em;st.A=ar||[];st.Pr=pr;
+    await lp(W0);
+    ss('online','Conectado');
+    uES();
+  }catch(e){ss('error','Sin conexion');console.error(e)}
+  rG();rP();
 }
 
-async function loadPlan(wk){if(st.plans[wk]!==undefined)return;try{const d=await sbGet('planes',`semana=eq.${wk}&select=filas`);st.plans[wk]=d.length?d[0].filas:[];}catch(e){st.plans[wk]=[]}}
-async function loadReal(wk){if(st.reals[wk]!==undefined)return;try{const d=await sbGet('produccion_real',`semana=eq.${wk}&select=datos`);st.reals[wk]=d.length?d[0].datos:{};}catch(e){st.reals[wk]={}}}
+async function lp(k){if(st.P[k]!==undefined)return;try{const d=await get('planes',`semana=eq.${k}&select=filas`);st.P[k]=d.length?d[0].filas:[];}catch{st.P[k]=[]}}
+async function lr(k){if(st.R[k]!==undefined)return;try{const d=await get('produccion_real',`semana=eq.${k}&select=datos`);st.R[k]=d.length?d[0].datos:{};}catch{st.R[k]={}}}
 
-function updateEmpSels(){
-  ['real-emp-sel','cmp-emp-sel','consumo-emp-sel'].forEach(id=>{
-    const sel=document.getElementById(id);if(!sel)return;
-    const cur=sel.value;sel.innerHTML='<option value="all">Todas</option>';
-    st.empresas.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;sel.appendChild(o)});
-    if(cur)sel.value=cur;
+function uES(){
+  ['resel','cesel','ceesel'].forEach(id=>{
+    const s=document.getElementById(id);if(!s)return;
+    const c=s.value;s.innerHTML='<option value="all">Todas</option>';
+    st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;s.appendChild(o)});
+    if(c)s.value=c;
   });
-  const se=document.getElementById('sel-emp-add');if(se){
-    const cur=se.value;se.innerHTML='<option value="">-- Empresa --</option>';
-    st.empresas.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se.appendChild(o)});
-    if(cur)se.value=cur;
+  const se=document.getElementById('semp');if(se){
+    const c=se.value;se.innerHTML='<option value="">Empresa</option>';
+    st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se.appendChild(o)});
+    if(c)se.value=c;
   }
 }
 
-function showTab(t){
-  const names=['plan','real','compare','recetas','consumo','maestro'];
-  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',names[i]===t));
+const TABS=['plan','real','cmp','rec','con','mae'];
+function T(t){
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',TABS[i]===t));
   document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));
   document.getElementById('tab-'+t).classList.add('active');
-  if(t==='real'){popSel('real-week-sel');loadAndRenderReal()}
-  if(t==='compare'){popSel('cmp-week-sel');loadAndRenderCompare()}
-  if(t==='recetas')renderRecetas();
-  if(t==='consumo'){popSelConsumo();renderConsumo()}
-  if(t==='maestro')renderMaestro();
+  if(t==='real'){pS('rwsel');loadReal2()}
+  if(t==='cmp'){pS('cwsel');loadCmp()}
+  if(t==='rec')rRec();
+  if(t==='con'){pSC();renderCon()}
+  if(t==='mae')rMae();
 }
-function popSel(id){
-  const sel=document.getElementById(id);const cur=sel.value||st.week;
-  const weeks=new Set([...st.semanas,st.week]);
-  sel.innerHTML='';[...weeks].sort().reverse().forEach(w=>{const o=document.createElement('option');o.value=w;o.textContent=weekLabel(w);sel.appendChild(o)});
-  sel.value=cur;
+function pS(id){
+  const s=document.getElementById(id);const c=s.value||st.w;
+  const ws=new Set([...st.Sem,st.w]);
+  s.innerHTML='';[...ws].sort().reverse().forEach(w=>{const o=document.createElement('option');o.value=w;o.textContent=wlb(w);s.appendChild(o)});
+  s.value=c;
 }
-function popSelConsumo(){
-  popSel('consumo-week-sel');
-  const d2=new Date(st.week+'T00:00:00');d2.setDate(d2.getDate()+6);
-  document.getElementById('consumo-desde').value=st.week;
-  document.getElementById('consumo-hasta').value=d2.toISOString().slice(0,10);
+function pSC(){
+  pS('cswsel');
+  const d2=new Date(st.w+'T00:00:00');d2.setDate(d2.getDate()+6);
+  document.getElementById('cfrom').value=st.w;
+  document.getElementById('cto').value=d2.toISOString().slice(0,10);
 }
-function toggleConsumoModo(){
-  const m=document.getElementById('consumo-modo').value;
-  document.getElementById('consumo-semana-wrap').style.display=m==='semana'?'block':'none';
-  document.getElementById('consumo-rango-wrap').style.display=m==='rango'?'flex':'none';
+function toggleCModo(){
+  const m=document.getElementById('cmodo').value;
+  document.getElementById('cswrap').style.display=m==='semana'?'block':'none';
+  document.getElementById('crwrap').style.display=m==='rango'?'flex':'none';
 }
 
-// PILLS
-function renderEmpPills(){
-  const wrap=document.getElementById('plan-emp-pills');
-  if(!st.empresas.length){wrap.innerHTML='';return}
-  let h=`<button class="emp-pill${st.planEmpFilter==='all'?' active':''}" style="${st.planEmpFilter==='all'?'background:var(--text);color:var(--bg)':''}" onclick="setPlanEmpFilter('all')">Todas</button>`;
-  st.empresas.forEach(e=>{
-    const act=st.planEmpFilter===e.id;
-    h+=`<button class="emp-pill${act?' active':''}" style="${act?`background:${e.color};color:#fff`:''}" onclick="setPlanEmpFilter('${e.id}')"><span class="color-dot" style="background:${e.color}"></span>${e.nombre}</button>`;
-  });
-  wrap.innerHTML=h;
+function rP(){
+  const w=document.getElementById('epills');
+  if(!st.E.length){w.innerHTML='';return}
+  let h=`<button class="emp-pill${st.ef==='all'?' active':''}" style="${st.ef==='all'?'background:var(--text);color:var(--bg)':''}" onclick="setEF('all')">Todas</button>`;
+  st.E.forEach(e=>{const a=st.ef===e.id;h+=`<button class="emp-pill${a?' active':''}" style="${a?`background:${e.color};color:#fff`:''}" onclick="setEF('${e.id}')"><span class="color-dot" style="background:${e.color}"></span>${e.nombre}</button>`});
+  w.innerHTML=h;
 }
-function setPlanEmpFilter(id){st.planEmpFilter=id;renderEmpPills();renderGrid()}
+function setEF(id){st.ef=id;rP();rG()}
 
-// PLANIFICACIÓN
-function changeWeek(n){st.week=addW(st.week,n);const l=document.getElementById('plan-loading');l.style.display='flex';loadPlan(st.week).then(()=>{l.style.display='none';renderGrid()})}
-function getEdit(){if(!st.edit[st.week])st.edit[st.week]=st.plans[st.week]?JSON.parse(JSON.stringify(st.plans[st.week])):[];return st.edit[st.week]}
+function onEmp(){
+  const eid=document.getElementById('semp').value;
+  const as=document.getElementById('sarea');const ps=document.getElementById('sprod');
+  as.innerHTML='<option value="">Area</option>';ps.innerHTML='<option value="">Producto</option>';
+  if(!eid)return;
+  st.A.filter(a=>a.empresa_id===eid).forEach(a=>{const o=document.createElement('option');o.value=a.id;o.textContent=a.nombre;as.appendChild(o)});
+}
+function onArea(){
+  const aid=document.getElementById('sarea').value;
+  const ps=document.getElementById('sprod');
+  ps.innerHTML='<option value="">Producto</option>';
+  if(!aid)return;
+  st.Pr.filter(p=>p.area_id===aid).forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.nombre;ps.appendChild(o)});
+}
 
-function renderGrid(){
-  document.getElementById('plan-week-label').textContent=weekLabel(st.week);
-  const allRows=getEdit();
-  const rows=st.planEmpFilter==='all'?allRows:allRows.filter(r=>r.empresa_id===st.planEmpFilter);
-  const wrap=document.getElementById('grid-wrap');
-  if(!allRows.length){wrap.innerHTML='<div class="empty"><i class="ti ti-table-off"></i>Agregá productos desde el maestro.</div>';return}
+function changeWeek(n){st.w=addW(st.w,n);document.getElementById('gload').style.display='flex';lp(st.w).then(()=>{document.getElementById('gload').style.display='none';rG()})}
+function gE(){if(!st.Ed[st.w])st.Ed[st.w]=st.P[st.w]?JSON.parse(JSON.stringify(st.P[st.w])):[];return st.Ed[st.w]}
+
+function rG(){
+  document.getElementById('wlabel').textContent=wlb(st.w);
+  const all=gE();const rows=st.ef==='all'?all:all.filter(r=>r.empresa_id===st.ef);
+  const wrap=document.getElementById('grid');
+  if(!all.length){wrap.innerHTML='<div class="empty"><i class="ti ti-table-off"></i>Agrega productos desde el maestro.</div>';return}
   if(!rows.length){wrap.innerHTML='<div class="empty"><i class="ti ti-filter-off"></i>No hay productos de esta empresa en el plan.</div>';return}
-  const tc=todayCol(st.week);
-  const areas=getAreas(rows);
-  const byEmp={};
-  rows.forEach(r=>{const eid=r.empresa_id||'__';if(!byEmp[eid])byEmp[eid]=[];byEmp[eid].push({...r,_i:allRows.findIndex(x=>x===r||(x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area))})});
-  let h=`<table class="plan-grid"><thead><tr>
-    <th class="left" style="width:105px">Empresa</th>
-    <th class="left" style="width:100px">Área</th>
-    <th class="left" style="width:160px">Producto</th>
-    <th class="left" style="width:85px">Unidad</th>`;
-  DAYS.forEach((d,i)=>{h+=`<th class="${i===tc?'today-head':''}" style="width:72px">${d.slice(0,3)}<br><span style="font-size:10px;font-weight:400">${dayDate(st.week,i)}</span></th>`});
-  h+=`<th style="width:66px">Total</th><th style="width:34px"></th></tr></thead><tbody>`;
-  let dayT=Array(7).fill(0),grand=0;
-  Object.entries(byEmp).forEach(([eid,items],gi)=>{
-    const ec=empColor(eid);const en=empName(eid)||'Sin empresa';const eb=hexRgba(ec==='#888'?'#888888':ec,.12);
-    const byArea={};items.forEach(r=>{const a=r.area||'Sin área';if(!byArea[a])byArea[a]=[];byArea[a].push(r)});
-    let empFirst=true;
-    Object.entries(byArea).forEach(([area,aItems],ai)=>{
-      aItems.forEach((r,ri)=>{
-        const rowTot=(r.days||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
-        grand+=rowTot;(r.days||Array(7).fill(0)).forEach((v,di)=>{dayT[di]+=(v||0)});
-        const cls=gi>0&&empFirst&&ri===0&&ai===0?'emp-sep':(!empFirst&&ri===0&&ai>0)?'area-sep':'';
+  const t=tc(st.w);const as=gas(rows);
+  const byE={};rows.forEach(r=>{const eid=r.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push({...r,_i:all.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area)})});
+  let h=`<table class="plan-grid"><thead><tr><th class="left" style="width:100px">Empresa</th><th class="left" style="width:95px">Area</th><th class="left" style="width:155px">Producto</th><th class="left" style="width:80px">Unidad</th>`;
+  DAYS.forEach((d,i)=>{h+=`<th class="${i===t?'today-head':''}" style="width:70px">${d.slice(0,3)}<br><span style="font-size:10px;font-weight:400">${ddate(st.w,i)}</span></th>`});
+  h+=`<th style="width:64px">Total</th><th style="width:32px"></th></tr></thead><tbody>`;
+  let dt=Array(7).fill(0),gd=0;
+  Object.entries(byE).forEach(([eid,items],gi)=>{
+    const clr=ec(eid);const nm=en(eid)||'Sin empresa';const bg=rgba(clr,.12);
+    const bA={};items.forEach(r=>{const a=r.area||'SA';if(!bA[a])bA[a]=[];bA[a].push(r)});
+    let ef=true;
+    Object.entries(bA).forEach(([area,aIt],ai)=>{
+      aIt.forEach((r,ri)=>{
+        const rt=(r.days||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
+        gd+=rt;(r.days||Array(7).fill(0)).forEach((v,di)=>{dt[di]+=(v||0)});
+        const cls=gi>0&&ef&&ri===0&&ai===0?'emp-sep':(!ef&&ri===0&&ai>0)?'area-sep':'';
         h+=`<tr class="${cls}">`;
-        if(empFirst&&ri===0&&ai===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="emp-tag" style="background:${eb};color:${ec}"><span class="color-dot" style="background:${ec}"></span>${en}</span></td>`;
-        if(ri===0)h+=`<td rowspan="${aItems.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${aBg(area,areas)};color:${aColor(area,areas)}">${area}</span></td>`;
-        h+=`<td><input class="prod-input" value="${r.producto}" onchange="upField(${r._i},'producto',this.value)"/></td>`;
-        h+=`<td><input value="${r.unidad||''}" list="units-dl" onchange="upField(${r._i},'unidad',this.value)" style="width:100%;padding:3px 5px;font-size:12px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`;
-        for(let di=0;di<7;di++){const v=(r.days&&r.days[di])||0;h+=`<td class="day-cell${di===tc?' today-col':''}"><input class="day-input${v>0?' has-val':''}" type="number" min="0" value="${v||''}" placeholder="—" onchange="upDay(${r._i},${di},this.value);this.classList.toggle('has-val',this.value!='')"/></td>`}
-        h+=`<td class="total-cell">${fmt(rowTot)}</td><td style="text-align:center"><button class="btn btn-xs btn-danger" onclick="removeRow(${r._i})"><i class="ti ti-trash"></i></button></td></tr>`;
-        empFirst=false;
+        if(ef&&ri===0&&ai===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span></td>`;
+        if(ri===0)h+=`<td rowspan="${aIt.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${ab(area,as)};color:${ac(area,as)}">${area}</span></td>`;
+        h+=`<td><input class="prod-input" value="${r.producto}" onchange="uf(${r._i},'producto',this.value)"/></td>`;
+        h+=`<td><input value="${r.unidad||''}" list="udl" onchange="uf(${r._i},'unidad',this.value)" style="width:100%;padding:3px 5px;font-size:12px;border:.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`;
+        for(let di=0;di<7;di++){const v=(r.days&&r.days[di])||0;h+=`<td class="day-cell${di===t?' today-col':''}"><input class="day-input${v>0?' has-val':''}" type="number" min="0" value="${v||''}" placeholder="--" onchange="ud(${r._i},${di},this.value);this.classList.toggle('has-val',this.value!='')"/></td>`}
+        h+=`<td class="total-cell">${fmt(rt)}</td><td style="text-align:center"><button class="btn btn-xs btn-danger" onclick="delRow(${r._i})"><i class="ti ti-trash"></i></button></td></tr>`;
+        ef=false;
       });
     });
   });
   h+=`<tr class="totals-row"><td></td><td></td><td style="padding-left:8px;font-size:12px">Total diario</td><td></td>`;
-  dayT.forEach((v,i)=>{h+=`<td class="day-cell${i===tc?' today-col':''}" style="text-align:center">${fmt(v)}</td>`});
-  h+=`<td class="day-cell grand">${fmt(grand)}</td><td></td></tr></tbody></table>`;
-  h+=`<datalist id="units-dl">${UNITS.map(u=>`<option>${u}</option>`).join('')}</datalist>`;
+  dt.forEach((v,i)=>{h+=`<td class="day-cell${i===t?' today-col':''}" style="text-align:center">${fmt(v)}</td>`});
+  h+=`<td class="day-cell grand">${fmt(gd)}</td><td></td></tr></tbody></table>`;
+  h+=`<datalist id="udl">${UNITS.map(u=>`<option>${u}</option>`).join('')}</datalist>`;
   wrap.innerHTML=h;
 }
-function upField(i,f,v){const r=getEdit()[i];if(r)r[f]=v}
-function upDay(i,di,v){const rows=getEdit();if(!rows[i])return;if(!rows[i].days)rows[i].days=Array(7).fill(0);rows[i].days[di]=parseFloat(v)||0;updateDayTotals()}
-function updateDayTotals(){
-  const rows=getEdit();const dayT=Array(7).fill(0);let grand=0;
-  rows.forEach(r=>{(r.days||[]).forEach((v,k)=>{dayT[k]+=(v||0);grand+=(v||0)})});
-  const trow=document.querySelector('.totals-row');if(!trow)return;
-  const cells=trow.querySelectorAll('td');
-  dayT.forEach((v,i)=>{if(cells[4+i])cells[4+i].textContent=fmt(v)});
-  if(cells[11])cells[11].textContent=fmt(grand);
+function uf(i,f,v){const r=gE()[i];if(r)r[f]=v}
+function ud(i,di,v){const r=gE();if(!r[i])return;if(!r[i].days)r[i].days=Array(7).fill(0);r[i].days[di]=parseFloat(v)||0;udt()}
+function udt(){
+  const r=gE();const dt=Array(7).fill(0);let gd=0;
+  r.forEach(x=>{(x.days||[]).forEach((v,k)=>{dt[k]+=(v||0);gd+=(v||0)})});
+  const tr=document.querySelector('.totals-row');if(!tr)return;
+  const cl=tr.querySelectorAll('td');
+  dt.forEach((v,i)=>{if(cl[4+i])cl[4+i].textContent=fmt(v)});
+  if(cl[11])cl[11].textContent=fmt(gd);
 }
-function removeRow(i){const rows=getEdit();rows.splice(i,1);st.edit[st.week]=rows;renderGrid()}
-
-function renderAddProdsSelect(){
-  const empId=document.getElementById('sel-emp-add')?.value||'';
-  const sel=document.getElementById('sel-prod-add');if(!sel)return;
-  sel.innerHTML='<option value="">-- Producto --</option>';
-  if(!empId)return;
-  st.productos.filter(p=>p.empresa_id===empId).forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=`[${p.area}] ${p.nombre}`;sel.appendChild(o)});
+function delRow(i){const r=gE();r.splice(i,1);st.Ed[st.w]=r;rG()}
+function addFromMaestro(){
+  const id=document.getElementById('sprod').value;if(!id)return;
+  const p=st.Pr.find(x=>x.id===id);if(!p)return;
+  const a=st.A.find(x=>x.id===p.area_id);const an=a?a.nombre:'SA';
+  const r=gE();
+  if(r.find(x=>x.producto===p.nombre&&x.empresa_id===p.empresa_id)){alert('Ya esta en el plan.');return}
+  r.push({empresa_id:p.empresa_id,area:an,producto:p.nombre,unidad:p.unidad,days:Array(7).fill(0)});
+  st.Ed[st.w]=r;rG();
 }
-function addRowFromMaestro(){
-  const id=document.getElementById('sel-prod-add').value;if(!id)return;
-  const prod=st.productos.find(p=>p.id===id);if(!prod)return;
-  const rows=getEdit();
-  if(rows.find(r=>r.producto===prod.nombre&&r.empresa_id===prod.empresa_id)){alert('Ya está en el plan.');return}
-  rows.push({empresa_id:prod.empresa_id,area:prod.area,producto:prod.nombre,unidad:prod.unidad,days:Array(7).fill(0)});
-  st.edit[st.week]=rows;renderGrid();
-}
-function addAllFromEmpresa(){
-  const empId=document.getElementById('sel-emp-add').value;if(!empId){alert('Seleccioná una empresa.');return}
-  const prods=st.productos.filter(p=>p.empresa_id===empId);if(!prods.length){alert('Sin productos en el maestro.');return}
-  const rows=getEdit();let added=0;
-  prods.forEach(p=>{if(!rows.find(r=>r.producto===p.nombre&&r.empresa_id===p.empresa_id)){rows.push({empresa_id:p.empresa_id,area:p.area,producto:p.nombre,unidad:p.unidad,days:Array(7).fill(0)});added++}});
-  st.edit[st.week]=rows;renderGrid();
-  if(!added)alert('Todos los productos ya estaban en el plan.');
+function addAllEmp(){
+  const eid=document.getElementById('semp').value;if(!eid){alert('Selecciona empresa.');return}
+  const ps=st.Pr.filter(p=>p.empresa_id===eid);if(!ps.length){alert('Sin productos en maestro.');return}
+  const r=gE();let n=0;
+  ps.forEach(p=>{
+    if(!r.find(x=>x.producto===p.nombre&&x.empresa_id===p.empresa_id)){
+      const a=st.A.find(x=>x.id===p.area_id);r.push({empresa_id:p.empresa_id,area:a?a.nombre:'SA',producto:p.nombre,unidad:p.unidad,days:Array(7).fill(0)});n++;
+    }
+  });
+  st.Ed[st.w]=r;rG();if(!n)alert('Todos ya estaban en el plan.');
 }
 async function savePlan(){
-  const btn=document.getElementById('btn-save-plan');btn.innerHTML='<span class="spinner"></span> Guardando...';btn.disabled=true;setStatus('saving','Guardando...');
+  const btn=document.getElementById('btnsave');btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;ss('saving','Guardando...');
   try{
-    const rows=JSON.parse(JSON.stringify(getEdit()));
-    await sbUpsert('planes',{semana:st.week,filas:rows,updated_at:new Date().toISOString()});
-    st.plans[st.week]=rows;if(!st.semanas.includes(st.week))st.semanas.push(st.week);
-    setStatus('online','Guardado ✓');flash('plan-msg');
-  }catch(e){setStatus('error','Error');document.getElementById('plan-err-txt').textContent=e.message;flash('plan-err')}
+    const rows=JSON.parse(JSON.stringify(gE()));
+    await upsert('planes',{semana:st.w,filas:rows,updated_at:new Date().toISOString()});
+    st.P[st.w]=rows;if(!st.Sem.includes(st.w))st.Sem.push(st.w);
+    ss('online','Guardado');fl('pmsg');
+  }catch(e){ss('error','Error');document.getElementById('perrtxt').textContent=e.message;fl('perr')}
   btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar plan';btn.disabled=false;
 }
 
-// REAL
-async function loadAndRenderReal(){
-  const wk=document.getElementById('real-week-sel').value;if(!wk)return;
-  document.getElementById('real-loading').style.display='flex';
-  await loadPlan(wk);await loadReal(wk);
-  document.getElementById('real-loading').style.display='none';renderReal();
+async function loadReal2(){
+  const k=document.getElementById('rwsel').value;if(!k)return;
+  document.getElementById('rload').style.display='flex';
+  await lp(k);await lr(k);
+  document.getElementById('rload').style.display='none';renderReal();
 }
 function renderReal(){
-  const wk=document.getElementById('real-week-sel').value;if(!wk)return;
-  const empF=document.getElementById('real-emp-sel').value;
-  const allPlan=st.plans[wk]||[];
-  let plan=empF==='all'?allPlan:allPlan.filter(r=>r.empresa_id===empF);
-  const noplan=document.getElementById('real-no-plan');const card=document.getElementById('real-card');const actions=document.getElementById('real-actions');
-  if(!plan.length){noplan.style.display='flex';card.style.display='none';actions.style.display='none';return}
-  noplan.style.display='none';card.style.display='block';actions.style.display='flex';
-  const real=st.reals[wk]||{};const areas=getAreas(plan);const tc=todayCol(wk);
-  let h=`<div style="overflow-x:auto"><table class="plan-grid"><thead><tr>
-    <th class="left">Empresa</th><th class="left">Área</th><th class="left">Producto</th><th class="left" style="width:70px">Unidad</th>`;
-  DAYS.forEach((d,i)=>{h+=`<th class="${i===tc?'today-head':''}" colspan="2" style="font-size:11px;text-align:center">${d.slice(0,3)} ${dayDate(wk,i)}</th>`});
+  const k=document.getElementById('rwsel').value;if(!k)return;
+  const ef=document.getElementById('resel').value;
+  const ap=st.P[k]||[];let plan=ef==='all'?ap:ap.filter(r=>r.empresa_id===ef);
+  const np=document.getElementById('rnop');const cd=document.getElementById('rcard');const ac2=document.getElementById('ract');
+  if(!plan.length){np.style.display='flex';cd.style.display='none';ac2.style.display='none';return}
+  np.style.display='none';cd.style.display='block';ac2.style.display='flex';
+  const re=st.R[k]||{};const as=gas(plan);const t=tc(k);
+  let h=`<div style="overflow-x:auto"><table class="plan-grid"><thead><tr><th class="left">Empresa</th><th class="left">Area</th><th class="left">Producto</th><th class="left" style="width:65px">Unidad</th>`;
+  DAYS.forEach((d,i)=>{h+=`<th class="${i===t?'today-head':''}" colspan="2" style="font-size:11px;text-align:center">${d.slice(0,3)} ${ddate(k,i)}</th>`});
   h+=`<th>Plan</th><th>Real</th></tr><tr style="background:var(--bg2)"><th></th><th></th><th></th><th></th>`;
-  DAYS.forEach((_,i)=>{h+=`<th style="font-size:10px;font-weight:400;color:var(--text2);text-align:center;padding:3px${i===tc?';background:var(--today-head)':''}">P</th><th style="font-size:10px;font-weight:400;color:var(--green);text-align:center;padding:3px${i===tc?';background:var(--today-head)':''}">R</th>`});
+  DAYS.forEach((_,i)=>{h+=`<th style="font-size:10px;font-weight:400;color:var(--text2);text-align:center;padding:3px${i===t?';background:var(--today-head)':''}">P</th><th style="font-size:10px;font-weight:400;color:var(--green);text-align:center;padding:3px${i===t?';background:var(--today-head)':''}">R</th>`});
   h+=`<th></th><th></th></tr></thead><tbody>`;
-  const byEmp={};plan.forEach(r=>{const eid=r.empresa_id||'__';if(!byEmp[eid])byEmp[eid]=[];byEmp[eid].push(r)});
-  Object.entries(byEmp).forEach(([eid,items],gi)=>{
-    const ec=empColor(eid);const en=empName(eid)||'Sin empresa';const eb=hexRgba(ec==='#888'?'#888888':ec,.12);
-    const byArea={};items.forEach(r=>{const a=r.area||'Sin área';if(!byArea[a])byArea[a]=[];byArea[a].push(r)});
+  const bE={};plan.forEach(r=>{const eid=r.empresa_id||'_';if(!bE[eid])bE[eid]=[];bE[eid].push(r)});
+  Object.entries(bE).forEach(([eid,items],gi)=>{
+    const clr=ec(eid);const nm=en(eid)||'SE';const bg=rgba(clr,.12);
+    const bA={};items.forEach(r=>{const a=r.area||'SA';if(!bA[a])bA[a]=[];bA[a].push(r)});
     let ef=true;
-    Object.entries(byArea).forEach(([area,aItems],ai)=>{
-      aItems.forEach((r,ri)=>{
-        const origIdx=allPlan.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
-        const rdays=real[origIdx]||Array(7).fill(0);
-        const tp=(r.days||[]).reduce((a,b)=>a+(b||0),0);const tr2=rdays.reduce((a,b)=>a+(b||0),0);
+    Object.entries(bA).forEach(([area,aIt],ai)=>{
+      aIt.forEach((r,ri)=>{
+        const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
+        const rd=re[oi]||Array(7).fill(0);
+        const tp=(r.days||[]).reduce((a,b)=>a+(b||0),0);const tr2=rd.reduce((a,b)=>a+(b||0),0);
         h+=`<tr class="${gi>0&&ef&&ri===0&&ai===0?'emp-sep':!ef&&ri===0&&ai>0?'area-sep':''}">`;
-        if(ef&&ri===0&&ai===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:8px"><span class="emp-tag" style="background:${eb};color:${ec}"><span class="color-dot" style="background:${ec}"></span>${en}</span></td>`;
-        if(ri===0)h+=`<td rowspan="${aItems.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${aBg(area,areas)};color:${aColor(area,areas)}">${area}</span></td>`;
+        if(ef&&ri===0&&ai===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:8px"><span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span></td>`;
+        if(ri===0)h+=`<td rowspan="${aIt.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${ab(area,as)};color:${ac(area,as)}">${area}</span></td>`;
         h+=`<td style="font-weight:500">${r.producto}</td><td style="font-size:12px;color:var(--text2)">${r.unidad}</td>`;
         for(let di=0;di<7;di++){
-          const pv=(r.days&&r.days[di])||0;const rv=real[origIdx]?.[di]||0;
-          h+=`<td class="day-cell${di===tc?' today-col':''}" style="font-size:12px;color:var(--text2)">${pv>0?pv:'—'}</td>`;
-          h+=`<td class="day-cell${di===tc?' today-col':''}"><input class="day-input${rv>0?' has-val':''}" type="number" min="0" value="${rv||''}" placeholder="—" onchange="upReal('${wk}',${origIdx},${di},this.value);this.classList.toggle('has-val',this.value!='')" style="border-color:rgba(29,158,117,.3)"/></td>`;
+          const pv=(r.days&&r.days[di])||0;const rv=re[oi]?.[di]||0;
+          h+=`<td class="day-cell${di===t?' today-col':''}" style="font-size:12px;color:var(--text2)">${pv>0?pv:'--'}</td>`;
+          h+=`<td class="day-cell${di===t?' today-col':''}"><input class="day-input${rv>0?' has-val':''}" type="number" min="0" value="${rv||''}" placeholder="--" onchange="uR('${k}',${oi},${di},this.value);this.classList.toggle('has-val',this.value!='')" style="border-color:rgba(29,158,117,.3)"/></td>`;
         }
         h+=`<td class="total-cell" style="font-size:12px">${fmt(tp)}</td><td class="total-cell" style="color:var(--green)">${fmt(tr2)}</td></tr>`;
         ef=false;
@@ -550,334 +537,349 @@ function renderReal(){
     });
   });
   h+=`</tbody></table></div>`;
-  document.getElementById('real-grid-wrap').innerHTML=h;
+  document.getElementById('rgrid').innerHTML=h;
 }
-function upReal(wk,i,di,v){if(!st.reals[wk])st.reals[wk]={};if(!st.reals[wk][i])st.reals[wk][i]=Array(7).fill(0);st.reals[wk][i][di]=parseFloat(v)||0}
+function uR(k,i,di,v){if(!st.R[k])st.R[k]={};if(!st.R[k][i])st.R[k][i]=Array(7).fill(0);st.R[k][i][di]=parseFloat(v)||0}
 async function saveReal(){
-  const wk=document.getElementById('real-week-sel').value;
-  const btn=document.getElementById('btn-save-real');btn.innerHTML='<span class="spinner"></span> Guardando...';btn.disabled=true;setStatus('saving','Guardando...');
+  const k=document.getElementById('rwsel').value;
+  const btn=document.getElementById('btnsaver');btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;ss('saving','Guardando...');
   try{
-    await sbUpsert('produccion_real',{semana:wk,datos:JSON.parse(JSON.stringify(st.reals[wk]||{})),updated_at:new Date().toISOString()});
-    if(!st.semanas.includes(wk))st.semanas.push(wk);setStatus('online','Guardado ✓');flash('real-msg');
-  }catch(e){setStatus('error','Error');document.getElementById('real-err-txt').textContent=e.message;flash('real-err')}
-  btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar producción';btn.disabled=false;
+    await upsert('produccion_real',{semana:k,datos:JSON.parse(JSON.stringify(st.R[k]||{})),updated_at:new Date().toISOString()});
+    if(!st.Sem.includes(k))st.Sem.push(k);ss('online','Guardado');fl('rmsg');
+  }catch(e){ss('error','Error');document.getElementById('rerrtxt').textContent=e.message;fl('rerr')}
+  btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar produccion';btn.disabled=false;
 }
 
-// COMPARACIÓN
-async function loadAndRenderCompare(){
-  const wk=document.getElementById('cmp-week-sel').value;if(!wk)return;
-  document.getElementById('compare-content').innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
-  await loadPlan(wk);await loadReal(wk);renderCompare();
+async function loadCmp(){
+  const k=document.getElementById('cwsel').value;if(!k)return;
+  document.getElementById('ccon').innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
+  await lp(k);await lr(k);renderCmp();
 }
-let cChart=null;
-function renderCompare(){
-  const wk=document.getElementById('cmp-week-sel').value;const empF=document.getElementById('cmp-emp-sel').value;
-  const el=document.getElementById('compare-content');if(!wk){el.innerHTML='';return}
-  const allPlan=st.plans[wk]||[];
-  if(!allPlan.length){el.innerHTML='<div class="alert alert-info"><i class="ti ti-info-circle"></i> No hay plan para esta semana.</div>';return}
-  let plan=empF==='all'?allPlan:allPlan.filter(r=>r.empresa_id===empF);
-  const real=st.reals[wk]||{};
-  let tp=0,tr2=0,cumple=0;
-  plan.forEach(r=>{const i=allPlan.indexOf(r);const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);const rv=(real[i]||[]).reduce((a,b)=>a+(b||0),0);tp+=pv;tr2+=rv;if(rv>=pv&&pv>0)cumple++});
+let cch=null;
+function renderCmp(){
+  const k=document.getElementById('cwsel').value;const ef=document.getElementById('cesel').value;
+  const el=document.getElementById('ccon');if(!k){el.innerHTML='';return}
+  const ap=st.P[k]||[];
+  if(!ap.length){el.innerHTML='<div class="alert alert-info"><i class="ti ti-info-circle"></i> No hay plan para esta semana.</div>';return}
+  let plan=ef==='all'?ap:ap.filter(r=>r.empresa_id===ef);
+  const re=st.R[k]||{};
+  let tp=0,tr2=0,cu=0;
+  plan.forEach(r=>{const i=ap.indexOf(r);const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);const rv=(re[i]||[]).reduce((a,b)=>a+(b||0),0);tp+=pv;tr2+=rv;if(rv>=pv&&pv>0)cu++});
   const pct=tp>0?Math.round(tr2/tp*100):0;const cls=pct>=90?'good':pct>=70?'warn':'bad';
-  const conPlan=plan.filter(r=>(r.days||[]).some(v=>v>0)).length;
   let html=`<div class="metric-grid">
     <div class="metric"><div class="metric-label">Cumplimiento global</div><div class="metric-val ${cls}">${pct}%</div></div>
     <div class="metric"><div class="metric-label">Total planificado</div><div class="metric-val">${tp.toLocaleString('es-AR')}</div></div>
     <div class="metric"><div class="metric-label">Total producido</div><div class="metric-val">${tr2.toLocaleString('es-AR')}</div></div>
-    <div class="metric"><div class="metric-label">Ítems cumplidos</div><div class="metric-val">${cumple}/${conPlan}</div></div>
+    <div class="metric"><div class="metric-label">Items cumplidos</div><div class="metric-val">${cu}/${plan.filter(r=>(r.days||[]).some(v=>v>0)).length}</div></div>
   </div>`;
-  const tc=todayCol(wk);const areas=getAreas(plan);
-  html+=`<div class="grid-card"><div style="overflow-x:auto"><table class="plan-grid"><thead><tr>
-    <th class="left">Empresa</th><th class="left">Área</th><th class="left">Producto</th>`;
-  DAYS.forEach((d,i)=>{html+=`<th class="${i===tc?'today-head':''}" colspan="2" style="font-size:11px">${d.slice(0,3)}</th>`});
-  html+=`<th>Plan</th><th>Real</th><th style="width:46px">%</th><th style="width:68px">Estado</th></tr>
-  <tr style="background:var(--bg2)"><th></th><th></th><th></th>`;
-  DAYS.forEach((_,i)=>{html+=`<th style="font-size:10px;font-weight:400;color:var(--text2);text-align:center;padding:3px${i===tc?';background:var(--today-head)':''}">P</th><th style="font-size:10px;font-weight:400;color:var(--green);text-align:center;padding:3px${i===tc?';background:var(--today-head)':''}">R</th>`});
+  const t=tc(k);const as=gas(plan);
+  html+=`<div class="grid-card"><div style="overflow-x:auto"><table class="plan-grid"><thead><tr><th class="left">Empresa</th><th class="left">Area</th><th class="left">Producto</th>`;
+  DAYS.forEach((d,i)=>{html+=`<th class="${i===t?'today-head':''}" colspan="2" style="font-size:11px">${d.slice(0,3)}</th>`});
+  html+=`<th>Plan</th><th>Real</th><th style="width:44px">%</th><th style="width:66px">Estado</th></tr><tr style="background:var(--bg2)"><th></th><th></th><th></th>`;
+  DAYS.forEach((_,i)=>{html+=`<th style="font-size:10px;font-weight:400;color:var(--text2);text-align:center;padding:3px${i===t?';background:var(--today-head)':''}">P</th><th style="font-size:10px;font-weight:400;color:var(--green);text-align:center;padding:3px${i===t?';background:var(--today-head)':''}">R</th>`});
   html+=`<th></th><th></th><th></th><th></th></tr></thead><tbody>`;
-  const byEmp={};plan.forEach(r=>{const eid=r.empresa_id||'__';if(!byEmp[eid])byEmp[eid]=[];byEmp[eid].push(r)});
-  const areaStats=[];
-  Object.entries(byEmp).forEach(([eid,items],gi)=>{
-    const ec=empColor(eid);const en=empName(eid)||'Sin empresa';const eb=hexRgba(ec==='#888'?'#888888':ec,.12);
-    const byArea={};items.forEach(r=>{const a=r.area||'Sin área';if(!byArea[a])byArea[a]=[];byArea[a].push(r)});
+  const bE={};plan.forEach(r=>{const eid=r.empresa_id||'_';if(!bE[eid])bE[eid]=[];bE[eid].push(r)});
+  const ast=[];
+  Object.entries(bE).forEach(([eid,items],gi)=>{
+    const clr=ec(eid);const nm=en(eid)||'SE';const bg=rgba(clr,.12);
+    const bA={};items.forEach(r=>{const a=r.area||'SA';if(!bA[a])bA[a]=[];bA[a].push(r)});
     let ef=true;
-    Object.entries(byArea).forEach(([area,aItems],ai)=>{
+    Object.entries(bA).forEach(([area,aIt],ai)=>{
       let aap=0,aar=0;
-      aItems.forEach((r,ri)=>{
-        const oi=allPlan.indexOf(r);
-        const tp2=(r.days||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
-        const tr3=(real[oi]||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
-        aap+=tp2;aar+=tr3;
-        const p=tp2>0?Math.round(tr3/tp2*100):0;
-        const badge=p>=90?'<span class="badge badge-ok">OK</span>':p>=70?'<span class="badge badge-warn">Parcial</span>':'<span class="badge badge-bad">Bajo</span>';
+      aIt.forEach((r,ri)=>{
+        const oi=ap.indexOf(r);
+        const t2=(r.days||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
+        const t3=(re[oi]||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
+        aap+=t2;aar+=t3;
+        const p=t2>0?Math.round(t3/t2*100):0;
+        const bdg=p>=90?'<span class="badge badge-ok">OK</span>':p>=70?'<span class="badge badge-warn">Parcial</span>':'<span class="badge badge-bad">Bajo</span>';
         html+=`<tr class="${gi>0&&ef&&ri===0&&ai===0?'emp-sep':!ef&&ri===0&&ai>0?'area-sep':''}">`;
-        if(ef&&ri===0&&ai===0)html+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:8px"><span class="emp-tag" style="background:${eb};color:${ec}"><span class="color-dot" style="background:${ec}"></span>${en}</span></td>`;
-        if(ri===0)html+=`<td rowspan="${aItems.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${aBg(area,areas)};color:${aColor(area,areas)}">${area}</span></td>`;
+        if(ef&&ri===0&&ai===0)html+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:8px"><span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span></td>`;
+        if(ri===0)html+=`<td rowspan="${aIt.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${ab(area,as)};color:${ac(area,as)}">${area}</span></td>`;
         html+=`<td style="font-weight:500;font-size:12px">${r.producto}</td>`;
         for(let di=0;di<7;di++){
-          const pv=(r.days&&r.days[di])||0;const rv=(real[oi]&&real[oi][di])||0;
+          const pv=(r.days&&r.days[di])||0;const rv=(re[oi]&&re[oi][di])||0;
           const ok=pv>0&&rv>=pv,low=pv>0&&rv>0&&rv<pv,zero=pv>0&&rv===0;
           const cbg=ok?'rgba(29,158,117,.1)':low?'rgba(186,117,23,.1)':zero?'rgba(226,75,74,.07)':'';
-          html+=`<td class="day-cell${di===tc?' today-col':''}" style="font-size:11px;color:var(--text2)">${pv>0?pv:'—'}</td>`;
-          html+=`<td class="day-cell${di===tc?' today-col':''}" style="font-size:11px;font-weight:${rv>0?'600':'400'};color:${ok?'var(--green)':low?'var(--amber)':zero&&pv>0?'var(--red)':'var(--text2)'};background:${cbg}">${rv>0?rv:'—'}</td>`;
+          html+=`<td class="day-cell${di===t?' today-col':''}" style="font-size:11px;color:var(--text2)">${pv>0?pv:'--'}</td>`;
+          html+=`<td class="day-cell${di===t?' today-col':''}" style="font-size:11px;font-weight:${rv>0?'600':'400'};color:${ok?'var(--green)':low?'var(--amber)':zero&&pv>0?'var(--red)':'var(--text2)'};background:${cbg}">${rv>0?rv:'--'}</td>`;
         }
-        html+=`<td class="total-cell" style="font-size:12px">${fmt(tp2)}</td><td class="total-cell" style="color:var(--green);font-size:12px">${fmt(tr3)}</td>`;
-        html+=`<td style="text-align:center;font-size:12px;font-weight:600">${tp2>0?p+'%':'—'}</td><td>${tp2>0?badge:'—'}</td></tr>`;
+        html+=`<td class="total-cell" style="font-size:12px">${fmt(t2)}</td><td class="total-cell" style="color:var(--green);font-size:12px">${fmt(t3)}</td>`;
+        html+=`<td style="text-align:center;font-size:12px;font-weight:600">${t2>0?p+'%':'--'}</td><td>${t2>0?bdg:'--'}</td></tr>`;
         ef=false;
       });
-      areaStats.push({label:`${en}/${area}`,ap:aap,ar:aar,color:ec});
+      ast.push({label:`${nm}/${area}`,ap:aap,ar:aar});
     });
   });
   html+=`</tbody></table></div></div>`;
-  html+=`<div class="chart-card"><div class="chart-wrap"><canvas id="cmpChart" role="img" aria-label="Plan vs real">Datos.</canvas></div>
+  html+=`<div class="chart-card"><div class="chart-wrap"><canvas id="cmpch"></canvas></div>
     <div style="display:flex;gap:16px;margin-top:12px;font-size:12px;color:var(--text2);justify-content:center">
       <span><span style="width:10px;height:10px;border-radius:2px;background:#378ADD;display:inline-block;margin-right:4px"></span>Planificado</span>
       <span><span style="width:10px;height:10px;border-radius:2px;background:#1D9E75;display:inline-block;margin-right:4px"></span>Real</span>
     </div></div>`;
   el.innerHTML=html;
-  if(cChart){cChart.destroy();cChart=null}
+  if(cch){cch.destroy();cch=null}
   setTimeout(()=>{
-    const isDark=matchMedia('(prefers-color-scheme: dark)').matches;const tc2=isDark?'#ccc':'#555';
-    cChart=new Chart(document.getElementById('cmpChart'),{type:'bar',
-      data:{labels:areaStats.map(s=>s.label),datasets:[
-        {label:'Planificado',data:areaStats.map(s=>s.ap),backgroundColor:'#B5D4F4',borderColor:'#378ADD',borderWidth:1.5},
-        {label:'Real',data:areaStats.map(s=>s.ar),backgroundColor:'#9FE1CB',borderColor:'#1D9E75',borderWidth:1.5}
+    const dk=matchMedia('(prefers-color-scheme: dark)').matches;const tc2=dk?'#ccc':'#555';
+    cch=new Chart(document.getElementById('cmpch'),{type:'bar',
+      data:{labels:ast.map(s=>s.label),datasets:[
+        {label:'Plan',data:ast.map(s=>s.ap),backgroundColor:'#B5D4F4',borderColor:'#378ADD',borderWidth:1.5},
+        {label:'Real',data:ast.map(s=>s.ar),backgroundColor:'#9FE1CB',borderColor:'#1D9E75',borderWidth:1.5}
       ]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-        scales:{x:{ticks:{color:tc2,font:{size:11}},grid:{display:false}},y:{ticks:{color:tc2},grid:{color:isDark?'rgba(255,255,255,.07)':'rgba(0,0,0,.06)'}}}}
+        scales:{x:{ticks:{color:tc2,font:{size:11}},grid:{display:false}},y:{ticks:{color:tc2},grid:{color:dk?'rgba(255,255,255,.07)':'rgba(0,0,0,.06)'}}}}
     });
   },100);
 }
 
 // MAESTRO
-function renderMaestro(){
-  const list=document.getElementById('emp-list');
-  if(!st.empresas.length){list.innerHTML='<div class="empty" style="padding:1.5rem"><i class="ti ti-building-off"></i>Sin empresas.</div>';document.getElementById('maestro-detail').innerHTML='<div class="empty"><i class="ti ti-arrow-left"></i>Agregá una empresa.</div>';return}
+function rMae(){
+  const list=document.getElementById('emplist');
+  if(!st.E.length){list.innerHTML='<div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Sin empresas.</div>';return}
   let h='';
-  st.empresas.forEach(e=>{
-    const cnt=st.productos.filter(p=>p.empresa_id===e.id).length;const act=e.id===st.activeEmpId;
-    h+=`<div class="emp-list-row${act?' active':''}" onclick="selectEmp('${e.id}')">
-      <div style="display:flex;align-items:center;gap:8px"><span class="color-dot" style="background:${e.color};width:14px;height:14px"></span>
-        <div><div class="emp-name">${e.nombre}</div><div class="emp-meta">${cnt} producto${cnt!==1?'s':''}</div></div>
+  st.E.forEach(e=>{
+    const cnt=st.Pr.filter(p=>p.empresa_id===e.id).length;const sel=e.id===st.aeid;
+    h+=`<div class="m-row${sel?' sel':''}" onclick="selEmp('${e.id}')">
+      <div style="display:flex;align-items:center;gap:7px;flex:1;min-width:0">
+        <span style="width:12px;height:12px;border-radius:50%;background:${e.color};flex-shrink:0;display:inline-block"></span>
+        <div style="min-width:0"><div class="m-name">${e.nombre}</div><div class="m-meta">${cnt} prod.</div></div>
       </div>
-      <div style="display:flex;gap:4px">
-        <button class="btn btn-xs" onclick="event.stopPropagation();editEmpColor('${e.id}')"><i class="ti ti-palette"></i></button>
-        <button class="btn btn-xs btn-danger" onclick="event.stopPropagation();deleteEmp('${e.id}')"><i class="ti ti-trash"></i></button>
-      </div>
+      <button class="btn btn-xs btn-danger" onclick="event.stopPropagation();delEmp('${e.id}')"><i class="ti ti-trash"></i></button>
     </div>`;
   });
   list.innerHTML=h;
-  if(st.activeEmpId)renderEmpDetail(st.activeEmpId);
+  if(st.aeid)rAreaList(st.aeid);
 }
-function selectEmp(id){st.activeEmpId=id;renderMaestro()}
-function renderEmpDetail(empId){
-  const emp=st.empresas.find(e=>e.id===empId);if(!emp)return;
-  const prods=st.productos.filter(p=>p.empresa_id===empId);
-  const areas=[...new Set(prods.map(p=>p.area))].sort();
-  const wrap=document.getElementById('maestro-detail');
-  let h=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem">
-    <span class="color-dot" style="background:${emp.color};width:16px;height:16px"></span>
-    <span style="font-size:16px;font-weight:600">${emp.nombre}</span>
-    <span style="font-size:13px;color:var(--text2)">${prods.length} producto${prods.length!==1?'s':''}</span>
+function selEmp(id){
+  st.aeid=id;st.aaid=null;
+  document.getElementById('proddetail').innerHTML='<div style="padding:2rem;text-align:center;font-size:13px;color:var(--text2)"><i class="ti ti-arrow-left" style="display:block;font-size:24px;margin-bottom:6px;color:var(--text3)"></i>Selecciona un area</div>';
+  rMae();
+}
+function rAreaList(eid){
+  const areas=st.A.filter(a=>a.empresa_id===eid);
+  const list=document.getElementById('arealist');
+  const add=document.getElementById('areaadd');
+  if(add)add.style.display='block';
+  if(!areas.length){list.innerHTML='<div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Sin areas.</div>';}
+  else{
+    let h='';
+    areas.forEach(a=>{
+      const cnt=st.Pr.filter(p=>p.area_id===a.id).length;const sel=a.id===st.aaid;
+      h+=`<div class="m-row${sel?' sel':''}" onclick="selArea('${a.id}')">
+        <div style="flex:1;min-width:0"><div class="m-name">${a.nombre}</div><div class="m-meta">${cnt} prod.</div></div>
+        <button class="btn btn-xs btn-danger" onclick="event.stopPropagation();delArea('${a.id}')"><i class="ti ti-trash"></i></button>
+      </div>`;
+    });
+    list.innerHTML=h;
+  }
+  if(st.aaid)rProdDetail(st.aaid);
+}
+function selArea(id){st.aaid=id;rAreaList(st.aeid);}
+function rProdDetail(aid){
+  const area=st.A.find(a=>a.id===aid);if(!area)return;
+  const emp=st.E.find(e=>e.id===area.empresa_id);
+  const prods=st.Pr.filter(p=>p.area_id===aid);
+  const wrap=document.getElementById('proddetail');
+  let h=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:1rem">
+    ${emp?`<span style="width:12px;height:12px;border-radius:50%;background:${emp.color};display:inline-block"></span><span style="font-size:12px;color:var(--text2)">${emp.nombre} /</span>`:''}
+    <span style="font-size:14px;font-weight:600">${area.nombre}</span>
+    <span style="font-size:12px;color:var(--text2)">${prods.length} producto${prods.length!==1?'s':''}</span>
   </div>`;
   if(prods.length){
-    h+=`<div class="grid-card" style="margin-bottom:1rem"><table class="prod-table"><thead><tr><th>Área</th><th>Producto</th><th style="width:110px">Unidad</th><th style="width:36px"></th></tr></thead><tbody>`;
-    const byArea={};prods.forEach(p=>{if(!byArea[p.area])byArea[p.area]=[];byArea[p.area].push(p)});
-    Object.entries(byArea).sort().forEach(([area,items])=>{
-      items.forEach((p,i)=>{
-        h+=`<tr>`;
-        if(i===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:9px"><span class="area-tag" style="background:${hexRgba(emp.color,.12)};color:${emp.color}">${area}</span></td>`;
-        h+=`<td><input value="${p.nombre}" onchange="updateProd('${p.id}','nombre',this.value)"/></td>`;
-        h+=`<td><input value="${p.unidad}" list="udl-m" onchange="updateProd('${p.id}','unidad',this.value)"/>
-          <datalist id="udl-m">${UNITS.map(u=>`<option>${u}</option>`).join('')}</datalist></td>`;
-        h+=`<td><button class="btn btn-xs btn-danger" onclick="deleteProd('${p.id}')"><i class="ti ti-trash"></i></button></td></tr>`;
-      });
+    h+=`<div class="grid-card" style="margin-bottom:1rem"><table class="ptbl">
+      <thead><tr><th>Producto</th><th style="width:120px">Unidad</th><th style="width:34px"></th></tr></thead><tbody>`;
+    prods.forEach(p=>{
+      h+=`<tr>
+        <td><input value="${p.nombre}" onchange="updP('${p.id}','nombre',this.value)"/></td>
+        <td><input value="${p.unidad}" list="pudl" onchange="updP('${p.id}','unidad',this.value)" style="width:100%"/>
+          <datalist id="pudl">${UNITS.map(u=>`<option>${u}</option>`).join('')}</datalist></td>
+        <td><button class="btn btn-xs btn-danger" onclick="delProd('${p.id}')"><i class="ti ti-trash"></i></button></td>
+      </tr>`;
     });
     h+=`</tbody></table></div>`;
   } else {
-    h+=`<div class="empty" style="padding:1.5rem"><i class="ti ti-package-off"></i>Sin productos aún.</div>`;
+    h+=`<div style="padding:1.25rem;text-align:center;font-size:13px;color:var(--text2);border:.5px solid var(--border);border-radius:var(--radius-lg);margin-bottom:1rem">Sin productos aun.</div>`;
   }
   h+=`<div class="add-bar">
-    <input type="text" id="np-nombre" placeholder="Nombre del producto" class="wide" />
-    <input type="text" id="np-area" placeholder="Área" list="np-areas-dl" style="width:130px"/>
-    <datalist id="np-areas-dl">${areas.map(a=>`<option>${a}</option>`).join('')}</datalist>
-    <input type="text" id="np-unit" placeholder="Unidad" list="np-units-dl" style="width:110px"/>
-    <datalist id="np-units-dl">${UNITS.map(u=>`<option>${u}</option>`).join('')}</datalist>
-    <button class="btn btn-primary" onclick="addProd('${empId}')"><i class="ti ti-plus"></i> Agregar producto</button>
+    <input type="text" id="npnom" placeholder="Nombre del producto" class="wide"/>
+    <input type="text" id="npunit" placeholder="Unidad" list="npudl" style="width:110px"/>
+    <datalist id="npudl">${UNITS.map(u=>`<option>${u}</option>`).join('')}</datalist>
+    <button class="btn btn-primary" onclick="addProd('${aid}','${area.empresa_id}')"><i class="ti ti-plus"></i> Agregar producto</button>
   </div>`;
   wrap.innerHTML=h;
 }
 async function addEmpresa(){
-  const nombre=document.getElementById('new-emp-name').value.trim();const color=document.getElementById('new-emp-color').value;
-  if(!nombre)return;setStatus('saving','Guardando...');
-  try{const res=await sbInsert('empresas',{nombre,color});st.empresas.push(res[0]);document.getElementById('new-emp-name').value='';updateEmpSels();renderMaestro();renderEmpPills();setStatus('online','Guardado ✓')}
-  catch(e){setStatus('error','Error');document.getElementById('maestro-err-txt').textContent=e.message;flash('maestro-err')}
+  const nom=document.getElementById('nemp').value.trim();const col=document.getElementById('nempcolor').value;
+  if(!nom)return;ss('saving','Guardando...');
+  try{const r=await ins('empresas',{nombre:nom,color:col});st.E.push(r[0]);document.getElementById('nemp').value='';uES();rMae();rP();ss('online','Guardado');}
+  catch(e){ss('error','Error');document.getElementById('maeErrtxt').textContent=e.message;fl('maeerr')}
 }
-async function deleteEmp(id){
-  if(!confirm('¿Eliminar empresa y todos sus productos?'))return;setStatus('saving','...');
-  try{await sbDel('empresas',id);st.empresas=st.empresas.filter(e=>e.id!==id);st.productos=st.productos.filter(p=>p.empresa_id!==id);if(st.activeEmpId===id)st.activeEmpId=null;updateEmpSels();renderMaestro();renderEmpPills();setStatus('online','Eliminado ✓')}
-  catch(e){setStatus('error','Error')}
+async function delEmp(id){
+  if(!confirm('Eliminar empresa, areas y productos?'))return;ss('saving','...');
+  try{await del('empresas',id);st.E=st.E.filter(e=>e.id!==id);st.A=st.A.filter(a=>a.empresa_id!==id);st.Pr=st.Pr.filter(p=>p.empresa_id!==id);if(st.aeid===id){st.aeid=null;st.aaid=null;}uES();rMae();rP();ss('online','Eliminado');}
+  catch(e){ss('error','Error')}
 }
-async function editEmpColor(id){
-  const color=prompt('Color hex (ej: #FF5500):');if(!color||!/^#[0-9a-fA-F]{6}$/.test(color))return;
-  try{await sbPatch('empresas',id,{color});const e=st.empresas.find(x=>x.id===id);if(e)e.color=color;renderMaestro();renderEmpPills();updateEmpSels()}
+async function addArea(){
+  const eid=st.aeid;if(!eid)return;
+  const nom=document.getElementById('narea').value.trim();if(!nom)return;
+  ss('saving','Guardando...');
+  try{const r=await ins('areas',{empresa_id:eid,nombre:nom});st.A.push(r[0]);document.getElementById('narea').value='';rAreaList(eid);rMae();onEmp();ss('online','Guardado');fl('maemsg');}
+  catch(e){ss('error','Error');document.getElementById('maeErrtxt').textContent=e.message;fl('maeerr')}
+}
+async function delArea(id){
+  if(!confirm('Eliminar area y sus productos?'))return;
+  try{await del('areas',id);st.A=st.A.filter(a=>a.id!==id);st.Pr=st.Pr.filter(p=>p.area_id!==id);if(st.aaid===id){st.aaid=null;document.getElementById('proddetail').innerHTML='<div style="padding:2rem;text-align:center;font-size:13px;color:var(--text2)">Selecciona un area</div>';}rAreaList(st.aeid);rMae();ss('online','Eliminado');}
   catch(e){alert('Error: '+e.message)}
 }
-async function addProd(empId){
-  const nombre=document.getElementById('np-nombre').value.trim();const area=document.getElementById('np-area').value.trim();const unidad=document.getElementById('np-unit').value.trim()||'unidades';
-  if(!nombre||!area)return;setStatus('saving','Guardando...');
-  try{const res=await sbInsert('productos',{empresa_id:empId,nombre,area,unidad});st.productos.push(res[0]);document.getElementById('np-nombre').value='';document.getElementById('np-area').value='';renderMaestro();renderAddProdsSelect();setStatus('online','Guardado ✓');flash('maestro-msg')}
-  catch(e){setStatus('error','Error');document.getElementById('maestro-err-txt').textContent=e.message;flash('maestro-err')}
+async function addProd(aid,eid){
+  const nom=document.getElementById('npnom').value.trim();const unit=document.getElementById('npunit').value.trim()||'unidades';
+  if(!nom)return;ss('saving','Guardando...');
+  try{const r=await ins('productos',{empresa_id:eid,area_id:aid,nombre:nom,unidad:unit});st.Pr.push(r[0]);document.getElementById('npnom').value='';rProdDetail(aid);rMae();onArea();ss('online','Guardado');fl('maemsg');}
+  catch(e){ss('error','Error');document.getElementById('maeErrtxt').textContent=e.message;fl('maeerr')}
 }
-async function updateProd(id,field,val){
-  try{await sbPatch('productos',id,{[field]:val});const p=st.productos.find(x=>x.id===id);if(p)p[field]=val}
-  catch(e){setStatus('error','Error al actualizar')}
+async function updP(id,f,v){
+  try{await pat('productos',id,{[f]:v});const p=st.Pr.find(x=>x.id===id);if(p)p[f]=v;}
+  catch(e){ss('error','Error al actualizar')}
 }
-async function deleteProd(id){
-  if(!confirm('¿Eliminar este producto?'))return;
-  try{await sbDel('productos',id);st.productos=st.productos.filter(p=>p.id!==id);renderMaestro();renderAddProdsSelect();setStatus('online','Eliminado ✓')}
+async function delProd(id){
+  if(!confirm('Eliminar producto?'))return;
+  try{await del('productos',id);st.Pr=st.Pr.filter(p=>p.id!==id);rProdDetail(st.aaid);rMae();ss('online','Eliminado');}
   catch(e){alert('Error: '+e.message)}
 }
 
 // RECETAS
-let activeRecProd=null;
-function getAllProducts(){const all=new Set();st.productos.forEach(p=>all.add(p.nombre));Object.keys(st.recetas).forEach(p=>all.add(p));return[...all].sort()}
-function renderRecetas(){
-  const prods=getAllProducts();const list=document.getElementById('receta-prod-list');
-  if(!prods.length){list.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Agregá productos en Maestro.</div>';return}
+let arec=null;
+function gprod(){const all=new Set();st.Pr.forEach(p=>all.add(p.nombre));Object.keys(st.Rec).forEach(p=>all.add(p));return[...all].sort()}
+function rRec(){
+  const ps=gprod();const list=document.getElementById('rplist');
+  if(!ps.length){list.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Agrega productos en Maestro.</div>';return}
   let h='';
-  prods.forEach(p=>{
-    const ingrs=st.recetas[p]||[];const active=p===activeRecProd;
-    const prod=st.productos.find(x=>x.nombre===p);const emp=prod?st.empresas.find(e=>e.id===prod.empresa_id):null;
-    h+=`<div class="receta-prod-row${active?' active':''}" onclick="selectRecProd('${p.replace(/'/g,"\\'")}')">
-      <div><div style="font-size:13px;font-weight:500">${p}</div>
-      <div style="font-size:12px;color:var(--text2)">${emp?emp.nombre+' · ':''}${ingrs.length?ingrs.length+' ingrediente'+(ingrs.length!==1?'s':''):'Sin receta'}</div></div>
+  ps.forEach(p=>{
+    const ings=st.Rec[p]||[];const sel=p===arec;
+    const pr=st.Pr.find(x=>x.nombre===p);const ar=pr?st.A.find(a=>a.id===pr.area_id):null;const em=pr?st.E.find(e=>e.id===pr.empresa_id):null;
+    h+=`<div class="rrow${sel?' sel':''}" onclick="selRec('${p.replace(/'/g,"\'")}')">
+      <div><div style="font-size:13px;font-weight:500">${p}</div><div style="font-size:12px;color:var(--text2)">${em?em.nombre:''}${ar?' / '+ar.nombre:''} - ${ings.length?ings.length+' ing.':'Sin receta'}</div></div>
       <i class="ti ti-chevron-right" style="color:var(--text3);font-size:14px"></i>
     </div>`;
   });
-  list.innerHTML=h;if(activeRecProd)renderRecetaDetail(activeRecProd);
+  list.innerHTML=h;if(arec)rRecDet(arec);
 }
-function selectRecProd(p){activeRecProd=p;renderRecetas()}
-function renderRecetaDetail(p){
-  const ingrs=st.recetas[p]||[];const wrap=document.getElementById('receta-detail-wrap');
-  const key=p.replace(/[\s']/g,'_');
-  let h=`<div class="receta-detail">
+function selRec(p){arec=p;rRec()}
+function rRecDet(p){
+  const ings=st.Rec[p]||[];const wrap=document.getElementById('rdetail');
+  const k=p.replace(/[\s']/g,'_');
+  let h=`<div class="rdetail">
     <div style="font-size:15px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px"><i class="ti ti-notebook" style="color:var(--purple)"></i>${p}</div>
-    <table class="ingr-table"><thead><tr><th>Ingrediente / MP</th><th style="width:130px">Cant. x unidad</th><th style="width:100px">Unidad</th><th style="width:34px"></th></tr></thead><tbody>`;
-  ingrs.forEach((ing,i)=>{
+    <table class="itbl"><thead><tr><th>Ingrediente / MP</th><th style="width:130px">Cant. x unidad</th><th style="width:100px">Unidad</th><th style="width:34px"></th></tr></thead><tbody>`;
+  ings.forEach((ing,i)=>{
     h+=`<tr>
-      <td><input value="${ing.ingrediente}" onchange="upIngr('${p.replace(/'/g,"\\'")}',${i},'ingrediente',this.value)" list="ingr-dl"/></td>
-      <td><input type="number" min="0" step="0.001" value="${ing.cantidad}" onchange="upIngr('${p.replace(/'/g,"\\'")}',${i},'cantidad',this.value)" style="width:120px;text-align:right"/></td>
-      <td><select onchange="upIngr('${p.replace(/'/g,"\\'")}',${i},'unidad',this.value)" style="width:100%">
+      <td><input value="${ing.ingrediente}" onchange="uIng('${p.replace(/'/g,"\'")}',${i},'ingrediente',this.value)" list="ingdl"/></td>
+      <td><input type="number" min="0" step="0.001" value="${ing.cantidad}" onchange="uIng('${p.replace(/'/g,"\'")}',${i},'cantidad',this.value)" style="width:120px;text-align:right"/></td>
+      <td><select onchange="uIng('${p.replace(/'/g,"\'")}',${i},'unidad',this.value)" style="width:100%">
         ${['kg','g','litros','ml','unidades','cajas','sobres','latas','bolsas','metros'].map(u=>`<option${u===ing.unidad?' selected':''}>${u}</option>`).join('')}
       </select></td>
-      <td><button class="btn btn-xs btn-danger" onclick="removeIngr('${p.replace(/'/g,"\\'")}',${i})"><i class="ti ti-trash"></i></button></td>
+      <td><button class="btn btn-xs btn-danger" onclick="delIng('${p.replace(/'/g,"\'")}',${i})"><i class="ti ti-trash"></i></button></td>
     </tr>`;
   });
-  h+=`</tbody></table>
-    <datalist id="ingr-dl"></datalist>
-    <div class="add-ingr-bar">
-      <input type="text" id="nig-name-${key}" placeholder="Ingrediente" class="wide" list="ingr-dl"/>
-      <input type="number" min="0" step="0.001" id="nig-qty-${key}" placeholder="Cantidad" class="num"/>
-      <select id="nig-unit-${key}">${['kg','g','litros','ml','unidades','cajas','sobres','latas','bolsas','metros'].map(u=>`<option>${u}</option>`).join('')}</select>
-      <button class="btn btn-primary btn-sm" onclick="addIngr('${p.replace(/'/g,"\\'")}')"><i class="ti ti-plus"></i> Agregar</button>
+  h+=`</tbody></table><datalist id="ingdl"></datalist>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">
+      <input type="text" id="ning-${k}" placeholder="Ingrediente" style="width:180px;padding:5px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)" list="ingdl"/>
+      <input type="number" min="0" step="0.001" id="nqty-${k}" placeholder="Cantidad" style="width:90px;padding:5px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <select id="nunit-${k}" style="padding:5px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">${['kg','g','litros','ml','unidades','cajas','sobres','latas','bolsas','metros'].map(u=>`<option>${u}</option>`).join('')}</select>
+      <button class="btn btn-primary btn-sm" onclick="addIng('${p.replace(/'/g,"\'")}')"><i class="ti ti-plus"></i> Agregar</button>
     </div></div>`;
   wrap.innerHTML=h;
-  const allIngr=new Set();Object.values(st.recetas).forEach(arr=>arr.forEach(i=>allIngr.add(i.ingrediente)));
-  const dl=document.getElementById('ingr-dl');[...allIngr].forEach(i=>{const o=document.createElement('option');o.value=i;dl.appendChild(o)});
+  const all=new Set();Object.values(st.Rec).forEach(arr=>arr.forEach(i=>all.add(i.ingrediente)));
+  const dl=document.getElementById('ingdl');[...all].forEach(i=>{const o=document.createElement('option');o.value=i;dl.appendChild(o)});
 }
-function upIngr(prod,i,field,val){if(!st.recetas[prod])st.recetas[prod]=[];st.recetas[prod][i][field]=field==='cantidad'?parseFloat(val)||0:val}
-function removeIngr(prod,i){st.recetas[prod].splice(i,1);renderRecetaDetail(prod);renderRecetas()}
-function addIngr(prod){
-  const k=prod.replace(/[\s']/g,'_');
-  const name=document.getElementById(`nig-name-${k}`)?.value.trim();
-  const qty=parseFloat(document.getElementById(`nig-qty-${k}`)?.value)||0;
-  const unit=document.getElementById(`nig-unit-${k}`)?.value;
-  if(!name)return;if(!st.recetas[prod])st.recetas[prod]=[];
-  st.recetas[prod].push({ingrediente:name,cantidad:qty,unidad:unit});
-  renderRecetaDetail(prod);renderRecetas();
+function uIng(p,i,f,v){if(!st.Rec[p])st.Rec[p]=[];st.Rec[p][i][f]=f==='cantidad'?parseFloat(v)||0:v}
+function delIng(p,i){st.Rec[p].splice(i,1);rRecDet(p);rRec()}
+function addIng(p){
+  const k=p.replace(/[\s']/g,'_');
+  const nm=document.getElementById(`ning-${k}`)?.value.trim();
+  const qty=parseFloat(document.getElementById(`nqty-${k}`)?.value)||0;
+  const unit=document.getElementById(`nunit-${k}`)?.value;
+  if(!nm)return;if(!st.Rec[p])st.Rec[p]=[];
+  st.Rec[p].push({ingrediente:nm,cantidad:qty,unidad:unit});
+  rRecDet(p);rRec();
 }
 async function saveRecetas(){
-  const btn=document.getElementById('btn-save-recetas');btn.innerHTML='<span class="spinner"></span> Guardando...';btn.disabled=true;setStatus('saving','Guardando...');
-  try{await sbUpsert('recetas',{id:1,datos:JSON.parse(JSON.stringify(st.recetas)),updated_at:new Date().toISOString()});setStatus('online','Guardado ✓');flash('recetas-msg')}
-  catch(e){setStatus('error','Error');alert('Error: '+e.message)}
+  const btn=document.getElementById('btnsaverec');btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;ss('saving','Guardando...');
+  try{await upsert('recetas',{id:1,datos:JSON.parse(JSON.stringify(st.Rec)),updated_at:new Date().toISOString()});ss('online','Guardado');fl('recmsg');}
+  catch(e){ss('error','Error');alert('Error: '+e.message)}
   btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar recetas';btn.disabled=false;
 }
 
 // CONSUMO
-async function renderConsumo(){
-  const modo=document.getElementById('consumo-modo').value;const empF=document.getElementById('consumo-emp-sel').value;
-  const el=document.getElementById('consumo-content');const filtro=document.getElementById('consumo-filtro').value.trim().toLowerCase();
-  let semanas=[];
-  if(modo==='semana'){const wk=document.getElementById('consumo-week-sel').value;if(wk)semanas=[wk]}
+async function renderCon(){
+  const modo=document.getElementById('cmodo').value;const ef=document.getElementById('ceesel').value;
+  const el=document.getElementById('ccon2');const flt=document.getElementById('cfilt').value.trim().toLowerCase();
+  let sems=[];
+  if(modo==='semana'){const k=document.getElementById('cswsel').value;if(k)sems=[k]}
   else{
-    const desde=document.getElementById('consumo-desde').value;const hasta=document.getElementById('consumo-hasta').value;
-    if(!desde||!hasta){el.innerHTML='<div class="alert alert-info"><i class="ti ti-info-circle"></i> Seleccioná el rango.</div>';return}
-    semanas=st.semanas.filter(w=>{const wEnd=addW(w,1);return w<=hasta&&wEnd>desde});
-    if(!semanas.length)semanas=[weekKey(new Date(desde))];
+    const fr=document.getElementById('cfrom').value;const to=document.getElementById('cto').value;
+    if(!fr||!to){el.innerHTML='<div class="alert alert-info"><i class="ti ti-info-circle"></i> Selecciona el rango.</div>';return}
+    sems=st.Sem.filter(w=>{const we=addW(w,1);return w<=to&&we>fr});
+    if(!sems.length)sems=[wk(new Date(fr))];
   }
   el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Calculando...</div>';
-  await Promise.all(semanas.map(w=>loadPlan(w)));
-  const consumoMap={};
-  semanas.forEach(wk=>{
-    let plan=st.plans[wk]||[];if(empF!=='all')plan=plan.filter(r=>r.empresa_id===empF);
+  await Promise.all(sems.map(w=>lp(w)));
+  const cm={};
+  sems.forEach(k=>{
+    let plan=st.P[k]||[];if(ef!=='all')plan=plan.filter(r=>r.empresa_id===ef);
     plan.forEach(r=>{
       const tot=(r.days||[]).reduce((a,b)=>a+(b||0),0);if(!tot)return;
-      (st.recetas[r.producto]||[]).forEach(ing=>{
-        const consumo=fmtN(ing.cantidad*tot);const key=ing.ingrediente+'|'+ing.unidad;
-        if(!consumoMap[key])consumoMap[key]={ingrediente:ing.ingrediente,unidad:ing.unidad,total:0,desglose:[]};
-        consumoMap[key].total=fmtN(consumoMap[key].total+consumo);
-        consumoMap[key].desglose.push({producto:r.producto,consumo});
+      (st.Rec[r.producto]||[]).forEach(ing=>{
+        const c=fn(ing.cantidad*tot);const key=ing.ingrediente+'|'+ing.unidad;
+        if(!cm[key])cm[key]={ingrediente:ing.ingrediente,unidad:ing.unidad,total:0,det:[]};
+        cm[key].total=fn(cm[key].total+c);cm[key].det.push({producto:r.producto,c});
       });
     });
   });
-  const items=Object.values(consumoMap).filter(i=>!filtro||i.ingrediente.toLowerCase().includes(filtro)).sort((a,b)=>b.total-a.total);
-  if(!items.length){el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>'+(Object.keys(consumoMap).length?'Sin resultados.':'Sin recetas o plan vacío.')+'</div>';return}
-  const maxT=Math.max(...items.map(i=>i.total));
-  const periodoLabel=modo==='semana'?weekLabel(semanas[0]):`${semanas.length} sem (${semanas[0]} → ${semanas[semanas.length-1]})`;
+  const items=Object.values(cm).filter(i=>!flt||i.ingrediente.toLowerCase().includes(flt)).sort((a,b)=>b.total-a.total);
+  if(!items.length){el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>'+(Object.keys(cm).length?'Sin resultados.':'Sin recetas o plan vacio.')+'</div>';return}
+  const mx=Math.max(...items.map(i=>i.total));
+  const pl=modo==='semana'?wlb(sems[0]):`${sems.length} semanas`;
   let html=`<div class="metric-grid">
-    <div class="metric"><div class="metric-label">Período</div><div style="font-size:14px;font-weight:600;margin-top:2px">${periodoLabel}</div></div>
+    <div class="metric"><div class="metric-label">Periodo</div><div style="font-size:14px;font-weight:600;margin-top:2px">${pl}</div></div>
     <div class="metric"><div class="metric-label">Ingredientes</div><div class="metric-val">${items.length}</div></div>
-    <div class="metric"><div class="metric-label">Semanas</div><div class="metric-val">${semanas.length}</div></div>
-    <div class="metric"><div class="metric-label">Prod. con receta</div><div class="metric-val">${Object.keys(st.recetas).length}</div></div>
-  </div>`;
-  html+=`<div class="grid-card"><table class="consumo-table"><thead><tr>
+    <div class="metric"><div class="metric-label">Semanas</div><div class="metric-val">${sems.length}</div></div>
+    <div class="metric"><div class="metric-label">Prod. con receta</div><div class="metric-val">${Object.keys(st.Rec).length}</div></div>
+  </div>
+  <div class="grid-card"><table class="ctbl"><thead><tr>
     <th style="width:34px">#</th><th>Ingrediente / MP</th>
-    <th style="text-align:right;width:130px">Total a consumir</th>
+    <th style="text-align:right;width:130px">Total</th>
     <th style="width:58px">Unidad</th><th>Detalle</th>
   </tr></thead><tbody>`;
   items.forEach((item,idx)=>{
-    const pct=maxT>0?Math.round(item.total/maxT*100):0;
-    const porProd={};item.desglose.forEach(d=>{if(!porProd[d.producto])porProd[d.producto]=0;porProd[d.producto]=fmtN(porProd[d.producto]+d.consumo)});
-    const detalle=Object.entries(porProd).sort((a,b)=>b[1]-a[1]).map(([p,c])=>`<span style="margin-right:8px"><b>${p}</b>: ${c.toLocaleString('es-AR')} ${item.unidad}</span>`).join('');
+    const pct=mx>0?Math.round(item.total/mx*100):0;
+    const pp={};item.det.forEach(d=>{if(!pp[d.producto])pp[d.producto]=0;pp[d.producto]=fn(pp[d.producto]+d.c)});
+    const det=Object.entries(pp).sort((a,b)=>b[1]-a[1]).map(([p,c])=>`<span style="margin-right:8px"><b>${p}</b>: ${c.toLocaleString('es-AR')} ${item.unidad}</span>`).join('');
     html+=`<tr>
       <td style="color:var(--text3);font-size:12px">${idx+1}</td>
-      <td><span class="ingr-chip">${item.ingrediente}</span><div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div></td>
+      <td><span class="ichip">${item.ingrediente}</span><div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div></td>
       <td style="text-align:right;font-size:16px;font-weight:600">${item.total.toLocaleString('es-AR')}</td>
-      <td class="muted">${item.unidad}</td>
-      <td class="muted">${detalle||'—'}</td>
+      <td class="muted">${item.unidad}</td><td class="muted">${det||'--'}</td>
     </tr>`;
   });
   html+=`</tbody></table></div>`;el.innerHTML=html;
 }
 
-// PDF
-async function generatePDF(){
-  const rows=st.edit[st.week]||st.plans[st.week]||[];if(!rows.length){showPdfMsg('Sin ítems en el plan.');return}
-  const btn=document.getElementById('btn-pdf');btn.innerHTML='<span class="spinner"></span> Generando...';btn.disabled=true;showPdfMsg('Preparando...');
-  const wk=st.week;const filtered=st.planEmpFilter==='all'?rows:rows.filter(r=>r.empresa_id===st.planEmpFilter);
-  const data={semana:weekLabel(wk),dias:DAYS.map((d,i)=>d+' '+dayDate(wk,i)),filas:filtered.map(r=>({empresa:empName(r.empresa_id)||'',area:r.area||'',producto:r.producto,unidad:r.unidad,dias:r.days||Array(7).fill(0),total:(r.days||[]).reduce((a,b)=>a+(b||0),0)}))};
+async function genPDF(){
+  const rows=st.Ed[st.w]||st.P[st.w]||[];if(!rows.length){spdf('Sin items en el plan.');return}
+  const btn=document.getElementById('btnpdf');btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;spdf('Preparando...');
+  const filtered=st.ef==='all'?rows:rows.filter(r=>r.empresa_id===st.ef);
+  const data={semana:wlb(st.w),dias:DAYS.map((d,i)=>d+' '+ddate(st.w,i)),filas:filtered.map(r=>({empresa:en(r.empresa_id)||'',area:r.area||'',producto:r.producto,unidad:r.unidad,dias:r.days||Array(7).fill(0),total:(r.days||[]).reduce((a,b)=>a+(b||0),0)}))};
   try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:`Generá código Python usando reportlab para PDF de planificación semanal. Datos: ${JSON.stringify(data)}. A4 apaisado, título "Plan de Producción Semanal" + semana, tabla Empresa/Área/Producto/Unidad/${DAYS.join('/')}/Total, agrupar por empresa y área, header azul #1B3A6B texto blanco, filas alternadas, pie de página. Guardar como "plan_produccion_semanal.pdf". Solo código Python, sin markdown.`}]})});
-    const d=await resp.json();const code=d.content.map(b=>b.text||'').join('').replace(/```python|```/g,'').trim();
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:`Genera codigo Python usando reportlab para PDF de planificacion semanal. Datos: ${JSON.stringify(data)}. A4 apaisado, titulo Plan de Produccion Semanal + semana, tabla Empresa/Area/Producto/Unidad/${DAYS.join('/')}/Total, agrupar por empresa y area, header azul #1B3A6B texto blanco, filas alternadas, pie de pagina. Guardar como plan_produccion_semanal.pdf. Solo codigo Python, sin markdown.`}]})});
+    const d=await resp.json();const code=d.content.map(b=>b.text||'').join('').replace(/\`\`\`python|\`\`\`/g,'').trim();
     const blob=new Blob([code],{type:'text/plain'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='generar_pdf.py';a.click();
-    showPdfMsg('✓ Script descargado.','ok');
-  }catch(e){showPdfMsg('Error al generar.')}
-  btn.innerHTML='<i class="ti ti-file-type-pdf"></i> Exportar PDF';btn.disabled=false;
+    spdf('Script descargado. Ejecuta: python generar_pdf.py','ok');
+  }catch(e){spdf('Error al generar.')}
+  btn.innerHTML='<i class="ti ti-file-type-pdf"></i> PDF';btn.disabled=false;
 }
-function showPdfMsg(msg,type){
-  const el=document.getElementById('pdf-msg');el.className='alert '+(type==='ok'?'alert-ok':'alert-info');
+function spdf(msg,type){
+  const el=document.getElementById('pdfmsg');el.className='alert '+(type==='ok'?'alert-ok':'alert-info');
   el.innerHTML=`<i class="ti ti-${type==='ok'?'check':'loader'}"></i> ${msg}`;el.style.display='flex';
   if(type==='ok')setTimeout(()=>el.style.display='none',5000);
 }
