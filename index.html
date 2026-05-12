@@ -2,14 +2,14 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Plan de Producción Semanal</title>
+<title>Plan de Producción</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#fff;--bg2:#f5f5f4;--bg3:#eeede9;
-  --text:#1a1a1a;--text2:#6b6b6b;--text3:#aaa;
+  --text:#1a1a1a;--text2:#6b6b6b;--text3:#bbb;
   --border:rgba(0,0,0,0.10);--border2:rgba(0,0,0,0.20);
   --radius:8px;--radius-lg:12px;
   --green:#1D9E75;--green-bg:#E1F5EE;
@@ -33,7 +33,7 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.
 .status-dot.online{background:var(--green)}.status-dot.saving{background:var(--amber);animation:pulse .8s infinite}.status-dot.error{background:var(--red)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 .status-label{font-size:12px;color:var(--text2);display:flex;align-items:center}
-.main{max-width:1300px;margin:0 auto;padding:1.5rem}
+.main{max-width:1350px;margin:0 auto;padding:1.5rem}
 .app-card{background:var(--bg);border-radius:var(--radius-lg);border:0.5px solid var(--border);overflow:hidden;margin-bottom:1.5rem}
 .tabs{display:flex;gap:2px;border-bottom:0.5px solid var(--border);padding:0 1rem;background:var(--bg);overflow-x:auto}
 .tab{padding:11px 16px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-1px;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;transition:color .15s}
@@ -46,19 +46,17 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.
 .week-label{font-size:14px;font-weight:500;min-width:240px;text-align:center}
 .btn{padding:7px 14px;font-size:13px;font-weight:500;border:0.5px solid var(--border2);border-radius:var(--radius);background:transparent;cursor:pointer;color:var(--text);display:inline-flex;align-items:center;gap:6px;transition:background .12s}
 .btn:hover{background:var(--bg2)}.btn:disabled{opacity:.45;cursor:not-allowed}
-.btn-sm{padding:5px 10px;font-size:12px}
-.btn-xs{padding:3px 8px;font-size:11px}
+.btn-sm{padding:5px 10px;font-size:12px}.btn-xs{padding:3px 8px;font-size:11px}
 .btn-primary{background:var(--text);color:var(--bg);border-color:var(--text)}.btn-primary:hover{opacity:.85;background:var(--text)}
 .btn-pdf{background:var(--green);color:#fff;border-color:var(--green)}.btn-pdf:hover{opacity:.85;background:var(--green)}
 .btn-danger{color:var(--red);border-color:rgba(226,75,74,.3)}.btn-danger:hover{background:var(--red-bg)}
-.btn-purple{background:var(--purple);color:#fff;border-color:var(--purple)}.btn-purple:hover{opacity:.85;background:var(--purple)}
 .btns{display:flex;gap:6px;flex-wrap:wrap}
 .add-bar{background:var(--bg2);border-radius:var(--radius-lg);padding:1rem;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:1rem}
 .add-bar input,.add-bar select{padding:6px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)}
-.add-bar input{width:140px}.add-bar input.wide{width:180px}.add-bar select{width:115px}
+.add-bar input{width:150px}.add-bar input.wide{width:190px}
 .grid-card{background:var(--bg);border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1rem}
 .grid-scroll{overflow-x:auto}
-.plan-grid{border-collapse:collapse;width:100%;min-width:780px;font-size:13px}
+.plan-grid{border-collapse:collapse;width:100%;min-width:820px;font-size:13px}
 .plan-grid th{padding:9px 10px;font-weight:500;font-size:12px;color:var(--text2);white-space:nowrap;border-bottom:0.5px solid var(--border);background:var(--bg2);text-align:center}
 .plan-grid th.left{text-align:left}
 .plan-grid td{padding:7px 10px;border-bottom:0.5px solid var(--border);vertical-align:middle;background:var(--bg)}
@@ -66,13 +64,16 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.
 .plan-grid tbody tr:hover td{background:var(--bg2)}
 .plan-grid td.day-cell{text-align:center;padding:4px 6px}
 .plan-grid td.total-cell{font-weight:600;text-align:center;background:var(--bg2)}
-.day-input{width:64px;padding:4px 6px;font-size:13px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text);text-align:center}
+.day-input{width:62px;padding:4px 6px;font-size:13px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text);text-align:center}
 .day-input:focus{border-color:var(--border2);outline:none}
 .day-input.has-val{background:var(--bg2);font-weight:500}
 .prod-input{width:100%;padding:4px 6px;font-size:13px;border:0.5px solid transparent;border-radius:var(--radius);background:transparent;color:var(--text)}
 .prod-input:focus{border-color:var(--border2);background:var(--bg);outline:none}
 .area-tag{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.emp-tag{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap}
+.color-dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0}
 .area-sep td{border-top:2px solid var(--border2)!important}
+.emp-sep td{border-top:3px solid var(--border2)!important}
 .today-col{background:var(--today-bg)!important}
 .today-head{color:var(--blue)!important;background:var(--today-head)!important}
 .totals-row td{background:var(--bg2)!important;font-weight:600;font-size:12px;color:var(--text2);border-top:2px solid var(--border2)!important}
@@ -100,19 +101,32 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.
 @keyframes spin{to{transform:rotate(360deg)}}
 .empty{text-align:center;padding:3rem;color:var(--text2);font-size:14px}
 .empty i{font-size:32px;display:block;margin-bottom:10px;color:var(--text3)}
-.sel-inline{width:100%;padding:3px 5px;font-size:12px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)}
 .loading-overlay{position:absolute;inset:0;background:rgba(255,255,255,.75);display:flex;align-items:center;justify-content:center;border-radius:var(--radius-lg);z-index:10;font-size:13px;color:var(--text2);gap:8px}
 @media(prefers-color-scheme:dark){.loading-overlay{background:rgba(28,28,27,.75)}}
-
-/* RECETAS */
-.receta-prod-list{display:flex;flex-direction:column;gap:1px;border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1rem}
-.receta-prod-row{background:var(--bg);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;transition:background .1s;gap:8px}
+.emp-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1.25rem}
+.emp-pill{padding:5px 14px;font-size:12px;font-weight:500;border-radius:20px;border:0.5px solid var(--border2);cursor:pointer;background:transparent;color:var(--text2);display:inline-flex;align-items:center;gap:5px}
+.emp-pill:hover{background:var(--bg2)}
+.emp-pill.active{color:#fff;border-color:transparent}
+.maestro-layout{display:grid;grid-template-columns:270px 1fr;gap:1.5rem;align-items:start}
+.emp-list{border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.emp-list-row{background:var(--bg);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;border-bottom:0.5px solid var(--border);gap:8px}
+.emp-list-row:last-child{border-bottom:none}
+.emp-list-row:hover{background:var(--bg2)}
+.emp-list-row.active{background:var(--blue-bg)}
+.emp-name{font-size:13px;font-weight:600}
+.emp-meta{font-size:12px;color:var(--text2)}
+.prod-table{width:100%;border-collapse:collapse;font-size:13px}
+.prod-table th{text-align:left;padding:8px 10px;font-size:12px;font-weight:500;color:var(--text2);border-bottom:0.5px solid var(--border);background:var(--bg2)}
+.prod-table td{padding:8px 10px;border-bottom:0.5px solid var(--border);vertical-align:middle;background:var(--bg)}
+.prod-table tbody tr:last-child td{border-bottom:none}
+.prod-table tr:hover td{background:var(--bg2)}
+.prod-table input{padding:4px 7px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:100%}
+.receta-prod-list{border:0.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.receta-prod-row{background:var(--bg);padding:10px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;border-bottom:0.5px solid var(--border);gap:8px}
+.receta-prod-row:last-child{border-bottom:none}
 .receta-prod-row:hover{background:var(--bg2)}
 .receta-prod-row.active{background:var(--blue-bg)}
-.receta-prod-name{font-size:13px;font-weight:500}
-.receta-prod-meta{font-size:12px;color:var(--text2)}
-.receta-detail{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1rem}
-.receta-title{font-size:15px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
+.receta-detail{background:var(--bg2);border:0.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem}
 .ingr-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:1rem}
 .ingr-table th{text-align:left;padding:7px 10px;font-size:12px;font-weight:500;color:var(--text2);border-bottom:0.5px solid var(--border);background:var(--bg)}
 .ingr-table td{padding:7px 10px;border-bottom:0.5px solid var(--border);background:var(--bg)}
@@ -120,41 +134,29 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.
 .ingr-table input{padding:4px 7px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:100%}
 .add-ingr-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .add-ingr-bar input,.add-ingr-bar select{padding:5px 9px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)}
-.add-ingr-bar input{width:160px}.add-ingr-bar input.num{width:90px}.add-ingr-bar select{width:100px}
-
-/* CONSUMO */
+.add-ingr-bar input{width:160px}.add-ingr-bar input.num{width:90px}
 .consumo-header{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:1.5rem;padding:1rem;background:var(--bg2);border-radius:var(--radius-lg)}
 .consumo-header label{font-size:12px;color:var(--text2);display:block;margin-bottom:4px}
 .consumo-header select,.consumo-header input[type=date]{padding:7px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)}
 .consumo-table{width:100%;border-collapse:collapse;font-size:13px}
-.consumo-table th{text-align:left;padding:9px 12px;font-size:12px;font-weight:500;color:var(--text2);border-bottom:0.5px solid var(--border);background:var(--bg2);white-space:nowrap}
-.consumo-table th.right{text-align:right}
+.consumo-table th{text-align:left;padding:9px 12px;font-size:12px;font-weight:500;color:var(--text2);border-bottom:0.5px solid var(--border);background:var(--bg2)}
 .consumo-table td{padding:9px 12px;border-bottom:0.5px solid var(--border);background:var(--bg);vertical-align:middle}
 .consumo-table tbody tr:last-child td{border-bottom:none}
 .consumo-table tr:hover td{background:var(--bg2)}
-.consumo-table td.right{text-align:right;font-weight:600}
 .consumo-table td.muted{color:var(--text2);font-size:12px}
 .ingr-chip{display:inline-block;padding:2px 8px;background:var(--purple-bg);color:var(--purple);border-radius:20px;font-size:11px;font-weight:600}
-.prod-breakdown{font-size:12px;color:var(--text2);margin-top:4px}
-.bar-bg{width:100%;height:6px;background:var(--bg2);border-radius:3px;overflow:hidden;margin-top:4px}
-.bar-fill{height:100%;border-radius:3px;background:var(--purple);transition:width .4s}
-.section-subtitle{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:10px;padding-bottom:6px;border-bottom:0.5px solid var(--border)}
+.bar-bg{width:100%;height:5px;background:var(--bg2);border-radius:3px;overflow:hidden;margin-top:4px}
+.bar-fill{height:100%;border-radius:3px;background:var(--purple)}
 </style>
 </head>
 <body>
-
 <header>
-  <div class="logo">
-    <i class="ti ti-building-factory-2"></i>
-    <span>Plan de Producción</span>
-    <span class="sub">— Control Semanal</span>
-  </div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Producción</span><span class="sub">— Control Semanal</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="status-dot"></span><span id="status-text">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="header-date"></div>
   </div>
 </header>
-
 <div class="main">
  <div class="app-card">
   <div class="tabs">
@@ -163,6 +165,7 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.
     <button class="tab" onclick="showTab('compare')"><i class="ti ti-chart-bar"></i> Comparación</button>
     <button class="tab" onclick="showTab('recetas')"><i class="ti ti-notebook"></i> Recetas</button>
     <button class="tab" onclick="showTab('consumo')"><i class="ti ti-package"></i> Consumo MP</button>
+    <button class="tab" onclick="showTab('maestro')"><i class="ti ti-building"></i> Maestro</button>
   </div>
   <div class="pad">
 
@@ -179,14 +182,17 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.
           <button class="btn btn-primary" id="btn-save-plan" onclick="savePlan()"><i class="ti ti-device-floppy"></i> Guardar plan</button>
         </div>
       </div>
+      <div id="plan-emp-pills" class="emp-pills"></div>
       <div class="add-bar">
-        <input type="text" id="new-area" placeholder="Área" list="areas-dl"/>
-        <datalist id="areas-dl"></datalist>
-        <input class="wide" type="text" id="new-prod" placeholder="Producto / tarea" list="prods-dl"/>
-        <datalist id="prods-dl"></datalist>
-        <input id="new-unit" list="units-dl" placeholder="Unidad" style="width:120px"/>
-        <datalist id="units-dl"></datalist>
-        <button class="btn btn-primary" onclick="addRow()"><i class="ti ti-plus"></i> Agregar producto</button>
+        <span style="font-size:13px;color:var(--text2);white-space:nowrap">Agregar al plan:</span>
+        <select id="sel-emp-add" style="padding:6px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)" onchange="renderAddProdsSelect()">
+          <option value="">-- Empresa --</option>
+        </select>
+        <select id="sel-prod-add" style="padding:6px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);min-width:180px">
+          <option value="">-- Producto --</option>
+        </select>
+        <button class="btn btn-primary" onclick="addRowFromMaestro()"><i class="ti ti-plus"></i> Agregar</button>
+        <button class="btn" onclick="addAllFromEmpresa()" title="Agregar todos los de la empresa"><i class="ti ti-packages"></i> Todos</button>
       </div>
       <div style="position:relative">
         <div class="grid-card"><div class="grid-scroll" id="grid-wrap"></div></div>
@@ -200,10 +206,10 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.
     <!-- PRODUCCIÓN REAL -->
     <div id="tab-real" class="section">
       <div class="real-sel">
-        <label>Semana:</label>
-        <select id="real-week-sel" onchange="loadAndRenderReal()"></select>
+        <label>Semana:</label><select id="real-week-sel" onchange="loadAndRenderReal()"></select>
+        <label>Empresa:</label><select id="real-emp-sel" onchange="renderReal()"><option value="all">Todas</option></select>
       </div>
-      <div id="real-no-plan" class="alert alert-info" style="display:none"><i class="ti ti-info-circle"></i> No hay plan guardado para esta semana.</div>
+      <div id="real-no-plan" class="alert alert-info" style="display:none"><i class="ti ti-info-circle"></i> No hay plan para esta semana.</div>
       <div style="position:relative">
         <div class="grid-card" id="real-card" style="display:none"><div class="grid-scroll" id="real-grid-wrap"></div></div>
         <div id="real-loading" class="loading-overlay" style="display:none"><span class="spinner spinner-dark"></span> Cargando...</div>
@@ -218,8 +224,8 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.
     <!-- COMPARACIÓN -->
     <div id="tab-compare" class="section">
       <div class="real-sel">
-        <label>Semana:</label>
-        <select id="cmp-week-sel" onchange="loadAndRenderCompare()"></select>
+        <label>Semana:</label><select id="cmp-week-sel" onchange="loadAndRenderCompare()"></select>
+        <label>Empresa:</label><select id="cmp-emp-sel" onchange="renderCompare()"><option value="all">Todas</option></select>
       </div>
       <div id="compare-content"></div>
     </div>
@@ -227,50 +233,58 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.
     <!-- RECETAS -->
     <div id="tab-recetas" class="section">
       <div class="toolbar">
-        <div>
-          <div style="font-size:16px;font-weight:600">Recetas de productos</div>
-          <div style="font-size:13px;color:var(--text2);margin-top:2px">Definí los ingredientes por unidad producida</div>
-        </div>
+        <div><div style="font-size:16px;font-weight:600">Recetas</div><div style="font-size:13px;color:var(--text2)">Ingredientes por unidad producida</div></div>
         <button class="btn btn-primary" id="btn-save-recetas" onclick="saveRecetas()"><i class="ti ti-device-floppy"></i> Guardar recetas</button>
       </div>
-      <div style="display:grid;grid-template-columns:280px 1fr;gap:1.5rem;align-items:start">
+      <div style="display:grid;grid-template-columns:270px 1fr;gap:1.5rem">
         <div>
-          <div class="section-subtitle">Productos del plan</div>
-          <div id="receta-prod-list"><div class="empty"><i class="ti ti-package-off"></i>Guardá primero un plan con productos.</div></div>
+          <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Productos</div>
+          <div id="receta-prod-list" class="receta-prod-list"><div class="empty"><i class="ti ti-package-off"></i>Agregá productos en Maestro.</div></div>
         </div>
-        <div id="receta-detail-wrap">
-          <div class="empty"><i class="ti ti-arrow-left"></i>Seleccioná un producto para editar su receta.</div>
-        </div>
+        <div id="receta-detail-wrap"><div class="empty"><i class="ti ti-arrow-left"></i>Seleccioná un producto.</div></div>
       </div>
-      <div id="recetas-msg" style="display:none" class="alert alert-ok"><i class="ti ti-check"></i> Recetas guardadas.</div>
+      <div id="recetas-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Recetas guardadas.</div>
     </div>
 
     <!-- CONSUMO MP -->
     <div id="tab-consumo" class="section">
       <div style="font-size:16px;font-weight:600;margin-bottom:4px">Consumo de materias primas</div>
-      <div style="font-size:13px;color:var(--text2);margin-bottom:1.5rem">Calculado automáticamente a partir del plan y las recetas</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:1.5rem">Calculado del plan × recetas</div>
       <div class="consumo-header">
-        <div>
-          <label>Modo</label>
-          <select id="consumo-modo" onchange="renderConsumo()">
-            <option value="semana">Por semana</option>
-            <option value="rango">Rango de fechas</option>
-          </select>
-        </div>
-        <div id="consumo-semana-wrap">
-          <label>Semana</label>
-          <select id="consumo-week-sel" onchange="renderConsumo()"></select>
-        </div>
+        <div><label>Modo</label><select id="consumo-modo" onchange="toggleConsumoModo();renderConsumo()"><option value="semana">Por semana</option><option value="rango">Rango de fechas</option></select></div>
+        <div id="consumo-semana-wrap"><label>Semana</label><select id="consumo-week-sel" onchange="renderConsumo()"></select></div>
         <div id="consumo-rango-wrap" style="display:none;gap:8px;align-items:flex-end">
           <div><label>Desde</label><input type="date" id="consumo-desde" onchange="renderConsumo()"/></div>
           <div><label>Hasta</label><input type="date" id="consumo-hasta" onchange="renderConsumo()"/></div>
         </div>
-        <div>
-          <label>Filtrar ingrediente</label>
-          <input type="text" id="consumo-filtro" placeholder="Buscar..." onInput="renderConsumo()" style="padding:7px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:180px"/>
-        </div>
+        <div><label>Empresa</label><select id="consumo-emp-sel" onchange="renderConsumo()"><option value="all">Todas</option></select></div>
+        <div><label>Buscar</label><input type="text" id="consumo-filtro" placeholder="Ingrediente..." oninput="renderConsumo()" style="padding:7px 10px;font-size:13px;border:0.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:150px"/></div>
       </div>
       <div id="consumo-content"></div>
+    </div>
+
+    <!-- MAESTRO -->
+    <div id="tab-maestro" class="section">
+      <div class="toolbar">
+        <div><div style="font-size:16px;font-weight:600">Maestro de empresas y productos</div><div style="font-size:13px;color:var(--text2)">Definí empresas, áreas y productos</div></div>
+      </div>
+      <div class="maestro-layout">
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Empresas</div>
+          <div id="emp-list" class="emp-list"></div>
+          <div class="add-bar" style="margin-top:10px;flex-direction:column;align-items:stretch;gap:8px">
+            <input type="text" id="new-emp-name" placeholder="Nombre de la empresa" style="width:100%"/>
+            <div style="display:flex;gap:8px;align-items:center">
+              <label style="font-size:12px;color:var(--text2)">Color:</label>
+              <input type="color" id="new-emp-color" value="#378ADD" style="width:40px;height:32px;border:none;cursor:pointer;border-radius:4px"/>
+              <button class="btn btn-primary" style="flex:1" onclick="addEmpresa()"><i class="ti ti-plus"></i> Agregar empresa</button>
+            </div>
+          </div>
+        </div>
+        <div id="maestro-detail"><div class="empty"><i class="ti ti-arrow-left"></i>Seleccioná una empresa.</div></div>
+      </div>
+      <div id="maestro-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
+      <div id="maestro-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="maestro-err-txt"></span></div>
     </div>
 
   </div>
@@ -278,32 +292,20 @@ header{background:var(--bg);border-bottom:0.5px solid var(--border);padding:0 1.
 </div>
 
 <script>
-// ── SUPABASE ────────────────────────────────────────────────────
 const SB_URL='https://ugmjfvgjumpnvbfskcgl.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnbWpmdmdqdW1wbnZiZnNrY2dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MjU4OTIsImV4cCI6MjA5NDEwMTg5Mn0.fmf7Isp5rDi10mq0VjahWRCgl6J4mD8-ib89DKWtPLs';
 const HDR={'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY};
+async function sbGet(t,f=''){const r=await fetch(`${SB_URL}/rest/v1/${t}?${f}`,{headers:HDR});if(!r.ok)throw new Error(await r.text());return r.json()}
+async function sbUpsert(t,d){const r=await fetch(`${SB_URL}/rest/v1/${t}`,{method:'POST',headers:{...HDR,'Prefer':'resolution=merge-duplicates,return=representation'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json()}
+async function sbInsert(t,d){const r=await fetch(`${SB_URL}/rest/v1/${t}`,{method:'POST',headers:{...HDR,'Prefer':'return=representation'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json()}
+async function sbPatch(t,id,d){const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:{...HDR,'Prefer':'return=minimal'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text())}
+async function sbDel(t,id){const r=await fetch(`${SB_URL}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:HDR});if(!r.ok)throw new Error(await r.text())}
 
-async function sbGet(table,filter=''){
-  const r=await fetch(`${SB_URL}/rest/v1/${table}?${filter}`,{headers:HDR});
-  if(!r.ok)throw new Error(await r.text());
-  return r.json();
-}
-async function sbUpsert(table,data){
-  const r=await fetch(`${SB_URL}/rest/v1/${table}`,{
-    method:'POST',
-    headers:{...HDR,'Prefer':'resolution=merge-duplicates,return=minimal'},
-    body:JSON.stringify(data)
-  });
-  if(!r.ok)throw new Error(await r.text());
-}
-
-// ── CONSTANTES ──────────────────────────────────────────────────
 const DAYS=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
 const UNITS=['unidades','docenas','kg','g','litros','ml','cajas','metros','horas','lotes','pallets','camiones','bolsas','paquetes','atados','rollos','piezas'];
 const ACOLORS=['#185FA5','#0F6E56','#993C1D','#993556','#854F0B','#3B6D11','#534AB7','#5F5E5A'];
 const ABGS=['#E6F1FB','#E1F5EE','#FAECE7','#FBEAF0','#FAEEDA','#EAF3DE','#EEEDFE','#F1EFE8'];
 
-// ── UTILS ───────────────────────────────────────────────────────
 function weekKey(d){const dt=new Date(d);dt.setHours(0,0,0,0);dt.setDate(dt.getDate()-((dt.getDay()+6)%7));return dt.toISOString().slice(0,10)}
 function weekLabel(k){const d=new Date(k+'T00:00:00');const e=new Date(d);e.setDate(e.getDate()+6);const f=x=>x.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'});return`Sem ${weekNum(d)} — ${f(d)} al ${f(e)} ${d.getFullYear()}`}
 function weekNum(d){const dt=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));const dn=dt.getUTCDay()||7;dt.setUTCDate(dt.getUTCDate()+4-dn);const ys=new Date(Date.UTC(dt.getUTCFullYear(),0,1));return Math.ceil((((dt-ys)/86400000)+1)/7)}
@@ -314,58 +316,66 @@ function getAreas(rows){return[...new Set(rows.map(r=>r.area||'Sin área'))]}
 function aColor(a,areas){return ACOLORS[areas.indexOf(a)%ACOLORS.length]}
 function aBg(a,areas){return ABGS[areas.indexOf(a)%ABGS.length]}
 function fmt(n){return n>0?n.toLocaleString('es-AR'):'—'}
-function fmtNum(n){return Math.round(n*100)/100}
+function fmtN(n){return Math.round(n*100)/100}
 function flash(id){const m=document.getElementById(id);m.style.display='flex';setTimeout(()=>m.style.display='none',3000)}
 function setStatus(s,t){document.getElementById('status-dot').className='status-dot '+s;document.getElementById('status-text').textContent=t}
+function hexRgba(hex,a){const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return`rgba(${r},${g},${b},${a})`}
+function empColor(eid){const e=st.empresas.find(x=>x.id===eid);return e?e.color:'#888'}
+function empName(eid){const e=st.empresas.find(x=>x.id===eid);return e?e.nombre:''}
 
-// ── ESTADO ──────────────────────────────────────────────────────
 const W0=weekKey(new Date());
-const st={week:W0,plans:{},reals:{},recetas:{},edit:{},semanas:[]};
+const st={week:W0,plans:{},reals:{},recetas:{},edit:{},semanas:[],empresas:[],productos:[],planEmpFilter:'all',activeEmpId:null};
 
-// ── INIT ────────────────────────────────────────────────────────
 document.getElementById('header-date').textContent=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
 async function init(){
   setStatus('saving','Conectando...');
   try{
-    const [planes,reales,recRow]=await Promise.all([
+    const [planes,reales,recRow,emps,prods]=await Promise.all([
       sbGet('planes','select=semana&order=semana.desc'),
       sbGet('produccion_real','select=semana&order=semana.desc'),
-      sbGet('recetas','select=datos').catch(()=>[])
+      sbGet('recetas','select=datos').catch(()=>[]),
+      sbGet('empresas','order=nombre.asc'),
+      sbGet('productos','order=area.asc,nombre.asc')
     ]);
     const semSet=new Set([...planes.map(p=>p.semana),...reales.map(r=>r.semana),W0]);
     st.semanas=[...semSet].sort();
     if(recRow.length)st.recetas=recRow[0].datos||{};
+    st.empresas=emps; st.productos=prods;
     await loadPlan(W0);
     setStatus('online','Conectado');
-  }catch(e){
-    setStatus('error','Sin conexión');
-    console.error(e);
+    updateEmpSels();
+  }catch(e){setStatus('error','Sin conexión');console.error(e)}
+  renderGrid(); renderEmpPills();
+}
+
+async function loadPlan(wk){if(st.plans[wk]!==undefined)return;try{const d=await sbGet('planes',`semana=eq.${wk}&select=filas`);st.plans[wk]=d.length?d[0].filas:[];}catch(e){st.plans[wk]=[]}}
+async function loadReal(wk){if(st.reals[wk]!==undefined)return;try{const d=await sbGet('produccion_real',`semana=eq.${wk}&select=datos`);st.reals[wk]=d.length?d[0].datos:{};}catch(e){st.reals[wk]={}}}
+
+function updateEmpSels(){
+  ['real-emp-sel','cmp-emp-sel','consumo-emp-sel'].forEach(id=>{
+    const sel=document.getElementById(id);if(!sel)return;
+    const cur=sel.value;sel.innerHTML='<option value="all">Todas</option>';
+    st.empresas.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;sel.appendChild(o)});
+    if(cur)sel.value=cur;
+  });
+  const se=document.getElementById('sel-emp-add');if(se){
+    const cur=se.value;se.innerHTML='<option value="">-- Empresa --</option>';
+    st.empresas.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se.appendChild(o)});
+    if(cur)se.value=cur;
   }
-  renderGrid();
-  updateProdDatalist();
 }
 
-async function loadPlan(wk){
-  if(st.plans[wk]!==undefined)return;
-  try{const d=await sbGet('planes',`semana=eq.${wk}&select=filas`);st.plans[wk]=d.length?d[0].filas:[];}
-  catch(e){st.plans[wk]=[];}
-}
-async function loadReal(wk){
-  if(st.reals[wk]!==undefined)return;
-  try{const d=await sbGet('produccion_real',`semana=eq.${wk}&select=datos`);st.reals[wk]=d.length?d[0].datos:{};}
-  catch(e){st.reals[wk]={};}
-}
-
-// ── TABS ────────────────────────────────────────────────────────
 function showTab(t){
-  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['plan','real','compare','recetas','consumo'][i]===t));
+  const names=['plan','real','compare','recetas','consumo','maestro'];
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',names[i]===t));
   document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));
   document.getElementById('tab-'+t).classList.add('active');
   if(t==='real'){popSel('real-week-sel');loadAndRenderReal()}
   if(t==='compare'){popSel('cmp-week-sel');loadAndRenderCompare()}
-  if(t==='recetas')renderRecetas()
+  if(t==='recetas')renderRecetas();
   if(t==='consumo'){popSelConsumo();renderConsumo()}
+  if(t==='maestro')renderMaestro();
 }
 function popSel(id){
   const sel=document.getElementById(id);const cur=sel.value||st.week;
@@ -375,192 +385,185 @@ function popSel(id){
 }
 function popSelConsumo(){
   popSel('consumo-week-sel');
-  // set default dates = current week
-  const d1=new Date(st.week+'T00:00:00');
-  const d2=new Date(d1);d2.setDate(d2.getDate()+6);
+  const d2=new Date(st.week+'T00:00:00');d2.setDate(d2.getDate()+6);
   document.getElementById('consumo-desde').value=st.week;
   document.getElementById('consumo-hasta').value=d2.toISOString().slice(0,10);
 }
+function toggleConsumoModo(){
+  const m=document.getElementById('consumo-modo').value;
+  document.getElementById('consumo-semana-wrap').style.display=m==='semana'?'block':'none';
+  document.getElementById('consumo-rango-wrap').style.display=m==='rango'?'flex':'none';
+}
 
-// ── PLANIFICACIÓN ───────────────────────────────────────────────
-function changeWeek(n){
-  st.week=addW(st.week,n);
-  const loading=document.getElementById('plan-loading');
-  loading.style.display='flex';
-  loadPlan(st.week).then(()=>{loading.style.display='none';renderGrid()});
-}
-function getEdit(){
-  if(!st.edit[st.week])st.edit[st.week]=st.plans[st.week]?JSON.parse(JSON.stringify(st.plans[st.week])):[];
-  return st.edit[st.week];
-}
-function renderGrid(){
-  document.getElementById('plan-week-label').textContent=weekLabel(st.week);
-  const rows=getEdit();
-  const areas=getAreas(rows);
-  const dl=document.getElementById('areas-dl');dl.innerHTML='';
-  areas.forEach(a=>{const o=document.createElement('option');o.value=a;dl.appendChild(o)});
-  const wrap=document.getElementById('grid-wrap');
-  if(!rows.length){wrap.innerHTML='<div class="empty"><i class="ti ti-table-off"></i>Agregá productos arriba para comenzar.</div>';return}
-  const tc=todayCol(st.week);
-  let h=`<table class="plan-grid"><thead><tr>
-    <th class="left" style="width:110px">Área</th>
-    <th class="left" style="width:170px">Producto / tarea</th>
-    <th class="left" style="width:90px">Unidad</th>`;
-  DAYS.forEach((d,i)=>{h+=`<th class="${i===tc?'today-head':''}" style="width:76px">${d.slice(0,3)}<br><span style="font-size:10px;font-weight:400">${dayDate(st.week,i)}</span></th>`});
-  h+=`<th style="width:68px">Total</th><th style="width:38px"></th></tr></thead><tbody>`;
-  const grouped={};
-  rows.forEach((r,idx)=>{const a=r.area||'Sin área';if(!grouped[a])grouped[a]=[];grouped[a].push({...r,_i:idx})});
-  let dayT=Array(7).fill(0),grand=0;
-  Object.entries(grouped).forEach(([area,items],gi)=>{
-    const col=aColor(area,areas),bg=aBg(area,areas);
-    items.forEach((r,ri)=>{
-      const rowTotal=(r.days||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
-      grand+=rowTotal;(r.days||Array(7).fill(0)).forEach((v,di)=>{dayT[di]+=(v||0)});
-      h+=`<tr class="${ri===0&&gi>0?'area-sep':''}">`;
-      if(ri===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="area-tag" style="background:${bg};color:${col}">${area}</span></td>`;
-      h+=`<td><input class="prod-input" value="${r.producto}" onchange="upField(${r._i},'producto',this.value)"/></td>`;
-      h+=`<td><input class="sel-inline" value="${r.unidad}" list="units-dl" onchange="upField(${r._i},'unidad',this.value)" style="width:100%;padding:3px 5px;font-size:12px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`;
-      for(let di=0;di<7;di++){
-        const v=(r.days&&r.days[di])||0;
-        h+=`<td class="day-cell${di===tc?' today-col':''}"><input class="day-input${v>0?' has-val':''}" type="number" min="0" value="${v||''}" placeholder="—" onchange="upDay(${r._i},${di},this.value);this.classList.toggle('has-val',this.value!='')"/></td>`;
-      }
-      h+=`<td class="total-cell">${fmt(rowTotal)}</td>`;
-      h+=`<td style="text-align:center"><button class="btn btn-sm btn-danger" onclick="removeRow(${r._i})"><i class="ti ti-trash"></i></button></td></tr>`;
-    });
+// PILLS
+function renderEmpPills(){
+  const wrap=document.getElementById('plan-emp-pills');
+  if(!st.empresas.length){wrap.innerHTML='';return}
+  let h=`<button class="emp-pill${st.planEmpFilter==='all'?' active':''}" style="${st.planEmpFilter==='all'?'background:var(--text);color:var(--bg)':''}" onclick="setPlanEmpFilter('all')">Todas</button>`;
+  st.empresas.forEach(e=>{
+    const act=st.planEmpFilter===e.id;
+    h+=`<button class="emp-pill${act?' active':''}" style="${act?`background:${e.color};color:#fff`:''}" onclick="setPlanEmpFilter('${e.id}')"><span class="color-dot" style="background:${e.color}"></span>${e.nombre}</button>`;
   });
-  h+=`<tr class="totals-row"><td></td><td style="padding-left:10px;font-size:12px">Total diario</td><td></td>`;
-  dayT.forEach((v,i)=>{h+=`<td class="day-cell${i===tc?' today-col':''}" style="text-align:center">${fmt(v)}</td>`});
-  h+=`<td class="day-cell grand">${fmt(grand)}</td><td></td></tr></tbody></table>`;
   wrap.innerHTML=h;
 }
-function upField(i,f,v){getEdit()[i][f]=v}
-function upDay(i,di,v){
-  const rows=getEdit();if(!rows[i].days)rows[i].days=Array(7).fill(0);
-  rows[i].days[di]=parseFloat(v)||0;updateDayTotals();
+function setPlanEmpFilter(id){st.planEmpFilter=id;renderEmpPills();renderGrid()}
+
+// PLANIFICACIÓN
+function changeWeek(n){st.week=addW(st.week,n);const l=document.getElementById('plan-loading');l.style.display='flex';loadPlan(st.week).then(()=>{l.style.display='none';renderGrid()})}
+function getEdit(){if(!st.edit[st.week])st.edit[st.week]=st.plans[st.week]?JSON.parse(JSON.stringify(st.plans[st.week])):[];return st.edit[st.week]}
+
+function renderGrid(){
+  document.getElementById('plan-week-label').textContent=weekLabel(st.week);
+  const allRows=getEdit();
+  const rows=st.planEmpFilter==='all'?allRows:allRows.filter(r=>r.empresa_id===st.planEmpFilter);
+  const wrap=document.getElementById('grid-wrap');
+  if(!allRows.length){wrap.innerHTML='<div class="empty"><i class="ti ti-table-off"></i>Agregá productos desde el maestro.</div>';return}
+  if(!rows.length){wrap.innerHTML='<div class="empty"><i class="ti ti-filter-off"></i>No hay productos de esta empresa en el plan.</div>';return}
+  const tc=todayCol(st.week);
+  const areas=getAreas(rows);
+  const byEmp={};
+  rows.forEach(r=>{const eid=r.empresa_id||'__';if(!byEmp[eid])byEmp[eid]=[];byEmp[eid].push({...r,_i:allRows.findIndex(x=>x===r||(x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area))})});
+  let h=`<table class="plan-grid"><thead><tr>
+    <th class="left" style="width:105px">Empresa</th>
+    <th class="left" style="width:100px">Área</th>
+    <th class="left" style="width:160px">Producto</th>
+    <th class="left" style="width:85px">Unidad</th>`;
+  DAYS.forEach((d,i)=>{h+=`<th class="${i===tc?'today-head':''}" style="width:72px">${d.slice(0,3)}<br><span style="font-size:10px;font-weight:400">${dayDate(st.week,i)}</span></th>`});
+  h+=`<th style="width:66px">Total</th><th style="width:34px"></th></tr></thead><tbody>`;
+  let dayT=Array(7).fill(0),grand=0;
+  Object.entries(byEmp).forEach(([eid,items],gi)=>{
+    const ec=empColor(eid);const en=empName(eid)||'Sin empresa';const eb=hexRgba(ec==='#888'?'#888888':ec,.12);
+    const byArea={};items.forEach(r=>{const a=r.area||'Sin área';if(!byArea[a])byArea[a]=[];byArea[a].push(r)});
+    let empFirst=true;
+    Object.entries(byArea).forEach(([area,aItems],ai)=>{
+      aItems.forEach((r,ri)=>{
+        const rowTot=(r.days||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
+        grand+=rowTot;(r.days||Array(7).fill(0)).forEach((v,di)=>{dayT[di]+=(v||0)});
+        const cls=gi>0&&empFirst&&ri===0&&ai===0?'emp-sep':(!empFirst&&ri===0&&ai>0)?'area-sep':'';
+        h+=`<tr class="${cls}">`;
+        if(empFirst&&ri===0&&ai===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="emp-tag" style="background:${eb};color:${ec}"><span class="color-dot" style="background:${ec}"></span>${en}</span></td>`;
+        if(ri===0)h+=`<td rowspan="${aItems.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${aBg(area,areas)};color:${aColor(area,areas)}">${area}</span></td>`;
+        h+=`<td><input class="prod-input" value="${r.producto}" onchange="upField(${r._i},'producto',this.value)"/></td>`;
+        h+=`<td><input value="${r.unidad||''}" list="units-dl" onchange="upField(${r._i},'unidad',this.value)" style="width:100%;padding:3px 5px;font-size:12px;border:0.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`;
+        for(let di=0;di<7;di++){const v=(r.days&&r.days[di])||0;h+=`<td class="day-cell${di===tc?' today-col':''}"><input class="day-input${v>0?' has-val':''}" type="number" min="0" value="${v||''}" placeholder="—" onchange="upDay(${r._i},${di},this.value);this.classList.toggle('has-val',this.value!='')"/></td>`}
+        h+=`<td class="total-cell">${fmt(rowTot)}</td><td style="text-align:center"><button class="btn btn-xs btn-danger" onclick="removeRow(${r._i})"><i class="ti ti-trash"></i></button></td></tr>`;
+        empFirst=false;
+      });
+    });
+  });
+  h+=`<tr class="totals-row"><td></td><td></td><td style="padding-left:8px;font-size:12px">Total diario</td><td></td>`;
+  dayT.forEach((v,i)=>{h+=`<td class="day-cell${i===tc?' today-col':''}" style="text-align:center">${fmt(v)}</td>`});
+  h+=`<td class="day-cell grand">${fmt(grand)}</td><td></td></tr></tbody></table>`;
+  h+=`<datalist id="units-dl">${UNITS.map(u=>`<option>${u}</option>`).join('')}</datalist>`;
+  wrap.innerHTML=h;
 }
+function upField(i,f,v){const r=getEdit()[i];if(r)r[f]=v}
+function upDay(i,di,v){const rows=getEdit();if(!rows[i])return;if(!rows[i].days)rows[i].days=Array(7).fill(0);rows[i].days[di]=parseFloat(v)||0;updateDayTotals()}
 function updateDayTotals(){
   const rows=getEdit();const dayT=Array(7).fill(0);let grand=0;
   rows.forEach(r=>{(r.days||[]).forEach((v,k)=>{dayT[k]+=(v||0);grand+=(v||0)})});
   const trow=document.querySelector('.totals-row');if(!trow)return;
   const cells=trow.querySelectorAll('td');
-  dayT.forEach((v,i)=>{if(cells[3+i])cells[3+i].textContent=fmt(v)});
-  if(cells[10])cells[10].textContent=fmt(grand);
+  dayT.forEach((v,i)=>{if(cells[4+i])cells[4+i].textContent=fmt(v)});
+  if(cells[11])cells[11].textContent=fmt(grand);
 }
 function removeRow(i){const rows=getEdit();rows.splice(i,1);st.edit[st.week]=rows;renderGrid()}
-function addRow(){
-  const a=document.getElementById('new-area').value.trim();
-  const p=document.getElementById('new-prod').value.trim();
-  const u=document.getElementById('new-unit').value;
-  if(!a){document.getElementById('new-area').focus();return}
-  if(!p){document.getElementById('new-prod').focus();return}
-  const rows=getEdit();rows.push({area:a,producto:p,unidad:u,days:Array(7).fill(0)});
-  st.edit[st.week]=rows;
-  document.getElementById('new-prod').value='';
-  document.getElementById('new-area').value='';
-  renderGrid();
+
+function renderAddProdsSelect(){
+  const empId=document.getElementById('sel-emp-add')?.value||'';
+  const sel=document.getElementById('sel-prod-add');if(!sel)return;
+  sel.innerHTML='<option value="">-- Producto --</option>';
+  if(!empId)return;
+  st.productos.filter(p=>p.empresa_id===empId).forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=`[${p.area}] ${p.nombre}`;sel.appendChild(o)});
+}
+function addRowFromMaestro(){
+  const id=document.getElementById('sel-prod-add').value;if(!id)return;
+  const prod=st.productos.find(p=>p.id===id);if(!prod)return;
+  const rows=getEdit();
+  if(rows.find(r=>r.producto===prod.nombre&&r.empresa_id===prod.empresa_id)){alert('Ya está en el plan.');return}
+  rows.push({empresa_id:prod.empresa_id,area:prod.area,producto:prod.nombre,unidad:prod.unidad,days:Array(7).fill(0)});
+  st.edit[st.week]=rows;renderGrid();
+}
+function addAllFromEmpresa(){
+  const empId=document.getElementById('sel-emp-add').value;if(!empId){alert('Seleccioná una empresa.');return}
+  const prods=st.productos.filter(p=>p.empresa_id===empId);if(!prods.length){alert('Sin productos en el maestro.');return}
+  const rows=getEdit();let added=0;
+  prods.forEach(p=>{if(!rows.find(r=>r.producto===p.nombre&&r.empresa_id===p.empresa_id)){rows.push({empresa_id:p.empresa_id,area:p.area,producto:p.nombre,unidad:p.unidad,days:Array(7).fill(0)});added++}});
+  st.edit[st.week]=rows;renderGrid();
+  if(!added)alert('Todos los productos ya estaban en el plan.');
 }
 async function savePlan(){
-  const btn=document.getElementById('btn-save-plan');
-  btn.innerHTML='<span class="spinner"></span> Guardando...';btn.disabled=true;
-  setStatus('saving','Guardando...');
+  const btn=document.getElementById('btn-save-plan');btn.innerHTML='<span class="spinner"></span> Guardando...';btn.disabled=true;setStatus('saving','Guardando...');
   try{
     const rows=JSON.parse(JSON.stringify(getEdit()));
     await sbUpsert('planes',{semana:st.week,filas:rows,updated_at:new Date().toISOString()});
-    st.plans[st.week]=rows;
-    if(!st.semanas.includes(st.week))st.semanas.push(st.week);
-    updateProdDatalist();
+    st.plans[st.week]=rows;if(!st.semanas.includes(st.week))st.semanas.push(st.week);
     setStatus('online','Guardado ✓');flash('plan-msg');
-  }catch(e){
-    setStatus('error','Error');
-    document.getElementById('plan-err-txt').textContent=e.message;flash('plan-err');
-  }
+  }catch(e){setStatus('error','Error');document.getElementById('plan-err-txt').textContent=e.message;flash('plan-err')}
   btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar plan';btn.disabled=false;
 }
-function updateProdDatalist(){
-  const all=new Set();
-  Object.values(st.plans).forEach(rows=>(rows||[]).forEach(r=>r.producto&&all.add(r.producto)));
-  const dl=document.getElementById('prods-dl');if(dl){dl.innerHTML='';[...all].forEach(p=>{const o=document.createElement('option');o.value=p;dl.appendChild(o)})}
-  // unidades: fijas + las ya usadas en planes
-  const uAll=new Set(UNITS);
-  Object.values(st.plans).forEach(rows=>(rows||[]).forEach(r=>r.unidad&&uAll.add(r.unidad)));
-  const udl=document.getElementById('units-dl');if(udl){udl.innerHTML='';[...uAll].forEach(u=>{const o=document.createElement('option');o.value=u;udl.appendChild(o)})}
-}
 
-// ── PRODUCCIÓN REAL ─────────────────────────────────────────────
+// REAL
 async function loadAndRenderReal(){
   const wk=document.getElementById('real-week-sel').value;if(!wk)return;
   document.getElementById('real-loading').style.display='flex';
   await loadPlan(wk);await loadReal(wk);
-  document.getElementById('real-loading').style.display='none';
-  renderReal();
+  document.getElementById('real-loading').style.display='none';renderReal();
 }
 function renderReal(){
   const wk=document.getElementById('real-week-sel').value;if(!wk)return;
-  const plan=st.plans[wk];
-  const noplan=document.getElementById('real-no-plan');
-  const card=document.getElementById('real-card');
-  const actions=document.getElementById('real-actions');
-  if(!plan||!plan.length){noplan.style.display='flex';card.style.display='none';actions.style.display='none';return}
+  const empF=document.getElementById('real-emp-sel').value;
+  const allPlan=st.plans[wk]||[];
+  let plan=empF==='all'?allPlan:allPlan.filter(r=>r.empresa_id===empF);
+  const noplan=document.getElementById('real-no-plan');const card=document.getElementById('real-card');const actions=document.getElementById('real-actions');
+  if(!plan.length){noplan.style.display='flex';card.style.display='none';actions.style.display='none';return}
   noplan.style.display='none';card.style.display='block';actions.style.display='flex';
-  const real=st.reals[wk]||{};
-  const areas=getAreas(plan);
-  const tc=todayCol(wk);
+  const real=st.reals[wk]||{};const areas=getAreas(plan);const tc=todayCol(wk);
   let h=`<div style="overflow-x:auto"><table class="plan-grid"><thead><tr>
-    <th class="left" style="width:110px">Área</th><th class="left" style="width:160px">Producto</th><th class="left" style="width:80px">Unidad</th>`;
-  DAYS.forEach((d,i)=>{h+=`<th class="${i===tc?'today-head':''}" colspan="2" style="text-align:center;font-size:11px">${d.slice(0,3)} ${dayDate(wk,i)}</th>`});
-  h+=`<th style="width:65px">Plan</th><th style="width:65px">Real</th></tr>
-  <tr style="background:var(--bg2)"><th></th><th></th><th></th>`;
-  DAYS.forEach((_,i)=>{
-    h+=`<th style="font-size:10px;font-weight:400;color:var(--text2);text-align:center;padding:3px${i===tc?';background:var(--today-head)':''}">Plan</th>`;
-    h+=`<th style="font-size:10px;font-weight:400;color:var(--green);text-align:center;padding:3px${i===tc?';background:var(--today-head)':''}">Real</th>`;
-  });
+    <th class="left">Empresa</th><th class="left">Área</th><th class="left">Producto</th><th class="left" style="width:70px">Unidad</th>`;
+  DAYS.forEach((d,i)=>{h+=`<th class="${i===tc?'today-head':''}" colspan="2" style="font-size:11px;text-align:center">${d.slice(0,3)} ${dayDate(wk,i)}</th>`});
+  h+=`<th>Plan</th><th>Real</th></tr><tr style="background:var(--bg2)"><th></th><th></th><th></th><th></th>`;
+  DAYS.forEach((_,i)=>{h+=`<th style="font-size:10px;font-weight:400;color:var(--text2);text-align:center;padding:3px${i===tc?';background:var(--today-head)':''}">P</th><th style="font-size:10px;font-weight:400;color:var(--green);text-align:center;padding:3px${i===tc?';background:var(--today-head)':''}">R</th>`});
   h+=`<th></th><th></th></tr></thead><tbody>`;
-  const grouped={};
-  plan.forEach((r,idx)=>{const a=r.area||'Sin área';if(!grouped[a])grouped[a]=[];grouped[a].push({...r,_i:idx})});
-  Object.entries(grouped).forEach(([area,items],gi)=>{
-    const col=aColor(area,areas),bg=aBg(area,areas);
-    items.forEach((r,ri)=>{
-      const rdays=real[r._i]||Array(7).fill(0);
-      const tp=(r.days||[]).reduce((a,b)=>a+(b||0),0);
-      const tr2=rdays.reduce((a,b)=>a+(b||0),0);
-      h+=`<tr class="${ri===0&&gi>0?'area-sep':''}">`;
-      if(ri===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="area-tag" style="background:${bg};color:${col}">${area}</span></td>`;
-      h+=`<td style="font-weight:500">${r.producto}</td><td style="font-size:12px;color:var(--text2)">${r.unidad}</td>`;
-      for(let di=0;di<7;di++){
-        const pv=(r.days&&r.days[di])||0;
-        const rv=(real[r._i]&&real[r._i][di])||0;
-        h+=`<td class="day-cell${di===tc?' today-col':''}" style="font-size:12px;color:var(--text2)">${pv>0?pv:'—'}</td>`;
-        h+=`<td class="day-cell${di===tc?' today-col':''}"><input class="day-input${rv>0?' has-val':''}" type="number" min="0" value="${rv||''}" placeholder="—" onchange="upReal('${wk}',${r._i},${di},this.value);this.classList.toggle('has-val',this.value!='')" style="border-color:rgba(29,158,117,.3)"/></td>`;
-      }
-      h+=`<td class="total-cell" style="font-size:12px">${fmt(tp)}</td>`;
-      h+=`<td class="total-cell" style="color:var(--green)">${fmt(tr2)}</td></tr>`;
+  const byEmp={};plan.forEach(r=>{const eid=r.empresa_id||'__';if(!byEmp[eid])byEmp[eid]=[];byEmp[eid].push(r)});
+  Object.entries(byEmp).forEach(([eid,items],gi)=>{
+    const ec=empColor(eid);const en=empName(eid)||'Sin empresa';const eb=hexRgba(ec==='#888'?'#888888':ec,.12);
+    const byArea={};items.forEach(r=>{const a=r.area||'Sin área';if(!byArea[a])byArea[a]=[];byArea[a].push(r)});
+    let ef=true;
+    Object.entries(byArea).forEach(([area,aItems],ai)=>{
+      aItems.forEach((r,ri)=>{
+        const origIdx=allPlan.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
+        const rdays=real[origIdx]||Array(7).fill(0);
+        const tp=(r.days||[]).reduce((a,b)=>a+(b||0),0);const tr2=rdays.reduce((a,b)=>a+(b||0),0);
+        h+=`<tr class="${gi>0&&ef&&ri===0&&ai===0?'emp-sep':!ef&&ri===0&&ai>0?'area-sep':''}">`;
+        if(ef&&ri===0&&ai===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:8px"><span class="emp-tag" style="background:${eb};color:${ec}"><span class="color-dot" style="background:${ec}"></span>${en}</span></td>`;
+        if(ri===0)h+=`<td rowspan="${aItems.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${aBg(area,areas)};color:${aColor(area,areas)}">${area}</span></td>`;
+        h+=`<td style="font-weight:500">${r.producto}</td><td style="font-size:12px;color:var(--text2)">${r.unidad}</td>`;
+        for(let di=0;di<7;di++){
+          const pv=(r.days&&r.days[di])||0;const rv=real[origIdx]?.[di]||0;
+          h+=`<td class="day-cell${di===tc?' today-col':''}" style="font-size:12px;color:var(--text2)">${pv>0?pv:'—'}</td>`;
+          h+=`<td class="day-cell${di===tc?' today-col':''}"><input class="day-input${rv>0?' has-val':''}" type="number" min="0" value="${rv||''}" placeholder="—" onchange="upReal('${wk}',${origIdx},${di},this.value);this.classList.toggle('has-val',this.value!='')" style="border-color:rgba(29,158,117,.3)"/></td>`;
+        }
+        h+=`<td class="total-cell" style="font-size:12px">${fmt(tp)}</td><td class="total-cell" style="color:var(--green)">${fmt(tr2)}</td></tr>`;
+        ef=false;
+      });
     });
   });
   h+=`</tbody></table></div>`;
   document.getElementById('real-grid-wrap').innerHTML=h;
 }
-function upReal(wk,i,di,v){
-  if(!st.reals[wk])st.reals[wk]={};
-  if(!st.reals[wk][i])st.reals[wk][i]=Array(7).fill(0);
-  st.reals[wk][i][di]=parseFloat(v)||0;
-}
+function upReal(wk,i,di,v){if(!st.reals[wk])st.reals[wk]={};if(!st.reals[wk][i])st.reals[wk][i]=Array(7).fill(0);st.reals[wk][i][di]=parseFloat(v)||0}
 async function saveReal(){
   const wk=document.getElementById('real-week-sel').value;
-  const btn=document.getElementById('btn-save-real');
-  btn.innerHTML='<span class="spinner"></span> Guardando...';btn.disabled=true;
-  setStatus('saving','Guardando...');
+  const btn=document.getElementById('btn-save-real');btn.innerHTML='<span class="spinner"></span> Guardando...';btn.disabled=true;setStatus('saving','Guardando...');
   try{
     await sbUpsert('produccion_real',{semana:wk,datos:JSON.parse(JSON.stringify(st.reals[wk]||{})),updated_at:new Date().toISOString()});
-    if(!st.semanas.includes(wk))st.semanas.push(wk);
-    setStatus('online','Guardado ✓');flash('real-msg');
-  }catch(e){
-    setStatus('error','Error');
-    document.getElementById('real-err-txt').textContent=e.message;flash('real-err');
-  }
+    if(!st.semanas.includes(wk))st.semanas.push(wk);setStatus('online','Guardado ✓');flash('real-msg');
+  }catch(e){setStatus('error','Error');document.getElementById('real-err-txt').textContent=e.message;flash('real-err')}
   btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar producción';btn.disabled=false;
 }
 
-// ── COMPARACIÓN ─────────────────────────────────────────────────
+// COMPARACIÓN
 async function loadAndRenderCompare(){
   const wk=document.getElementById('cmp-week-sel').value;if(!wk)return;
   document.getElementById('compare-content').innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
@@ -568,17 +571,15 @@ async function loadAndRenderCompare(){
 }
 let cChart=null;
 function renderCompare(){
-  const wk=document.getElementById('cmp-week-sel').value;
-  const el=document.getElementById('compare-content');
-  if(!wk){el.innerHTML='';return}
-  const plan=st.plans[wk];
-  if(!plan||!plan.length){el.innerHTML='<div class="alert alert-info"><i class="ti ti-info-circle"></i> No hay plan para esta semana.</div>';return}
+  const wk=document.getElementById('cmp-week-sel').value;const empF=document.getElementById('cmp-emp-sel').value;
+  const el=document.getElementById('compare-content');if(!wk){el.innerHTML='';return}
+  const allPlan=st.plans[wk]||[];
+  if(!allPlan.length){el.innerHTML='<div class="alert alert-info"><i class="ti ti-info-circle"></i> No hay plan para esta semana.</div>';return}
+  let plan=empF==='all'?allPlan:allPlan.filter(r=>r.empresa_id===empF);
   const real=st.reals[wk]||{};
-  const areas=getAreas(plan);
   let tp=0,tr2=0,cumple=0;
-  plan.forEach((r,i)=>{const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);const rv=(real[i]||[]).reduce((a,b)=>a+(b||0),0);tp+=pv;tr2+=rv;if(rv>=pv&&pv>0)cumple++});
-  const pct=tp>0?Math.round(tr2/tp*100):0;
-  const cls=pct>=90?'good':pct>=70?'warn':'bad';
+  plan.forEach(r=>{const i=allPlan.indexOf(r);const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);const rv=(real[i]||[]).reduce((a,b)=>a+(b||0),0);tp+=pv;tr2+=rv;if(rv>=pv&&pv>0)cumple++});
+  const pct=tp>0?Math.round(tr2/tp*100):0;const cls=pct>=90?'good':pct>=70?'warn':'bad';
   const conPlan=plan.filter(r=>(r.days||[]).some(v=>v>0)).length;
   let html=`<div class="metric-grid">
     <div class="metric"><div class="metric-label">Cumplimiento global</div><div class="metric-val ${cls}">${pct}%</div></div>
@@ -586,47 +587,49 @@ function renderCompare(){
     <div class="metric"><div class="metric-label">Total producido</div><div class="metric-val">${tr2.toLocaleString('es-AR')}</div></div>
     <div class="metric"><div class="metric-label">Ítems cumplidos</div><div class="metric-val">${cumple}/${conPlan}</div></div>
   </div>`;
-  const tc=todayCol(wk);
+  const tc=todayCol(wk);const areas=getAreas(plan);
   html+=`<div class="grid-card"><div style="overflow-x:auto"><table class="plan-grid"><thead><tr>
-    <th class="left" style="width:110px">Área</th><th class="left" style="width:160px">Producto</th>`;
+    <th class="left">Empresa</th><th class="left">Área</th><th class="left">Producto</th>`;
   DAYS.forEach((d,i)=>{html+=`<th class="${i===tc?'today-head':''}" colspan="2" style="font-size:11px">${d.slice(0,3)}</th>`});
-  html+=`<th>Plan</th><th>Real</th><th style="width:50px">%</th><th style="width:72px">Estado</th></tr>
-  <tr style="background:var(--bg2)"><th></th><th></th>`;
-  DAYS.forEach((_,i)=>{
-    html+=`<th style="font-size:10px;font-weight:400;color:var(--text2);text-align:center;padding:3px${i===tc?';background:var(--today-head)':''}">P</th>`;
-    html+=`<th style="font-size:10px;font-weight:400;color:var(--green);text-align:center;padding:3px${i===tc?';background:var(--today-head)':''}">R</th>`;
-  });
+  html+=`<th>Plan</th><th>Real</th><th style="width:46px">%</th><th style="width:68px">Estado</th></tr>
+  <tr style="background:var(--bg2)"><th></th><th></th><th></th>`;
+  DAYS.forEach((_,i)=>{html+=`<th style="font-size:10px;font-weight:400;color:var(--text2);text-align:center;padding:3px${i===tc?';background:var(--today-head)':''}">P</th><th style="font-size:10px;font-weight:400;color:var(--green);text-align:center;padding:3px${i===tc?';background:var(--today-head)':''}">R</th>`});
   html+=`<th></th><th></th><th></th><th></th></tr></thead><tbody>`;
-  const grouped={};
-  plan.forEach((r,idx)=>{const a=r.area||'Sin área';if(!grouped[a])grouped[a]=[];grouped[a].push({...r,_i:idx})});
-  Object.entries(grouped).forEach(([area,items],gi)=>{
-    const col=aColor(area,areas),bg=aBg(area,areas);
-    items.forEach((r,ri)=>{
-      const tp2=(r.days||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
-      const tr3=(real[r._i]||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
-      const p=tp2>0?Math.round(tr3/tp2*100):0;
-      const badge=p>=90?'<span class="badge badge-ok">OK</span>':p>=70?'<span class="badge badge-warn">Parcial</span>':'<span class="badge badge-bad">Bajo</span>';
-      html+=`<tr class="${ri===0&&gi>0?'area-sep':''}">`;
-      if(ri===0)html+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="area-tag" style="background:${bg};color:${col}">${area}</span></td>`;
-      html+=`<td style="font-weight:500;font-size:12px">${r.producto}</td>`;
-      for(let di=0;di<7;di++){
-        const pv=(r.days&&r.days[di])||0;const rv=(real[r._i]&&real[r._i][di])||0;
-        const ok=pv>0&&rv>=pv,low=pv>0&&rv>0&&rv<pv,zero=pv>0&&rv===0;
-        const cbg=ok?'rgba(29,158,117,.1)':low?'rgba(186,117,23,.1)':zero?'rgba(226,75,74,.07)':'';
-        html+=`<td class="day-cell${di===tc?' today-col':''}" style="font-size:11px;color:var(--text2)">${pv>0?pv:'—'}</td>`;
-        html+=`<td class="day-cell${di===tc?' today-col':''}" style="font-size:11px;font-weight:${rv>0?'600':'400'};color:${ok?'var(--green)':low?'var(--amber)':zero&&pv>0?'var(--red)':'var(--text2)'};background:${cbg}">${rv>0?rv:'—'}</td>`;
-      }
-      html+=`<td class="total-cell" style="font-size:12px">${fmt(tp2)}</td><td class="total-cell" style="color:var(--green);font-size:12px">${fmt(tr3)}</td>`;
-      html+=`<td style="text-align:center;font-size:12px;font-weight:600">${tp2>0?p+'%':'—'}</td><td>${tp2>0?badge:'—'}</td></tr>`;
+  const byEmp={};plan.forEach(r=>{const eid=r.empresa_id||'__';if(!byEmp[eid])byEmp[eid]=[];byEmp[eid].push(r)});
+  const areaStats=[];
+  Object.entries(byEmp).forEach(([eid,items],gi)=>{
+    const ec=empColor(eid);const en=empName(eid)||'Sin empresa';const eb=hexRgba(ec==='#888'?'#888888':ec,.12);
+    const byArea={};items.forEach(r=>{const a=r.area||'Sin área';if(!byArea[a])byArea[a]=[];byArea[a].push(r)});
+    let ef=true;
+    Object.entries(byArea).forEach(([area,aItems],ai)=>{
+      let aap=0,aar=0;
+      aItems.forEach((r,ri)=>{
+        const oi=allPlan.indexOf(r);
+        const tp2=(r.days||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
+        const tr3=(real[oi]||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
+        aap+=tp2;aar+=tr3;
+        const p=tp2>0?Math.round(tr3/tp2*100):0;
+        const badge=p>=90?'<span class="badge badge-ok">OK</span>':p>=70?'<span class="badge badge-warn">Parcial</span>':'<span class="badge badge-bad">Bajo</span>';
+        html+=`<tr class="${gi>0&&ef&&ri===0&&ai===0?'emp-sep':!ef&&ri===0&&ai>0?'area-sep':''}">`;
+        if(ef&&ri===0&&ai===0)html+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:8px"><span class="emp-tag" style="background:${eb};color:${ec}"><span class="color-dot" style="background:${ec}"></span>${en}</span></td>`;
+        if(ri===0)html+=`<td rowspan="${aItems.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${aBg(area,areas)};color:${aColor(area,areas)}">${area}</span></td>`;
+        html+=`<td style="font-weight:500;font-size:12px">${r.producto}</td>`;
+        for(let di=0;di<7;di++){
+          const pv=(r.days&&r.days[di])||0;const rv=(real[oi]&&real[oi][di])||0;
+          const ok=pv>0&&rv>=pv,low=pv>0&&rv>0&&rv<pv,zero=pv>0&&rv===0;
+          const cbg=ok?'rgba(29,158,117,.1)':low?'rgba(186,117,23,.1)':zero?'rgba(226,75,74,.07)':'';
+          html+=`<td class="day-cell${di===tc?' today-col':''}" style="font-size:11px;color:var(--text2)">${pv>0?pv:'—'}</td>`;
+          html+=`<td class="day-cell${di===tc?' today-col':''}" style="font-size:11px;font-weight:${rv>0?'600':'400'};color:${ok?'var(--green)':low?'var(--amber)':zero&&pv>0?'var(--red)':'var(--text2)'};background:${cbg}">${rv>0?rv:'—'}</td>`;
+        }
+        html+=`<td class="total-cell" style="font-size:12px">${fmt(tp2)}</td><td class="total-cell" style="color:var(--green);font-size:12px">${fmt(tr3)}</td>`;
+        html+=`<td style="text-align:center;font-size:12px;font-weight:600">${tp2>0?p+'%':'—'}</td><td>${tp2>0?badge:'—'}</td></tr>`;
+        ef=false;
+      });
+      areaStats.push({label:`${en}/${area}`,ap:aap,ar:aar,color:ec});
     });
   });
   html+=`</tbody></table></div></div>`;
-  const areaStats=[];
-  Object.entries(grouped).forEach(([area,items])=>{
-    let ap=0,ar=0;items.forEach(r=>{ap+=(r.days||[]).reduce((a,b)=>a+(b||0),0);ar+=(real[r._i]||[]).reduce((a,b)=>a+(b||0),0)});
-    areaStats.push({area,ap,ar});
-  });
-  html+=`<div class="chart-card"><div class="chart-wrap"><canvas id="cmpChart" role="img" aria-label="Plan vs real por área">Datos.</canvas></div>
+  html+=`<div class="chart-card"><div class="chart-wrap"><canvas id="cmpChart" role="img" aria-label="Plan vs real">Datos.</canvas></div>
     <div style="display:flex;gap:16px;margin-top:12px;font-size:12px;color:var(--text2);justify-content:center">
       <span><span style="width:10px;height:10px;border-radius:2px;background:#378ADD;display:inline-block;margin-right:4px"></span>Planificado</span>
       <span><span style="width:10px;height:10px;border-radius:2px;background:#1D9E75;display:inline-block;margin-right:4px"></span>Real</span>
@@ -636,65 +639,135 @@ function renderCompare(){
   setTimeout(()=>{
     const isDark=matchMedia('(prefers-color-scheme: dark)').matches;const tc2=isDark?'#ccc':'#555';
     cChart=new Chart(document.getElementById('cmpChart'),{type:'bar',
-      data:{labels:areaStats.map(s=>s.area),datasets:[
+      data:{labels:areaStats.map(s=>s.label),datasets:[
         {label:'Planificado',data:areaStats.map(s=>s.ap),backgroundColor:'#B5D4F4',borderColor:'#378ADD',borderWidth:1.5},
         {label:'Real',data:areaStats.map(s=>s.ar),backgroundColor:'#9FE1CB',borderColor:'#1D9E75',borderWidth:1.5}
       ]},
       options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
-        scales:{x:{ticks:{color:tc2,font:{size:12}},grid:{display:false}},y:{ticks:{color:tc2},grid:{color:isDark?'rgba(255,255,255,.07)':'rgba(0,0,0,.06)'}}}}
+        scales:{x:{ticks:{color:tc2,font:{size:11}},grid:{display:false}},y:{ticks:{color:tc2},grid:{color:isDark?'rgba(255,255,255,.07)':'rgba(0,0,0,.06)'}}}}
     });
   },100);
 }
 
-// ── RECETAS ─────────────────────────────────────────────────────
-// st.recetas = { "Galletitas Dulces": [ {ingrediente, cantidad, unidad}, ... ], ... }
-let activeRecProd=null;
-
-function getAllProducts(){
-  const all=new Set();
-  Object.values(st.plans).forEach(rows=>(rows||[]).forEach(r=>r.producto&&all.add(r.producto)));
-  // también los que ya tienen receta cargada
-  Object.keys(st.recetas).forEach(p=>all.add(p));
-  return [...all].sort();
-}
-
-function renderRecetas(){
-  const prods=getAllProducts();
-  const list=document.getElementById('receta-prod-list');
-  if(!prods.length){list.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Guardá primero un plan con productos.</div>';return}
+// MAESTRO
+function renderMaestro(){
+  const list=document.getElementById('emp-list');
+  if(!st.empresas.length){list.innerHTML='<div class="empty" style="padding:1.5rem"><i class="ti ti-building-off"></i>Sin empresas.</div>';document.getElementById('maestro-detail').innerHTML='<div class="empty"><i class="ti ti-arrow-left"></i>Agregá una empresa.</div>';return}
   let h='';
-  prods.forEach(p=>{
-    const ingrs=st.recetas[p]||[];
-    const active=p===activeRecProd;
-    h+=`<div class="receta-prod-row${active?' active':''}" onclick="selectRecProd('${p.replace(/'/g,"\\'")}')">
-      <div>
-        <div class="receta-prod-name">${p}</div>
-        <div class="receta-prod-meta">${ingrs.length?ingrs.length+' ingrediente'+(ingrs.length!==1?'s':''):'Sin receta'}</div>
+  st.empresas.forEach(e=>{
+    const cnt=st.productos.filter(p=>p.empresa_id===e.id).length;const act=e.id===st.activeEmpId;
+    h+=`<div class="emp-list-row${act?' active':''}" onclick="selectEmp('${e.id}')">
+      <div style="display:flex;align-items:center;gap:8px"><span class="color-dot" style="background:${e.color};width:14px;height:14px"></span>
+        <div><div class="emp-name">${e.nombre}</div><div class="emp-meta">${cnt} producto${cnt!==1?'s':''}</div></div>
       </div>
-      <i class="ti ti-chevron-right" style="color:var(--text3);font-size:14px"></i>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-xs" onclick="event.stopPropagation();editEmpColor('${e.id}')"><i class="ti ti-palette"></i></button>
+        <button class="btn btn-xs btn-danger" onclick="event.stopPropagation();deleteEmp('${e.id}')"><i class="ti ti-trash"></i></button>
+      </div>
     </div>`;
   });
   list.innerHTML=h;
-  if(activeRecProd)renderRecetaDetail(activeRecProd);
+  if(st.activeEmpId)renderEmpDetail(st.activeEmpId);
+}
+function selectEmp(id){st.activeEmpId=id;renderMaestro()}
+function renderEmpDetail(empId){
+  const emp=st.empresas.find(e=>e.id===empId);if(!emp)return;
+  const prods=st.productos.filter(p=>p.empresa_id===empId);
+  const areas=[...new Set(prods.map(p=>p.area))].sort();
+  const wrap=document.getElementById('maestro-detail');
+  let h=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem">
+    <span class="color-dot" style="background:${emp.color};width:16px;height:16px"></span>
+    <span style="font-size:16px;font-weight:600">${emp.nombre}</span>
+    <span style="font-size:13px;color:var(--text2)">${prods.length} producto${prods.length!==1?'s':''}</span>
+  </div>`;
+  if(prods.length){
+    h+=`<div class="grid-card" style="margin-bottom:1rem"><table class="prod-table"><thead><tr><th>Área</th><th>Producto</th><th style="width:110px">Unidad</th><th style="width:36px"></th></tr></thead><tbody>`;
+    const byArea={};prods.forEach(p=>{if(!byArea[p.area])byArea[p.area]=[];byArea[p.area].push(p)});
+    Object.entries(byArea).sort().forEach(([area,items])=>{
+      items.forEach((p,i)=>{
+        h+=`<tr>`;
+        if(i===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:9px"><span class="area-tag" style="background:${hexRgba(emp.color,.12)};color:${emp.color}">${area}</span></td>`;
+        h+=`<td><input value="${p.nombre}" onchange="updateProd('${p.id}','nombre',this.value)"/></td>`;
+        h+=`<td><input value="${p.unidad}" list="udl-m" onchange="updateProd('${p.id}','unidad',this.value)"/>
+          <datalist id="udl-m">${UNITS.map(u=>`<option>${u}</option>`).join('')}</datalist></td>`;
+        h+=`<td><button class="btn btn-xs btn-danger" onclick="deleteProd('${p.id}')"><i class="ti ti-trash"></i></button></td></tr>`;
+      });
+    });
+    h+=`</tbody></table></div>`;
+  } else {
+    h+=`<div class="empty" style="padding:1.5rem"><i class="ti ti-package-off"></i>Sin productos aún.</div>`;
+  }
+  h+=`<div class="add-bar">
+    <input type="text" id="np-nombre" placeholder="Nombre del producto" class="wide" />
+    <input type="text" id="np-area" placeholder="Área" list="np-areas-dl" style="width:130px"/>
+    <datalist id="np-areas-dl">${areas.map(a=>`<option>${a}</option>`).join('')}</datalist>
+    <input type="text" id="np-unit" placeholder="Unidad" list="np-units-dl" style="width:110px"/>
+    <datalist id="np-units-dl">${UNITS.map(u=>`<option>${u}</option>`).join('')}</datalist>
+    <button class="btn btn-primary" onclick="addProd('${empId}')"><i class="ti ti-plus"></i> Agregar producto</button>
+  </div>`;
+  wrap.innerHTML=h;
+}
+async function addEmpresa(){
+  const nombre=document.getElementById('new-emp-name').value.trim();const color=document.getElementById('new-emp-color').value;
+  if(!nombre)return;setStatus('saving','Guardando...');
+  try{const res=await sbInsert('empresas',{nombre,color});st.empresas.push(res[0]);document.getElementById('new-emp-name').value='';updateEmpSels();renderMaestro();renderEmpPills();setStatus('online','Guardado ✓')}
+  catch(e){setStatus('error','Error');document.getElementById('maestro-err-txt').textContent=e.message;flash('maestro-err')}
+}
+async function deleteEmp(id){
+  if(!confirm('¿Eliminar empresa y todos sus productos?'))return;setStatus('saving','...');
+  try{await sbDel('empresas',id);st.empresas=st.empresas.filter(e=>e.id!==id);st.productos=st.productos.filter(p=>p.empresa_id!==id);if(st.activeEmpId===id)st.activeEmpId=null;updateEmpSels();renderMaestro();renderEmpPills();setStatus('online','Eliminado ✓')}
+  catch(e){setStatus('error','Error')}
+}
+async function editEmpColor(id){
+  const color=prompt('Color hex (ej: #FF5500):');if(!color||!/^#[0-9a-fA-F]{6}$/.test(color))return;
+  try{await sbPatch('empresas',id,{color});const e=st.empresas.find(x=>x.id===id);if(e)e.color=color;renderMaestro();renderEmpPills();updateEmpSels()}
+  catch(e){alert('Error: '+e.message)}
+}
+async function addProd(empId){
+  const nombre=document.getElementById('np-nombre').value.trim();const area=document.getElementById('np-area').value.trim();const unidad=document.getElementById('np-unit').value.trim()||'unidades';
+  if(!nombre||!area)return;setStatus('saving','Guardando...');
+  try{const res=await sbInsert('productos',{empresa_id:empId,nombre,area,unidad});st.productos.push(res[0]);document.getElementById('np-nombre').value='';document.getElementById('np-area').value='';renderMaestro();renderAddProdsSelect();setStatus('online','Guardado ✓');flash('maestro-msg')}
+  catch(e){setStatus('error','Error');document.getElementById('maestro-err-txt').textContent=e.message;flash('maestro-err')}
+}
+async function updateProd(id,field,val){
+  try{await sbPatch('productos',id,{[field]:val});const p=st.productos.find(x=>x.id===id);if(p)p[field]=val}
+  catch(e){setStatus('error','Error al actualizar')}
+}
+async function deleteProd(id){
+  if(!confirm('¿Eliminar este producto?'))return;
+  try{await sbDel('productos',id);st.productos=st.productos.filter(p=>p.id!==id);renderMaestro();renderAddProdsSelect();setStatus('online','Eliminado ✓')}
+  catch(e){alert('Error: '+e.message)}
 }
 
-function selectRecProd(p){
-  activeRecProd=p;
-  renderRecetas();
+// RECETAS
+let activeRecProd=null;
+function getAllProducts(){const all=new Set();st.productos.forEach(p=>all.add(p.nombre));Object.keys(st.recetas).forEach(p=>all.add(p));return[...all].sort()}
+function renderRecetas(){
+  const prods=getAllProducts();const list=document.getElementById('receta-prod-list');
+  if(!prods.length){list.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Agregá productos en Maestro.</div>';return}
+  let h='';
+  prods.forEach(p=>{
+    const ingrs=st.recetas[p]||[];const active=p===activeRecProd;
+    const prod=st.productos.find(x=>x.nombre===p);const emp=prod?st.empresas.find(e=>e.id===prod.empresa_id):null;
+    h+=`<div class="receta-prod-row${active?' active':''}" onclick="selectRecProd('${p.replace(/'/g,"\\'")}')">
+      <div><div style="font-size:13px;font-weight:500">${p}</div>
+      <div style="font-size:12px;color:var(--text2)">${emp?emp.nombre+' · ':''}${ingrs.length?ingrs.length+' ingrediente'+(ingrs.length!==1?'s':''):'Sin receta'}</div></div>
+      <i class="ti ti-chevron-right" style="color:var(--text3);font-size:14px"></i>
+    </div>`;
+  });
+  list.innerHTML=h;if(activeRecProd)renderRecetaDetail(activeRecProd);
 }
-
+function selectRecProd(p){activeRecProd=p;renderRecetas()}
 function renderRecetaDetail(p){
-  const ingrs=st.recetas[p]||[];
-  const wrap=document.getElementById('receta-detail-wrap');
+  const ingrs=st.recetas[p]||[];const wrap=document.getElementById('receta-detail-wrap');
+  const key=p.replace(/[\s']/g,'_');
   let h=`<div class="receta-detail">
-    <div class="receta-title"><i class="ti ti-notebook" style="color:var(--purple)"></i>${p}</div>
-    <table class="ingr-table">
-      <thead><tr><th>Ingrediente / Materia prima</th><th style="width:110px">Cantidad por unidad</th><th style="width:100px">Unidad</th><th style="width:40px"></th></tr></thead>
-      <tbody id="ingr-tbody-${CSS.escape(p)}">`;
+    <div style="font-size:15px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px"><i class="ti ti-notebook" style="color:var(--purple)"></i>${p}</div>
+    <table class="ingr-table"><thead><tr><th>Ingrediente / MP</th><th style="width:130px">Cant. x unidad</th><th style="width:100px">Unidad</th><th style="width:34px"></th></tr></thead><tbody>`;
   ingrs.forEach((ing,i)=>{
     h+=`<tr>
       <td><input value="${ing.ingrediente}" onchange="upIngr('${p.replace(/'/g,"\\'")}',${i},'ingrediente',this.value)" list="ingr-dl"/></td>
-      <td><input type="number" min="0" step="0.001" value="${ing.cantidad}" onchange="upIngr('${p.replace(/'/g,"\\'")}',${i},'cantidad',this.value)" style="width:100px;text-align:right"/></td>
+      <td><input type="number" min="0" step="0.001" value="${ing.cantidad}" onchange="upIngr('${p.replace(/'/g,"\\'")}',${i},'cantidad',this.value)" style="width:120px;text-align:right"/></td>
       <td><select onchange="upIngr('${p.replace(/'/g,"\\'")}',${i},'unidad',this.value)" style="width:100%">
         ${['kg','g','litros','ml','unidades','cajas','sobres','latas','bolsas','metros'].map(u=>`<option${u===ing.unidad?' selected':''}>${u}</option>`).join('')}
       </select></td>
@@ -704,194 +777,111 @@ function renderRecetaDetail(p){
   h+=`</tbody></table>
     <datalist id="ingr-dl"></datalist>
     <div class="add-ingr-bar">
-      <input type="text" id="new-ingr-name-${CSS.escape(p)}" placeholder="Ingrediente" class="wide" list="ingr-dl"/>
-      <input type="number" min="0" step="0.001" id="new-ingr-qty-${CSS.escape(p)}" placeholder="Cantidad" class="num"/>
-      <select id="new-ingr-unit-${CSS.escape(p)}">
-        ${['kg','g','litros','ml','unidades','cajas','sobres','latas','bolsas','metros'].map(u=>`<option>${u}</option>`).join('')}
-      </select>
+      <input type="text" id="nig-name-${key}" placeholder="Ingrediente" class="wide" list="ingr-dl"/>
+      <input type="number" min="0" step="0.001" id="nig-qty-${key}" placeholder="Cantidad" class="num"/>
+      <select id="nig-unit-${key}">${['kg','g','litros','ml','unidades','cajas','sobres','latas','bolsas','metros'].map(u=>`<option>${u}</option>`).join('')}</select>
       <button class="btn btn-primary btn-sm" onclick="addIngr('${p.replace(/'/g,"\\'")}')"><i class="ti ti-plus"></i> Agregar</button>
-    </div>
-  </div>`;
+    </div></div>`;
   wrap.innerHTML=h;
-  // populate ingr datalist con ingredientes ya usados
-  const allIngr=new Set();
-  Object.values(st.recetas).forEach(arr=>arr.forEach(i=>allIngr.add(i.ingrediente)));
-  const dl=document.getElementById('ingr-dl');
-  [...allIngr].forEach(i=>{const o=document.createElement('option');o.value=i;dl.appendChild(o)});
+  const allIngr=new Set();Object.values(st.recetas).forEach(arr=>arr.forEach(i=>allIngr.add(i.ingrediente)));
+  const dl=document.getElementById('ingr-dl');[...allIngr].forEach(i=>{const o=document.createElement('option');o.value=i;dl.appendChild(o)});
 }
-
-function upIngr(prod,i,field,val){
-  if(!st.recetas[prod])st.recetas[prod]=[];
-  st.recetas[prod][i][field]=field==='cantidad'?parseFloat(val)||0:val;
-}
-function removeIngr(prod,i){
-  st.recetas[prod].splice(i,1);
-  renderRecetaDetail(prod);
-  renderRecetas();
-}
+function upIngr(prod,i,field,val){if(!st.recetas[prod])st.recetas[prod]=[];st.recetas[prod][i][field]=field==='cantidad'?parseFloat(val)||0:val}
+function removeIngr(prod,i){st.recetas[prod].splice(i,1);renderRecetaDetail(prod);renderRecetas()}
 function addIngr(prod){
-  const esc=CSS.escape(prod);
-  const name=document.getElementById(`new-ingr-name-${esc}`).value.trim();
-  const qty=parseFloat(document.getElementById(`new-ingr-qty-${esc}`).value)||0;
-  const unit=document.getElementById(`new-ingr-unit-${esc}`).value;
-  if(!name)return;
-  if(!st.recetas[prod])st.recetas[prod]=[];
+  const k=prod.replace(/[\s']/g,'_');
+  const name=document.getElementById(`nig-name-${k}`)?.value.trim();
+  const qty=parseFloat(document.getElementById(`nig-qty-${k}`)?.value)||0;
+  const unit=document.getElementById(`nig-unit-${k}`)?.value;
+  if(!name)return;if(!st.recetas[prod])st.recetas[prod]=[];
   st.recetas[prod].push({ingrediente:name,cantidad:qty,unidad:unit});
-  renderRecetaDetail(prod);
-  renderRecetas();
+  renderRecetaDetail(prod);renderRecetas();
 }
 async function saveRecetas(){
-  const btn=document.getElementById('btn-save-recetas');
-  btn.innerHTML='<span class="spinner"></span> Guardando...';btn.disabled=true;
-  setStatus('saving','Guardando...');
-  try{
-    await sbUpsert('recetas',{id:1,datos:JSON.parse(JSON.stringify(st.recetas)),updated_at:new Date().toISOString()});
-    setStatus('online','Guardado ✓');flash('recetas-msg');
-  }catch(e){
-    setStatus('error','Error');alert('Error al guardar recetas: '+e.message);
-  }
+  const btn=document.getElementById('btn-save-recetas');btn.innerHTML='<span class="spinner"></span> Guardando...';btn.disabled=true;setStatus('saving','Guardando...');
+  try{await sbUpsert('recetas',{id:1,datos:JSON.parse(JSON.stringify(st.recetas)),updated_at:new Date().toISOString()});setStatus('online','Guardado ✓');flash('recetas-msg')}
+  catch(e){setStatus('error','Error');alert('Error: '+e.message)}
   btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar recetas';btn.disabled=false;
 }
 
-// ── CONSUMO ──────────────────────────────────────────────────────
-document.getElementById('consumo-modo').addEventListener('change',function(){
-  document.getElementById('consumo-semana-wrap').style.display=this.value==='semana'?'block':'none';
-  document.getElementById('consumo-rango-wrap').style.display=this.value==='rango'?'flex':'none';
-  renderConsumo();
-});
-
+// CONSUMO
 async function renderConsumo(){
-  const modo=document.getElementById('consumo-modo').value;
-  const el=document.getElementById('consumo-content');
-  const filtro=document.getElementById('consumo-filtro').value.trim().toLowerCase();
-
-  // Determinar qué semanas incluir
+  const modo=document.getElementById('consumo-modo').value;const empF=document.getElementById('consumo-emp-sel').value;
+  const el=document.getElementById('consumo-content');const filtro=document.getElementById('consumo-filtro').value.trim().toLowerCase();
   let semanas=[];
-  if(modo==='semana'){
-    const wk=document.getElementById('consumo-week-sel').value;
-    if(wk)semanas=[wk];
-  } else {
-    const desde=document.getElementById('consumo-desde').value;
-    const hasta=document.getElementById('consumo-hasta').value;
-    if(!desde||!hasta){el.innerHTML='<div class="alert alert-info"><i class="ti ti-info-circle"></i> Seleccioná el rango de fechas.</div>';return}
-    // incluir todas las semanas que caen dentro del rango
-    semanas=st.semanas.filter(w=>{
-      const wEnd=addW(w,1); // lunes siguiente
-      return w<=hasta&&wEnd>desde;
-    });
+  if(modo==='semana'){const wk=document.getElementById('consumo-week-sel').value;if(wk)semanas=[wk]}
+  else{
+    const desde=document.getElementById('consumo-desde').value;const hasta=document.getElementById('consumo-hasta').value;
+    if(!desde||!hasta){el.innerHTML='<div class="alert alert-info"><i class="ti ti-info-circle"></i> Seleccioná el rango.</div>';return}
+    semanas=st.semanas.filter(w=>{const wEnd=addW(w,1);return w<=hasta&&wEnd>desde});
     if(!semanas.length)semanas=[weekKey(new Date(desde))];
   }
-
-  // cargar planes que falten
   el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Calculando...</div>';
   await Promise.all(semanas.map(w=>loadPlan(w)));
-
-  // CALCULAR consumo: para cada semana, cada producto × total planificado × receta
-  // consumoMap: { "Harina|kg": { total, unidad, desglose:[{semana,producto,cantidad}] } }
   const consumoMap={};
-
   semanas.forEach(wk=>{
-    const plan=st.plans[wk]||[];
+    let plan=st.plans[wk]||[];if(empF!=='all')plan=plan.filter(r=>r.empresa_id===empF);
     plan.forEach(r=>{
-      const totalProd=(r.days||[]).reduce((a,b)=>a+(b||0),0);
-      if(!totalProd)return;
-      const receta=st.recetas[r.producto]||[];
-      receta.forEach(ing=>{
-        const consumo=fmtNum(ing.cantidad*totalProd);
-        const key=ing.ingrediente+'|'+ing.unidad;
+      const tot=(r.days||[]).reduce((a,b)=>a+(b||0),0);if(!tot)return;
+      (st.recetas[r.producto]||[]).forEach(ing=>{
+        const consumo=fmtN(ing.cantidad*tot);const key=ing.ingrediente+'|'+ing.unidad;
         if(!consumoMap[key])consumoMap[key]={ingrediente:ing.ingrediente,unidad:ing.unidad,total:0,desglose:[]};
-        consumoMap[key].total=fmtNum(consumoMap[key].total+consumo);
-        consumoMap[key].desglose.push({semana:wk,producto:r.producto,totalProd,consumo});
+        consumoMap[key].total=fmtN(consumoMap[key].total+consumo);
+        consumoMap[key].desglose.push({producto:r.producto,consumo});
       });
     });
   });
-
-  const items=Object.values(consumoMap).filter(i=>!filtro||i.ingrediente.toLowerCase().includes(filtro));
-  items.sort((a,b)=>b.total-a.total);
-
-  if(!items.length){
-    el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>'+(Object.keys(consumoMap).length?'Ningún ingrediente coincide con el filtro.':'No hay recetas cargadas o el plan está vacío para este período.')+'</div>';
-    return;
-  }
-
-  const maxTotal=Math.max(...items.map(i=>i.total));
-  const periodoLabel=modo==='semana'?weekLabel(semanas[0]):`${semanas.length} semana${semanas.length!==1?'s':''} (${semanas[0]} → ${semanas[semanas.length-1]})`;
-
+  const items=Object.values(consumoMap).filter(i=>!filtro||i.ingrediente.toLowerCase().includes(filtro)).sort((a,b)=>b.total-a.total);
+  if(!items.length){el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>'+(Object.keys(consumoMap).length?'Sin resultados.':'Sin recetas o plan vacío.')+'</div>';return}
+  const maxT=Math.max(...items.map(i=>i.total));
+  const periodoLabel=modo==='semana'?weekLabel(semanas[0]):`${semanas.length} sem (${semanas[0]} → ${semanas[semanas.length-1]})`;
   let html=`<div class="metric-grid">
     <div class="metric"><div class="metric-label">Período</div><div style="font-size:14px;font-weight:600;margin-top:2px">${periodoLabel}</div></div>
-    <div class="metric"><div class="metric-label">Ingredientes distintos</div><div class="metric-val">${items.length}</div></div>
-    <div class="metric"><div class="metric-label">Semanas incluidas</div><div class="metric-val">${semanas.length}</div></div>
-    <div class="metric"><div class="metric-label">Productos con receta</div><div class="metric-val">${Object.keys(st.recetas).length}</div></div>
+    <div class="metric"><div class="metric-label">Ingredientes</div><div class="metric-val">${items.length}</div></div>
+    <div class="metric"><div class="metric-label">Semanas</div><div class="metric-val">${semanas.length}</div></div>
+    <div class="metric"><div class="metric-label">Prod. con receta</div><div class="metric-val">${Object.keys(st.recetas).length}</div></div>
   </div>`;
-
-  html+=`<div class="grid-card"><table class="consumo-table">
-    <thead><tr>
-      <th style="width:40px">#</th>
-      <th>Ingrediente / Materia prima</th>
-      <th class="right" style="width:130px">Total a consumir</th>
-      <th style="width:60px">Unidad</th>
-      <th>Detalle por producto</th>
-    </tr></thead><tbody>`;
-
+  html+=`<div class="grid-card"><table class="consumo-table"><thead><tr>
+    <th style="width:34px">#</th><th>Ingrediente / MP</th>
+    <th style="text-align:right;width:130px">Total a consumir</th>
+    <th style="width:58px">Unidad</th><th>Detalle</th>
+  </tr></thead><tbody>`;
   items.forEach((item,idx)=>{
-    const pct=maxTotal>0?Math.round(item.total/maxTotal*100):0;
-    // agrupar desglose por producto
-    const porProd={};
-    item.desglose.forEach(d=>{
-      if(!porProd[d.producto])porProd[d.producto]={prod:d.producto,consumo:0};
-      porProd[d.producto].consumo=fmtNum(porProd[d.producto].consumo+d.consumo);
-    });
-    const detalle=Object.values(porProd).sort((a,b)=>b.consumo-a.consumo)
-      .map(d=>`<span style="margin-right:8px"><b>${d.prod}</b>: ${d.consumo.toLocaleString('es-AR')} ${item.unidad}</span>`)
-      .join('');
+    const pct=maxT>0?Math.round(item.total/maxT*100):0;
+    const porProd={};item.desglose.forEach(d=>{if(!porProd[d.producto])porProd[d.producto]=0;porProd[d.producto]=fmtN(porProd[d.producto]+d.consumo)});
+    const detalle=Object.entries(porProd).sort((a,b)=>b[1]-a[1]).map(([p,c])=>`<span style="margin-right:8px"><b>${p}</b>: ${c.toLocaleString('es-AR')} ${item.unidad}</span>`).join('');
     html+=`<tr>
       <td style="color:var(--text3);font-size:12px">${idx+1}</td>
-      <td>
-        <span class="ingr-chip">${item.ingrediente}</span>
-        <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
-      </td>
-      <td class="right" style="font-size:16px">${item.total.toLocaleString('es-AR')}</td>
+      <td><span class="ingr-chip">${item.ingrediente}</span><div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div></td>
+      <td style="text-align:right;font-size:16px;font-weight:600">${item.total.toLocaleString('es-AR')}</td>
       <td class="muted">${item.unidad}</td>
       <td class="muted">${detalle||'—'}</td>
     </tr>`;
   });
-  html+=`</tbody></table></div>`;
-  el.innerHTML=html;
+  html+=`</tbody></table></div>`;el.innerHTML=html;
 }
 
-// ── PDF ──────────────────────────────────────────────────────────
+// PDF
 async function generatePDF(){
-  const rows=st.edit[st.week]||st.plans[st.week]||[];
-  if(!rows.length){showPdfMsg('No hay ítems en el plan para exportar.');return}
-  const btn=document.getElementById('btn-pdf');
-  btn.innerHTML='<span class="spinner"></span> Generando...';btn.disabled=true;
-  showPdfMsg('Preparando PDF...');
-  const wk=st.week;
-  const data={semana:weekLabel(wk),dias:DAYS.map((d,i)=>d+' '+dayDate(wk,i)),filas:rows.map(r=>({area:r.area||'Sin área',producto:r.producto,unidad:r.unidad,dias:r.days||Array(7).fill(0),total:(r.days||[]).reduce((a,b)=>a+(b||0),0)}))};
+  const rows=st.edit[st.week]||st.plans[st.week]||[];if(!rows.length){showPdfMsg('Sin ítems en el plan.');return}
+  const btn=document.getElementById('btn-pdf');btn.innerHTML='<span class="spinner"></span> Generando...';btn.disabled=true;showPdfMsg('Preparando...');
+  const wk=st.week;const filtered=st.planEmpFilter==='all'?rows:rows.filter(r=>r.empresa_id===st.planEmpFilter);
+  const data={semana:weekLabel(wk),dias:DAYS.map((d,i)=>d+' '+dayDate(wk,i)),filas:filtered.map(r=>({empresa:empName(r.empresa_id)||'',area:r.area||'',producto:r.producto,unidad:r.unidad,dias:r.days||Array(7).fill(0),total:(r.days||[]).reduce((a,b)=>a+(b||0),0)}))};
   try{
     const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,
-        messages:[{role:'user',content:`Generá código Python completo usando reportlab para PDF de planificación semanal.
-Datos: ${JSON.stringify(data)}
-Requisitos: A4 apaisado, título "Plan de Producción Semanal" + semana, fecha, tabla Área/Producto/Unidad/${DAYS.join('/')}/Total, agrupar por área con fondo suave, fila totales, header azul oscuro #1B3A6B texto blanco, filas alternadas, pie de página. Guardar como "plan_produccion_semanal.pdf". Solo código Python, sin markdown.`}]})});
-    const d=await resp.json();
-    const code=d.content.map(b=>b.text||'').join('').replace(/```python|```/g,'').trim();
-    const blob=new Blob([code],{type:'text/plain'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');a.href=url;a.download='generar_pdf.py';a.click();
-    showPdfMsg('✓ Script descargado. Ejecutá: python generar_pdf.py','ok');
-  }catch(e){showPdfMsg('Error al generar el script.')}
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:`Generá código Python usando reportlab para PDF de planificación semanal. Datos: ${JSON.stringify(data)}. A4 apaisado, título "Plan de Producción Semanal" + semana, tabla Empresa/Área/Producto/Unidad/${DAYS.join('/')}/Total, agrupar por empresa y área, header azul #1B3A6B texto blanco, filas alternadas, pie de página. Guardar como "plan_produccion_semanal.pdf". Solo código Python, sin markdown.`}]})});
+    const d=await resp.json();const code=d.content.map(b=>b.text||'').join('').replace(/```python|```/g,'').trim();
+    const blob=new Blob([code],{type:'text/plain'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='generar_pdf.py';a.click();
+    showPdfMsg('✓ Script descargado.','ok');
+  }catch(e){showPdfMsg('Error al generar.')}
   btn.innerHTML='<i class="ti ti-file-type-pdf"></i> Exportar PDF';btn.disabled=false;
 }
 function showPdfMsg(msg,type){
-  const el=document.getElementById('pdf-msg');
-  el.className='alert '+(type==='ok'?'alert-ok':'alert-info');
-  el.innerHTML=`<i class="ti ti-${type==='ok'?'check':'loader'}"></i> ${msg}`;
-  el.style.display='flex';
+  const el=document.getElementById('pdf-msg');el.className='alert '+(type==='ok'?'alert-ok':'alert-info');
+  el.innerHTML=`<i class="ti ti-${type==='ok'?'check':'loader'}"></i> ${msg}`;el.style.display='flex';
   if(type==='ok')setTimeout(()=>el.style.display='none',5000);
 }
 
-// ── START ────────────────────────────────────────────────────────
 init();
 </script>
 </body>
