@@ -489,7 +489,15 @@ async function savePlan(){
   try{
     const rows=JSON.parse(JSON.stringify(gE()));
     await upsert('planes',{semana:st.w,filas:rows,updated_at:new Date().toISOString()});
-    st.P[st.w]=rows;if(!st.Sem.includes(st.w))st.Sem.push(st.w);
+    st.P[st.w]=rows;
+    if(!st.Sem.includes(st.w)){st.Sem.push(st.w);st.Sem.sort();}
+    // Actualizar todos los selectores de semana
+    ['rwsel','cwsel','cswsel'].forEach(id=>{
+      const s=document.getElementById(id);if(!s)return;
+      const cur=s.value;s.innerHTML='';
+      [...new Set([...st.Sem,st.w])].sort().reverse().forEach(w=>{const o=document.createElement('option');o.value=w;o.textContent=wlb(w);s.appendChild(o)});
+      if(cur)s.value=cur;
+    });
     ss('online','Guardado');fl('pmsg');
   }catch(e){ss('error','Error');document.getElementById('perrtxt').textContent=e.message;fl('perr')}
   btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar plan';btn.disabled=false;
@@ -888,15 +896,84 @@ async function renderCon(){
 
 async function genPDF(){
   const rows=st.Ed[st.w]||st.P[st.w]||[];if(!rows.length){spdf('Sin items en el plan.');return}
-  const btn=document.getElementById('btnpdf');btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;spdf('Preparando...');
+  const btn=document.getElementById('btnpdf');btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;
   const filtered=st.ef==='all'?rows:rows.filter(r=>r.empresa_id===st.ef);
-  const data={semana:wlb(st.w),dias:DAYS.map((d,i)=>d+' '+ddate(st.w,i)),filas:filtered.map(r=>({empresa:en(r.empresa_id)||'',area:r.area||'',producto:r.producto,unidad:r.unidad,dias:r.days||Array(7).fill(0),total:(r.days||[]).reduce((a,b)=>a+(b||0),0)}))};
-  try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:`Genera codigo Python usando reportlab para PDF de planificacion semanal. Datos: ${JSON.stringify(data)}. A4 apaisado, titulo Plan de Produccion Semanal + semana, tabla Empresa/Area/Producto/Unidad/${DAYS.join('/')}/Total, agrupar por empresa y area, header azul #1B3A6B texto blanco, filas alternadas, pie de pagina. Guardar como plan_produccion_semanal.pdf. Solo codigo Python, sin markdown.`}]})});
-    const d=await resp.json();const code=d.content.map(b=>b.text||'').join('').replace(/\`\`\`python|\`\`\`/g,'').trim();
-    const blob=new Blob([code],{type:'text/plain'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='generar_pdf.py';a.click();
-    spdf('Script descargado. Ejecuta: python generar_pdf.py','ok');
-  }catch(e){spdf('Error al generar.')}
+  const semana=wlb(st.w);
+  const fecha=new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+
+  // Armar tabla agrupada
+  const byE={};
+  filtered.forEach(r=>{const eid=r.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(r)});
+  let filas='';let dayT=Array(7).fill(0);let grand=0;
+  Object.entries(byE).forEach(([eid,items])=>{
+    const nm=en(eid)||'Sin empresa';const clr=ec(eid);
+    const bA={};items.forEach(r=>{const a=r.area||'SA';if(!bA[a])bA[a]=[];bA[a].push(r)});
+    let eFirst=true;
+    Object.entries(bA).forEach(([area,aIt])=>{
+      aIt.forEach((r,ri)=>{
+        const dias=r.days||Array(7).fill(0);
+        const tot=dias.reduce((a,b)=>a+(b||0),0);
+        grand+=tot;dias.forEach((v,i)=>dayT[i]+=(v||0));
+        filas+=`<tr>
+          ${eFirst&&ri===0?`<td rowspan="${items.length}" style="font-weight:600;color:${clr};border-right:3px solid ${clr}">${nm}</td>`:''}
+          ${ri===0?`<td rowspan="${aIt.length}" style="font-weight:500">${area}</td>`:''}
+          <td style="text-align:left">${r.producto}</td>
+          <td>${r.unidad}</td>
+          ${dias.map(v=>`<td>${v>0?v.toLocaleString('es-AR'):''}</td>`).join('')}
+          <td style="font-weight:700">${tot>0?tot.toLocaleString('es-AR'):''}</td>
+        </tr>`;
+        eFirst=false;
+      });
+    });
+  });
+  // Fila totales
+  filas+=`<tr class="total-row">
+    <td colspan="2" style="font-weight:700">TOTAL DIARIO</td>
+    <td></td><td></td>
+    ${dayT.map(v=>`<td style="font-weight:700">${v>0?v.toLocaleString('es-AR'):''}</td>`).join('')}
+    <td style="font-weight:700">${grand>0?grand.toLocaleString('es-AR'):''}</td>
+  </tr>`;
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Plan de Produccion - ${semana}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:9pt;color:#1a1a1a}
+    .hdr{background:#1B3A6B;color:#fff;padding:8px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+    .hdr h1{font-size:13pt;font-weight:700}
+    .hdr .sub{font-size:9pt;opacity:.85}
+    table{width:100%;border-collapse:collapse;font-size:8pt}
+    th{background:#1B3A6B;color:#fff;padding:5px 6px;text-align:center;border:1px solid #1B3A6B}
+    th.left{text-align:left}
+    td{padding:4px 6px;border:1px solid #d0d0d0;text-align:center;vertical-align:middle}
+    td.left{text-align:left}
+    tr:nth-child(even) td{background:#f5f5f4}
+    tr.total-row td{background:#e0e0e0!important;font-weight:700;border-top:2px solid #999}
+    .fecha{font-size:7.5pt;color:#999;text-align:right;margin-top:6px}
+    @media print{@page{size:A4 landscape;margin:10mm}}
+  </style></head><body>
+  <div class="hdr">
+    <div><h1>Plan de Produccion Semanal</h1><div class="sub">${semana}</div></div>
+    <div class="sub">Generado: ${fecha}</div>
+  </div>
+  <table>
+    <thead><tr>
+      <th class="left" style="width:90px">Empresa</th>
+      <th class="left" style="width:80px">Area</th>
+      <th class="left" style="width:130px">Producto</th>
+      <th class="left" style="width:60px">Unidad</th>
+      ${DAYS.map((d,i)=>`<th style="width:52px">${d.slice(0,3)}<br><span style="font-weight:400;font-size:7pt">${ddate(st.w,i)}</span></th>`).join('')}
+      <th style="width:55px;background:#0F6E56">Total</th>
+    </tr></thead>
+    <tbody>${filas}</tbody>
+  </table>
+  <div class="fecha">Plan de Produccion Semanal &mdash; ${semana} &mdash; ${fecha}</div>
+  <script>window.onload=()=>{window.print();setTimeout(()=>window.close(),1000)}<\/script>
+  </body></html>`;
+
+  const w=window.open('','_blank','width=900,height=650');
+  if(w){w.document.write(html);w.document.close();spdf('Ventana de impresion abierta. Selecciona "Guardar como PDF".','ok');}
+  else{spdf('Permiti las ventanas emergentes para este sitio.');}
   btn.innerHTML='<i class="ti ti-file-type-pdf"></i> PDF';btn.disabled=false;
 }
 function spdf(msg,type){
