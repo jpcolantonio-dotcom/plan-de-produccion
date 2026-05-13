@@ -133,6 +133,20 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 .ichip{display:inline-block;padding:2px 8px;background:var(--purple-bg);color:var(--purple);border-radius:20px;font-size:11px;font-weight:600}
 .bar-bg{width:100%;height:5px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:4px}
 .bar-fill{height:100%;border-radius:3px;background:var(--purple)}
+/* MODAL CAUSA */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center}
+.modal{background:var(--bg);border-radius:var(--radius-lg);padding:1.5rem;width:440px;max-width:95vw;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.modal-title{font-size:15px;font-weight:600;margin-bottom:4px}
+.modal-sub{font-size:13px;color:var(--text2);margin-bottom:1.25rem}
+.modal select,.modal textarea{width:100%;padding:8px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);margin-bottom:10px}
+.modal textarea{resize:vertical;min-height:70px}
+.modal-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.causa-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:var(--amber-bg);color:var(--amber)}
+.desv-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.desv-tbl th{text-align:left;padding:8px 10px;font-size:12px;font-weight:500;color:var(--text2);border-bottom:.5px solid var(--border);background:var(--bg2)}
+.desv-tbl td{padding:8px 10px;border-bottom:.5px solid var(--border);vertical-align:middle}
+.desv-tbl tbody tr:last-child td{border-bottom:none}
+.desv-tbl tr:hover td{background:var(--bg2)}
 </style>
 </head>
 <body>
@@ -148,6 +162,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab active" onclick="T('plan')"><i class="ti ti-calendar"></i> Planificacion</button>
   <button class="tab" onclick="T('real')"><i class="ti ti-clipboard-list"></i> Produccion real</button>
   <button class="tab" onclick="T('cmp')"><i class="ti ti-chart-bar"></i> Comparacion</button>
+  <button class="tab" onclick="T('desv')"><i class="ti ti-alert-triangle"></i> Desvios</button>
   <button class="tab" onclick="T('rec')"><i class="ti ti-notebook"></i> Recetas</button>
   <button class="tab" onclick="T('con')"><i class="ti ti-package"></i> Consumo MP</button>
   <button class="tab" onclick="T('mae')"><i class="ti ti-building"></i> Maestro</button>
@@ -245,6 +260,23 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <div id="ccon2"></div>
 </div>
 
+<!-- DESVIOS -->
+<div id="tab-desv" class="section">
+  <div class="toolbar">
+    <div>
+      <div style="font-size:16px;font-weight:600">Desvios de Produccion</div>
+      <div style="font-size:13px;color:var(--text2)">Causas registradas cuando la produccion fue menor a lo planificado</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
+    <label style="font-size:13px;color:var(--text2)">Semana:</label>
+    <select id="desv-wsel" onchange="loadDesv()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
+    <label style="font-size:13px;color:var(--text2)">Empresa:</label>
+    <select id="desv-esel" onchange="renderDesv()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas</option></select>
+  </div>
+  <div id="desv-content"></div>
+</div>
+
 <!-- MAESTRO -->
 <div id="tab-mae" class="section">
   <div class="toolbar">
@@ -293,6 +325,17 @@ const ins=async(t,d)=>{const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',h
 const pat=async(t,id,d)=>{const r=await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text())};
 const del=async(t,id)=>{const r=await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'DELETE',headers:H});if(!r.ok)throw new Error(await r.text())};
 
+const CAUSAS_PRED=[
+  'Falta de materia prima',
+  'Falla de maquinaria',
+  'Falta de personal',
+  'Problema de calidad',
+  'Corte de luz / servicios',
+  'Demanda menor a lo esperado',
+  'Cambio de prioridad',
+  'Otra'
+];
+
 const DAYS=['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo'];
 const UNITS=['unidades','docenas','kg','g','litros','ml','cajas','metros','horas','lotes','pallets','camiones','bolsas','paquetes','atados','rollos','piezas'];
 const AC=['#185FA5','#0F6E56','#993C1D','#993556','#854F0B','#3B6D11','#534AB7','#5F5E5A'];
@@ -316,7 +359,7 @@ const ec=eid=>{const e=st.E.find(x=>x.id===eid);return e?e.color:'#888'};
 const en=eid=>{const e=st.E.find(x=>x.id===eid);return e?e.nombre:''};
 
 const W0=wk(new Date());
-const st={w:W0,P:{},R:{},Rec:{},Ed:{},Sem:[],E:[],A:[],Pr:[],ef:'all',aeid:null,aaid:null};
+const st={w:W0,P:{},R:{},Rec:{},Ed:{},Sem:[],E:[],A:[],Pr:[],ef:'all',aeid:null,aaid:null,causas:[]};
 
 document.getElementById('hdate').textContent=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
@@ -346,7 +389,7 @@ async function lp(k){if(st.P[k]!==undefined)return;try{const d=await get('planes
 async function lr(k){if(st.R[k]!==undefined)return;try{const d=await get('produccion_real',`semana=eq.${k}&select=datos`);st.R[k]=d.length?d[0].datos:{};}catch{st.R[k]={}}}
 
 function uES(){
-  ['resel','cesel','ceesel'].forEach(id=>{
+  ['resel','cesel','ceesel','desv-esel'].forEach(id=>{
     const s=document.getElementById(id);if(!s)return;
     const c=s.value;s.innerHTML='<option value="all">Todas</option>';
     st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;s.appendChild(o)});
@@ -359,13 +402,14 @@ function uES(){
   }
 }
 
-const TABS=['plan','real','cmp','rec','con','mae'];
+const TABS=['plan','real','cmp','desv','rec','con','mae'];
 function T(t){
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',TABS[i]===t));
   document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));
   document.getElementById('tab-'+t).classList.add('active');
   if(t==='real'){pS('rwsel');loadReal2()}
   if(t==='cmp'){pS('cwsel');loadCmp()}
+  if(t==='desv'){pS('desv-wsel');loadDesv()}
   if(t==='rec')rRec();
   if(t==='con'){pSC();renderCon()}
   if(t==='mae')rMae();
@@ -561,8 +605,14 @@ function renderReal(){
         h+=`<td style="font-weight:500">${r.producto}</td><td style="font-size:12px;color:var(--text2)">${r.unidad}</td>`;
         for(let di=0;di<7;di++){
           const pv=(r.days&&r.days[di])||0;const rv=re[oi]?.[di]||0;
+          const desvio=pv>0&&rv<pv;
           h+=`<td class="day-cell${di===t?' today-col':''}" style="font-size:12px;color:var(--text2)">${pv>0?pv:'--'}</td>`;
-          h+=`<td class="day-cell${di===t?' today-col':''}"><input class="day-input${rv>0?' has-val':''}" type="number" min="0" value="${rv||''}" placeholder="--" onchange="uR('${k}',${oi},${di},this.value);this.classList.toggle('has-val',this.value!='')" style="border-color:rgba(29,158,117,.3)"/></td>`;
+          h+=`<td class="day-cell${di===t?' today-col':''}" style="position:relative">
+            <input class="day-input${rv>0?' has-val':''}" type="number" min="0" value="${rv||''}" placeholder="--"
+              onchange="uR('${k}',${oi},${di},this.value);this.classList.toggle('has-val',this.value!='');chkDesv('${k}',${oi},${di},${pv},this.value,'${r.empresa_id}','${area}','${r.producto.replace(/'/g,"\\'")}')"
+              style="border-color:rgba(29,158,117,.3)"/>
+            ${desvio?`<button onclick="showCausaModal('${k}',${oi},${di},${pv},${rv},'${r.empresa_id}','${area}','${r.producto.replace(/'/g,"\\'")}','${r.unidad}')" style="position:absolute;right:2px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--amber);font-size:14px" title="Registrar causa"><i class="ti ti-alert-triangle"></i></button>`:''}
+          </td>`;
         }
         h+=`<td class="total-cell" style="font-size:12px">${fmt(tp)}</td><td class="total-cell" style="color:var(--green)">${fmt(tr2)}</td></tr>`;
         ef=false;
@@ -1042,6 +1092,128 @@ function spdf(msg,type){
   const el=document.getElementById('pdfmsg');el.className='alert '+(type==='ok'?'alert-ok':'alert-info');
   el.innerHTML=`<i class="ti ti-${type==='ok'?'check':'loader'}"></i> ${msg}`;el.style.display='flex';
   if(type==='ok')setTimeout(()=>el.style.display='none',5000);
+}
+
+// ── CAUSAS / DESVIOS ─────────────────────────────────────────────
+function chkDesv(k,oi,di,pv,rv,eid,area,producto){
+  rv=parseFloat(rv)||0;
+  if(pv>0&&rv<pv){
+    // pequeño delay para que el input termine de actualizarse
+    setTimeout(()=>renderReal(),100);
+  }
+}
+
+function showCausaModal(k,oi,di,pv,rv,eid,area,producto,unidad){
+  const ya=st.causas.find(c=>c.semana===k&&c.dia===di&&c.producto===producto&&c.area===area&&c.empresa_id===eid);
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay';
+  overlay.id='causa-modal';
+  overlay.innerHTML=`
+    <div class="modal">
+      <div class="modal-title"><i class="ti ti-alert-triangle" style="color:var(--amber)"></i> Registrar desvio</div>
+      <div class="modal-sub">${producto} &mdash; ${area} &mdash; ${DAYS[di]}<br>
+        <span style="color:var(--text2)">Planificado: <b>${pv} ${unidad}</b> &nbsp;|&nbsp; Producido: <b>${rv} ${unidad}</b></span>
+      </div>
+      <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Causa</label>
+      <select id="causa-sel">
+        ${CAUSAS_PRED.map(c=>`<option value="${c}"${ya&&ya.causa===c?' selected':''}>${c}</option>`).join('')}
+      </select>
+      <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Observacion (opcional)</label>
+      <textarea id="causa-obs" placeholder="Detalle adicional...">${ya?ya.observacion||'':''}</textarea>
+      <div class="modal-btns">
+        <button class="btn" onclick="closeCausaModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveCausa('${k}',${oi},${di},'${eid}','${area}','${producto.replace(/'/g,"\\'")}')">
+          <i class="ti ti-check"></i> Guardar causa
+        </button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click',e=>{if(e.target===overlay)closeCausaModal()});
+  document.body.appendChild(overlay);
+}
+
+function closeCausaModal(){
+  const m=document.getElementById('causa-modal');if(m)m.remove();
+}
+
+async function saveCausa(k,oi,di,eid,area,producto){
+  const causa=document.getElementById('causa-sel').value;
+  const obs=document.getElementById('causa-obs').value.trim();
+  ss('saving','Guardando causa...');
+  try{
+    // Verificar si ya existe para actualizar o insertar
+    const existing=await get('causas',`semana=eq.${k}&empresa_id=eq.${eid}&area=eq.${encodeURIComponent(area)}&producto=eq.${encodeURIComponent(producto)}&dia=eq.${di}&select=id`);
+    if(existing.length){
+      await fetch(`${SB}/rest/v1/causas?id=eq.${existing[0].id}`,{
+        method:'PATCH',headers:{...H,'Prefer':'return=minimal'},
+        body:JSON.stringify({causa,observacion:obs})
+      });
+    } else {
+      await ins('causas',{semana:k,empresa_id:eid,area,producto,dia:di,causa,observacion:obs});
+    }
+    // Actualizar cache local
+    const idx=st.causas.findIndex(c=>c.semana===k&&c.dia===di&&c.producto===producto&&c.area===area&&c.empresa_id===eid);
+    const obj={semana:k,empresa_id:eid,area,producto,dia:di,causa,observacion:obs};
+    if(idx>=0)st.causas[idx]=obj;else st.causas.push(obj);
+    ss('online','Guardado');closeCausaModal();
+  }catch(e){ss('error','Error al guardar causa: '+e.message)}
+}
+
+async function loadDesv(){
+  const k=document.getElementById('desv-wsel').value;if(!k)return;
+  document.getElementById('desv-content').innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
+  try{
+    const data=await get('causas',`semana=eq.${k}&order=created_at.desc`);
+    st.causas=data;renderDesv();
+  }catch(e){document.getElementById('desv-content').innerHTML='<div class="alert alert-err"><i class="ti ti-alert-circle"></i> Error al cargar.</div>'}
+}
+
+function renderDesv(){
+  const ef=document.getElementById('desv-esel').value;
+  const el=document.getElementById('desv-content');
+  let causas=st.causas||[];
+  if(ef!=='all')causas=causas.filter(c=>c.empresa_id===ef);
+  if(!causas.length){el.innerHTML='<div class="empty"><i class="ti ti-mood-happy"></i>Sin desvios registrados para esta semana.</div>';return}
+  // Agrupar por empresa/area
+  const byE={};causas.forEach(c=>{const eid=c.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(c)});
+  let h=`<div class="grid-card"><table class="desv-tbl"><thead><tr>
+    <th>Empresa</th><th>Area</th><th>Producto</th><th>Dia</th>
+    <th style="text-align:center">Causa</th><th>Observacion</th>
+    <th style="width:34px"></th>
+  </tr></thead><tbody>`;
+  Object.entries(byE).forEach(([eid,items])=>{
+    const clr=ec(eid);const nm=en(eid)||'Sin empresa';const bg=rgba(clr,.12);
+    items.forEach((c,i)=>{
+      h+=`<tr>
+        ${i===0?`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span></td>`:''}
+        <td><span class="area-tag" style="background:var(--amber-bg);color:var(--amber)">${c.area}</span></td>
+        <td style="font-weight:500">${c.producto}</td>
+        <td style="text-align:center;font-size:12px">${DAYS[c.dia]||c.dia}</td>
+        <td><span class="causa-badge">${c.causa}</span></td>
+        <td style="font-size:12px;color:var(--text2)">${c.observacion||'--'}</td>
+        <td><button class="btn btn-xs btn-danger" onclick="delCausa('${c.id}')"><i class="ti ti-trash"></i></button></td>
+      </tr>`;
+    });
+  });
+  h+=`</tbody></table></div>`;
+  // Resumen por causa
+  const resumen={};causas.forEach(c=>{resumen[c.causa]=(resumen[c.causa]||0)+1});
+  h+=`<div style="margin-top:1rem"><div style="font-size:13px;font-weight:600;margin-bottom:8px">Resumen de causas</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">`;
+  Object.entries(resumen).sort((a,b)=>b[1]-a[1]).forEach(([causa,cnt])=>{
+    h+=`<div style="background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-lg);padding:8px 14px;font-size:13px">
+      <span class="causa-badge" style="margin-right:6px">${causa}</span><b>${cnt}</b> ${cnt===1?'vez':'veces'}
+    </div>`;
+  });
+  h+=`</div></div>`;
+  el.innerHTML=h;
+}
+
+async function delCausa(id){
+  if(!confirm('Eliminar esta causa?'))return;
+  try{
+    await del('causas',id);
+    st.causas=st.causas.filter(c=>c.id!==id);renderDesv();ss('online','Eliminado');
+  }catch(e){alert('Error: '+e.message)}
 }
 
 init();
