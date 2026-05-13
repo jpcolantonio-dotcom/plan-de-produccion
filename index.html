@@ -454,7 +454,13 @@ function rG(){
   wrap.innerHTML=h;
 }
 function uf(i,f,v){const r=gE()[i];if(r)r[f]=v}
-function ud(i,di,v){const r=gE();if(!r[i])return;if(!r[i].days)r[i].days=Array(7).fill(0);r[i].days[di]=parseFloat(v)||0;udt()}
+function ud(i,di,v){
+  const r=gE();
+  if(i<0||i>=r.length)return;
+  if(!r[i].days)r[i].days=Array(7).fill(0);
+  r[i].days[di]=parseFloat(v)||0;
+  udt();
+}
 function udt(){
   const r=gE();const dt=Array(7).fill(0);let gd=0;
   r.forEach(x=>{(x.days||[]).forEach((v,k)=>{dt[k]+=(v||0);gd+=(v||0)})});
@@ -467,9 +473,8 @@ function delRow(i){const r=gE();r.splice(i,1);st.Ed[st.w]=r;rG()}
 function addFromMaestro(){
   const id=document.getElementById('sprod').value;if(!id)return;
   const p=st.Pr.find(x=>x.id===id);if(!p)return;
-  const a=st.A.find(x=>x.id===p.area_id);const an=a?a.nombre:'SA';
+  const a=st.A.find(x=>x.id===p.area_id);const anom=a?a.nombre:'SA';
   const r=gE();
-  const an=st.A.find(x=>x.id===p.area_id);const anom=an?an.nombre:'SA';
   if(r.find(x=>x.producto===p.nombre&&x.empresa_id===p.empresa_id&&x.area===anom)){alert('Ya esta en el plan.');return}
   r.push({empresa_id:p.empresa_id,area:anom,producto:p.nombre,unidad:p.unidad,days:Array(7).fill(0)});
   st.Ed[st.w]=r;rG();
@@ -490,7 +495,21 @@ async function savePlan(){
   const btn=document.getElementById('btnsave');btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;ss('saving','Guardando...');
   try{
     const rows=JSON.parse(JSON.stringify(gE()));
-    await upsert('planes',{semana:st.w,filas:rows,updated_at:new Date().toISOString()});
+    // Primero intentar update, si no existe insertar
+    const existing=await get('planes',`semana=eq.${st.w}&select=id`);
+    if(existing.length){
+      await fetch(`${SB}/rest/v1/planes?semana=eq.${st.w}`,{
+        method:'PATCH',
+        headers:{...H,'Prefer':'return=minimal'},
+        body:JSON.stringify({filas:rows,updated_at:new Date().toISOString()})
+      }).then(r=>{if(!r.ok)throw new Error('Error al actualizar')});
+    } else {
+      await fetch(`${SB}/rest/v1/planes`,{
+        method:'POST',
+        headers:{...H,'Prefer':'return=minimal'},
+        body:JSON.stringify({semana:st.w,filas:rows,updated_at:new Date().toISOString()})
+      }).then(r=>{if(!r.ok)throw new Error('Error al insertar')});
+    }
     st.P[st.w]=rows;
     if(!st.Sem.includes(st.w)){st.Sem.push(st.w);st.Sem.sort();}
     // Actualizar todos los selectores de semana
@@ -558,7 +577,19 @@ async function saveReal(){
   const k=document.getElementById('rwsel').value;
   const btn=document.getElementById('btnsaver');btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;ss('saving','Guardando...');
   try{
-    await upsert('produccion_real',{semana:k,datos:JSON.parse(JSON.stringify(st.R[k]||{})),updated_at:new Date().toISOString()});
+    const datos=JSON.parse(JSON.stringify(st.R[k]||{}));
+    const existing=await get('produccion_real',`semana=eq.${k}&select=id`);
+    if(existing.length){
+      await fetch(`${SB}/rest/v1/produccion_real?semana=eq.${k}`,{
+        method:'PATCH',headers:{...H,'Prefer':'return=minimal'},
+        body:JSON.stringify({datos,updated_at:new Date().toISOString()})
+      }).then(r=>{if(!r.ok)throw new Error('Error al actualizar')});
+    } else {
+      await fetch(`${SB}/rest/v1/produccion_real`,{
+        method:'POST',headers:{...H,'Prefer':'return=minimal'},
+        body:JSON.stringify({semana:k,datos,updated_at:new Date().toISOString()})
+      }).then(r=>{if(!r.ok)throw new Error('Error al insertar')});
+    }
     if(!st.Sem.includes(k))st.Sem.push(k);ss('online','Guardado');fl('rmsg');
   }catch(e){ss('error','Error');document.getElementById('rerrtxt').textContent=e.message;fl('rerr')}
   btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar produccion';btn.disabled=false;
@@ -579,7 +610,7 @@ function renderCmp(){
   let plan=ef==='all'?ap:ap.filter(r=>r.empresa_id===ef);
   const re=st.R[k]||{};
   let tp=0,tr2=0,cu=0;
-  plan.forEach(r=>{const i=ap.indexOf(r);const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);const rv=(re[i]||[]).reduce((a,b)=>a+(b||0),0);tp+=pv;tr2+=rv;if(rv>=pv&&pv>0)cu++});
+  plan.forEach((r,i)=>{const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);const rv=(re[oi]||[]).reduce((a,b)=>a+(b||0),0);tp+=pv;tr2+=rv;if(rv>=pv&&pv>0)cu++});
   const pct=tp>0?Math.round(tr2/tp*100):0;const cls=pct>=90?'good':pct>=70?'warn':'bad';
   let html=`<div class="metric-grid">
     <div class="metric"><div class="metric-label">Cumplimiento global</div><div class="metric-val ${cls}">${pct}%</div></div>
@@ -602,7 +633,7 @@ function renderCmp(){
     Object.entries(bA).forEach(([area,aIt],ai)=>{
       let aap=0,aar=0;
       aIt.forEach((r,ri)=>{
-        const oi=ap.indexOf(r);
+        const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
         const t2=(r.days||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
         const t3=(re[oi]||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
         aap+=t2;aar+=t3;
