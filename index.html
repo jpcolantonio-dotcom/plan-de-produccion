@@ -469,8 +469,9 @@ function addFromMaestro(){
   const p=st.Pr.find(x=>x.id===id);if(!p)return;
   const a=st.A.find(x=>x.id===p.area_id);const an=a?a.nombre:'SA';
   const r=gE();
-  if(r.find(x=>x.producto===p.nombre&&x.empresa_id===p.empresa_id)){alert('Ya esta en el plan.');return}
-  r.push({empresa_id:p.empresa_id,area:an,producto:p.nombre,unidad:p.unidad,days:Array(7).fill(0)});
+  const an=st.A.find(x=>x.id===p.area_id);const anom=an?an.nombre:'SA';
+  if(r.find(x=>x.producto===p.nombre&&x.empresa_id===p.empresa_id&&x.area===anom)){alert('Ya esta en el plan.');return}
+  r.push({empresa_id:p.empresa_id,area:anom,producto:p.nombre,unidad:p.unidad,days:Array(7).fill(0)});
   st.Ed[st.w]=r;rG();
 }
 function addAllEmp(){
@@ -478,8 +479,9 @@ function addAllEmp(){
   const ps=st.Pr.filter(p=>p.empresa_id===eid);if(!ps.length){alert('Sin productos en maestro.');return}
   const r=gE();let n=0;
   ps.forEach(p=>{
-    if(!r.find(x=>x.producto===p.nombre&&x.empresa_id===p.empresa_id)){
-      const a=st.A.find(x=>x.id===p.area_id);r.push({empresa_id:p.empresa_id,area:a?a.nombre:'SA',producto:p.nombre,unidad:p.unidad,days:Array(7).fill(0)});n++;
+    const a=st.A.find(x=>x.id===p.area_id);const anom=a?a.nombre:'SA';
+    if(!r.find(x=>x.producto===p.nombre&&x.empresa_id===p.empresa_id&&x.area===anom)){
+      r.push({empresa_id:p.empresa_id,area:anom,producto:p.nombre,unidad:p.unidad,days:Array(7).fill(0)});n++;
     }
   });
   st.Ed[st.w]=r;rG();if(!n)alert('Todos ya estaban en el plan.');
