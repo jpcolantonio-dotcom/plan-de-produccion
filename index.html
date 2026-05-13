@@ -329,7 +329,7 @@ async function init(){
       get('recetas','select=datos').catch(()=>[]),
       get('empresas','order=nombre.asc'),
       get('areas','order=nombre.asc'),
-      get('productos','order=nombre.asc')
+      get('productos','order=orden.asc,nombre.asc')
     ]);
     const ss2=new Set([...pl.map(p=>p.semana),...re.map(r=>r.semana),W0]);
     st.Sem=[...ss2].sort();
@@ -680,7 +680,7 @@ function selArea(id){st.aaid=id;rAreaList(st.aeid);}
 function rProdDetail(aid){
   const area=st.A.find(a=>a.id===aid);if(!area)return;
   const emp=st.E.find(e=>e.id===area.empresa_id);
-  const prods=st.Pr.filter(p=>p.area_id===aid);
+  const prods=st.Pr.filter(p=>p.area_id===aid).sort((a,b)=>(a.orden||0)-(b.orden||0));
   const wrap=document.getElementById('proddetail');
   let h=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:1rem">
     ${emp?`<span style="width:12px;height:12px;border-radius:50%;background:${emp.color};display:inline-block"></span><span style="font-size:12px;color:var(--text2)">${emp.nombre} /</span>`:''}
@@ -689,9 +689,15 @@ function rProdDetail(aid){
   </div>`;
   if(prods.length){
     h+=`<div class="grid-card" style="margin-bottom:1rem"><table class="ptbl">
-      <thead><tr><th>Producto</th><th style="width:120px">Unidad</th><th style="width:34px"></th></tr></thead><tbody>`;
-    prods.forEach(p=>{
+      <thead><tr><th style="width:56px">Orden</th><th>Producto</th><th style="width:120px">Unidad</th><th style="width:34px"></th></tr></thead><tbody>`;
+    prods.forEach((p,idx)=>{
       h+=`<tr>
+        <td style="text-align:center">
+          <div style="display:flex;flex-direction:column;gap:2px;align-items:center">
+            <button class="btn btn-xs" onclick="moveProd('${p.id}','${aid}',-1)" ${idx===0?'disabled':''} style="padding:2px 6px"><i class="ti ti-chevron-up"></i></button>
+            <button class="btn btn-xs" onclick="moveProd('${p.id}','${aid}',1)" ${idx===prods.length-1?'disabled':''} style="padding:2px 6px"><i class="ti ti-chevron-down"></i></button>
+          </div>
+        </td>
         <td><input value="${p.nombre}" onchange="updP('${p.id}','nombre',this.value)"/></td>
         <td><select onchange="updP('${p.id}','unidad',this.value)" style="width:100%;padding:4px 6px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">${UNITS.map(u=>`<option${u===p.unidad?' selected':''}>${u}</option>`).join('')}</select></td>
         <td><button class="btn btn-xs btn-danger" onclick="delProd('${p.id}')"><i class="ti ti-trash"></i></button></td>
@@ -708,6 +714,20 @@ function rProdDetail(aid){
     <button class="btn btn-primary" onclick="addProd('${aid}','${area.empresa_id}')"><i class="ti ti-plus"></i> Agregar producto</button>
   </div>`;
   wrap.innerHTML=h;
+}
+async function moveProd(id,aid,dir){
+  const prods=st.Pr.filter(p=>p.area_id===aid).sort((a,b)=>(a.orden||0)-(b.orden||0));
+  const idx=prods.findIndex(p=>p.id===id);if(idx<0)return;
+  const swapIdx=idx+dir;if(swapIdx<0||swapIdx>=prods.length)return;
+  const a=prods[idx],b=prods[swapIdx];
+  const ao=a.orden||idx,bo=b.orden||swapIdx;
+  a.orden=bo;b.orden=ao;
+  ss('saving','Guardando orden...');
+  try{
+    await Promise.all([pat('productos',a.id,{orden:a.orden}),pat('productos',b.id,{orden:b.orden})]);
+    ss('online','Guardado');
+  }catch(e){ss('error','Error al reordenar')}
+  rProdDetail(aid);
 }
 async function addEmpresa(){
   const nom=document.getElementById('nemp').value.trim();const col=document.getElementById('nempcolor').value;
