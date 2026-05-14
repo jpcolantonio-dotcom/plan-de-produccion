@@ -373,6 +373,22 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <input type="date" id="sal-fecha" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
       <select id="sal-esel" onchange="renderSalidas()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
+      <label class="btn" style="cursor:pointer" title="Importar Excel de repartos">
+        <i class="ti ti-file-spreadsheet"></i> Importar Excel
+        <input type="file" id="sal-excel-input" accept=".xlsx,.xls" style="display:none" onchange="importarExcelSalidas(this)"/>
+      </label>
+    </div>
+  </div>
+  <!-- PREVISUALIZACIÓN EXCEL -->
+  <div id="sal-preview" style="display:none;margin-bottom:1rem">
+    <div class="alert alert-info" style="margin-bottom:1rem">
+      <i class="ti ti-file-spreadsheet"></i>
+      <span id="sal-preview-title">Previsualización del Excel</span>
+    </div>
+    <div id="sal-preview-content"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
+      <button class="btn" onclick="cancelarImport()"><i class="ti ti-x"></i> Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarImport()"><i class="ti ti-check"></i> Confirmar e importar</button>
     </div>
   </div>
   <div id="sal-content"></div>
@@ -1233,106 +1249,89 @@ async function genPDF(){
   const filtered=st.ef==='all'?rows:rows.filter(r=>r.empresa_id===st.ef);
   const semana=wlb(st.w);
   const fecha=new Date().toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
-
-  // Agrupar por empresa → área
   const byE={};
   filtered.forEach(r=>{const eid=r.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(r)});
-
-  // Generar una sección por cada área (con page-break entre ellas)
   let paginas='';
   Object.entries(byE).forEach(([eid,items])=>{
     const nm=en(eid)||'Sin empresa';const clr=ec(eid)||'#1B3A6B';
     const bA={};items.forEach(r=>{const a=r.area||'SA';if(!bA[a])bA[a]=[];bA[a].push(r)});
-
     Object.entries(bA).forEach(([area,aIt])=>{
-      let filas='';let dayT=Array(7).fill(0);let grand=0;
+      let filas='';let dayTP=Array(7).fill(0);let grand=0;
       aIt.forEach(r=>{
         const dias=r.days||Array(7).fill(0);
         const tot=dias.reduce((a,b)=>a+(b||0),0);
-        grand+=tot;dias.forEach((v,i)=>dayT[i]+=(v||0));
+        grand+=tot;dias.forEach((v,i)=>dayTP[i]+=(v||0));
         filas+=`<tr>
           <td class="left" style="font-weight:500">${r.producto}</td>
-          <td>${r.unidad}</td>
-          ${dias.map(v=>`<td class="num">${v>0?v.toLocaleString('es-AR'):''}</td>`).join('')}
-          <td class="num total">${tot>0?tot.toLocaleString('es-AR'):''}</td>
+          <td class="uni">${r.unidad}</td>
+          ${dias.map(v=>`<td class="plan">${v>0?v.toLocaleString('es-AR'):''}</td><td class="real-cell"></td>`).join('')}
+          <td class="plan total">${tot>0?tot.toLocaleString('es-AR'):''}</td>
+          <td class="real-cell"></td>
         </tr>`;
       });
-      // Fila firma
-      filas+=`<tr style="height:32px">
-        <td class="left" style="color:#aaa;font-size:7pt" colspan="2">Firma operario:</td>
-        ${Array(7).fill('<td></td>').join('')}
-        <td></td>
-      </tr>`;
-      // Fila totales
       filas+=`<tr class="total-row">
         <td class="left" colspan="2" style="font-weight:700">TOTAL DIARIO</td>
-        ${dayT.map(v=>`<td class="num">${v>0?v.toLocaleString('es-AR'):''}</td>`).join('')}
-        <td class="num">${grand>0?grand.toLocaleString('es-AR'):''}</td>
+        ${dayTP.map(v=>`<td>${v>0?v.toLocaleString('es-AR'):''}</td><td class="real-cell"></td>`).join('')}
+        <td>${grand>0?grand.toLocaleString('es-AR'):''}</td><td class="real-cell"></td>
       </tr>`;
-
-      paginas+=`
-      <div class="pagina">
+      filas+=`<tr style="height:26px">
+        <td class="left" style="color:#aaa;font-size:7pt;border:none" colspan="2">Firma operario: ___________________________</td>
+        ${Array(16).fill('<td style="border:none"></td>').join('')}
+      </tr>`;
+      const dayHdrs=DAYS.map((d,i)=>`<th colspan="2">${d.slice(0,3)}<br><span style="font-weight:400;font-size:6pt">${ddate(st.w,i)}</span></th>`).join('');
+      const prHdrs=DAYS.map(()=>`<th class="ph-plan">P</th><th class="ph-real">R</th>`).join('');
+      paginas+=`<div class="pagina">
         <div class="hdr" style="border-left:6px solid ${clr}">
-          <div>
-            <div class="empresa" style="color:${clr}">${nm}</div>
-            <div class="area">${area}</div>
-          </div>
-          <div class="right-hdr">
-            <div class="semana">${semana}</div>
-            <div class="fecha-txt">Generado: ${fecha}</div>
-          </div>
+          <div><div class="empresa" style="color:${clr}">${nm}</div><div class="area">${area}</div></div>
+          <div class="right-hdr"><div class="semana">${semana}</div><div class="fecha-txt">Generado: ${fecha}</div></div>
         </div>
-        <table>
-          <thead><tr>
-            <th class="left" style="width:160px">Producto</th>
-            <th style="width:65px">Unidad</th>
-            ${DAYS.map((d,i)=>`<th style="width:62px">${d.slice(0,3)}<br><span style="font-weight:400;font-size:7pt">${ddate(st.w,i)}</span></th>`).join('')}
-            <th style="width:62px;background:#0F6E56">Total</th>
-          </tr></thead>
-          <tbody>${filas}</tbody>
-        </table>
-      </div>
-      <div style="border-top:3px dashed #ccc;margin:8mm 0;display:block" class="separador"></div>`;
+        <table><thead>
+          <tr><th class="left" rowspan="2" style="width:130px">Producto</th><th rowspan="2" style="width:40px">Unidad</th>
+          ${dayHdrs}<th colspan="2" style="background:#0F6E56">Total</th></tr>
+          <tr>${prHdrs}<th class="ph-plan">P</th><th class="ph-real">R</th></tr>
+        </thead><tbody>${filas}</tbody></table>
+      </div><div class="separador"></div>`;
     });
   });
 
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
-  <title>Plan de Produccion - ${semana}</title>
-  <style>
+  <title>Plan - ${semana}</title><style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:Arial,sans-serif;font-size:9pt;color:#1a1a1a;background:#fff}
-    .pagina{padding:12mm 14mm;min-height:190mm}
-    .hdr{background:#f8f8f8;border:1px solid #e0e0e0;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-radius:4px}
-    .empresa{font-size:14pt;font-weight:700;margin-bottom:2px}
-    .area{font-size:11pt;font-weight:600;color:#444}
-    .right-hdr{text-align:right}
-    .semana{font-size:10pt;font-weight:600;color:#333}
-    .fecha-txt{font-size:8pt;color:#888;margin-top:2px}
-    table{width:100%;border-collapse:collapse;font-size:8.5pt}
-    th{background:#1B3A6B;color:#fff;padding:6px 7px;text-align:center;border:1px solid #1B3A6B;line-height:1.3}
-    th.left{text-align:left}
-    td{padding:5px 7px;border:1px solid #d0d0d0;text-align:center;vertical-align:middle}
-    td.left{text-align:left}
-    td.num{text-align:center;font-weight:500}
-    td.total{font-weight:700;background:#e8f5ee!important}
-    tr:nth-child(even) td{background:#f9f9f8}
-    tr.total-row td{background:#ddd!important;font-weight:700;border-top:2px solid #999}
+    body{font-family:Arial,sans-serif;font-size:8pt;color:#1a1a1a}
+    .pagina{padding:7mm 8mm}
+    .hdr{background:#f5f5f5;border:1px solid #ddd;padding:7px 12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;border-radius:3px}
+    .empresa{font-size:12pt;font-weight:700}.area{font-size:10pt;font-weight:600;color:#444}
+    .right-hdr{text-align:right}.semana{font-size:9pt;font-weight:600}.fecha-txt{font-size:7pt;color:#888}
+    table{width:100%;border-collapse:collapse;font-size:7.5pt}
+    th{background:#1B3A6B;color:#fff;padding:4px 3px;text-align:center;border:1px solid #1B3A6B;line-height:1.3}
+    th.left{text-align:left;padding-left:5px}
+    th.ph-plan{background:#2A4F8A;font-size:7pt;padding:3px 2px}
+    th.ph-real{background:#f0f0f0;color:#333;font-size:7pt;padding:3px 2px;border:1px solid #bbb}
+    td{padding:4px 3px;border:1px solid #d0d0d0;text-align:center;vertical-align:middle;height:18px}
+    td.left{text-align:left;padding-left:5px}
+    td.uni{font-size:7pt;color:#666}
+    td.plan{background:#EAF3FB;font-weight:600}
+    td.real-cell{background:#fff;min-width:32px}
+    td.total{background:#d4edda!important;font-weight:700}
+    tr:nth-child(even) td.plan{background:#dceef9}
+    tr.total-row td{background:#e0e0e0!important;font-weight:700;border-top:2px solid #999}
+    tr.total-row td.real-cell{background:#efefef!important}
+    .separador{border-top:2px dashed #ccc;margin:5mm 0}
     @media print{
-      @page{size:A4 portrait;margin:8mm 10mm}
+      @page{size:A4 landscape;margin:5mm 6mm}
       body{margin:0;padding:0}
       .pagina{break-after:page;page-break-after:always;padding:0;margin:0}
       .pagina:last-child{break-after:avoid;page-break-after:avoid}
       .separador{display:none!important}
     }
-    .pagina{padding:12mm 14mm;}
   </style></head><body>
   ${paginas}
   <script>window.onload=()=>{window.print()}<\/script>
   </body></html>`;
 
-  const w=window.open('','_blank','width=860,height=700');
-  if(w){w.document.write(html);w.document.close();spdf('Ventana lista. Selecciona "Guardar como PDF" en la impresora.','ok');}
-  else{spdf('Permiti las ventanas emergentes para este sitio.');}
+  const w=window.open('','_blank','width=1050,height=750');
+  if(w){w.document.write(html);w.document.close();spdf('Listo. Selecciona Guardar como PDF.','ok');}
+  else{spdf('Permiti las ventanas emergentes.');}
   btn.innerHTML='<i class="ti ti-file-type-pdf"></i> PDF';btn.disabled=false;
 }
 function spdf(msg,type){
@@ -1944,6 +1943,167 @@ async function guardarSalidas(){
     document.getElementById('sal-errtxt').textContent=e.message;
     fl('sal-err');
   }
+}
+
+// ── IMPORTADOR EXCEL SALIDAS ──────────────────────────────────────
+// Mapeo nombres del Excel -> (area, producto en sistema)
+const EXCEL_MAPEO = {
+  'Ravioles Pollo':                 ['PASTAS ESPECIALES', 'Ravioles de Pollo'],
+  'Ravioles Verdura':               ['PASTAS ESPECIALES', 'Ravioles de Verdura'],
+  'Ravioles de Ricota':             ['PASTAS ESPECIALES', 'Ravioles de Ricota'],
+  'Ravioles Jamon y Queso':         ['PASTAS ESPECIALES', 'Ravioles de JYQ'],
+  'Tallarines Finos':               ['ENVASE', 'Tallarines Finos'],
+  'Tallarin Mediano':               ['ENVASE', 'Tallarines Medianos'],
+  'Tallarin Ancho':                 ['ENVASE', 'Tallarines Anchos'],
+  'Tallarines Morron':              ['ENVASE', 'Tallarines Morron'],
+  'Tallarines Espinaca':            ['ENVASE', 'Tallarines Verduras'],
+  'Fucciles':                       ['PASTAS ESPECIALES', 'Fuccilles'],
+  'Ñoquis':                         ['PASTAS ESPECIALES', 'Ñoquis de papa'],
+  'Mostachol':                      ['PASTAS ESPECIALES', 'Mostacholes'],
+  'Discos p/Pascualina':            ['TAPAS', 'Pascualinas'],
+  'Discos p/empanadas horno':       ['TAPAS', 'Horno 13'],
+  'Discos p/empanadas freir':       ['TAPAS', 'Freir 13'],
+  'Discos p/empanadas horno/freir': ['TAPAS', 'Horno / Freir  13'],
+  'Disco Rotisero Freir':           ['TAPAS', 'Roti Freir'],
+  'Tapas p/Pasteles':               ['TAPAS', 'Pasteles Grandes'],
+  'Sorrentinos':                    ['PASTAS ESPECIALES', 'Sorrentinos de JYQ'],
+  'Panqueques':                     ['PASTAS ESPECIALES', 'Panqueques'],
+  'Canelones':                      ['PASTAS ESPECIALES', 'Canelones'],
+  'Discos Copetin':                 ['TAPAS', 'Copetin'],
+};
+
+let excelImportData = []; // datos procesados listos para confirmar
+
+async function importarExcelSalidas(input){
+  const file = input.files[0]; if(!file) return;
+  // Cargar SheetJS si no está disponible
+  if(!window.XLSX){
+    await new Promise((res,rej)=>{
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload=res; s.onerror=rej; document.head.appendChild(s);
+    });
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const data = new Uint8Array(e.target.result);
+      const wb = XLSX.read(data, {type:'array'});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1});
+      // Detectar fecha del título (primera fila)
+      const titulo = rows[0]?.[0]||'';
+      const fechaMatch = titulo.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      let fecha = document.getElementById('sal-fecha').value;
+      if(fechaMatch){
+        const [,d,m,y] = fechaMatch;
+        fecha = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+        document.getElementById('sal-fecha').value = fecha;
+      }
+      // Buscar fila de headers (Codigo, Denominacion, Cant)
+      let dataRows = [];
+      for(let i=0;i<rows.length;i++){
+        if(rows[i][0]==='Codigo'||rows[i][1]==='Denominacion') continue;
+        if(rows[i][0] && rows[i][1] && rows[i][2]){
+          const denom = String(rows[i][1]).trim();
+          const cant = parseFloat(rows[i][2])||0;
+          if(!cant) continue;
+          if(EXCEL_MAPEO[denom]){
+            const [area, producto] = EXCEL_MAPEO[denom];
+            dataRows.push({denom, area, producto, cant, ok:true});
+          } else {
+            dataRows.push({denom, area:'--', producto:'--', cant, ok:false});
+          }
+        }
+      }
+      excelImportData = dataRows.filter(r=>r.ok);
+      // Mostrar previsualización
+      const okRows = dataRows.filter(r=>r.ok);
+      const skipRows = dataRows.filter(r=>!r.ok);
+      document.getElementById('sal-preview-title').textContent =
+        `Excel importado: ${okRows.length} productos para el ${fecha}${skipRows.length?' ('+skipRows.length+' ignorados)':''}`;
+      let h = `<div class="stock-card"><table class="stock-tbl"><thead><tr>
+        <th>Producto en Excel</th><th>Area</th><th>Producto en sistema</th>
+        <th style="text-align:right">Cantidad</th><th style="text-align:center">Estado</th>
+      </tr></thead><tbody>`;
+      [...okRows, ...skipRows].forEach(r=>{
+        h+=`<tr>
+          <td style="font-size:12px;color:var(--text2)">${r.denom}</td>
+          <td>${r.ok?`<span class="area-tag" style="background:var(--blue-bg);color:var(--blue)">${r.area}</span>`:'-'}</td>
+          <td style="font-weight:${r.ok?'500':'400'};color:${r.ok?'var(--text)':'var(--text3)'}">${r.producto}</td>
+          <td style="text-align:right;font-weight:600">${r.cant.toLocaleString('es-AR')}</td>
+          <td style="text-align:center">${r.ok?
+            '<span class="badge badge-ok">OK</span>':
+            '<span class="badge badge-warn">Ignorado</span>'}</td>
+        </tr>`;
+      });
+      h+=`</tbody></table></div>`;
+      document.getElementById('sal-preview-content').innerHTML = h;
+      document.getElementById('sal-preview').style.display = 'block';
+      document.getElementById('sal-content').style.display = 'none';
+      // Reset input para permitir reimportar el mismo archivo
+      input.value='';
+    }catch(e){alert('Error al leer el Excel: '+e.message)}
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function cancelarImport(){
+  excelImportData=[];
+  document.getElementById('sal-preview').style.display='none';
+  document.getElementById('sal-content').style.display='block';
+}
+
+async function confirmarImport(){
+  if(!excelImportData.length){alert('Sin datos para importar.');return}
+  const fecha = document.getElementById('sal-fecha').value;
+  const eid = st.E.find(e=>e.nombre.toLowerCase().includes('joselito'))?.id || st.E[0]?.id;
+  if(!eid){alert('No se encontró la empresa.');return}
+  if(!stockData.length) await loadStock();
+  ss('saving','Importando salidas...');
+  let ok=0;
+  try{
+    for(const item of excelImportData){
+      const s = stockData.find(x=>x.area===item.area&&x.producto===item.producto&&x.empresa_id===eid);
+      const unidad = s?.unidad || 'docenas';
+      // Verificar si ya existe movimiento hoy para este producto
+      const existing = await get('stock_movimientos',
+        `tipo=eq.salida&fecha=eq.${fecha}&empresa_id=eq.${eid}&area=eq.${encodeURIComponent(item.area)}&producto=eq.${encodeURIComponent(item.producto)}&select=id,cantidad`
+      ).catch(()=>[]);
+      if(existing.length){
+        const diff = item.cant - existing[0].cantidad;
+        await fetch(`${SB}/rest/v1/stock_movimientos?id=eq.${existing[0].id}`,{
+          method:'PATCH', headers:{...H,'Prefer':'return=minimal'},
+          body:JSON.stringify({cantidad:item.cant})
+        });
+        if(diff!==0&&s){
+          const nueva=Math.max(0,s.cantidad-diff);
+          await pat('stock',s.id,{cantidad:nueva,updated_at:new Date().toISOString()});
+          s.cantidad=nueva;
+        }
+      } else {
+        await ins('stock_movimientos',{empresa_id:eid,area:item.area,producto:item.producto,unidad,tipo:'salida',cantidad:item.cant,fecha,observacion:'Importado desde Excel'});
+        if(s){
+          const nueva=Math.max(0,s.cantidad-item.cant);
+          await pat('stock',s.id,{cantidad:nueva,updated_at:new Date().toISOString()});
+          s.cantidad=nueva;
+        } else {
+          // Crear registro de stock si no existe
+          try{
+            const res=await ins('stock',{empresa_id:eid,area:item.area,producto:item.producto,unidad,cantidad:0});
+            if(res&&res[0]){const nueva=Math.max(0,res[0].cantidad-item.cant);await pat('stock',res[0].id,{cantidad:nueva,updated_at:new Date().toISOString()});res[0].cantidad=nueva;stockData.push(res[0]);}
+          }catch{}
+        }
+      }
+      ok++;
+    }
+    ss('online','Importado');
+    excelImportData=[];
+    document.getElementById('sal-preview').style.display='none';
+    document.getElementById('sal-content').style.display='block';
+    fl('sal-msg');
+    renderSalidas();
+  }catch(e){ss('error','Error: '+e.message);document.getElementById('sal-errtxt').textContent=e.message;fl('sal-err')}
 }
 
 init();
