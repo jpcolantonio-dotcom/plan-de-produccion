@@ -806,6 +806,8 @@ async function saveReal(){
     ss('online','Guardado');fl('rmsg');
     // Actualizar stock automaticamente con produccion de hoy
     await actualizarStockDesdeReal(k);
+    // Recargar cache de stock
+    stockData=await get('stock','order=area.asc,producto.asc').catch(()=>stockData);
   }catch(e){ss('error','Error');document.getElementById('rerrtxt').textContent=e.message;fl('rerr')}
   btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar produccion';btn.disabled=false;
 }
