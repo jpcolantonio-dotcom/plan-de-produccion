@@ -790,7 +790,7 @@ function renderCmp(){
   let plan=ef==='all'?ap:ap.filter(r=>r.empresa_id===ef);
   const re=st.R[k]||{};
   let tp=0,tr2=0,cu=0;
-  plan.forEach((r,i)=>{const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);const rv=(re[oi]||[]).reduce((a,b)=>a+(b||0),0);tp+=pv;tr2+=rv;if(rv>=pv&&pv>0)cu++});
+  plan.forEach((r,i)=>{const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);const rk=rKey(r);const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);const rv=(re[rk]||re[oi]||[]).reduce((a,b)=>a+(b||0),0);tp+=pv;tr2+=rv;if(rv>=pv&&pv>0)cu++});
   const pct=tp>0?Math.round(tr2/tp*100):0;const cls=pct>=90?'good':pct>=70?'warn':'bad';
   let html=`<div class="metric-grid">
     <div class="metric"><div class="metric-label">Cumplimiento global</div><div class="metric-val ${cls}">${pct}%</div></div>
@@ -814,8 +814,10 @@ function renderCmp(){
       let aap=0,aar=0;
       aIt.forEach((r,ri)=>{
         const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
+        const rk=rKey(r);
+        const rdReal=re[rk]||re[oi]||Array(7).fill(0);
         const t2=(r.days||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
-        const t3=(re[oi]||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
+        const t3=rdReal.reduce((a,b)=>a+(b||0),0);
         aap+=t2;aar+=t3;
         const p=t2>0?Math.round(t3/t2*100):0;
         const bdg=p>=90?'<span class="badge badge-ok">OK</span>':p>=70?'<span class="badge badge-warn">Parcial</span>':'<span class="badge badge-bad">Bajo</span>';
@@ -824,7 +826,7 @@ function renderCmp(){
         if(ri===0)html+=`<td rowspan="${aIt.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${ab(area,as)};color:${ac(area,as)}">${area}</span></td>`;
         html+=`<td style="font-weight:500;font-size:12px">${r.producto}</td>`;
         for(let di=0;di<7;di++){
-          const pv=(r.days&&r.days[di])||0;const rv=(re[oi]&&re[oi][di])||0;
+          const pv=(r.days&&r.days[di])||0;const rv=rdReal[di]||0;
           const ok=pv>0&&rv>=pv,low=pv>0&&rv>0&&rv<pv,zero=pv>0&&rv===0;
           const cbg=ok?'rgba(29,158,117,.1)':low?'rgba(186,117,23,.1)':zero?'rgba(226,75,74,.07)':'';
           html+=`<td class="day-cell${di===t?' today-col':''}" style="font-size:11px;color:var(--text2)">${pv>0?pv:'--'}</td>`;
@@ -1378,8 +1380,9 @@ function buildDashItems(k,ef){
   let filtered=ef==='all'?plan:plan.filter(r=>r.empresa_id===ef);
   filtered.forEach(r=>{
     const oi=(st.P[k]||[]).findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
+    const rk=rKey(r);
     const pv=(r.days&&r.days[dia])||0;
-    const rv=real[oi]?.[dia]||0;
+    const rv=(real[rk]||real[oi]||[])[dia]||0;
     if(pv>0) items.push({produto:r.producto,area:r.area,unidad:r.unidad,empresa_id:r.empresa_id,pv,rv});
   });
   dashItems=items;
