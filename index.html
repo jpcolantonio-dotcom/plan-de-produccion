@@ -211,6 +211,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('desv')"><i class="ti ti-alert-triangle"></i> Desvios</button>
   <button class="tab" onclick="T('dash')"><i class="ti ti-layout-dashboard"></i> Dashboard</button>
   <button class="tab" onclick="T('stock')"><i class="ti ti-building-warehouse"></i> Stock</button>
+  <button class="tab" onclick="T('sal')"><i class="ti ti-arrow-bar-right"></i> Salidas</button>
   <button class="tab" onclick="T('rec')"><i class="ti ti-notebook"></i> Recetas</button>
   <button class="tab" onclick="T('con')"><i class="ti ti-package"></i> Consumo MP</button>
   <button class="tab" onclick="T('mae')"><i class="ti ti-building"></i> Maestro</button>
@@ -360,6 +361,23 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:#F7C1C1;display:inline-block"></span> Menos de 90%</div>
     <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:var(--bg2);border:.5px solid var(--border);display:inline-block"></span> Sin produccion registrada</div>
   </div>
+</div>
+
+<!-- SALIDAS -->
+<div id="tab-sal" class="section">
+  <div class="toolbar">
+    <div>
+      <div style="font-size:16px;font-weight:600">Salidas de camara</div>
+      <div style="font-size:13px;color:var(--text2)">Registra lo que sale de la camara por dia</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input type="date" id="sal-fecha" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <select id="sal-esel" onchange="renderSalidas()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
+    </div>
+  </div>
+  <div id="sal-content"></div>
+  <div id="sal-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Salidas guardadas.</div>
+  <div id="sal-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="sal-errtxt"></span></div>
 </div>
 
 <!-- STOCK -->
@@ -547,7 +565,7 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['plan','real','cmp','desv','dash','stock','rec','con','mae'];
+const TABS=['plan','real','cmp','desv','dash','stock','sal','rec','con','mae'];
 function T(t){
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',TABS[i]===t));
   document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));
@@ -557,6 +575,7 @@ function T(t){
   if(t==='desv'){pS('desv-wsel');loadDesv()}
   if(t==='dash'){pS('dash-wsel');initDash()}
   if(t==='stock')initStock();
+  if(t==='sal')initSalidas();
   if(t==='rec')rRec();
   if(t==='con'){pSC();renderCon()}
   if(t==='mae')rMae();
@@ -1807,6 +1826,124 @@ async function confirmarCierreDia(items){
     ss('online','Dia cerrado correctamente');
     renderStock();
   }catch(e){ss('error','Error al cerrar dia: '+e.message)}
+}
+
+// ── SALIDAS ───────────────────────────────────────────────────────
+async function initSalidas(){
+  const hoy=new Date().toISOString().slice(0,10);
+  document.getElementById('sal-fecha').value=hoy;
+  document.getElementById('sal-fecha').onchange=()=>renderSalidas();
+  // Actualizar selector empresa
+  const se=document.getElementById('sal-esel');
+  const cur=se.value;se.innerHTML='<option value="all">Todas las empresas</option>';
+  st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se.appendChild(o)});
+  if(cur)se.value=cur;
+  // Cargar stock si no está
+  if(!stockData.length)await loadStock();
+  renderSalidas();
+}
+
+async function renderSalidas(){
+  const fecha=document.getElementById('sal-fecha').value;
+  const ef=document.getElementById('sal-esel').value;
+  const el=document.getElementById('sal-content');
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
+
+  // Cargar salidas ya registradas para esa fecha
+  let f=`tipo=eq.salida&fecha=eq.${fecha}`;
+  if(ef!=='all')f+=`&empresa_id=eq.${ef}`;
+  const salidaHoy=await get('stock_movimientos',f+'&order=created_at.desc').catch(()=>[]);
+
+  // Armar grilla con productos del stock
+  let items=ef==='all'?stockData:stockData.filter(s=>s.empresa_id===ef);
+  if(!items.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin productos en stock. Carga el stock inicial primero.</div>';
+    return;
+  }
+
+  const byE={};items.forEach(s=>{const eid=s.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(s)});
+
+  let h=`<div class="grid-card"><table class="stock-tbl"><thead><tr>
+    <th>Empresa</th><th>Area</th><th>Producto</th><th>Unidad</th>
+    <th style="text-align:right">Stock actual</th>
+    <th style="text-align:right;width:140px">Salida del dia</th>
+    <th style="text-align:right;width:120px">Ya registrado</th>
+  </tr></thead><tbody>`;
+
+  Object.entries(byE).forEach(([eid,sitems])=>{
+    const clr=ec(eid);const nm=en(eid)||'Sin empresa';const bg=rgba(clr,.12);
+    const byArea={};sitems.forEach(s=>{if(!byArea[s.area])byArea[s.area]=[];byArea[s.area].push(s)});
+    let ef2=true;
+    Object.entries(byArea).forEach(([area,aItems])=>{
+      aItems.forEach((s,ri)=>{
+        const yaReg=salidaHoy.filter(m=>m.empresa_id===s.empresa_id&&m.area===s.area&&m.producto===s.producto).reduce((a,b)=>a+b.cantidad,0);
+        const stockCls=s.cantidad>0?'stock-num-pos':s.cantidad<0?'stock-num-neg':'stock-num-zero';
+        h+=`<tr>`;
+        if(ef2&&ri===0)h+=`<td rowspan="${sitems.length}" style="vertical-align:top;padding-top:10px"><span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span></td>`;
+        if(ri===0)h+=`<td rowspan="${aItems.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${rgba(clr,.1)};color:${clr}">${area}</span></td>`;
+        h+=`<td style="font-weight:500">${s.producto}</td>`;
+        h+=`<td class="muted">${s.unidad}</td>`;
+        h+=`<td class="num ${stockCls}">${s.cantidad.toLocaleString('es-AR')}</td>`;
+        h+=`<td style="text-align:right"><input class="stock-input" type="number" min="0" id="sout-${s.id}" placeholder="0"/></td>`;
+        h+=`<td style="text-align:right;font-size:13px;color:${yaReg>0?'var(--red)':'var(--text3)'};font-weight:${yaReg>0?'600':'400'}">${yaReg>0?yaReg.toLocaleString('es-AR'):'--'}</td>`;
+        h+=`</tr>`;
+        ef2=false;
+      });
+    });
+  });
+
+  h+=`</tbody></table></div>`;
+  h+=`<div style="display:flex;justify-content:flex-end;margin-top:1rem">
+    <button class="btn btn-primary" onclick="guardarSalidas()"><i class="ti ti-device-floppy"></i> Guardar salidas del dia</button>
+  </div>`;
+  el.innerHTML=h;
+}
+
+async function guardarSalidas(){
+  const fecha=document.getElementById('sal-fecha').value;
+  const ef=document.getElementById('sal-esel').value;
+  let items=ef==='all'?stockData:stockData.filter(s=>s.empresa_id===ef);
+  ss('saving','Guardando salidas...');
+  let guardados=0;
+  try{
+    for(const s of items){
+      const inp=document.getElementById(`sout-${s.id}`);
+      const cant=parseFloat(inp?.value)||0;
+      if(!cant)continue;
+      // Verificar si ya hay salida registrada hoy para este producto
+      const existing=await get('stock_movimientos',
+        `tipo=eq.salida&fecha=eq.${fecha}&empresa_id=eq.${s.empresa_id}&area=eq.${encodeURIComponent(s.area)}&producto=eq.${encodeURIComponent(s.producto)}&select=id,cantidad`
+      ).catch(()=>[]);
+      if(existing.length){
+        // Actualizar — ajustar diferencia en stock
+        const diff=cant-existing[0].cantidad;
+        await fetch(`${SB}/rest/v1/stock_movimientos?id=eq.${existing[0].id}`,{
+          method:'PATCH',headers:{...H,'Prefer':'return=minimal'},
+          body:JSON.stringify({cantidad:cant})
+        });
+        if(diff!==0){
+          const nueva=Math.max(0,s.cantidad-diff);
+          await pat('stock',s.id,{cantidad:nueva,updated_at:new Date().toISOString()});
+          s.cantidad=nueva;
+        }
+      } else {
+        // Nueva salida
+        await ins('stock_movimientos',{empresa_id:s.empresa_id,area:s.area,producto:s.producto,unidad:s.unidad,tipo:'salida',cantidad:cant,fecha,observacion:'Salida del dia'});
+        const nueva=Math.max(0,s.cantidad-cant);
+        await pat('stock',s.id,{cantidad:nueva,updated_at:new Date().toISOString()});
+        s.cantidad=nueva;
+      }
+      if(inp)inp.value='';
+      guardados++;
+    }
+    ss('online','Guardado');
+    if(guardados>0){fl('sal-msg');renderSalidas();}
+    else{alert('No ingresaste ninguna cantidad.');}
+  }catch(e){
+    ss('error','Error');
+    document.getElementById('sal-errtxt').textContent=e.message;
+    fl('sal-err');
+  }
 }
 
 init();
