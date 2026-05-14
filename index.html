@@ -802,9 +802,72 @@ async function saveReal(){
         body:JSON.stringify({semana:k,datos,updated_at:new Date().toISOString()})
       }).then(r=>{if(!r.ok)throw new Error('Error al insertar')});
     }
-    if(!st.Sem.includes(k))st.Sem.push(k);ss('online','Guardado');fl('rmsg');
+    if(!st.Sem.includes(k))st.Sem.push(k);
+    ss('online','Guardado');fl('rmsg');
+    // Actualizar stock automaticamente con produccion de hoy
+    await actualizarStockDesdeReal(k);
   }catch(e){ss('error','Error');document.getElementById('rerrtxt').textContent=e.message;fl('rerr')}
   btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar produccion';btn.disabled=false;
+}
+
+async function actualizarStockDesdeReal(semKey){
+  // Solo toma el dia de hoy
+  const hoy=new Date().toISOString().slice(0,10);
+  const diHoy=(new Date().getDay()+6)%7; // 0=lunes
+  // Verificar que la semana corresponde a hoy
+  const semHoy=wk(new Date());
+  if(semKey!==semHoy)return; // solo actualiza stock si es la semana actual
+  const plan=st.P[semKey]||[];
+  const real=st.R[semKey]||{};
+  // Cargar stock actual si no está en cache
+  if(!stockData.length){
+    try{stockData=await get('stock','order=area.asc,producto.asc');}catch{return}
+  }
+  for(const r of plan){
+    const rk=rKey(r);
+    const rv=(real[rk]||[])[diHoy]||0;
+    if(!rv)continue; // si no hay produccion hoy, saltar
+    // Buscar si ya existe movimiento de entrada para hoy para este producto
+    const movExisting=await get('stock_movimientos',
+      `empresa_id=eq.${r.empresa_id}&producto=eq.${encodeURIComponent(r.producto)}&area=eq.${encodeURIComponent(r.area)}&fecha=eq.${hoy}&tipo=eq.entrada`
+    ).catch(()=>[]);
+    const s=stockData.find(x=>x.empresa_id===r.empresa_id&&x.area===r.area&&x.producto===r.producto);
+    if(movExisting.length){
+      // Ya existe entrada hoy — actualizar si cambió el valor
+      const movAnterior=movExisting[0];
+      const diff=rv-movAnterior.cantidad;
+      if(diff===0)continue; // sin cambios
+      // Actualizar movimiento
+      await fetch(`${SB}/rest/v1/stock_movimientos?id=eq.${movAnterior.id}`,{
+        method:'PATCH',headers:{...H,'Prefer':'return=minimal'},
+        body:JSON.stringify({cantidad:rv})
+      });
+      // Ajustar stock con la diferencia
+      if(s){
+        const nueva=Math.max(0,s.cantidad+diff);
+        await pat('stock',s.id,{cantidad:nueva,updated_at:new Date().toISOString()});
+        s.cantidad=nueva;
+      }
+    } else {
+      // Nueva entrada
+      await ins('stock_movimientos',{
+        empresa_id:r.empresa_id,area:r.area,producto:r.producto,
+        unidad:r.unidad,tipo:'entrada',cantidad:rv,
+        fecha:hoy,observacion:'Produccion real del dia'
+      });
+      if(s){
+        const nueva=s.cantidad+rv;
+        await pat('stock',s.id,{cantidad:nueva,updated_at:new Date().toISOString()});
+        s.cantidad=nueva;
+      } else {
+        // Crear registro de stock si no existe
+        try{
+          const res=await ins('stock',{empresa_id:r.empresa_id,area:r.area,producto:r.producto,unidad:r.unidad,cantidad:rv});
+          if(res&&res[0])stockData.push(res[0]);
+        }catch{}
+      }
+    }
+  }
 }
 
 async function loadCmp(){
