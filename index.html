@@ -1244,7 +1244,10 @@ async function renderCon(){
 }
 
 async function genPDF(){
-  const rows=st.Ed[st.w]||st.P[st.w]||[];if(!rows.length){spdf('Sin items en el plan.');return}
+  // Forzar recarga del plan desde Supabase para tener todos los datos
+  delete st.P[st.w];
+  await lp(st.w);
+  const rows=st.P[st.w]||[];if(!rows.length){spdf('Sin items en el plan.');return}
   const btn=document.getElementById('btnpdf');btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;
   const filtered=st.ef==='all'?rows:rows.filter(r=>r.empresa_id===st.ef);
   const semana=wlb(st.w);
