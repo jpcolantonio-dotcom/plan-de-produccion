@@ -147,6 +147,35 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 .desv-tbl td{padding:8px 10px;border-bottom:.5px solid var(--border);vertical-align:middle}
 .desv-tbl tbody tr:last-child td{border-bottom:none}
 .desv-tbl tr:hover td{background:var(--bg2)}
+/* DASHBOARD */
+.dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:12px;margin-bottom:1rem}
+.dash-card{border-radius:var(--radius-lg);overflow:hidden;border:.5px solid var(--border)}
+.dash-card-header{background:var(--bg);padding:9px 12px;border-bottom:.5px solid var(--border)}
+.dash-card-title{font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dash-card-sub{font-size:11px;color:var(--text2);margin-top:1px}
+.dash-halves{display:grid;grid-template-columns:1fr 1fr}
+.dash-half{padding:14px 10px;text-align:center}
+.dash-half-label{font-size:10px;font-weight:500;margin-bottom:4px;white-space:nowrap}
+.dash-half-num{font-size:24px;font-weight:600;line-height:1}
+.dash-plan{background:#E6F1FB}
+.dash-plan .dash-half-label{color:#0C447C}
+.dash-plan .dash-half-num{color:#0C447C}
+.dash-ok{background:#1D9E75}
+.dash-ok .dash-half-label{color:#E1F5EE}
+.dash-ok .dash-half-num{color:#fff}
+.dash-warn{background:#FAC775}
+.dash-warn .dash-half-label{color:#633806}
+.dash-warn .dash-half-num{color:#412402}
+.dash-bad{background:#F7C1C1}
+.dash-bad .dash-half-label{color:#791F1F}
+.dash-bad .dash-half-num{color:#501313}
+.dash-empty{background:var(--bg2)}
+.dash-empty .dash-half-label{color:var(--text2)}
+.dash-empty .dash-half-num{color:var(--text3)}
+.dash-progress{height:4px;background:var(--bg3)}
+.dash-progress-bar{height:100%;transition:width .3s}
+.dash-ticker{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);justify-content:flex-end;margin-bottom:8px}
+.dash-ticker-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse .8s infinite}
 </style>
 </head>
 <body>
@@ -163,6 +192,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('real')"><i class="ti ti-clipboard-list"></i> Produccion real</button>
   <button class="tab" onclick="T('cmp')"><i class="ti ti-chart-bar"></i> Comparacion</button>
   <button class="tab" onclick="T('desv')"><i class="ti ti-alert-triangle"></i> Desvios</button>
+  <button class="tab" onclick="T('dash')"><i class="ti ti-layout-dashboard"></i> Dashboard</button>
   <button class="tab" onclick="T('rec')"><i class="ti ti-notebook"></i> Recetas</button>
   <button class="tab" onclick="T('con')"><i class="ti ti-package"></i> Consumo MP</button>
   <button class="tab" onclick="T('mae')"><i class="ti ti-building"></i> Maestro</button>
@@ -277,6 +307,43 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <div id="desv-content"></div>
 </div>
 
+<!-- DASHBOARD -->
+<div id="tab-dash" class="section">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+    <div>
+      <div style="font-size:16px;font-weight:600">Dashboard de produccion</div>
+      <div style="font-size:13px;color:var(--text2)">Vista en tiempo real — se actualiza cada 45 seg.</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <select id="dash-wsel" onchange="initDash()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
+      <select id="dash-dsel" onchange="initDash()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+        <option value="">Dia de hoy</option>
+        <option value="0">Lunes</option>
+        <option value="1">Martes</option>
+        <option value="2">Miercoles</option>
+        <option value="3">Jueves</option>
+        <option value="4">Viernes</option>
+        <option value="5">Sabado</option>
+        <option value="6">Domingo</option>
+      </select>
+      <select id="dash-esel" onchange="initDash()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
+    </div>
+  </div>
+  <div class="dash-ticker">
+    <span class="dash-ticker-dot"></span>
+    <span id="dash-ticker-txt">Actualizando...</span>
+    <span id="dash-countdown" style="font-weight:500;color:var(--text);min-width:28px;text-align:right"></span>
+  </div>
+  <div id="dash-page-info" style="font-size:12px;color:var(--text2);margin-bottom:8px;text-align:center"></div>
+  <div id="dash-grid" class="dash-grid"></div>
+  <div style="display:flex;gap:16px;margin-top:.75rem;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:#1D9E75;display:inline-block"></span> 100% o mas</div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:#FAC775;display:inline-block"></span> 90–99%</div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:#F7C1C1;display:inline-block"></span> Menos de 90%</div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:var(--bg2);border:.5px solid var(--border);display:inline-block"></span> Sin produccion registrada</div>
+  </div>
+</div>
+
 <!-- MAESTRO -->
 <div id="tab-mae" class="section">
   <div class="toolbar">
@@ -388,21 +455,10 @@ async function init(){
 async function lp(k){if(st.P[k]!==undefined)return;try{const d=await get('planes',`semana=eq.${k}&select=filas`);st.P[k]=d.length?d[0].filas:[];}catch{st.P[k]=[]}}
 async function lr(k){if(st.R[k]!==undefined)return;try{const d=await get('produccion_real',`semana=eq.${k}&select=datos`);st.R[k]=d.length?d[0].datos:{};}catch{st.R[k]={}}}
 
-function uES(){
-  ['resel','cesel','ceesel','desv-esel'].forEach(id=>{
-    const s=document.getElementById(id);if(!s)return;
-    const c=s.value;s.innerHTML='<option value="all">Todas</option>';
-    st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;s.appendChild(o)});
-    if(c)s.value=c;
-  });
-  const se=document.getElementById('semp');if(se){
-    const c=se.value;se.innerHTML='<option value="">Empresa</option>';
-    st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se.appendChild(o)});
-    if(c)se.value=c;
-  }
-}
+// uES definida en sección Dashboard
 
-const TABS=['plan','real','cmp','desv','rec','con','mae'];
+
+const TABS=['plan','real','cmp','desv','dash','rec','con','mae'];
 function T(t){
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',TABS[i]===t));
   document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));
@@ -410,6 +466,7 @@ function T(t){
   if(t==='real'){pS('rwsel');loadReal2()}
   if(t==='cmp'){pS('cwsel');loadCmp()}
   if(t==='desv'){pS('desv-wsel');loadDesv()}
+  if(t==='dash'){pS('dash-wsel');initDash()}
   if(t==='rec')rRec();
   if(t==='con'){pSC();renderCon()}
   if(t==='mae')rMae();
@@ -1214,6 +1271,121 @@ async function delCausa(id){
     await del('causas',id);
     st.causas=st.causas.filter(c=>c.id!==id);renderDesv();ss('online','Eliminado');
   }catch(e){alert('Error: '+e.message)}
+}
+
+// ── DASHBOARD ────────────────────────────────────────────────────
+const DASH_PER_PAGE=6;
+const DASH_INTERVAL=45;
+let dashTimer=null,dashCountdown=0,dashPage=0,dashItems=[],dashTotalPages=0;
+
+function getDashDia(){
+  const sel=document.getElementById('dash-dsel');
+  if(!sel||sel.value==='')return tc(st.w);  // dia de hoy
+  return parseInt(sel.value);
+}
+
+async function initDash(){
+  clearDashTimer();
+  const k=document.getElementById('dash-wsel')?.value||st.w;
+  const ef=document.getElementById('dash-esel')?.value||'all';
+  // Forzar recarga
+  delete st.P[k]; delete st.R[k];
+  await lp(k); await lr(k);
+  buildDashItems(k,ef);
+  dashPage=0;
+  renderDashPage();
+  startDashTimer(k,ef);
+}
+
+function buildDashItems(k,ef){
+  const plan=st.P[k]||[];
+  const real=st.R[k]||{};
+  const dia=getDashDia();
+  const items=[];
+  let filtered=ef==='all'?plan:plan.filter(r=>r.empresa_id===ef);
+  filtered.forEach(r=>{
+    const oi=(st.P[k]||[]).findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
+    const pv=(r.days&&r.days[dia])||0;
+    const rv=real[oi]?.[dia]||0;
+    if(pv>0) items.push({produto:r.producto,area:r.area,unidad:r.unidad,empresa_id:r.empresa_id,pv,rv});
+  });
+  dashItems=items;
+  dashTotalPages=Math.ceil(items.length/DASH_PER_PAGE)||1;
+}
+
+function renderDashPage(){
+  const dia=getDashDia();
+  const dname=dia>=0&&dia<=6?DAYS[dia]:'--';
+  const k=document.getElementById('dash-wsel')?.value||st.w;
+  document.getElementById('dash-ticker-txt').textContent=`${dname} — ${wlb(k)}`;
+  document.getElementById('dash-page-info').textContent=dashItems.length?`Pagina ${dashPage+1} de ${dashTotalPages} (${dashItems.length} productos con plan)`:'Sin productos con plan para este dia.';
+  const start=dashPage*DASH_PER_PAGE;
+  const page=dashItems.slice(start,start+DASH_PER_PAGE);
+  const grid=document.getElementById('dash-grid');
+  if(!page.length){grid.innerHTML='<div class="empty"><i class="ti ti-moon-off"></i>Sin productos planificados para este dia.</div>';return}
+  grid.innerHTML=page.map(item=>{
+    const pct=item.pv>0?Math.round(item.rv/item.pv*100):0;
+    const hasReal=item.rv>0;
+    const cls=!hasReal?'dash-empty':pct>=100?'dash-ok':pct>=90?'dash-warn':'dash-bad';
+    const pctLabel=item.pv>0?(hasReal?pct+'%':'--'):'--';
+    const ec2=ec(item.empresa_id);
+    return`<div class="dash-card">
+      <div class="dash-card-header">
+        <div class="dash-card-title">${item.produto}</div>
+        <div class="dash-card-sub">${en(item.empresa_id)||''} · ${item.area} · ${item.unidad}</div>
+      </div>
+      <div class="dash-halves">
+        <div class="dash-half dash-plan">
+          <div class="dash-half-label">Planificado</div>
+          <div class="dash-half-num">${item.pv>0?item.pv.toLocaleString('es-AR'):'--'}</div>
+        </div>
+        <div class="dash-half ${cls}">
+          <div class="dash-half-label">Real · ${pctLabel}</div>
+          <div class="dash-half-num">${hasReal?item.rv.toLocaleString('es-AR'):'--'}</div>
+        </div>
+      </div>
+      ${item.pv>0&&hasReal?`<div class="dash-progress"><div class="dash-progress-bar" style="width:${Math.min(pct,100)}%;background:${pct>=100?'#1D9E75':pct>=90?'#EF9F27':'#E24B4A'}"></div></div>`:''}
+    </div>`;
+  }).join('');
+}
+
+function startDashTimer(k,ef){
+  dashCountdown=DASH_INTERVAL;
+  dashTimer=setInterval(async()=>{
+    dashCountdown--;
+    const el=document.getElementById('dash-countdown');
+    if(el)el.textContent=dashCountdown+'s';
+    if(dashCountdown<=0){
+      dashCountdown=DASH_INTERVAL;
+      dashPage=(dashPage+1)%dashTotalPages;
+      // Si volvemos al principio, refrescamos datos
+      if(dashPage===0){
+        delete st.P[k]; delete st.R[k];
+        await lp(k); await lr(k);
+        buildDashItems(k,ef);
+      }
+      renderDashPage();
+    }
+  },1000);
+}
+
+function clearDashTimer(){
+  if(dashTimer){clearInterval(dashTimer);dashTimer=null}
+}
+
+function uES(){
+  ['resel','cesel','ceesel','desv-esel','dash-esel'].forEach(id=>{
+    const s=document.getElementById(id);if(!s)return;
+    const c=s.value;s.innerHTML='<option value="all">Todas</option>';
+    if(id==='dash-esel')s.options[0].text='Todas las empresas';
+    st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;s.appendChild(o)});
+    if(c)s.value=c;
+  });
+  const se=document.getElementById('semp');if(se){
+    const c=se.value;se.innerHTML='<option value="">Empresa</option>';
+    st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se.appendChild(o)});
+    if(c)se.value=c;
+  }
 }
 
 init();
