@@ -747,7 +747,9 @@ function renderReal(){
         const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
         const rk=rKey(r);
         const rd=st.R[k]?.[rk]||st.R[k]?.[oi]||Array(7).fill(0);
-        const tp=(r.days||[]).reduce((a,b)=>a+(b||0),0);const tr2=rd.reduce((a,b)=>a+(b||0),0);
+        const tp=(r.days||[]).reduce((a,b)=>a+(b||0),0);
+        const tr2=rd.reduce((a,b)=>a+(b||0),0);
+        const trId=`rtot-${rk.replace(/[|]/g,'-')}`;
         h+=`<tr class="${gi>0&&ef&&ri===0&&ai===0?'emp-sep':!ef&&ri===0&&ai>0?'area-sep':''}">`;
         if(ef&&ri===0&&ai===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:8px"><span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span></td>`;
         if(ri===0)h+=`<td rowspan="${aIt.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${ab(area,as)};color:${ac(area,as)}">${area}</span></td>`;
@@ -758,18 +760,24 @@ function renderReal(){
           h+=`<td class="day-cell${di===t?' today-col':''}" style="font-size:12px;color:var(--text2)">${pv>0?pv:'--'}</td>`;
           h+=`<td class="day-cell${di===t?' today-col':''}" style="position:relative">
             <input class="day-input${rv>0?' has-val':''}" type="number" min="0" value="${rv||''}" placeholder="--"
-              onchange="uR('${k}','${rk}',${di},this.value);this.classList.toggle('has-val',this.value!='');chkDesv('${k}',${oi},${di},${pv},this.value,'${r.empresa_id}','${area}','${r.producto.replace(/'/g,"\\'")}')"
+              onchange="uR('${k}','${rk}',${di},this.value);this.classList.toggle('has-val',this.value!='');updRealTot('${trId}','${rk}','${k}')"
               style="border-color:rgba(29,158,117,.3)"/>
             ${desvio?`<button onclick="showCausaModal('${k}',${oi},${di},${pv},${rv},'${r.empresa_id}','${area}','${r.producto.replace(/'/g,"\\'")}','${r.unidad}')" style="position:absolute;right:2px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--amber);font-size:14px" title="Registrar causa"><i class="ti ti-alert-triangle"></i></button>`:''}
           </td>`;
         }
-        h+=`<td class="total-cell" style="font-size:12px">${fmt(tp)}</td><td class="total-cell" style="color:var(--green)">${fmt(tr2)}</td></tr>`;
+        h+=`<td class="total-cell" style="font-size:12px">${fmt(tp)}</td><td class="total-cell" style="color:var(--green)" id="${trId}">${tr2>0?fmt(tr2):'--'}</td></tr>`;
         ef=false;
       });
     });
   });
   h+=`</tbody></table></div>`;
   document.getElementById('rgrid').innerHTML=h;
+}
+function updRealTot(trId,rk,k){
+  const days=st.R[k]?.[rk]||Array(7).fill(0);
+  const tot=days.reduce((a,b)=>a+(b||0),0);
+  const el=document.getElementById(trId);
+  if(el)el.textContent=tot>0?tot.toLocaleString('es-AR'):'--';
 }
 function rKey(r){return`${r.empresa_id}||${r.area}||${r.producto}`}
 function uR(k,rkey,di,v){
