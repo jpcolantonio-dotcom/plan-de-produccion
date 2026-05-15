@@ -221,7 +221,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('desv')"><i class="ti ti-alert-triangle"></i> Desvios</button>
   <button class="tab" onclick="T('dash')"><i class="ti ti-layout-dashboard"></i> Dashboard</button>
   <button class="tab" onclick="T('stock')"><i class="ti ti-building-warehouse"></i> Stock</button>
-  <button class="tab" onclick="T('sal')"><i class="ti ti-arrow-bar-right"></i> Salidas</button>
   <button class="tab" onclick="T('proy')"><i class="ti ti-chart-dots"></i> Proyeccion</button>
   <button class="tab" onclick="T('rec')"><i class="ti ti-notebook"></i> Recetas</button>
   <button class="tab" onclick="T('con')"><i class="ti ti-package"></i> Consumo MP</button>
@@ -455,47 +454,17 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <div id="tab-stock" class="section">
   <div class="toolbar">
     <div>
-      <div style="font-size:16px;font-weight:600">Stock de camara</div>
-      <div style="font-size:13px;color:var(--text2)">Saldo actual + movimientos del dia</div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <select id="stock-esel" onchange="renderStock()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
+      <div style="font-size:16px;font-weight:600">Historial de conteos</div>
+      <div style="font-size:13px;color:var(--text2)">Consulta los conteos de stock realizados por fecha</div>
     </div>
   </div>
-
-  <!-- SUBTABS -->
-  <div style="display:flex;gap:2px;border-bottom:.5px solid var(--border);margin-bottom:1.25rem">
-    <button id="stab-saldo" class="tab active" style="font-size:13px" onclick="showStockTab('saldo')"><i class="ti ti-building-warehouse"></i> Saldo actual</button>
-    <button id="stab-mov" class="tab" style="font-size:13px" onclick="showStockTab('mov')"><i class="ti ti-list"></i> Movimientos</button>
-    <button id="stab-init" class="tab" style="font-size:13px" onclick="showStockTab('init')"><i class="ti ti-pencil"></i> Cargar stock inicial</button>
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
+    <label style="font-size:13px;color:var(--text2)">Fecha:</label>
+    <input type="date" id="stock-hist-fecha" onchange="renderHistStock()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+    <select id="stock-hist-esel" onchange="renderHistStock()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
+    <button class="btn btn-sm" onclick="renderHistStock()"><i class="ti ti-refresh"></i> Buscar</button>
   </div>
-
-  <!-- SALDO ACTUAL -->
-  <div id="stock-saldo">
-    <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
-      <span style="font-size:13px;color:var(--text2)">Registrar salida para:</span>
-      <input type="date" id="stock-fecha-salida" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-    </div>
-    <div id="stock-saldo-content"></div>
-  </div>
-
-  <!-- MOVIMIENTOS -->
-  <div id="stock-mov" style="display:none">
-    <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;align-items:center">
-      <label style="font-size:13px;color:var(--text2)">Desde:</label>
-      <input type="date" id="stock-mov-desde" onchange="renderMovimientos()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-      <label style="font-size:13px;color:var(--text2)">Hasta:</label>
-      <input type="date" id="stock-mov-hasta" onchange="renderMovimientos()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-      <button class="btn btn-sm" onclick="renderMovimientos()"><i class="ti ti-refresh"></i> Actualizar</button>
-    </div>
-    <div id="stock-mov-content"></div>
-  </div>
-
-  <!-- STOCK INICIAL -->
-  <div id="stock-init" style="display:none">
-    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Ingresa el stock actual en camara para cada producto. Esto se usa como punto de partida.</div>
-    <div id="stock-init-content"></div>
-  </div>
+  <div id="stock-hist-content"></div>
 </div>
 
 <!-- MAESTRO -->
@@ -636,7 +605,7 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['plan','real','cmp','desv','dash','stock','sal','proy','rec','con','mae'];
+const TABS=['plan','real','cmp','desv','dash','stock','proy','rec','con','mae'];
 function T(t){
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',TABS[i]===t));
   document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));
@@ -646,7 +615,6 @@ function T(t){
   if(t==='desv'){pS('desv-wsel');loadDesv()}
   if(t==='dash'){pS('dash-wsel');initDash()}
   if(t==='stock')initStock();
-  if(t==='sal')initSalidas();
   if(t==='proy')initProy();
   if(t==='rec')rRec();
   if(t==='con'){pSC();renderCon()}
@@ -1651,19 +1619,49 @@ function showStockTab(t){
 }
 
 async function initStock(){
-  // Setear fecha de hoy
   const hoy=new Date().toISOString().slice(0,10);
-  document.getElementById('stock-fecha-salida').value=hoy;
-  const hace30=new Date();hace30.setDate(hace30.getDate()-30);
-  document.getElementById('stock-mov-desde').value=hace30.toISOString().slice(0,10);
-  document.getElementById('stock-mov-hasta').value=hoy;
-  // Actualizar selector empresa
-  const se=document.getElementById('stock-esel');
-  const cur=se.value;se.innerHTML='<option value="all">Todas las empresas</option>';
+  document.getElementById('stock-hist-fecha').value=hoy;
+  const se=document.getElementById('stock-hist-esel');
+  se.innerHTML='<option value="all">Todas las empresas</option>';
   st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se.appendChild(o)});
-  if(cur)se.value=cur;
-  await loadStock();
-  renderStock();
+  renderHistStock();
+}
+
+async function renderHistStock(){
+  const fecha=document.getElementById('stock-hist-fecha').value;
+  const ef=document.getElementById('stock-hist-esel').value;
+  const el=document.getElementById('stock-hist-content');
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
+  try{
+    let f=`fecha=eq.${fecha}&order=area.asc,producto.asc`;
+    if(ef!=='all')f+=`&empresa_id=eq.${ef}`;
+    const data=await get('proyeccion_diaria',f);
+    if(!data.length){el.innerHTML='<div class="empty"><i class="ti ti-calendar-off"></i>Sin conteo para esta fecha.</div>';return}
+    const byE={};data.forEach(d=>{if(!byE[d.empresa_id])byE[d.empresa_id]=[];byE[d.empresa_id].push(d)});
+    let h=`<div class="stock-card"><table class="stock-tbl"><thead><tr>
+      <th>Empresa</th><th>Area</th><th>Producto</th><th>Unidad</th>
+      <th style="text-align:right;background:#E6F1FB;color:#0C447C">Stock contado</th>
+    </tr></thead><tbody>`;
+    Object.entries(byE).forEach(([eid,items])=>{
+      const clr=ec(eid);const nm=en(eid)||'SE';const bg=rgba(clr,.12);
+      const byArea={};items.forEach(d=>{if(!byArea[d.area])byArea[d.area]=[];byArea[d.area].push(d)});
+      let ef2=true;
+      Object.entries(byArea).forEach(([area,aItems])=>{
+        aItems.forEach((d,ri)=>{
+          h+=`<tr>`;
+          if(ef2&&ri===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span></td>`;
+          if(ri===0)h+=`<td rowspan="${aItems.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${rgba(clr,.1)};color:${clr}">${area}</span></td>`;
+          h+=`<td style="font-weight:500">${d.producto}</td>`;
+          h+=`<td class="muted">${d.unidad}</td>`;
+          h+=`<td style="text-align:right;font-weight:700;font-size:14px;background:#E6F1FB;color:#0C447C">${d.stock>0?d.stock.toLocaleString('es-AR'):'--'}</td>`;
+          h+=`</tr>`;
+          ef2=false;
+        });
+      });
+    });
+    h+=`</tbody></table></div>`;
+    el.innerHTML=h;
+  }catch(e){el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> Error: ${e.message}</div>`}
 }
 
 async function loadStock(){
@@ -2346,57 +2344,77 @@ function renderResumen(){
   const fecha=document.getElementById('proy-fecha').value;
   const ef=document.getElementById('proy-esel').value;
   const el=document.getElementById('proy-resumen-content');
-  // Obtener plan del dia
   const semKey=wk(new Date(fecha));
   const diIdx=(new Date(fecha+'T00:00:00').getDay()+6)%7;
   const plan=st.P[semKey]||[];
   let prods=st.Pr;
   if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
   if(!prods.length){el.innerHTML='<div class="empty"><i class="ti ti-table-off"></i>Sin productos.</div>';return}
-  const byE={};prods.forEach(p=>{const eid=p.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(p)});
+
+  // Construir filas con todos los datos ANTES de renderizar para calcular rowspans correctos
+  const byE={};
+  prods.forEach(p=>{
+    const eid=p.empresa_id||'_';
+    const a=st.A.find(x=>x.id===p.area_id);const area=a?a.nombre:'SA';
+    const planRow=plan.find(r=>r.producto===p.nombre&&r.empresa_id===eid&&r.area===area);
+    const aElab=(planRow&&planRow.days&&planRow.days[diIdx])||0;
+    const proy=getProyItem(eid,area,p.nombre);
+    const stock=proy?proy.stock:0;
+    const vend=proy?proy.vendedores:0;
+    const tyc=proy?proy.tyc:0;
+    const saldo=stock+aElab-vend-tyc;
+    if(!stock&&!aElab&&!vend&&!tyc)return; // omitir sin datos
+    if(!byE[eid])byE[eid]={nm:en(eid)||'SE',clr:ec(eid),areas:{}};
+    if(!byE[eid].areas[area])byE[eid].areas[area]=[];
+    byE[eid].areas[area].push({nombre:p.nombre,unidad:p.unidad,stock,aElab,vend,tyc,saldo});
+  });
+
   let h=`<div style="font-size:14px;font-weight:600;margin-bottom:1rem">Resumen del dia — ${new Date(fecha+'T00:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}</div>`;
   h+=`<div class="stock-card"><table class="stock-tbl"><thead><tr>
-    <th>Empresa</th><th>Area</th><th>Producto</th><th>Unidad</th>
-    <th style="text-align:right;background:#E6F1FB;color:#0C447C">Stock actual</th>
-    <th style="text-align:right;background:#E1F5EE;color:#0F6E56">A elaborar</th>
-    <th style="text-align:right;background:#FAEEDA;color:#854F0B">Vendedores</th>
-    <th style="text-align:right;background:#FAEEDA;color:#854F0B">T&amp;C</th>
-    <th style="text-align:right;width:110px">Saldo proy.</th>
+    <th style="min-width:100px">Empresa</th>
+    <th style="min-width:90px">Area</th>
+    <th>Producto</th>
+    <th style="width:70px">Unidad</th>
+    <th style="text-align:right;background:#E6F1FB;color:#0C447C;width:100px">Stock</th>
+    <th style="text-align:right;background:#E1F5EE;color:#0F6E56;width:100px">A elaborar</th>
+    <th style="text-align:right;background:#FFF8EE;color:#854F0B;width:100px">Vendedores</th>
+    <th style="text-align:right;background:#FFF8EE;color:#854F0B;width:90px">T&amp;C</th>
+    <th style="text-align:right;width:100px">Saldo</th>
   </tr></thead><tbody>`;
-  Object.entries(byE).forEach(([eid,items])=>{
-    const clr=ec(eid);const nm=en(eid)||'SE';const bg=rgba(clr,.12);
-    const byArea={};items.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id);const an=a?a.nombre:'SA';if(!byArea[an])byArea[an]=[];byArea[an].push({...p,anom:an})});
-    let ef2=true;
-    Object.entries(byArea).forEach(([area,aItems])=>{
-      aItems.forEach((p,ri)=>{
-        // Buscar plan del dia para este producto
-        const planRow=plan.find(r=>r.producto===p.nombre&&r.empresa_id===eid&&r.area===area);
-        const aElab=(planRow&&planRow.days&&planRow.days[diIdx])||0;
-        const proy=getProyItem(eid,area,p.nombre);
-        const stock=proy?proy.stock:0;
-        const vend=proy?proy.vendedores:0;
-        const tyc=proy?proy.tyc:0;
-        const saldo=stock+aElab-vend-tyc;
-        const saldoCls=saldo>0?'saldo-pos':saldo<0?'saldo-neg':'saldo-zero';
-        // Solo mostrar si tiene algun valor
-        if(!stock&&!aElab&&!vend&&!tyc)return;
+
+  Object.entries(byE).forEach(([eid,{nm,clr,areas}])=>{
+    const bg=rgba(clr,.12);
+    // Contar total de filas de esta empresa
+    const totalFilas=Object.values(areas).reduce((a,b)=>a+b.length,0);
+    let empFirstRow=true;
+    Object.entries(areas).forEach(([area,items])=>{
+      items.forEach((item,ri)=>{
+        const saldoCls=item.saldo>0?'saldo-pos':item.saldo<0?'saldo-neg':'saldo-zero';
         h+=`<tr>`;
-        if(ef2&&ri===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span></td>`;
-        if(ri===0)h+=`<td rowspan="${aItems.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${rgba(clr,.1)};color:${clr}">${area}</span></td>`;
-        h+=`<td style="font-weight:500">${p.nombre}</td>`;
-        h+=`<td class="muted">${p.unidad}</td>`;
-        h+=`<td style="text-align:right;background:#E6F1FB;font-weight:600;color:#0C447C">${stock>0?stock.toLocaleString('es-AR'):'--'}</td>`;
-        h+=`<td style="text-align:right;background:#E1F5EE;font-weight:600;color:#0F6E56">${aElab>0?aElab.toLocaleString('es-AR'):'--'}</td>`;
-        h+=`<td style="text-align:right;background:#FFF8EE;font-weight:600;color:#854F0B">${vend>0?vend.toLocaleString('es-AR'):'--'}</td>`;
-        h+=`<td style="text-align:right;background:#FFF8EE;font-weight:600;color:#854F0B">${tyc>0?tyc.toLocaleString('es-AR'):'--'}</td>`;
-        h+=`<td style="text-align:right;font-size:15px" class="${saldoCls}">${saldo.toLocaleString('es-AR')}</td>`;
+        if(empFirstRow&&ri===0){
+          h+=`<td rowspan="${totalFilas}" style="vertical-align:top;padding-top:10px;border-right:3px solid ${clr}">
+            <span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span>
+          </td>`;
+        }
+        if(ri===0){
+          h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:8px">
+            <span class="area-tag" style="background:${rgba(clr,.1)};color:${clr}">${area}</span>
+          </td>`;
+        }
+        h+=`<td style="font-weight:500">${item.nombre}</td>`;
+        h+=`<td class="muted" style="text-align:center">${item.unidad}</td>`;
+        h+=`<td style="text-align:right;background:#E6F1FB;font-weight:600;color:#0C447C">${item.stock>0?item.stock.toLocaleString('es-AR'):'--'}</td>`;
+        h+=`<td style="text-align:right;background:#E1F5EE;font-weight:600;color:#0F6E56">${item.aElab>0?item.aElab.toLocaleString('es-AR'):'--'}</td>`;
+        h+=`<td style="text-align:right;background:#FFF8EE;font-weight:600;color:#854F0B">${item.vend>0?item.vend.toLocaleString('es-AR'):'--'}</td>`;
+        h+=`<td style="text-align:right;background:#FFF8EE;font-weight:600;color:#854F0B">${item.tyc>0?item.tyc.toLocaleString('es-AR'):'--'}</td>`;
+        h+=`<td style="text-align:right;font-size:14px;font-weight:700" class="${saldoCls}">${item.saldo.toLocaleString('es-AR')}</td>`;
         h+=`</tr>`;
-        ef2=false;
+        empFirstRow=false;
       });
     });
   });
+
   h+=`</tbody></table></div>`;
-  // Leyenda
   h+=`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:.75rem;font-size:12px;color:var(--text2)">
     <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#E6F1FB;border:1px solid #B5D4F4;display:inline-block;border-radius:2px"></span> Stock contado</span>
     <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#E1F5EE;border:1px solid #9FE1CB;display:inline-block;border-radius:2px"></span> A elaborar (del plan)</span>
@@ -2405,15 +2423,12 @@ function renderResumen(){
     <span style="color:var(--red);font-weight:600">Rojo = falta stock</span>
   </div>`;
   el.innerHTML=h;
-  // Actualizar a_elaborar en Supabase
+  // Actualizar a_elaborar en Supabase en background
   prods.forEach(async p=>{
     const a=st.A.find(x=>x.id===p.area_id);const area=a?a.nombre:'SA';
     const planRow=plan.find(r=>r.producto===p.nombre&&r.empresa_id===p.empresa_id&&r.area===area);
     const aElab=(planRow&&planRow.days&&planRow.days[diIdx])||0;
-    if(aElab>0){
-      const fecha=document.getElementById('proy-fecha').value;
-      await upsertProy(fecha,p.empresa_id,area,p.nombre,p.unidad,{a_elaborar:aElab}).catch(()=>{});
-    }
+    if(aElab>0){await upsertProy(fecha,p.empresa_id,area,p.nombre,p.unidad,{a_elaborar:aElab}).catch(()=>{});}
   });
 }
 
