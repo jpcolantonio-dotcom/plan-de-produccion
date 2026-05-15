@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -214,7 +215,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v1.2</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v1.3</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2218,33 +2219,39 @@ function renderConteo(){
   if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
   if(!prods.length){el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin productos en el maestro.</div>';return}
   const byE={};prods.forEach(p=>{const eid=p.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(p)});
-  let h=`<div class="stock-card"><table class="stock-tbl"><thead><tr>
-    <th>Empresa</th><th>Area</th><th>Producto</th><th>Unidad</th>
-    <th style="text-align:right;width:120px">Stock en camara</th>
+  let h=`<div class="stock-card"><div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
+    <th style="text-align:left">Producto</th>
+    <th style="text-align:left;width:70px">Unidad</th>
+    <th style="text-align:right;width:110px">Stock</th>
   </tr></thead><tbody>`;
+  // Agrupar por empresa/area con separadores
   Object.entries(byE).forEach(([eid,items])=>{
-    const clr=ec(eid);const nm=en(eid)||'SE';const bg=rgba(clr,.12);
+    const clr=ec(eid);const nm=en(eid)||'SE';
     const byArea={};items.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id);const an=a?a.nombre:'SA';if(!byArea[an])byArea[an]=[];byArea[an].push({...p,anom:an})});
-    let ef2=true;
     Object.entries(byArea).forEach(([area,aItems])=>{
-      aItems.forEach((p,ri)=>{
+      // Fila separadora de empresa/area
+      h+=`<tr><td colspan="3" style="background:var(--bg2);padding:6px 10px;font-size:11px;font-weight:700;color:${clr};border-top:2px solid var(--border2)">
+        <span class="color-dot" style="background:${clr}"></span> ${nm} &mdash; ${area}
+      </td></tr>`;
+      aItems.forEach((p)=>{
         const existing=getProyItem(eid,area,p.nombre);
-        const val=existing?existing.stock:'';
-        h+=`<tr>`;
-        if(ef2&&ri===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span></td>`;
-        if(ri===0)h+=`<td rowspan="${aItems.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${rgba(clr,.1)};color:${clr}">${area}</span></td>`;
-        h+=`<td style="font-weight:500">${p.nombre}</td>`;
-        h+=`<td class="muted">${p.unidad}</td>`;
-        h+=`<td style="text-align:right;display:flex;align-items:center;gap:6px;justify-content:flex-end">
-          <input class="proy-input" type="number" min="0" id="pconteo-${eid}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}" value="${val}" placeholder="0" style="border-color:${existing&&existing.stock>0?'var(--green)':'var(--border2)'}"/>
-          ${existing&&existing.stock>=0&&val!==''?`<span style="color:var(--green);font-size:11px" title="Guardado"><i class="ti ti-check"></i></span>`:'<span style="width:14px"></span>'}
-        </td>`;
-        h+=`</tr>`;
-        ef2=false;
+        const val=existing&&existing.stock>0?existing.stock:'';
+        const guardado=existing&&val!=='';
+        const pid=`${eid}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+        h+=`<tr>
+          <td style="font-weight:500">${p.nombre}${guardado?` <span style="color:var(--green);font-size:10px">✓</span>`:''}</td>
+          <td style="font-size:12px;color:var(--text2)">${p.unidad}</td>
+          <td style="text-align:right">
+            <input class="proy-input" type="number" min="0" 
+              id="pconteo-${pid}" 
+              value="${val}" placeholder="0" 
+              style="border-color:${guardado?'var(--green)':'var(--border2)'};width:90px"/>
+          </td>
+        </tr>`;
       });
     });
   });
-  h+=`</tbody></table></div>`;
+  h+=`</tbody></table></div></div>`;
   el.innerHTML=h;
 }
 
@@ -2255,34 +2262,32 @@ function renderVentas(){
   if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
   if(!prods.length){el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin productos.</div>';return}
   const byE={};prods.forEach(p=>{const eid=p.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(p)});
-  let h=`<div class="stock-card"><table class="stock-tbl"><thead><tr>
-    <th>Empresa</th><th>Area</th><th>Producto</th><th>Unidad</th>
-    <th style="text-align:right;width:110px">Vendedores</th>
-    <th style="text-align:right;width:110px">T&amp;C</th>
+  let h=`<div class="stock-card"><div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
+    <th style="text-align:left">Producto</th>
+    <th style="text-align:right;width:90px">Vendedores</th>
+    <th style="text-align:right;width:90px">T&amp;C</th>
   </tr></thead><tbody>`;
   Object.entries(byE).forEach(([eid,items])=>{
-    const clr=ec(eid);const nm=en(eid)||'SE';const bg=rgba(clr,.12);
+    const clr=ec(eid);const nm=en(eid)||'SE';
     const byArea={};items.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id);const an=a?a.nombre:'SA';if(!byArea[an])byArea[an]=[];byArea[an].push({...p,anom:an})});
-    let ef2=true;
     Object.entries(byArea).forEach(([area,aItems])=>{
-      aItems.forEach((p,ri)=>{
+      h+=`<tr><td colspan="3" style="background:var(--bg2);padding:6px 10px;font-size:11px;font-weight:700;color:${clr};border-top:2px solid var(--border2)">
+        <span class="color-dot" style="background:${clr}"></span> ${nm} &mdash; ${area}
+      </td></tr>`;
+      aItems.forEach((p)=>{
         const existing=getProyItem(eid,area,p.nombre);
-        const vend=existing?existing.vendedores:'';
-        const tyc=existing?existing.tyc:'';
+        const vend=existing&&existing.vendedores>0?existing.vendedores:'';
+        const tyc=existing&&existing.tyc>0?existing.tyc:'';
         const pid=`${eid}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
-        h+=`<tr>`;
-        if(ef2&&ri===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span></td>`;
-        if(ri===0)h+=`<td rowspan="${aItems.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${rgba(clr,.1)};color:${clr}">${area}</span></td>`;
-        h+=`<td style="font-weight:500">${p.nombre}</td>`;
-        h+=`<td class="muted">${p.unidad}</td>`;
-        h+=`<td style="text-align:right"><input class="proy-input" type="number" min="0" id="pvend-${pid}" value="${vend}" placeholder="0"/></td>`;
-        h+=`<td style="text-align:right"><input class="proy-input" type="number" min="0" id="ptyc-${pid}" value="${tyc}" placeholder="0"/></td>`;
-        h+=`</tr>`;
-        ef2=false;
+        h+=`<tr>
+          <td style="font-weight:500;font-size:13px">${p.nombre}<br><span style="font-size:11px;color:var(--text2)">${p.unidad}</span></td>
+          <td style="text-align:right"><input class="proy-input" type="number" min="0" id="pvend-${pid}" value="${vend}" placeholder="0" style="width:80px"/></td>
+          <td style="text-align:right"><input class="proy-input" type="number" min="0" id="ptyc-${pid}" value="${tyc}" placeholder="0" style="width:80px"/></td>
+        </tr>`;
       });
     });
   });
-  h+=`</tbody></table></div>`;
+  h+=`</tbody></table></div></div>`;
   el.innerHTML=h;
 }
 
