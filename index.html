@@ -1600,6 +1600,17 @@ function showStockTab(t){
 async function initStock(){
   const hoy=new Date().toISOString().slice(0,10);
   document.getElementById('stock-hist-fecha').value=hoy;
+  // Recargar empresas si no están cargadas
+  if(!st.E.length){
+    try{
+      const[em,ar,pr]=await Promise.all([
+        get('empresas','order=nombre.asc'),
+        get('areas','order=nombre.asc'),
+        get('productos','order=nombre.asc')
+      ]);
+      st.E=em;st.A=ar||[];st.Pr=pr;uES();rP();
+    }catch{}
+  }
   const se=document.getElementById('stock-hist-esel');
   se.innerHTML='<option value="all">Todas las empresas</option>';
   st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se.appendChild(o)});
@@ -2157,6 +2168,18 @@ async function initProy(){
   const hoy=new Date().toISOString().slice(0,10);
   document.getElementById('proy-fecha').value=hoy;
   document.getElementById('proy-fecha').onchange=()=>loadProy();
+  // Recargar maestro si no está cargado
+  if(!st.Pr.length||!st.E.length){
+    try{
+      const[em,ar,pr]=await Promise.all([
+        get('empresas','order=nombre.asc'),
+        get('areas','order=nombre.asc'),
+        get('productos','order=nombre.asc')
+      ]);
+      st.E=em;st.A=ar||[];st.Pr=pr;
+      uES();rP();
+    }catch(e){console.error('Error cargando maestro:',e)}
+  }
   // Actualizar selector empresa
   const se=document.getElementById('proy-esel');
   const cur=se.value;se.innerHTML='<option value="all">Todas las empresas</option>';
