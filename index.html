@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -401,8 +402,12 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <div id="proy-conteo">
     <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Ingresa el stock actual en camara contado fisicamente.</div>
     <div id="proy-conteo-content"></div>
-    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
-      <button class="btn btn-primary" onclick="guardarConteo()"><i class="ti ti-device-floppy"></i> Guardar conteo</button>
+    <div style="display:flex;justify-content:space-between;margin-top:1rem;flex-wrap:wrap;gap:8px">
+      <div style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px"><i class="ti ti-info-circle"></i> Podes guardar varias veces durante el dia. Los valores se actualizan sin borrar el resto.</div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="guardarConteo()"><i class="ti ti-device-floppy"></i> Guardar conteo</button>
+        <button class="btn" onclick="showProyTab('ventas')">Ir a Ventas <i class="ti ti-arrow-right"></i></button>
+      </div>
     </div>
   </div>
   <!-- VENTAS -->
@@ -2205,7 +2210,10 @@ function renderConteo(){
         if(ri===0)h+=`<td rowspan="${aItems.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${rgba(clr,.1)};color:${clr}">${area}</span></td>`;
         h+=`<td style="font-weight:500">${p.nombre}</td>`;
         h+=`<td class="muted">${p.unidad}</td>`;
-        h+=`<td style="text-align:right"><input class="proy-input" type="number" min="0" id="pconteo-${eid}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}" value="${val}" placeholder="0"/></td>`;
+        h+=`<td style="text-align:right;display:flex;align-items:center;gap:6px;justify-content:flex-end">
+          <input class="proy-input" type="number" min="0" id="pconteo-${eid}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}" value="${val}" placeholder="0" style="border-color:${existing&&existing.stock>0?'var(--green)':'var(--border2)'}"/>
+          ${existing&&existing.stock>=0&&val!==''?`<span style="color:var(--green);font-size:11px" title="Guardado"><i class="ti ti-check"></i></span>`:'<span style="width:14px"></span>'}
+        </td>`;
         h+=`</tr>`;
         ef2=false;
       });
@@ -2258,18 +2266,21 @@ async function guardarConteo(){
   const ef=document.getElementById('proy-esel').value;
   let prods=st.Pr;if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
   ss('saving','Guardando conteo...');
+  let guardados=0;
   try{
     for(const p of prods){
       const a=st.A.find(x=>x.id===p.area_id);const area=a?a.nombre:'SA';
       const pid=`${p.empresa_id}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
       const inp=document.getElementById(`pconteo-${pid}`);
-      if(!inp)continue;
+      if(!inp||inp.value==='')continue; // solo guardar los que tienen valor ingresado
       const stock=parseFloat(inp.value)||0;
       await upsertProy(fecha,p.empresa_id,area,p.nombre,p.unidad,{stock});
+      guardados++;
     }
-    await loadProy();
-    ss('online','Guardado');fl('proy-msg');
-    showProyTab('ventas');
+    await loadProy(); // recargar para mostrar valores guardados
+    ss('online','Guardado');
+    fl('proy-msg');
+    // NO avanzar al paso 2 automaticamente - dejar que el usuario corrija si quiere
   }catch(e){ss('error','Error');document.getElementById('proy-errtxt').textContent=e.message;fl('proy-err')}
 }
 
