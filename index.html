@@ -193,6 +193,16 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 .stock-num-pos{color:var(--green);font-weight:700}
 .stock-num-neg{color:var(--red);font-weight:700}
 .stock-num-zero{color:var(--text2)}
+/* PROYECCION */
+.proy-subtabs{display:flex;gap:2px;border-bottom:.5px solid var(--border);margin-bottom:1.25rem}
+.proy-tab{padding:8px 14px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-1px;display:inline-flex;align-items:center;gap:6px}
+.proy-tab.active{color:var(--text);border-bottom-color:var(--text)}
+.proy-tab:hover:not(.active){color:var(--text)}
+.proy-input{width:90px;padding:5px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);text-align:right}
+.proy-input:focus{outline:none;border-color:var(--blue)}
+.saldo-pos{color:var(--green);font-weight:700}
+.saldo-neg{color:var(--red);font-weight:700}
+.saldo-zero{color:var(--text2);font-weight:500}
 </style>
 </head>
 <body>
@@ -212,6 +222,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('dash')"><i class="ti ti-layout-dashboard"></i> Dashboard</button>
   <button class="tab" onclick="T('stock')"><i class="ti ti-building-warehouse"></i> Stock</button>
   <button class="tab" onclick="T('sal')"><i class="ti ti-arrow-bar-right"></i> Salidas</button>
+  <button class="tab" onclick="T('proy')"><i class="ti ti-chart-dots"></i> Proyeccion</button>
   <button class="tab" onclick="T('rec')"><i class="ti ti-notebook"></i> Recetas</button>
   <button class="tab" onclick="T('con')"><i class="ti ti-package"></i> Consumo MP</button>
   <button class="tab" onclick="T('mae')"><i class="ti ti-building"></i> Maestro</button>
@@ -361,6 +372,50 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:#F7C1C1;display:inline-block"></span> Menos de 90%</div>
     <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:var(--bg2);border:.5px solid var(--border);display:inline-block"></span> Sin produccion registrada</div>
   </div>
+</div>
+
+<!-- PROYECCION -->
+<div id="tab-proy" class="section">
+  <div class="toolbar">
+    <div>
+      <div style="font-size:16px;font-weight:600">Proyeccion diaria</div>
+      <div style="font-size:13px;color:var(--text2)">Conteo de stock + ventas proyectadas + resumen del dia</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input type="date" id="proy-fecha" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <select id="proy-esel" onchange="renderProyActivo()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
+    </div>
+  </div>
+  <div class="proy-subtabs">
+    <button class="proy-tab active" id="ptab-conteo" onclick="showProyTab('conteo')"><i class="ti ti-clipboard-check"></i> 1. Conteo de stock</button>
+    <button class="proy-tab" id="ptab-ventas" onclick="showProyTab('ventas')"><i class="ti ti-shopping-cart"></i> 2. Ventas del dia</button>
+    <button class="proy-tab" id="ptab-resumen" onclick="showProyTab('resumen')"><i class="ti ti-table"></i> 3. Resumen</button>
+  </div>
+  <!-- CONTEO -->
+  <div id="proy-conteo">
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Ingresa el stock actual en camara contado fisicamente.</div>
+    <div id="proy-conteo-content"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+      <button class="btn btn-primary" onclick="guardarConteo()"><i class="ti ti-device-floppy"></i> Guardar conteo</button>
+    </div>
+  </div>
+  <!-- VENTAS -->
+  <div id="proy-ventas" style="display:none">
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Ingresa las ventas proyectadas para el dia por canal.</div>
+    <div id="proy-ventas-content"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+      <button class="btn btn-primary" onclick="guardarVentas()"><i class="ti ti-device-floppy"></i> Guardar ventas</button>
+    </div>
+  </div>
+  <!-- RESUMEN -->
+  <div id="proy-resumen" style="display:none">
+    <div id="proy-resumen-content"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
+      <button class="btn" onclick="imprimirResumen()"><i class="ti ti-printer"></i> Imprimir resumen</button>
+    </div>
+  </div>
+  <div id="proy-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
+  <div id="proy-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="proy-errtxt"></span></div>
 </div>
 
 <!-- SALIDAS -->
@@ -581,7 +636,7 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['plan','real','cmp','desv','dash','stock','sal','rec','con','mae'];
+const TABS=['plan','real','cmp','desv','dash','stock','sal','proy','rec','con','mae'];
 function T(t){
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',TABS[i]===t));
   document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));
@@ -592,6 +647,7 @@ function T(t){
   if(t==='dash'){pS('dash-wsel');initDash()}
   if(t==='stock')initStock();
   if(t==='sal')initSalidas();
+  if(t==='proy')initProy();
   if(t==='rec')rRec();
   if(t==='con'){pSC();renderCon()}
   if(t==='mae')rMae();
@@ -2107,6 +2163,275 @@ async function confirmarImport(){
     fl('sal-msg');
     renderSalidas();
   }catch(e){ss('error','Error: '+e.message);document.getElementById('sal-errtxt').textContent=e.message;fl('sal-err')}
+}
+
+// ── PROYECCION DIARIA ─────────────────────────────────────────────
+let proyData = []; // cache proyeccion del dia
+
+function showProyTab(t){
+  ['conteo','ventas','resumen'].forEach(id=>{
+    document.getElementById('proy-'+id).style.display=id===t?'block':'none';
+    document.getElementById('ptab-'+id).classList.toggle('active',id===t);
+  });
+  if(t==='resumen')renderResumen();
+}
+
+async function initProy(){
+  const hoy=new Date().toISOString().slice(0,10);
+  document.getElementById('proy-fecha').value=hoy;
+  document.getElementById('proy-fecha').onchange=()=>loadProy();
+  // Actualizar selector empresa
+  const se=document.getElementById('proy-esel');
+  const cur=se.value;se.innerHTML='<option value="all">Todas las empresas</option>';
+  st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se.appendChild(o)});
+  if(cur)se.value=cur;
+  // Cargar plan del dia
+  const semKey=wk(new Date(hoy));
+  await lp(semKey);
+  await loadProy();
+}
+
+async function loadProy(){
+  const fecha=document.getElementById('proy-fecha').value;
+  const ef=document.getElementById('proy-esel').value;
+  try{
+    let f=`fecha=eq.${fecha}`;
+    if(ef!=='all')f+=`&empresa_id=eq.${ef}`;
+    proyData=await get('proyeccion_diaria',f+'&order=area.asc,producto.asc');
+  }catch{proyData=[]}
+  renderConteo();
+  renderVentas();
+  if(document.getElementById('proy-resumen').style.display!=='none')renderResumen();
+}
+
+function getProyItem(eid,area,prod){
+  return proyData.find(x=>x.empresa_id===eid&&x.area===area&&x.producto===prod)||null;
+}
+
+function renderConteo(){
+  const fecha=document.getElementById('proy-fecha').value;
+  const ef=document.getElementById('proy-esel').value;
+  const el=document.getElementById('proy-conteo-content');
+  let prods=st.Pr;
+  if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
+  if(!prods.length){el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin productos en el maestro.</div>';return}
+  const byE={};prods.forEach(p=>{const eid=p.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(p)});
+  let h=`<div class="stock-card"><table class="stock-tbl"><thead><tr>
+    <th>Empresa</th><th>Area</th><th>Producto</th><th>Unidad</th>
+    <th style="text-align:right;width:120px">Stock en camara</th>
+  </tr></thead><tbody>`;
+  Object.entries(byE).forEach(([eid,items])=>{
+    const clr=ec(eid);const nm=en(eid)||'SE';const bg=rgba(clr,.12);
+    const byArea={};items.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id);const an=a?a.nombre:'SA';if(!byArea[an])byArea[an]=[];byArea[an].push({...p,anom:an})});
+    let ef2=true;
+    Object.entries(byArea).forEach(([area,aItems])=>{
+      aItems.forEach((p,ri)=>{
+        const existing=getProyItem(eid,area,p.nombre);
+        const val=existing?existing.stock:'';
+        h+=`<tr>`;
+        if(ef2&&ri===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span></td>`;
+        if(ri===0)h+=`<td rowspan="${aItems.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${rgba(clr,.1)};color:${clr}">${area}</span></td>`;
+        h+=`<td style="font-weight:500">${p.nombre}</td>`;
+        h+=`<td class="muted">${p.unidad}</td>`;
+        h+=`<td style="text-align:right"><input class="proy-input" type="number" min="0" id="pconteo-${eid}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}" value="${val}" placeholder="0"/></td>`;
+        h+=`</tr>`;
+        ef2=false;
+      });
+    });
+  });
+  h+=`</tbody></table></div>`;
+  el.innerHTML=h;
+}
+
+function renderVentas(){
+  const ef=document.getElementById('proy-esel').value;
+  const el=document.getElementById('proy-ventas-content');
+  let prods=st.Pr;
+  if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
+  if(!prods.length){el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin productos.</div>';return}
+  const byE={};prods.forEach(p=>{const eid=p.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(p)});
+  let h=`<div class="stock-card"><table class="stock-tbl"><thead><tr>
+    <th>Empresa</th><th>Area</th><th>Producto</th><th>Unidad</th>
+    <th style="text-align:right;width:110px">Vendedores</th>
+    <th style="text-align:right;width:110px">T&amp;C</th>
+  </tr></thead><tbody>`;
+  Object.entries(byE).forEach(([eid,items])=>{
+    const clr=ec(eid);const nm=en(eid)||'SE';const bg=rgba(clr,.12);
+    const byArea={};items.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id);const an=a?a.nombre:'SA';if(!byArea[an])byArea[an]=[];byArea[an].push({...p,anom:an})});
+    let ef2=true;
+    Object.entries(byArea).forEach(([area,aItems])=>{
+      aItems.forEach((p,ri)=>{
+        const existing=getProyItem(eid,area,p.nombre);
+        const vend=existing?existing.vendedores:'';
+        const tyc=existing?existing.tyc:'';
+        const pid=`${eid}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+        h+=`<tr>`;
+        if(ef2&&ri===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span></td>`;
+        if(ri===0)h+=`<td rowspan="${aItems.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${rgba(clr,.1)};color:${clr}">${area}</span></td>`;
+        h+=`<td style="font-weight:500">${p.nombre}</td>`;
+        h+=`<td class="muted">${p.unidad}</td>`;
+        h+=`<td style="text-align:right"><input class="proy-input" type="number" min="0" id="pvend-${pid}" value="${vend}" placeholder="0"/></td>`;
+        h+=`<td style="text-align:right"><input class="proy-input" type="number" min="0" id="ptyc-${pid}" value="${tyc}" placeholder="0"/></td>`;
+        h+=`</tr>`;
+        ef2=false;
+      });
+    });
+  });
+  h+=`</tbody></table></div>`;
+  el.innerHTML=h;
+}
+
+async function guardarConteo(){
+  const fecha=document.getElementById('proy-fecha').value;
+  const ef=document.getElementById('proy-esel').value;
+  let prods=st.Pr;if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
+  ss('saving','Guardando conteo...');
+  try{
+    for(const p of prods){
+      const a=st.A.find(x=>x.id===p.area_id);const area=a?a.nombre:'SA';
+      const pid=`${p.empresa_id}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+      const inp=document.getElementById(`pconteo-${pid}`);
+      if(!inp)continue;
+      const stock=parseFloat(inp.value)||0;
+      await upsertProy(fecha,p.empresa_id,area,p.nombre,p.unidad,{stock});
+    }
+    await loadProy();
+    ss('online','Guardado');fl('proy-msg');
+    showProyTab('ventas');
+  }catch(e){ss('error','Error');document.getElementById('proy-errtxt').textContent=e.message;fl('proy-err')}
+}
+
+async function guardarVentas(){
+  const fecha=document.getElementById('proy-fecha').value;
+  const ef=document.getElementById('proy-esel').value;
+  let prods=st.Pr;if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
+  ss('saving','Guardando ventas...');
+  try{
+    for(const p of prods){
+      const a=st.A.find(x=>x.id===p.area_id);const area=a?a.nombre:'SA';
+      const pid=`${p.empresa_id}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+      const inpV=document.getElementById(`pvend-${pid}`);
+      const inpT=document.getElementById(`ptyc-${pid}`);
+      const vendedores=parseFloat(inpV?.value)||0;
+      const tyc=parseFloat(inpT?.value)||0;
+      if(!vendedores&&!tyc)continue;
+      await upsertProy(fecha,p.empresa_id,area,p.nombre,p.unidad,{vendedores,tyc});
+    }
+    await loadProy();
+    ss('online','Guardado');fl('proy-msg');
+    showProyTab('resumen');
+  }catch(e){ss('error','Error');document.getElementById('proy-errtxt').textContent=e.message;fl('proy-err')}
+}
+
+async function upsertProy(fecha,eid,area,producto,unidad,campos){
+  const existing=proyData.find(x=>x.empresa_id===eid&&x.area===area&&x.producto===producto);
+  if(existing){
+    // Calcular nuevo saldo
+    const upd={...campos,updated_at:new Date().toISOString()};
+    const ns={...existing,...upd};
+    upd.saldo=(ns.stock||0)+(ns.a_elaborar||0)-(ns.vendedores||0)-(ns.tyc||0);
+    await fetch(`${SB}/rest/v1/proyeccion_diaria?id=eq.${existing.id}`,{
+      method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify(upd)
+    });
+    Object.assign(existing,upd);
+  } else {
+    const row={empresa_id:eid,fecha,area,producto,unidad,stock:0,a_elaborar:0,vendedores:0,tyc:0,...campos};
+    row.saldo=(row.stock||0)+(row.a_elaborar||0)-(row.vendedores||0)-(row.tyc||0);
+    const res=await ins('proyeccion_diaria',row);
+    if(res&&res[0])proyData.push(res[0]);
+  }
+}
+
+function renderResumen(){
+  const fecha=document.getElementById('proy-fecha').value;
+  const ef=document.getElementById('proy-esel').value;
+  const el=document.getElementById('proy-resumen-content');
+  // Obtener plan del dia
+  const semKey=wk(new Date(fecha));
+  const diIdx=(new Date(fecha+'T00:00:00').getDay()+6)%7;
+  const plan=st.P[semKey]||[];
+  let prods=st.Pr;
+  if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
+  if(!prods.length){el.innerHTML='<div class="empty"><i class="ti ti-table-off"></i>Sin productos.</div>';return}
+  const byE={};prods.forEach(p=>{const eid=p.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(p)});
+  let h=`<div style="font-size:14px;font-weight:600;margin-bottom:1rem">Resumen del dia — ${new Date(fecha+'T00:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}</div>`;
+  h+=`<div class="stock-card"><table class="stock-tbl"><thead><tr>
+    <th>Empresa</th><th>Area</th><th>Producto</th><th>Unidad</th>
+    <th style="text-align:right;background:#E6F1FB;color:#0C447C">Stock actual</th>
+    <th style="text-align:right;background:#E1F5EE;color:#0F6E56">A elaborar</th>
+    <th style="text-align:right;background:#FAEEDA;color:#854F0B">Vendedores</th>
+    <th style="text-align:right;background:#FAEEDA;color:#854F0B">T&amp;C</th>
+    <th style="text-align:right;width:110px">Saldo proy.</th>
+  </tr></thead><tbody>`;
+  Object.entries(byE).forEach(([eid,items])=>{
+    const clr=ec(eid);const nm=en(eid)||'SE';const bg=rgba(clr,.12);
+    const byArea={};items.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id);const an=a?a.nombre:'SA';if(!byArea[an])byArea[an]=[];byArea[an].push({...p,anom:an})});
+    let ef2=true;
+    Object.entries(byArea).forEach(([area,aItems])=>{
+      aItems.forEach((p,ri)=>{
+        // Buscar plan del dia para este producto
+        const planRow=plan.find(r=>r.producto===p.nombre&&r.empresa_id===eid&&r.area===area);
+        const aElab=(planRow&&planRow.days&&planRow.days[diIdx])||0;
+        const proy=getProyItem(eid,area,p.nombre);
+        const stock=proy?proy.stock:0;
+        const vend=proy?proy.vendedores:0;
+        const tyc=proy?proy.tyc:0;
+        const saldo=stock+aElab-vend-tyc;
+        const saldoCls=saldo>0?'saldo-pos':saldo<0?'saldo-neg':'saldo-zero';
+        // Solo mostrar si tiene algun valor
+        if(!stock&&!aElab&&!vend&&!tyc)return;
+        h+=`<tr>`;
+        if(ef2&&ri===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span></td>`;
+        if(ri===0)h+=`<td rowspan="${aItems.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${rgba(clr,.1)};color:${clr}">${area}</span></td>`;
+        h+=`<td style="font-weight:500">${p.nombre}</td>`;
+        h+=`<td class="muted">${p.unidad}</td>`;
+        h+=`<td style="text-align:right;background:#E6F1FB;font-weight:600;color:#0C447C">${stock>0?stock.toLocaleString('es-AR'):'--'}</td>`;
+        h+=`<td style="text-align:right;background:#E1F5EE;font-weight:600;color:#0F6E56">${aElab>0?aElab.toLocaleString('es-AR'):'--'}</td>`;
+        h+=`<td style="text-align:right;background:#FFF8EE;font-weight:600;color:#854F0B">${vend>0?vend.toLocaleString('es-AR'):'--'}</td>`;
+        h+=`<td style="text-align:right;background:#FFF8EE;font-weight:600;color:#854F0B">${tyc>0?tyc.toLocaleString('es-AR'):'--'}</td>`;
+        h+=`<td style="text-align:right;font-size:15px" class="${saldoCls}">${saldo.toLocaleString('es-AR')}</td>`;
+        h+=`</tr>`;
+        ef2=false;
+      });
+    });
+  });
+  h+=`</tbody></table></div>`;
+  // Leyenda
+  h+=`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:.75rem;font-size:12px;color:var(--text2)">
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#E6F1FB;border:1px solid #B5D4F4;display:inline-block;border-radius:2px"></span> Stock contado</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#E1F5EE;border:1px solid #9FE1CB;display:inline-block;border-radius:2px"></span> A elaborar (del plan)</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#FFF8EE;border:1px solid #F9D89A;display:inline-block;border-radius:2px"></span> Ventas proyectadas</span>
+    <span style="color:var(--green);font-weight:600">Verde = saldo positivo</span>
+    <span style="color:var(--red);font-weight:600">Rojo = falta stock</span>
+  </div>`;
+  el.innerHTML=h;
+  // Actualizar a_elaborar en Supabase
+  prods.forEach(async p=>{
+    const a=st.A.find(x=>x.id===p.area_id);const area=a?a.nombre:'SA';
+    const planRow=plan.find(r=>r.producto===p.nombre&&r.empresa_id===p.empresa_id&&r.area===area);
+    const aElab=(planRow&&planRow.days&&planRow.days[diIdx])||0;
+    if(aElab>0){
+      const fecha=document.getElementById('proy-fecha').value;
+      await upsertProy(fecha,p.empresa_id,area,p.nombre,p.unidad,{a_elaborar:aElab}).catch(()=>{});
+    }
+  });
+}
+
+function imprimirResumen(){
+  const el=document.getElementById('proy-resumen-content');
+  if(!el.innerHTML){alert('Primero carga el resumen.');return}
+  const fecha=document.getElementById('proy-fecha').value;
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Resumen ${fecha}</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:9pt;padding:10mm}
+  table{width:100%;border-collapse:collapse;font-size:8.5pt}
+  th{background:#1B3A6B;color:#fff;padding:6px 8px;text-align:center;border:1px solid #1B3A6B}
+  th.left{text-align:left}td{padding:5px 8px;border:1px solid #d0d0d0;vertical-align:middle}
+  td.left{text-align:left}.pos{color:#0F6E56;font-weight:700}.neg{color:#A32D2D;font-weight:700}
+  @media print{@page{size:A4;margin:8mm}}</style></head>
+  <body>${el.innerHTML}
+  <script>window.onload=()=>{window.print()}<\/script></body></html>`;
+  const w=window.open('','_blank');
+  if(w){w.document.write(html);w.document.close();}
 }
 
 init();
