@@ -655,7 +655,7 @@ function rG(){
   if(!rows.length){wrap.innerHTML='<div class="empty"><i class="ti ti-filter-off"></i>No hay productos de esta empresa en el plan.</div>';return}
   const t=tc(st.w);const as=gas(rows);
   const byE={};rows.forEach(r=>{const eid=r.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push({...r,_i:all.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area)})});
-  let h=`<table class="plan-grid"><thead><tr><th class="left" style="width:100px">Empresa</th><th class="left" style="width:95px">Area</th><th class="left" style="width:155px">Producto</th><th class="left" style="width:80px">Unidad</th>`;
+  let h=`<table class="plan-grid"><thead><tr><th class="left" style="width:100px">Empresa</th><th class="left" style="width:75px">Area</th><th class="left" style="width:200px">Producto</th><th class="left" style="width:80px">Unidad</th>`;
   DAYS.forEach((d,i)=>{h+=`<th class="${i===t?'today-head':''}" style="width:70px">${d.slice(0,3)}<br><span style="font-size:10px;font-weight:400">${ddate(st.w,i)}</span></th>`});
   h+=`<th style="width:64px">Total</th><th style="width:32px"></th></tr></thead><tbody>`;
   let dt=Array(7).fill(0),gd=0;
