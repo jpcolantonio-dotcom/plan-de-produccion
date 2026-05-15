@@ -417,39 +417,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <div id="proy-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="proy-errtxt"></span></div>
 </div>
 
-<!-- SALIDAS -->
-<div id="tab-sal" class="section">
-  <div class="toolbar">
-    <div>
-      <div style="font-size:16px;font-weight:600">Salidas de camara</div>
-      <div style="font-size:13px;color:var(--text2)">Registra lo que sale de la camara por dia</div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <input type="date" id="sal-fecha" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-      <select id="sal-esel" onchange="renderSalidas()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
-      <label class="btn" style="cursor:pointer" title="Importar Excel de repartos">
-        <i class="ti ti-file-spreadsheet"></i> Importar Excel
-        <input type="file" id="sal-excel-input" accept=".xlsx,.xls" style="display:none" onchange="importarExcelSalidas(this)"/>
-      </label>
-    </div>
-  </div>
-  <!-- PREVISUALIZACIÓN EXCEL -->
-  <div id="sal-preview" style="display:none;margin-bottom:1rem">
-    <div class="alert alert-info" style="margin-bottom:1rem">
-      <i class="ti ti-file-spreadsheet"></i>
-      <span id="sal-preview-title">Previsualización del Excel</span>
-    </div>
-    <div id="sal-preview-content"></div>
-    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
-      <button class="btn" onclick="cancelarImport()"><i class="ti ti-x"></i> Cancelar</button>
-      <button class="btn btn-primary" onclick="confirmarImport()"><i class="ti ti-check"></i> Confirmar e importar</button>
-    </div>
-  </div>
-  <div id="sal-content"></div>
-  <div id="sal-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Salidas guardadas.</div>
-  <div id="sal-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="sal-errtxt"></span></div>
-</div>
-
 <!-- STOCK -->
 <div id="tab-stock" class="section">
   <div class="toolbar">
@@ -460,7 +427,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   </div>
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
     <label style="font-size:13px;color:var(--text2)">Fecha:</label>
-    <input type="date" id="stock-hist-fecha" onchange="renderHistStock()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+    <input type="date" id="stock-hist-fecha" onchange="renderHistStock()" oninput="renderHistStock()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
     <select id="stock-hist-esel" onchange="renderHistStock()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
     <button class="btn btn-sm" onclick="renderHistStock()"><i class="ti ti-refresh"></i> Buscar</button>
   </div>
@@ -2351,7 +2318,7 @@ function renderResumen(){
   if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
   if(!prods.length){el.innerHTML='<div class="empty"><i class="ti ti-table-off"></i>Sin productos.</div>';return}
 
-  // Construir filas con todos los datos ANTES de renderizar para calcular rowspans correctos
+  // Construir estructura de datos completa primero, luego renderizar
   const byE={};
   prods.forEach(p=>{
     const eid=p.empresa_id||'_';
@@ -2363,18 +2330,25 @@ function renderResumen(){
     const vend=proy?proy.vendedores:0;
     const tyc=proy?proy.tyc:0;
     const saldo=stock+aElab-vend-tyc;
-    if(!stock&&!aElab&&!vend&&!tyc)return; // omitir sin datos
+    if(!stock&&!aElab&&!vend&&!tyc)return;
     if(!byE[eid])byE[eid]={nm:en(eid)||'SE',clr:ec(eid),areas:{}};
     if(!byE[eid].areas[area])byE[eid].areas[area]=[];
     byE[eid].areas[area].push({nombre:p.nombre,unidad:p.unidad,stock,aElab,vend,tyc,saldo});
   });
 
+  // Verificar si hay datos
+  const totalItems=Object.values(byE).reduce((s,e)=>s+Object.values(e.areas).reduce((s2,a)=>s2+a.length,0),0);
+  if(!totalItems){
+    el.innerHTML='<div class="empty"><i class="ti ti-table-off"></i>Sin datos para mostrar. Carga el conteo y las ventas primero.</div>';
+    return;
+  }
+
   let h=`<div style="font-size:14px;font-weight:600;margin-bottom:1rem">Resumen del dia — ${new Date(fecha+'T00:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})}</div>`;
   h+=`<div class="stock-card"><table class="stock-tbl"><thead><tr>
-    <th style="min-width:100px">Empresa</th>
-    <th style="min-width:90px">Area</th>
-    <th>Producto</th>
-    <th style="width:70px">Unidad</th>
+    <th style="min-width:110px;text-align:left">Empresa</th>
+    <th style="min-width:100px;text-align:left">Area</th>
+    <th style="text-align:left">Producto</th>
+    <th style="width:70px;text-align:center">Unidad</th>
     <th style="text-align:right;background:#E6F1FB;color:#0C447C;width:100px">Stock</th>
     <th style="text-align:right;background:#E1F5EE;color:#0F6E56;width:100px">A elaborar</th>
     <th style="text-align:right;background:#FFF8EE;color:#854F0B;width:100px">Vendedores</th>
@@ -2382,34 +2356,26 @@ function renderResumen(){
     <th style="text-align:right;width:100px">Saldo</th>
   </tr></thead><tbody>`;
 
+  // Renderizar sin rowspan - mas simple y sin bugs de corrimiento
   Object.entries(byE).forEach(([eid,{nm,clr,areas}])=>{
     const bg=rgba(clr,.12);
-    // Contar total de filas de esta empresa
-    const totalFilas=Object.values(areas).reduce((a,b)=>a+b.length,0);
-    let empFirstRow=true;
     Object.entries(areas).forEach(([area,items])=>{
       items.forEach((item,ri)=>{
         const saldoCls=item.saldo>0?'saldo-pos':item.saldo<0?'saldo-neg':'saldo-zero';
-        h+=`<tr>`;
-        if(empFirstRow&&ri===0){
-          h+=`<td rowspan="${totalFilas}" style="vertical-align:top;padding-top:10px;border-right:3px solid ${clr}">
-            <span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span>
-          </td>`;
-        }
-        if(ri===0){
-          h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:8px">
-            <span class="area-tag" style="background:${rgba(clr,.1)};color:${clr}">${area}</span>
-          </td>`;
-        }
-        h+=`<td style="font-weight:500">${item.nombre}</td>`;
-        h+=`<td class="muted" style="text-align:center">${item.unidad}</td>`;
+        const isFirst=ri===0;
+        h+=`<tr style="border-top:${isFirst?'2px solid var(--border2)':''}">`;
+        // Empresa - mostrar solo en primera fila del area
+        h+=`<td style="font-size:12px">${isFirst?`<span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span>`:'&nbsp;'}</td>`;
+        // Area - mostrar solo en primera fila del area
+        h+=`<td>${isFirst?`<span class="area-tag" style="background:${rgba(clr,.1)};color:${clr}">${area}</span>`:'&nbsp;'}</td>`;
+        h+=`<td style="font-weight:500;padding-left:${isFirst?'8':'20'}px">${item.nombre}</td>`;
+        h+=`<td style="text-align:center;color:var(--text2);font-size:12px">${item.unidad}</td>`;
         h+=`<td style="text-align:right;background:#E6F1FB;font-weight:600;color:#0C447C">${item.stock>0?item.stock.toLocaleString('es-AR'):'--'}</td>`;
         h+=`<td style="text-align:right;background:#E1F5EE;font-weight:600;color:#0F6E56">${item.aElab>0?item.aElab.toLocaleString('es-AR'):'--'}</td>`;
         h+=`<td style="text-align:right;background:#FFF8EE;font-weight:600;color:#854F0B">${item.vend>0?item.vend.toLocaleString('es-AR'):'--'}</td>`;
         h+=`<td style="text-align:right;background:#FFF8EE;font-weight:600;color:#854F0B">${item.tyc>0?item.tyc.toLocaleString('es-AR'):'--'}</td>`;
         h+=`<td style="text-align:right;font-size:14px;font-weight:700" class="${saldoCls}">${item.saldo.toLocaleString('es-AR')}</td>`;
         h+=`</tr>`;
-        empFirstRow=false;
       });
     });
   });
