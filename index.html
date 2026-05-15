@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -156,15 +155,17 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 .desv-tbl tbody tr:last-child td{border-bottom:none}
 .desv-tbl tr:hover td{background:var(--bg2)}
 /* DASHBOARD */
-.dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:12px;margin-bottom:1rem}
-.dash-card{border-radius:var(--radius-lg);overflow:hidden;border:.5px solid var(--border)}
-.dash-card-header{background:var(--bg);padding:9px 12px;border-bottom:.5px solid var(--border)}
-.dash-card-title{font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dash-card-sub{font-size:11px;color:var(--text2);margin-top:1px}
+.dash-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:1rem}
+@media(max-width:1100px){.dash-grid{grid-template-columns:repeat(4,1fr)}}
+@media(max-width:700px){.dash-grid{grid-template-columns:repeat(2,1fr)}}
+.dash-card{border-radius:var(--radius);overflow:hidden;border:.5px solid var(--border)}
+.dash-card-header{background:var(--bg);padding:6px 8px;border-bottom:.5px solid var(--border)}
+.dash-card-title{font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dash-card-sub{font-size:9px;color:var(--text2);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dash-halves{display:grid;grid-template-columns:1fr 1fr}
-.dash-half{padding:14px 10px;text-align:center}
-.dash-half-label{font-size:10px;font-weight:500;margin-bottom:4px;white-space:nowrap}
-.dash-half-num{font-size:24px;font-weight:600;line-height:1}
+.dash-half{padding:8px 6px;text-align:center}
+.dash-half-label{font-size:9px;font-weight:500;margin-bottom:3px;white-space:nowrap}
+.dash-half-num{font-size:18px;font-weight:700;line-height:1}
 .dash-plan{background:#E6F1FB}
 .dash-plan .dash-half-label{color:#0C447C}
 .dash-plan .dash-half-num{color:#0C447C}
@@ -1514,25 +1515,23 @@ function renderDashPage(){
   const dname=dia>=0&&dia<=6?DAYS[dia]:'--';
   const k=document.getElementById('dash-wsel')?.value||st.w;
   document.getElementById('dash-ticker-txt').textContent=`${dname} — ${wlb(k)}`;
-  document.getElementById('dash-page-info').textContent=dashItems.length?`Pagina ${dashPage+1} de ${dashTotalPages} (${dashItems.length} productos con plan)`:'Sin productos con plan para este dia.';
-  const start=dashPage*DASH_PER_PAGE;
-  const page=dashItems.slice(start,start+DASH_PER_PAGE);
+  document.getElementById('dash-page-info').textContent=dashItems.length?`${dashItems.length} productos con plan`:'Sin productos con plan para este dia.';
   const grid=document.getElementById('dash-grid');
-  if(!page.length){grid.innerHTML='<div class="empty"><i class="ti ti-moon-off"></i>Sin productos planificados para este dia.</div>';return}
-  grid.innerHTML=page.map(item=>{
+  if(!dashItems.length){grid.innerHTML='<div class="empty"><i class="ti ti-moon-off"></i>Sin productos planificados para este dia.</div>';return}
+  // Mostrar TODOS sin paginacion
+  grid.innerHTML=dashItems.map(item=>{
     const pct=item.pv>0?Math.round(item.rv/item.pv*100):0;
     const hasReal=item.rv>0;
     const cls=!hasReal?'dash-empty':pct>=100?'dash-ok':pct>=90?'dash-warn':'dash-bad';
     const pctLabel=item.pv>0?(hasReal?pct+'%':'--'):'--';
-    const ec2=ec(item.empresa_id);
     return`<div class="dash-card">
       <div class="dash-card-header">
         <div class="dash-card-title">${item.produto}</div>
-        <div class="dash-card-sub">${en(item.empresa_id)||''} · ${item.area} · ${item.unidad}</div>
+        <div class="dash-card-sub">${en(item.empresa_id)||''} · ${item.area}</div>
       </div>
       <div class="dash-halves">
         <div class="dash-half dash-plan">
-          <div class="dash-half-label">Planificado</div>
+          <div class="dash-half-label">Plan</div>
           <div class="dash-half-num">${item.pv>0?item.pv.toLocaleString('es-AR'):'--'}</div>
         </div>
         <div class="dash-half ${cls}">
@@ -1553,13 +1552,10 @@ function startDashTimer(k,ef){
     if(el)el.textContent=dashCountdown+'s';
     if(dashCountdown<=0){
       dashCountdown=DASH_INTERVAL;
-      dashPage=(dashPage+1)%dashTotalPages;
-      // Si volvemos al principio, refrescamos datos
-      if(dashPage===0){
-        delete st.P[k]; delete st.R[k];
-        await lp(k); await lr(k);
-        buildDashItems(k,ef);
-      }
+      // Refrescar datos desde Supabase
+      delete st.P[k]; delete st.R[k];
+      await lp(k); await lr(k);
+      buildDashItems(k,ef);
       renderDashPage();
     }
   },1000);
