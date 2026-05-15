@@ -1,0 +1,26 @@
+{
+  "name": "PAPO - Plan de Produccion",
+  "short_name": "PAPO",
+  "description": "Control semanal de produccion, stock y proyeccion diaria",
+  "start_url": "/plan-de-produccion/",
+  "scope": "/plan-de-produccion/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1a1a6b",
+  "theme_color": "#1a1a1a",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"]
+}

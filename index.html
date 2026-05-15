@@ -1,10 +1,17 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>Plan de Produccion</title>
+<!-- PWA -->
+<link rel="manifest" href="manifest.json"/>
+<meta name="theme-color" content="#1a1a1a"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="PAPO"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<meta name="mobile-web-app-capable" content="yes"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
@@ -2416,6 +2423,15 @@ function imprimirResumen(){
 }
 
 init();
+
+// Registrar Service Worker para PWA
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('/plan-de-produccion/sw.js')
+      .then(()=>console.log('SW registrado'))
+      .catch(e=>console.log('SW error:',e));
+  });
+}
 </script>
 </body>
 </html>
