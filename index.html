@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -54,6 +55,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 .plan-grid th{padding:9px 10px;font-weight:500;font-size:12px;color:var(--text2);white-space:nowrap;border-bottom:.5px solid var(--border);background:var(--bg2);text-align:center}
 .plan-grid th.left{text-align:left}
 .plan-grid td{padding:7px 10px;border-bottom:.5px solid var(--border);vertical-align:middle;background:var(--bg)}
+.plan-grid td.prod-name{white-space:normal;word-break:break-word;min-width:120px;max-width:180px}
 .plan-grid tbody tr:last-child td{border-bottom:none}
 .plan-grid tbody tr:hover td{background:var(--bg2)}
 .plan-grid td.day-cell{text-align:center;padding:4px 6px}
@@ -669,7 +671,7 @@ function rG(){
         h+=`<tr class="${cls}">`;
         if(ef&&ri===0&&ai===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span></td>`;
         if(ri===0)h+=`<td rowspan="${aIt.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${ab(area,as)};color:${ac(area,as)}">${area}</span></td>`;
-        h+=`<td><input class="prod-input" value="${r.producto}" onchange="uf(${r._i},'producto',this.value)"/></td>`;
+        h+=`<td class="prod-name"><input class="prod-input" value="${r.producto}" onchange="uf(${r._i},'producto',this.value)"/></td>`;
         h+=`<td><input value="${r.unidad||''}" list="udl" onchange="uf(${r._i},'unidad',this.value)" style="width:100%;padding:3px 5px;font-size:12px;border:.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`;
         for(let di=0;di<7;di++){const v=(r.days&&r.days[di])||0;h+=`<td class="day-cell${di===t?' today-col':''}"><input class="day-input${v>0?' has-val':''}" type="number" min="0" value="${v||''}" placeholder="--" onchange="ud(${r._i},${di},this.value);this.classList.toggle('has-val',this.value!='')"/></td>`}
         h+=`<td class="total-cell">${fmt(rt)}</td><td style="text-align:center"><button class="btn btn-xs btn-danger" onclick="delRow(${r._i})"><i class="ti ti-trash"></i></button></td></tr>`;
@@ -1625,23 +1627,24 @@ async function renderHistStock(){
     if(!data.length){el.innerHTML='<div class="empty"><i class="ti ti-calendar-off"></i>Sin conteo para esta fecha.</div>';return}
     const byE={};data.forEach(d=>{if(!byE[d.empresa_id])byE[d.empresa_id]=[];byE[d.empresa_id].push(d)});
     let h=`<div class="stock-card"><table class="stock-tbl"><thead><tr>
-      <th>Empresa</th><th>Area</th><th>Producto</th><th>Unidad</th>
-      <th style="text-align:right;background:#E6F1FB;color:#0C447C">Stock contado</th>
+      <th style="text-align:left">Empresa / Area / Producto</th>
+      <th style="text-align:right;width:90px">Stock</th>
+      <th style="text-align:left;width:60px">Unidad</th>
     </tr></thead><tbody>`;
     Object.entries(byE).forEach(([eid,items])=>{
       const clr=ec(eid);const nm=en(eid)||'SE';const bg=rgba(clr,.12);
       const byArea={};items.forEach(d=>{if(!byArea[d.area])byArea[d.area]=[];byArea[d.area].push(d)});
-      let ef2=true;
       Object.entries(byArea).forEach(([area,aItems])=>{
-        aItems.forEach((d,ri)=>{
-          h+=`<tr>`;
-          if(ef2&&ri===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span></td>`;
-          if(ri===0)h+=`<td rowspan="${aItems.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${rgba(clr,.1)};color:${clr}">${area}</span></td>`;
-          h+=`<td style="font-weight:500">${d.producto}</td>`;
-          h+=`<td class="muted">${d.unidad}</td>`;
-          h+=`<td style="text-align:right;font-weight:700;font-size:14px;background:#E6F1FB;color:#0C447C">${d.stock>0?d.stock.toLocaleString('es-AR'):'--'}</td>`;
-          h+=`</tr>`;
-          ef2=false;
+        // Fila separadora empresa/area
+        h+=`<tr><td colspan="3" style="background:var(--bg2);padding:5px 10px;font-size:11px;font-weight:700;color:${clr};border-top:2px solid var(--border2)">
+          <span class="color-dot" style="background:${clr}"></span> ${nm} — ${area}
+        </td></tr>`;
+        aItems.forEach(d=>{
+          h+=`<tr>
+            <td style="font-weight:500;padding-left:16px">${d.producto}</td>
+            <td style="text-align:right;font-weight:700;font-size:15px;color:${d.stock>0?'var(--green)':'var(--text2)'}">${d.stock>0?d.stock.toLocaleString('es-AR'):'--'}</td>
+            <td style="font-size:12px;color:var(--text2)">${d.unidad}</td>
+          </tr>`;
         });
       });
     });
