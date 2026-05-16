@@ -217,7 +217,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v1.4</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v1.5</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2280,7 +2280,12 @@ function showProyTab(t){
     document.getElementById('proy-'+id).style.display=id===t?'block':'none';
     document.getElementById('ptab-'+id).classList.toggle('active',id===t);
   });
-  if(t==='resumen')renderResumen();
+  if(t==='resumen'){
+    const fecha=document.getElementById('proy-fecha').value;
+    const semKey=wk(new Date(fecha));
+    // Cargar plan y real antes de renderizar
+    Promise.all([lp(semKey),lr(semKey)]).then(()=>renderResumen());
+  }
 }
 
 async function initProy(){
@@ -2481,29 +2486,34 @@ function renderResumen(){
   const semKey=wk(new Date(fecha));
   const diIdx=(new Date(fecha+'T00:00:00').getDay()+6)%7;
   const plan=st.P[semKey]||[];
+  const real=st.R[semKey]||{};
   let prods=st.Pr;
   if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
   if(!prods.length){el.innerHTML='<div class="empty"><i class="ti ti-table-off"></i>Sin productos.</div>';return}
 
-  // Construir estructura de datos completa primero, luego renderizar
   const byE={};
   prods.forEach(p=>{
     const eid=p.empresa_id||'_';
     const a=st.A.find(x=>x.id===p.area_id);const area=a?a.nombre:'SA';
     const planRow=plan.find(r=>r.producto===p.nombre&&r.empresa_id===eid&&r.area===area);
     const aElab=(planRow&&planRow.days&&planRow.days[diIdx])||0;
+    // Buscar produccion real del dia
+    const oi=plan.findIndex(r=>r.producto===p.nombre&&r.empresa_id===eid&&r.area===area);
+    const rk=`${eid}||${area}||${p.nombre}`;
+    const realDia=(real[rk]&&real[rk][diIdx])||(real[oi]&&real[oi][diIdx])||0;
     const proy=getProyItem(eid,area,p.nombre);
     const stock=proy?proy.stock:0;
     const vend=proy?proy.vendedores:0;
     const tyc=proy?proy.tyc:0;
-    const saldo=stock+aElab-vend-tyc;
-    if(!stock&&!aElab&&!vend&&!tyc)return;
+    // Saldo usa real si está disponible, sino plan
+    const elaborado=realDia>0?realDia:aElab;
+    const saldo=stock+elaborado-vend-tyc;
+    if(!stock&&!aElab&&!realDia&&!vend&&!tyc)return;
     if(!byE[eid])byE[eid]={nm:en(eid)||'SE',clr:ec(eid),areas:{}};
     if(!byE[eid].areas[area])byE[eid].areas[area]=[];
-    byE[eid].areas[area].push({nombre:p.nombre,unidad:p.unidad,stock,aElab,vend,tyc,saldo});
+    byE[eid].areas[area].push({nombre:p.nombre,unidad:p.unidad,stock,aElab,realDia,vend,tyc,saldo});
   });
 
-  // Verificar si hay datos
   const totalItems=Object.values(byE).reduce((s,e)=>s+Object.values(e.areas).reduce((s2,a)=>s2+a.length,0),0);
   if(!totalItems){
     el.innerHTML='<div class="empty"><i class="ti ti-table-off"></i>Sin datos para mostrar. Carga el conteo y las ventas primero.</div>';
@@ -2515,15 +2525,15 @@ function renderResumen(){
     <th style="min-width:110px;text-align:left">Empresa</th>
     <th style="min-width:100px;text-align:left">Area</th>
     <th style="text-align:left">Producto</th>
-    <th style="width:70px;text-align:center">Unidad</th>
-    <th style="text-align:right;background:#E6F1FB;color:#0C447C;width:100px">Stock</th>
-    <th style="text-align:right;background:#E1F5EE;color:#0F6E56;width:100px">A elaborar</th>
-    <th style="text-align:right;background:#FFF8EE;color:#854F0B;width:100px">Vendedores</th>
-    <th style="text-align:right;background:#FFF8EE;color:#854F0B;width:90px">T&amp;C</th>
-    <th style="text-align:right;width:100px">Saldo</th>
+    <th style="width:65px;text-align:center">Unidad</th>
+    <th style="text-align:right;background:#E6F1FB;color:#0C447C;width:85px">Stock</th>
+    <th style="text-align:right;background:#E1F5EE;color:#0F6E56;width:85px">Plan</th>
+    <th style="text-align:right;background:#d4edda;color:#0a5c2e;width:85px">Real</th>
+    <th style="text-align:right;background:#FFF8EE;color:#854F0B;width:85px">Vendedores</th>
+    <th style="text-align:right;background:#FFF8EE;color:#854F0B;width:75px">T&amp;C</th>
+    <th style="text-align:right;width:90px">Saldo</th>
   </tr></thead><tbody>`;
 
-  // Renderizar sin rowspan - mas simple y sin bugs de corrimiento
   Object.entries(byE).forEach(([eid,{nm,clr,areas}])=>{
     const bg=rgba(clr,.12);
     Object.entries(areas).forEach(([area,items])=>{
@@ -2531,14 +2541,14 @@ function renderResumen(){
         const saldoCls=item.saldo>0?'saldo-pos':item.saldo<0?'saldo-neg':'saldo-zero';
         const isFirst=ri===0;
         h+=`<tr style="border-top:${isFirst?'2px solid var(--border2)':''}">`;
-        // Empresa - mostrar solo en primera fila del area
         h+=`<td style="font-size:12px">${isFirst?`<span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span>`:'&nbsp;'}</td>`;
-        // Area - mostrar solo en primera fila del area
         h+=`<td>${isFirst?`<span class="area-tag" style="background:${rgba(clr,.1)};color:${clr}">${area}</span>`:'&nbsp;'}</td>`;
         h+=`<td style="font-weight:500;padding-left:${isFirst?'8':'20'}px">${item.nombre}</td>`;
         h+=`<td style="text-align:center;color:var(--text2);font-size:12px">${item.unidad}</td>`;
         h+=`<td style="text-align:right;background:#E6F1FB;font-weight:600;color:#0C447C">${item.stock>0?item.stock.toLocaleString('es-AR'):'--'}</td>`;
         h+=`<td style="text-align:right;background:#E1F5EE;font-weight:600;color:#0F6E56">${item.aElab>0?item.aElab.toLocaleString('es-AR'):'--'}</td>`;
+        // Real: verde fuerte si cargado, gris si no
+        h+=`<td style="text-align:right;background:#d4edda;font-weight:700;color:${item.realDia>0?'#0a5c2e':'var(--text3)'}">${item.realDia>0?item.realDia.toLocaleString('es-AR'):'--'}</td>`;
         h+=`<td style="text-align:right;background:#FFF8EE;font-weight:600;color:#854F0B">${item.vend>0?item.vend.toLocaleString('es-AR'):'--'}</td>`;
         h+=`<td style="text-align:right;background:#FFF8EE;font-weight:600;color:#854F0B">${item.tyc>0?item.tyc.toLocaleString('es-AR'):'--'}</td>`;
         h+=`<td style="text-align:right;font-size:14px;font-weight:700" class="${saldoCls}">${item.saldo.toLocaleString('es-AR')}</td>`;
@@ -2550,13 +2560,13 @@ function renderResumen(){
   h+=`</tbody></table></div>`;
   h+=`<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:.75rem;font-size:12px;color:var(--text2)">
     <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#E6F1FB;border:1px solid #B5D4F4;display:inline-block;border-radius:2px"></span> Stock contado</span>
-    <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#E1F5EE;border:1px solid #9FE1CB;display:inline-block;border-radius:2px"></span> A elaborar (del plan)</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#E1F5EE;border:1px solid #9FE1CB;display:inline-block;border-radius:2px"></span> A elaborar (plan)</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#d4edda;border:1px solid #9FE1CB;display:inline-block;border-radius:2px"></span> Real producido</span>
     <span style="display:flex;align-items:center;gap:4px"><span style="width:12px;height:12px;background:#FFF8EE;border:1px solid #F9D89A;display:inline-block;border-radius:2px"></span> Ventas proyectadas</span>
-    <span style="color:var(--green);font-weight:600">Verde = saldo positivo</span>
-    <span style="color:var(--red);font-weight:600">Rojo = falta stock</span>
+    <span style="color:var(--text2);font-style:italic">Saldo = Stock + (Real si hay, sino Plan) - Vendedores - T&C</span>
   </div>`;
   el.innerHTML=h;
-  // Actualizar a_elaborar en Supabase en background
+  // Actualizar a_elaborar en background
   prods.forEach(async p=>{
     const a=st.A.find(x=>x.id===p.area_id);const area=a?a.nombre:'SA';
     const planRow=plan.find(r=>r.producto===p.nombre&&r.empresa_id===p.empresa_id&&r.area===area);
