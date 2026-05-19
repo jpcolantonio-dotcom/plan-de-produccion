@@ -217,7 +217,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v1.5</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v1.6</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -234,6 +234,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('proy')"><i class="ti ti-chart-dots"></i> Proyeccion</button>
   <button class="tab" onclick="T('rec')"><i class="ti ti-notebook"></i> Recetas</button>
   <button class="tab" onclick="T('con')"><i class="ti ti-package"></i> Consumo MP</button>
+  <button class="tab" onclick="T('hor')"><i class="ti ti-clock"></i> Horarios</button>
   <button class="tab" onclick="T('mae')"><i class="ti ti-building"></i> Maestro</button>
 </div>
 <div class="pad">
@@ -465,6 +466,34 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   </div>
 </div>
 
+<!-- HORARIOS -->
+<div id="tab-hor" class="section">
+  <div class="toolbar">
+    <div>
+      <div style="font-size:16px;font-weight:600">Horarios semanales</div>
+      <div style="font-size:13px;color:var(--text2)">Turnos de entrada y salida por empleado</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <div class="week-nav">
+        <button class="btn btn-sm" onclick="changeHorSemana(-1)"><i class="ti ti-chevron-left"></i></button>
+        <span id="hor-wlabel" style="font-size:14px;font-weight:500;min-width:220px;text-align:center"></span>
+        <button class="btn btn-sm" onclick="changeHorSemana(1)"><i class="ti ti-chevron-right"></i></button>
+      </div>
+      <button class="btn btn-primary" onclick="saveHorarios()"><i class="ti ti-device-floppy"></i> Guardar</button>
+    </div>
+  </div>
+  <!-- Agregar empleado -->
+  <div class="add-bar" style="margin-bottom:1rem">
+    <span style="font-size:13px;color:var(--text2)">Nuevo empleado:</span>
+    <input type="text" id="hor-nemp" placeholder="Nombre del empleado" style="width:220px"/>
+    <button class="btn btn-primary" onclick="addEmpleado()"><i class="ti ti-plus"></i> Agregar</button>
+  </div>
+  <!-- Tabla de horarios -->
+  <div class="grid-card"><div class="grid-scroll" id="hor-grid"></div></div>
+  <div id="hor-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Horarios guardados.</div>
+  <div id="hor-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="hor-errtxt"></span></div>
+</div>
+
 <!-- MAESTRO -->
 <div id="tab-mae" class="section">
   <div class="toolbar">
@@ -603,7 +632,7 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['plan','real','cmp','desv','dash','stock','proy','rec','con','mae'];
+const TABS=['plan','real','cmp','desv','dash','stock','proy','hor','rec','con','mae'];
 function T(t){
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',TABS[i]===t));
   document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));
@@ -614,6 +643,7 @@ function T(t){
   if(t==='dash'){pS('dash-wsel');initDash()}
   if(t==='stock')initStock();
   if(t==='proy')initProy();
+  if(t==='hor')initHorarios();
   if(t==='rec')rRec();
   if(t==='con'){pSC();renderCon()}
   if(t==='mae')rMae();
@@ -2590,6 +2620,190 @@ function imprimirResumen(){
   <script>window.onload=()=>{window.print()}<\/script></body></html>`;
   const w=window.open('','_blank');
   if(w){w.document.write(html);w.document.close();}
+}
+
+// ── HORARIOS ──────────────────────────────────────────────────────
+let horSemana=wk(new Date());
+let empleados=[];
+let horarios={};  // {empleado_id: {lunes_entrada, lunes_salida, ...}}
+
+// Generar opciones de horario: 03:00 a 23:30 cada 30 min
+const HOR_OPTS=(()=>{
+  const opts=[];
+  for(let h=3;h<24;h++){
+    opts.push(`${String(h).padStart(2,'0')}:00`);
+    opts.push(`${String(h).padStart(2,'0')}:30`);
+  }
+  opts.push('00:00','00:30','01:00','01:30','02:00','02:30');
+  return opts;
+})();
+
+// Calcular salida automática (entrada + 8 horas)
+function calcSalida(entrada){
+  if(!entrada)return '';
+  const[h,m]=entrada.split(':').map(Number);
+  const tot=(h*60+m+480)%1440;
+  return`${String(Math.floor(tot/60)).padStart(2,'0')}:${String(tot%60).padStart(2,'0')}`;
+}
+
+function horOptsSel(val){
+  return`<option value="">--</option>${HOR_OPTS.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}`;
+}
+
+async function initHorarios(){
+  horSemana=wk(new Date());
+  if(!empleados.length) await loadEmpleados();
+  await loadHorariosSemana(horSemana);
+  renderHorarios();
+}
+
+async function loadEmpleados(){
+  try{empleados=await get('empleados','activo=eq.true&order=nombre.asc');}
+  catch{empleados=[]}
+}
+
+async function loadHorariosSemana(sem){
+  horarios={};
+  try{
+    const data=await get('horarios',`semana=eq.${sem}`);
+    data.forEach(h=>{horarios[h.empleado_id]=h;});
+  }catch{}
+}
+
+function changeHorSemana(n){
+  horSemana=addW(horSemana,n);
+  loadHorariosSemana(horSemana).then(()=>renderHorarios());
+}
+
+const DIAS_HOR=['lunes','martes','miercoles','jueves','viernes','sabado','domingo'];
+const DIAS_HOR_LBL=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+
+function renderHorarios(){
+  document.getElementById('hor-wlabel').textContent=wlb(horSemana);
+  const wrap=document.getElementById('hor-grid');
+  if(!empleados.length){
+    wrap.innerHTML='<div class="empty"><i class="ti ti-users"></i>Agregá empleados para comenzar.</div>';
+    return;
+  }
+  let h=`<table class="plan-grid" style="min-width:1100px"><thead>
+    <tr>
+      <th class="left" style="width:160px">Empleado</th>`;
+  DIAS_HOR_LBL.forEach((d,i)=>{
+    const dd=ddate(horSemana,i);
+    h+=`<th colspan="2" style="text-align:center;font-size:11px">${d}<br><span style="font-weight:400;font-size:10px">${dd}</span></th>`;
+  });
+  h+=`<th style="width:34px"></th></tr>
+    <tr style="background:var(--bg2)">
+      <th></th>`;
+  DIAS_HOR_LBL.forEach(()=>{
+    h+=`<th style="font-size:10px;font-weight:400;color:var(--green);padding:3px;text-align:center">Entrada</th>
+        <th style="font-size:10px;font-weight:400;color:var(--red);padding:3px;text-align:center">Salida</th>`;
+  });
+  h+=`<th></th></tr></thead><tbody>`;
+
+  empleados.forEach(emp=>{
+    const hor=horarios[emp.id]||{};
+    h+=`<tr><td style="font-weight:500">${emp.nombre}</td>`;
+    DIAS_HOR.forEach((dia,di)=>{
+      const eVal=hor[`${dia}_entrada`]||'';
+      const sVal=hor[`${dia}_salida`]||'';
+      const onChangeEntrada=di===0
+        ?`onchange="onLunesEntrada('${emp.id}',this.value)"`
+        :`onchange="updHorario('${emp.id}','${dia}_entrada',this.value)"`;
+      h+=`<td class="day-cell" style="padding:3px">
+        <select class="day-input" style="width:70px;font-size:11px;padding:3px 2px" ${onChangeEntrada}>
+          ${horOptsSel(eVal)}
+        </select>
+      </td>
+      <td class="day-cell" style="padding:3px">
+        <select class="day-input" style="width:70px;font-size:11px;padding:3px 2px" onchange="updHorario('${emp.id}','${dia}_salida',this.value)">
+          ${horOptsSel(sVal)}
+        </select>
+      </td>`;
+    });
+    h+=`<td style="text-align:center">
+      <button class="btn btn-xs btn-danger" onclick="desactivarEmpleado('${emp.id}')" title="Desactivar"><i class="ti ti-user-off"></i></button>
+    </td></tr>`;
+  });
+  h+=`</tbody></table>`;
+  wrap.innerHTML=h;
+}
+
+function updHorario(eid,campo,val){
+  if(!horarios[eid])horarios[eid]={empleado_id:eid};
+  horarios[eid][campo]=val;
+}
+
+function onLunesEntrada(eid,val){
+  updHorario(eid,'lunes_entrada',val);
+  // Calcular salida del lunes
+  const sal=calcSalida(val);
+  updHorario(eid,'lunes_salida',sal);
+  // Copiar a todos los días menos domingo
+  DIAS_HOR.slice(0,6).forEach(dia=>{
+    updHorario(eid,`${dia}_entrada`,val);
+    updHorario(eid,`${dia}_salida`,sal);
+  });
+  // Domingo en blanco
+  updHorario(eid,'domingo_entrada','');
+  updHorario(eid,'domingo_salida','');
+  // Re-renderizar para reflejar cambios
+  renderHorarios();
+}
+
+async function addEmpleado(){
+  const nombre=document.getElementById('hor-nemp').value.trim();
+  if(!nombre)return;
+  ss('saving','Guardando...');
+  try{
+    const res=await ins('empleados',{nombre,activo:true});
+    empleados.push(res[0]);
+    document.getElementById('hor-nemp').value='';
+    renderHorarios();
+    ss('online','Empleado agregado');
+  }catch(e){ss('error','Error');document.getElementById('hor-errtxt').textContent=e.message;fl('hor-err')}
+}
+
+async function desactivarEmpleado(id){
+  if(!confirm('¿Desactivar este empleado?'))return;
+  try{
+    await fetch(`${SB}/rest/v1/empleados?id=eq.${id}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({activo:false})});
+    empleados=empleados.filter(e=>e.id!==id);
+    renderHorarios();
+    ss('online','Empleado desactivado');
+  }catch(e){alert('Error: '+e.message)}
+}
+
+async function saveHorarios(){
+  const btn=document.querySelector('#tab-hor .btn-primary');
+  if(btn){btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;}
+  ss('saving','Guardando horarios...');
+  try{
+    for(const emp of empleados){
+      const hor=horarios[emp.id]||{};
+      const row={
+        semana:horSemana,
+        empleado_id:emp.id,
+        updated_at:new Date().toISOString()
+      };
+      DIAS_HOR.forEach(dia=>{
+        row[`${dia}_entrada`]=hor[`${dia}_entrada`]||null;
+        row[`${dia}_salida`]=hor[`${dia}_salida`]||null;
+      });
+      // Upsert por semana+empleado
+      const existing=await get('horarios',`semana=eq.${horSemana}&empleado_id=eq.${emp.id}&select=id`).catch(()=>[]);
+      if(existing.length){
+        await fetch(`${SB}/rest/v1/horarios?id=eq.${existing[0].id}`,{
+          method:'PATCH',headers:{...H,'Prefer':'return=minimal'},
+          body:JSON.stringify(row)
+        });
+      } else {
+        await ins('horarios',row);
+      }
+    }
+    ss('online','Guardado');fl('hor-msg');
+  }catch(e){ss('error','Error');document.getElementById('hor-errtxt').textContent=e.message;fl('hor-err')}
+  if(btn){btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar';btn.disabled=false;}
 }
 
 init();
