@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -217,7 +218,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v1.6</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v1.7</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -479,13 +480,16 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <span id="hor-wlabel" style="font-size:14px;font-weight:500;min-width:220px;text-align:center"></span>
         <button class="btn btn-sm" onclick="changeHorSemana(1)"><i class="ti ti-chevron-right"></i></button>
       </div>
+      <select id="hor-esel" onchange="renderHorarios()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
+      <button class="btn btn-pdf" onclick="pdfHorarios()"><i class="ti ti-file-type-pdf"></i> PDF</button>
       <button class="btn btn-primary" onclick="saveHorarios()"><i class="ti ti-device-floppy"></i> Guardar</button>
     </div>
   </div>
   <!-- Agregar empleado -->
   <div class="add-bar" style="margin-bottom:1rem">
     <span style="font-size:13px;color:var(--text2)">Nuevo empleado:</span>
-    <input type="text" id="hor-nemp" placeholder="Nombre del empleado" style="width:220px"/>
+    <input type="text" id="hor-nemp" placeholder="Nombre del empleado" style="width:200px"/>
+    <select id="hor-nemp-emp" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Sin empresa</option></select>
     <button class="btn btn-primary" onclick="addEmpleado()"><i class="ti ti-plus"></i> Agregar</button>
   </div>
   <!-- Tabla de horarios -->
@@ -2653,6 +2657,13 @@ function horOptsSel(val){
 async function initHorarios(){
   horSemana=wk(new Date());
   if(!empleados.length) await loadEmpleados();
+  // Actualizar selectores de empresa
+  ['hor-esel','hor-nemp-emp'].forEach(id=>{
+    const se=document.getElementById(id);if(!se)return;
+    const isFilter=id==='hor-esel';
+    se.innerHTML=isFilter?'<option value="all">Todas las empresas</option>':'<option value="">Sin empresa</option>';
+    st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se.appendChild(o)});
+  });
   await loadHorariosSemana(horSemana);
   renderHorarios();
 }
@@ -2680,30 +2691,29 @@ const DIAS_HOR_LBL=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','
 
 function renderHorarios(){
   document.getElementById('hor-wlabel').textContent=wlb(horSemana);
+  const ef=document.getElementById('hor-esel')?.value||'all';
+  const emps=ef==='all'?empleados:empleados.filter(e=>e.empresa_id===ef);
   const wrap=document.getElementById('hor-grid');
-  if(!empleados.length){
+  if(!emps.length){
     wrap.innerHTML='<div class="empty"><i class="ti ti-users"></i>Agregá empleados para comenzar.</div>';
     return;
   }
   let h=`<table class="plan-grid" style="min-width:1100px"><thead>
-    <tr>
-      <th class="left" style="width:160px">Empleado</th>`;
+    <tr><th class="left" style="width:160px">Empleado</th>`;
   DIAS_HOR_LBL.forEach((d,i)=>{
-    const dd=ddate(horSemana,i);
-    h+=`<th colspan="2" style="text-align:center;font-size:11px">${d}<br><span style="font-weight:400;font-size:10px">${dd}</span></th>`;
+    h+=`<th colspan="2" style="text-align:center;font-size:11px">${d}<br><span style="font-weight:400;font-size:10px">${ddate(horSemana,i)}</span></th>`;
   });
   h+=`<th style="width:34px"></th></tr>
-    <tr style="background:var(--bg2)">
-      <th></th>`;
+    <tr style="background:var(--bg2)"><th></th>`;
   DIAS_HOR_LBL.forEach(()=>{
     h+=`<th style="font-size:10px;font-weight:400;color:var(--green);padding:3px;text-align:center">Entrada</th>
         <th style="font-size:10px;font-weight:400;color:var(--red);padding:3px;text-align:center">Salida</th>`;
   });
   h+=`<th></th></tr></thead><tbody>`;
-
-  empleados.forEach(emp=>{
+  emps.forEach(emp=>{
     const hor=horarios[emp.id]||{};
-    h+=`<tr><td style="font-weight:500">${emp.nombre}</td>`;
+    const empNm=emp.empresa_id?`<div style="font-size:10px;color:var(--text2)">${en(emp.empresa_id)||''}</div>`:'';
+    h+=`<tr><td style="font-weight:500">${emp.nombre}${empNm}</td>`;
     DIAS_HOR.forEach((dia,di)=>{
       const eVal=hor[`${dia}_entrada`]||'';
       const sVal=hor[`${dia}_salida`]||'';
@@ -2711,14 +2721,10 @@ function renderHorarios(){
         ?`onchange="onLunesEntrada('${emp.id}',this.value)"`
         :`onchange="updHorario('${emp.id}','${dia}_entrada',this.value)"`;
       h+=`<td class="day-cell" style="padding:3px">
-        <select class="day-input" style="width:70px;font-size:11px;padding:3px 2px" ${onChangeEntrada}>
-          ${horOptsSel(eVal)}
-        </select>
+        <select class="day-input" style="width:70px;font-size:11px;padding:3px 2px" ${onChangeEntrada}>${horOptsSel(eVal)}</select>
       </td>
       <td class="day-cell" style="padding:3px">
-        <select class="day-input" style="width:70px;font-size:11px;padding:3px 2px" onchange="updHorario('${emp.id}','${dia}_salida',this.value)">
-          ${horOptsSel(sVal)}
-        </select>
+        <select class="day-input" style="width:70px;font-size:11px;padding:3px 2px" onchange="updHorario('${emp.id}','${dia}_salida',this.value)">${horOptsSel(sVal)}</select>
       </td>`;
     });
     h+=`<td style="text-align:center">
@@ -2753,10 +2759,11 @@ function onLunesEntrada(eid,val){
 
 async function addEmpleado(){
   const nombre=document.getElementById('hor-nemp').value.trim();
+  const empresa_id=document.getElementById('hor-nemp-emp')?.value||null;
   if(!nombre)return;
   ss('saving','Guardando...');
   try{
-    const res=await ins('empleados',{nombre,activo:true});
+    const res=await ins('empleados',{nombre,empresa_id:empresa_id||null,activo:true});
     empleados.push(res[0]);
     document.getElementById('hor-nemp').value='';
     renderHorarios();
@@ -2805,6 +2812,49 @@ async function saveHorarios(){
   }catch(e){ss('error','Error');document.getElementById('hor-errtxt').textContent=e.message;fl('hor-err')}
   if(btn){btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar';btn.disabled=false;}
 }
+
+function pdfHorarios(){
+  const ef=document.getElementById('hor-esel')?.value||'all';
+  const emps=ef==='all'?empleados:empleados.filter(e=>e.empresa_id===ef);
+  if(!emps.length){alert('No hay empleados para imprimir.');return}
+  const semNum=horSemana.split('-')[1]||'';
+  const semLabel=wlb(horSemana);
+  const fecha=new Date().toLocaleDateString('es-AR');
+  let filas=emps.map(emp=>{
+    const hor=horarios[emp.id]||{};
+    const celdas=DIAS_HOR.map(dia=>{
+      const e=hor[`${dia}_entrada`]||'';
+      const s=hor[`${dia}_salida`]||'';
+      return`<td style="text-align:center;font-size:9pt">${e?`${e}<br>${s}`:'-'}</td>`;
+    }).join('');
+    const empNm=emp.empresa_id?` <span style="font-size:8pt;color:#888">(${en(emp.empresa_id)||''})</span>`:'';
+    return`<tr><td style="font-weight:500">${emp.nombre}${empNm}</td>${celdas}</tr>`;
+  }).join('');
+  const hdrs=DIAS_HOR_LBL.map((d,i)=>`<th>${d}<br><span style="font-weight:400;font-size:8pt">${ddate(horSemana,i)}</span></th>`).join('');
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Horarios Sem ${semNum}</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif;font-size:10pt;padding:10mm}
+  h2{font-size:14pt;margin-bottom:4px}
+  .sub{font-size:10pt;color:#666;margin-bottom:12px}
+  table{width:100%;border-collapse:collapse;font-size:9pt}
+  th{background:#1B3A6B;color:#fff;padding:6px 8px;text-align:center;border:1px solid #1B3A6B;line-height:1.4}
+  th:first-child{text-align:left}
+  td{padding:6px 8px;border:1px solid #d0d0d0;vertical-align:middle}
+  tr:nth-child(even) td{background:#f9f9f8}
+  @media print{@page{size:A4 landscape;margin:8mm}}</style>
+  </head><body>
+  <h2>Horarios — ${semLabel}</h2>
+  <div class="sub">Generado: ${fecha}</div>
+  <table><thead><tr><th style="width:150px;text-align:left">Empleado</th>${hdrs}</tr></thead>
+  <tbody>${filas}</tbody></table>
+  <script>window.onload=()=>{window.print()}<\/script>
+  </body></html>`;
+  const w=window.open('','_blank',`width=1050,height=750`);
+  if(w){w.document.write(html);w.document.close();}
+  else alert('Permití ventanas emergentes.');
+}
+
 
 init();
 
