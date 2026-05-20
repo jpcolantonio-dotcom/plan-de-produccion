@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -218,7 +217,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v1.7</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v1.8</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2677,7 +2676,13 @@ async function loadHorariosSemana(sem){
   horarios={};
   try{
     const data=await get('horarios',`semana=eq.${sem}`);
-    data.forEach(h=>{horarios[h.empleado_id]=h;});
+    data.forEach(h=>{
+      horarios[h.empleado_id]=h;
+      // Cargar novedades
+      DIAS_HOR.forEach(dia=>{
+        if(h[`${dia}_novedad`])horarios[h.empleado_id][`${dia}_novedad`]=h[`${dia}_novedad`];
+      });
+    });
   }catch{}
 }
 
@@ -2720,11 +2725,22 @@ function renderHorarios(){
       const onChangeEntrada=di===0
         ?`onchange="onLunesEntrada('${emp.id}',this.value)"`
         :`onchange="updHorario('${emp.id}','${dia}_entrada',this.value)"`;
-      h+=`<td class="day-cell" style="padding:3px">
-        <select class="day-input" style="width:70px;font-size:11px;padding:3px 2px" ${onChangeEntrada}>${horOptsSel(eVal)}</select>
+      const novVal=hor[`${dia}_novedad`]||'';
+      const showHor=!novVal;
+      h+=`<td class="day-cell" style="padding:2px;vertical-align:middle">
+        ${showHor?`<select class="day-input" style="width:70px;font-size:11px;padding:2px" ${onChangeEntrada}>${horOptsSel(eVal)}</select>`
+          :`<div style="font-size:10px;font-weight:600;color:var(--blue);text-align:center;padding:4px">${novVal}</div>`}
       </td>
-      <td class="day-cell" style="padding:3px">
-        <select class="day-input" style="width:70px;font-size:11px;padding:3px 2px" onchange="updHorario('${emp.id}','${dia}_salida',this.value)">${horOptsSel(sVal)}</select>
+      <td class="day-cell" style="padding:2px;vertical-align:middle">
+        ${showHor?`<select class="day-input" style="width:70px;font-size:11px;padding:2px" onchange="updHorario('${emp.id}','${dia}_salida',this.value)">${horOptsSel(sVal)}</select>`:''}
+        <div style="margin-top:2px">
+          <select class="day-input" style="width:70px;font-size:9px;padding:1px;color:var(--text2)" onchange="updNovedad('${emp.id}','${dia}',this.value)">
+            <option value="">--</option>
+            <option value="Lic. Vacaciones"${novVal==='Lic. Vacaciones'?' selected':''}>Vacaciones</option>
+            <option value="Lic. Medica"${novVal==='Lic. Medica'?' selected':''}>Lic. Medica</option>
+            <option value="Libre"${novVal==='Libre'?' selected':''}>Libre</option>
+          </select>
+        </div>
       </td>`;
     });
     h+=`<td style="text-align:center">
@@ -2733,6 +2749,17 @@ function renderHorarios(){
   });
   h+=`</tbody></table>`;
   wrap.innerHTML=h;
+}
+
+function updNovedad(eid,dia,val){
+  if(!horarios[eid])horarios[eid]={empleado_id:eid};
+  horarios[eid][`${dia}_novedad`]=val;
+  // Si se elige novedad, limpiar horarios del dia
+  if(val){
+    horarios[eid][`${dia}_entrada`]='';
+    horarios[eid][`${dia}_salida`]='';
+  }
+  renderHorarios();
 }
 
 function updHorario(eid,campo,val){
@@ -2794,8 +2821,9 @@ async function saveHorarios(){
         updated_at:new Date().toISOString()
       };
       DIAS_HOR.forEach(dia=>{
-        row[`${dia}_entrada`]=hor[`${dia}_entrada`]||null;
-        row[`${dia}_salida`]=hor[`${dia}_salida`]||null;
+        row[`${dia}_entrada`]=hor[`${dia}_novedad`]?null:(hor[`${dia}_entrada`]||null);
+        row[`${dia}_salida`]=hor[`${dia}_novedad`]?null:(hor[`${dia}_salida`]||null);
+        row[`${dia}_novedad`]=hor[`${dia}_novedad`]||null;
       });
       // Upsert por semana+empleado
       const existing=await get('horarios',`semana=eq.${horSemana}&empleado_id=eq.${emp.id}&select=id`).catch(()=>[]);
@@ -2825,6 +2853,8 @@ function pdfHorarios(){
     const celdas=DIAS_HOR.map(dia=>{
       const e=hor[`${dia}_entrada`]||'';
       const s=hor[`${dia}_salida`]||'';
+      const nov=hor[`${dia}_novedad`]||'';
+      if(nov) return`<td style="text-align:center;font-size:9pt;font-weight:600;color:#1B3A6B">${nov}</td>`;
       return`<td style="text-align:center;font-size:9pt">${e?`${e}<br>${s}`:'-'}</td>`;
     }).join('');
     const empNm=emp.empresa_id?` <span style="font-size:8pt;color:#888">(${en(emp.empresa_id)||''})</span>`:'';
