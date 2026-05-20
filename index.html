@@ -156,7 +156,8 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 .desv-tbl tbody tr:last-child td{border-bottom:none}
 .desv-tbl tr:hover td{background:var(--bg2)}
 /* DASHBOARD */
-.dash-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:1rem}
+.dash-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:1rem;transition:opacity .35s,transform .35s}
+.dash-area-header{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:6px 4px 2px}
 @media(max-width:1100px){.dash-grid{grid-template-columns:repeat(4,1fr)}}
 @media(max-width:700px){.dash-grid{grid-template-columns:repeat(2,1fr)}}
 .dash-card{border-radius:var(--radius);overflow:hidden;border:.5px solid var(--border)}
@@ -217,7 +218,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v1.8</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v2.3</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -369,12 +370,18 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <select id="dash-esel" onchange="initDash()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
     </div>
   </div>
-  <div class="dash-ticker">
-    <span class="dash-ticker-dot"></span>
-    <span id="dash-ticker-txt">Actualizando...</span>
-    <span id="dash-countdown" style="font-weight:500;color:var(--text);min-width:28px;text-align:right"></span>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <button class="btn btn-sm" onclick="navDash(-1)" id="dash-prev"><i class="ti ti-chevron-left"></i></button>
+      <button class="btn btn-sm" onclick="navDash(1)" id="dash-next"><i class="ti ti-chevron-right"></i></button>
+      <span id="dash-page-info" style="font-size:12px;color:var(--text2)"></span>
+    </div>
+    <div class="dash-ticker">
+      <span class="dash-ticker-dot"></span>
+      <span id="dash-ticker-txt">Actualizando...</span>
+      <span id="dash-countdown" style="font-weight:500;color:var(--text);min-width:28px;text-align:right"></span>
+    </div>
   </div>
-  <div id="dash-page-info" style="font-size:12px;color:var(--text2);margin-bottom:8px;text-align:center"></div>
   <div id="dash-grid" class="dash-grid"></div>
   <div style="display:flex;gap:16px;margin-top:.75rem;flex-wrap:wrap">
     <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:#1D9E75;display:inline-block"></span> 100% o mas</div>
@@ -1521,13 +1528,18 @@ async function delCausa(id){
 }
 
 // ── DASHBOARD ────────────────────────────────────────────────────
-const DASH_PER_PAGE=6;
+function navDash(dir){
+  dashPage=(dashPage+dir+dashTotalPages)%dashTotalPages;
+  renderDashPage(true);
+}
+
+const DASH_PER_PAGE=12;
 const DASH_INTERVAL=45;
-let dashTimer=null,dashCountdown=0,dashPage=0,dashItems=[],dashTotalPages=0;
+let dashTimer=null,dashCountdown=0,dashPage=0,dashItems=[],dashPages=[],dashTotalPages=0;
 
 function getDashDia(){
   const sel=document.getElementById('dash-dsel');
-  if(!sel||sel.value==='')return tc(st.w);  // dia de hoy
+  if(!sel||sel.value==='')return tc(st.w);
   return parseInt(sel.value);
 }
 
@@ -1535,12 +1547,11 @@ async function initDash(){
   clearDashTimer();
   const k=document.getElementById('dash-wsel')?.value||st.w;
   const ef=document.getElementById('dash-esel')?.value||'all';
-  // Forzar recarga
   delete st.P[k]; delete st.R[k];
   await lp(k); await lr(k);
   buildDashItems(k,ef);
   dashPage=0;
-  renderDashPage();
+  renderDashPage(false);
   startDashTimer(k,ef);
 }
 
@@ -1548,51 +1559,94 @@ function buildDashItems(k,ef){
   const plan=st.P[k]||[];
   const real=st.R[k]||{};
   const dia=getDashDia();
-  const items=[];
+  const byArea={};
   let filtered=ef==='all'?plan:plan.filter(r=>r.empresa_id===ef);
   filtered.forEach(r=>{
-    const oi=(st.P[k]||[]).findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
     const rk=rKey(r);
+    const oi=(st.P[k]||[]).findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
     const pv=(r.days&&r.days[dia])||0;
     const rv=(real[rk]||real[oi]||[])[dia]||0;
-    if(pv>0) items.push({produto:r.producto,area:r.area,unidad:r.unidad,empresa_id:r.empresa_id,pv,rv});
+    if(pv>0){
+      if(!byArea[r.area])byArea[r.area]={empresa_id:r.empresa_id,items:[]};
+      byArea[r.area].items.push({produto:r.producto,area:r.area,unidad:r.unidad,empresa_id:r.empresa_id,pv,rv});
+    }
   });
-  dashItems=items;
-  dashTotalPages=Math.ceil(items.length/DASH_PER_PAGE)||1;
+  // Construir páginas: 3 áreas por página, hasta 6 productos por área
+  const areaList=Object.entries(byArea);
+  dashPages=[];
+  for(let i=0;i<areaList.length;i+=3){
+    const grupo=areaList.slice(i,i+3).map(([area,{empresa_id,items}])=>({area,empresa_id,items:items.slice(0,6)}));
+    dashPages.push(grupo);
+  }
+  dashItems=filtered;
+  dashTotalPages=dashPages.length||1;
 }
 
-function renderDashPage(){
+function renderDashPage(animate=true){
   const dia=getDashDia();
   const dname=dia>=0&&dia<=6?DAYS[dia]:'--';
   const k=document.getElementById('dash-wsel')?.value||st.w;
   document.getElementById('dash-ticker-txt').textContent=`${dname} — ${wlb(k)}`;
-  document.getElementById('dash-page-info').textContent=dashItems.length?`${dashItems.length} productos con plan`:'Sin productos con plan para este dia.';
-  const grid=document.getElementById('dash-grid');
-  if(!dashItems.length){grid.innerHTML='<div class="empty"><i class="ti ti-moon-off"></i>Sin productos planificados para este dia.</div>';return}
-  // Mostrar TODOS sin paginacion
-  grid.innerHTML=dashItems.map(item=>{
-    const pct=item.pv>0?Math.round(item.rv/item.pv*100):0;
-    const hasReal=item.rv>0;
-    const cls=!hasReal?'dash-empty':pct>=100?'dash-ok':pct>=90?'dash-warn':'dash-bad';
-    const pctLabel=item.pv>0?(hasReal?pct+'%':'--'):'--';
-    return`<div class="dash-card">
-      <div class="dash-card-header">
-        <div class="dash-card-title">${item.produto}</div>
-        <div class="dash-card-sub">${en(item.empresa_id)||''} · ${item.area}</div>
-      </div>
-      <div class="dash-halves">
-        <div class="dash-half dash-plan">
-          <div class="dash-half-label">Plan</div>
-          <div class="dash-half-num">${item.pv>0?item.pv.toLocaleString('es-AR'):'--'}</div>
-        </div>
-        <div class="dash-half ${cls}">
-          <div class="dash-half-label">Real · ${pctLabel}</div>
-          <div class="dash-half-num">${hasReal?item.rv.toLocaleString('es-AR'):'--'}</div>
-        </div>
-      </div>
-      ${item.pv>0&&hasReal?`<div class="dash-progress"><div class="dash-progress-bar" style="width:${Math.min(pct,100)}%;background:${pct>=100?'#1D9E75':pct>=90?'#EF9F27':'#E24B4A'}"></div></div>`:''}
+  if(!dashPages||!dashPages.length){
+    document.getElementById('dash-page-info').textContent='Sin productos con plan para este dia.';
+    document.getElementById('dash-grid').innerHTML='<div class="empty"><i class="ti ti-moon-off"></i>Sin productos planificados para este dia.</div>';
+    return;
+  }
+  const grupo=dashPages[dashPage]||dashPages[0];
+  const areaNames=grupo.map(g=>g.area).join(' · ');
+  document.getElementById('dash-page-info').textContent=
+    `${areaNames} — Pagina ${dashPage+1} de ${dashTotalPages}`;
+  const prev=document.getElementById('dash-prev');
+  const next=document.getElementById('dash-next');
+  if(prev)prev.disabled=dashTotalPages<=1;
+  if(next)next.disabled=dashTotalPages<=1;
+
+  let html='';
+  grupo.forEach(({area,empresa_id,items})=>{
+    const clr=ec(empresa_id)||'var(--blue)';
+    html+=`<div class="dash-area-header" style="margin-bottom:4px">
+      <span style="width:10px;height:10px;border-radius:50%;background:${clr};display:inline-block;flex-shrink:0"></span>
+      <span style="font-size:12px;font-weight:700;color:${clr};text-transform:uppercase;letter-spacing:.5px">${area}</span>
+      <div style="flex:1;height:1px;background:${clr}33"></div>
+      <span style="font-size:10px;color:var(--text2)">${en(empresa_id)||''}</span>
     </div>`;
-  }).join('');
+    items.forEach(item=>{
+      const pct=item.pv>0?Math.round(item.rv/item.pv*100):0;
+      const hasReal=item.rv>0;
+      const cls=!hasReal?'dash-empty':pct>=100?'dash-ok':pct>=90?'dash-warn':'dash-bad';
+      const pctLabel=item.pv>0?(hasReal?pct+'%':'--'):'--';
+      html+=`<div class="dash-card">
+        <div class="dash-card-header">
+          <div class="dash-card-title">${item.produto}</div>
+          <div class="dash-card-sub">${item.unidad}</div>
+        </div>
+        <div class="dash-halves">
+          <div class="dash-half dash-plan">
+            <div class="dash-half-label">Plan</div>
+            <div class="dash-half-num">${item.pv>0?item.pv.toLocaleString('es-AR'):'--'}</div>
+          </div>
+          <div class="dash-half ${cls}">
+            <div class="dash-half-label">Real · ${pctLabel}</div>
+            <div class="dash-half-num">${hasReal?item.rv.toLocaleString('es-AR'):'--'}</div>
+          </div>
+        </div>
+        ${item.pv>0&&hasReal?`<div class="dash-progress"><div class="dash-progress-bar" style="width:${Math.min(pct,100)}%;background:${pct>=100?'#1D9E75':pct>=90?'#EF9F27':'#E24B4A'}"></div></div>`:''}
+      </div>`;
+    });
+  });
+
+  const grid=document.getElementById('dash-grid');
+  if(animate){
+    grid.style.opacity='0';grid.style.transform='translateX(40px)';
+    setTimeout(()=>{
+      grid.innerHTML=html;
+      grid.style.transform='translateX(-40px)';
+      setTimeout(()=>{grid.style.opacity='1';grid.style.transform='translateX(0)';},30);
+    },280);
+  } else {
+    grid.innerHTML=html;
+    grid.style.opacity='1';grid.style.transform='';
+  }
 }
 
 function startDashTimer(k,ef){
@@ -1603,11 +1657,13 @@ function startDashTimer(k,ef){
     if(el)el.textContent=dashCountdown+'s';
     if(dashCountdown<=0){
       dashCountdown=DASH_INTERVAL;
-      // Refrescar datos desde Supabase
-      delete st.P[k]; delete st.R[k];
-      await lp(k); await lr(k);
-      buildDashItems(k,ef);
-      renderDashPage();
+      dashPage=(dashPage+1)%dashTotalPages;
+      if(dashPage===0){
+        delete st.P[k]; delete st.R[k];
+        await lp(k); await lr(k);
+        buildDashItems(k,ef);
+      }
+      renderDashPage(true);
     }
   },1000);
 }
@@ -2715,38 +2771,55 @@ function renderHorarios(){
         <th style="font-size:10px;font-weight:400;color:var(--red);padding:3px;text-align:center">Salida</th>`;
   });
   h+=`<th></th></tr></thead><tbody>`;
-  emps.forEach(emp=>{
+  // Agrupar por empresa
+  const byEmp={};
+  emps.forEach(emp=>{const eid=emp.empresa_id||'_';if(!byEmp[eid])byEmp[eid]=[];byEmp[eid].push(emp)});
+  Object.entries(byEmp).forEach(([eid,eEmps])=>{
+    const clr=eid!=='_'?ec(eid):'var(--text2)';
+    const nm=eid!=='_'?en(eid)||'Sin empresa':'Sin empresa';
+    h+=`<tr><td colspan="${2*7+2}" style="background:${eid!=='_'?`${clr}18`:'var(--bg2)'};padding:6px 12px;font-size:12px;font-weight:700;color:${clr};border-top:2px solid ${clr}">${nm}</td></tr>`;
+  eEmps.forEach(emp=>{
     const hor=horarios[emp.id]||{};
-    const empNm=emp.empresa_id?`<div style="font-size:10px;color:var(--text2)">${en(emp.empresa_id)||''}</div>`:'';
-    h+=`<tr><td style="font-weight:500">${emp.nombre}${empNm}</td>`;
+    h+=`<tr><td style="font-weight:500;white-space:nowrap">${emp.nombre}</td>`;
     DIAS_HOR.forEach((dia,di)=>{
       const eVal=hor[`${dia}_entrada`]||'';
       const sVal=hor[`${dia}_salida`]||'';
       const onChangeEntrada=di===0
         ?`onchange="onLunesEntrada('${emp.id}',this.value)"`
-        :`onchange="updHorario('${emp.id}','${dia}_entrada',this.value)"`;
+        :`onchange="updEntrada('${emp.id}','${dia}',this.value)"`;
       const novVal=hor[`${dia}_novedad`]||'';
-      const showHor=!novVal;
-      h+=`<td class="day-cell" style="padding:2px;vertical-align:middle">
-        ${showHor?`<select class="day-input" style="width:70px;font-size:11px;padding:2px" ${onChangeEntrada}>${horOptsSel(eVal)}</select>`
-          :`<div style="font-size:10px;font-weight:600;color:var(--blue);text-align:center;padding:4px">${novVal}</div>`}
-      </td>
-      <td class="day-cell" style="padding:2px;vertical-align:middle">
-        ${showHor?`<select class="day-input" style="width:70px;font-size:11px;padding:2px" onchange="updHorario('${emp.id}','${dia}_salida',this.value)">${horOptsSel(sVal)}</select>`:''}
-        <div style="margin-top:2px">
-          <select class="day-input" style="width:70px;font-size:9px;padding:1px;color:var(--text2)" onchange="updNovedad('${emp.id}','${dia}',this.value)">
-            <option value="">--</option>
+      if(novVal){
+        h+=`<td colspan="2" class="day-cell" style="padding:4px;vertical-align:middle;text-align:center">
+          <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:3px">${novVal}</div>
+          <select class="day-input" style="width:100%;font-size:9px;padding:1px;color:var(--text2)" onchange="updNovedad('${emp.id}','${dia}',this.value)">
+            <option value="">-- quitar --</option>
             <option value="Lic. Vacaciones"${novVal==='Lic. Vacaciones'?' selected':''}>Vacaciones</option>
             <option value="Lic. Medica"${novVal==='Lic. Medica'?' selected':''}>Lic. Medica</option>
             <option value="Libre"${novVal==='Libre'?' selected':''}>Libre</option>
           </select>
-        </div>
-      </td>`;
+        </td>`;
+      } else {
+        h+=`<td class="day-cell" style="padding:2px;vertical-align:top">
+          <select class="day-input" style="width:70px;font-size:11px;padding:2px" ${onChangeEntrada}>${horOptsSel(eVal)}</select>
+        </td>
+        <td class="day-cell" style="padding:2px;vertical-align:top">
+          <select class="day-input" style="width:70px;font-size:11px;padding:2px" data-sal="${emp.id}-${dia}" onchange="updHorario('${emp.id}','${dia}_salida',this.value)">${horOptsSel(sVal)}</select>
+          <div style="margin-top:2px">
+            <select class="day-input" style="width:70px;font-size:9px;padding:1px;color:var(--text2)" onchange="updNovedad('${emp.id}','${dia}',this.value)">
+              <option value="">novedad</option>
+              <option value="Lic. Vacaciones">Vacaciones</option>
+              <option value="Lic. Medica">Lic. Medica</option>
+              <option value="Libre">Libre</option>
+            </select>
+          </div>
+        </td>`;
+      }
     });
     h+=`<td style="text-align:center">
       <button class="btn btn-xs btn-danger" onclick="desactivarEmpleado('${emp.id}')" title="Desactivar"><i class="ti ti-user-off"></i></button>
     </td></tr>`;
   });
+  }); // fin byEmp
   h+=`</tbody></table>`;
   wrap.innerHTML=h;
 }
@@ -2758,6 +2831,18 @@ function updNovedad(eid,dia,val){
   if(val){
     horarios[eid][`${dia}_entrada`]='';
     horarios[eid][`${dia}_salida`]='';
+  }
+  renderHorarios();
+}
+
+function updEntrada(eid,dia,val){
+  updHorario(eid,`${dia}_entrada`,val);
+  if(val){
+    const sal=calcSalida(val);
+    updHorario(eid,`${dia}_salida`,sal);
+    // Actualizar el select de salida en el DOM si existe
+    const rows=document.querySelectorAll(`[data-sal="${eid}-${dia}"]`);
+    rows.forEach(sel=>sel.value=sal);
   }
   renderHorarios();
 }
