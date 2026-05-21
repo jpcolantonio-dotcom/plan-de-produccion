@@ -218,7 +218,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v2.9</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v3.0</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -457,6 +457,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab" id="stab-seg" onclick="showStockSubTab('seg')"><i class="ti ti-shield-check"></i> Stock seguridad</button>
     <button class="proy-tab" id="stab-mix" onclick="showStockSubTab('mix')"><i class="ti ti-chart-pie"></i> Mix ventas</button>
     <button class="proy-tab" id="stab-cajas" onclick="showStockSubTab('cajas')"><i class="ti ti-box"></i> Cajas</button>
+    <button class="proy-tab" id="stab-cam" onclick="showStockSubTab('cam')"><i class="ti ti-temperature-snow"></i> Camaras</button>
   </div>
   <!-- HISTORIAL -->
   <div id="stock-sub-hist">
@@ -1808,7 +1809,220 @@ function showStockTab(t){
   if(t==='init')renderStockInit();
 }
 
-// ── MIX VENTAS ────────────────────────────────────────────────────
+// ── CAMARAS DE FRIO ───────────────────────────────────────────────
+let camarasData=[], sectoresData=[], camProdData=[];
+
+async function initCamaras(){
+  // Poblar selector empresa
+  const se=document.getElementById('cam-esel');
+  if(se.options.length<=1){
+    se.innerHTML='<option value="">Empresa...</option>';
+    st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se.appendChild(o)});
+    if(st.E.length===1)se.value=st.E[0].id;
+  }
+  await loadCamaras();
+  renderCamaras();
+}
+
+async function loadCamaras(){
+  const eid=document.getElementById('cam-esel').value;
+  try{
+    let f=eid?`empresa_id=eq.${eid}`:'';
+    camarasData=await get('camaras',f?f+'&order=nombre.asc':'order=nombre.asc');
+    if(camarasData.length){
+      const ids=camarasData.map(c=>c.id);
+      sectoresData=await get('camara_sectores',`camara_id=in.(${ids.join(',')})&order=nombre.asc`);
+      const secIds=sectoresData.map(s=>s.id);
+      camProdData=secIds.length?await get('camara_productos',`sector_id=in.(${secIds.join(',')})&order=area.asc,producto.asc`):[];
+    } else {
+      sectoresData=[];camProdData=[];
+    }
+  }catch(e){console.error(e);camarasData=[];sectoresData=[];camProdData=[];}
+}
+
+function renderCamaras(){
+  const el=document.getElementById('cam-content');
+  const eid=document.getElementById('cam-esel').value;
+  if(!eid){el.innerHTML='<div class="empty"><i class="ti ti-building"></i>Seleccioná una empresa.</div>';return}
+  if(!camarasData.length){el.innerHTML='<div class="empty"><i class="ti ti-temperature-snow"></i>Sin camaras. Agregá una arriba.</div>';return}
+
+  let h='';
+  camarasData.forEach(cam=>{
+    const secs=sectoresData.filter(s=>s.camara_id===cam.id);
+    h+=`<div class="stock-card" style="margin-bottom:1.5rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:.5px solid var(--border);background:var(--bg2)">
+        <div style="font-size:15px;font-weight:700"><i class="ti ti-temperature-snow" style="color:var(--blue)"></i> Camara ${cam.nombre}</div>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="sec-nueva-${cam.id}" placeholder="Nuevo sector (ej: Torres)" style="width:160px;padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+          <button class="btn btn-sm" onclick="addSector('${cam.id}')"><i class="ti ti-plus"></i> Sector</button>
+          <button class="btn btn-xs btn-danger" onclick="deleteCamara('${cam.id}','${cam.nombre}')"><i class="ti ti-trash"></i></button>
+        </div>
+      </div>`;
+
+    if(!secs.length){
+      h+=`<div style="padding:12px;font-size:13px;color:var(--text2)">Agregá un sector para esta camara.</div>`;
+    } else {
+      secs.forEach(sec=>{
+        const prods=camProdData.filter(p=>p.sector_id===sec.id);
+        // Calcular distribución según mix
+        const totalCajas=prods.reduce((s,p)=>s+p.max_cajas,0);
+        h+=`<div style="padding:10px 14px;border-bottom:.5px solid var(--border)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <div style="font-weight:600;font-size:13px"><i class="ti ti-layout-rows" style="color:var(--amber)"></i> Sector ${sec.nombre}</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <span style="font-size:12px;color:var(--text2)">Total: <b>${totalCajas.toLocaleString('es-AR')} cajas</b></span>
+              <button class="btn btn-xs" onclick="showAddProdCamara('${cam.id}','${sec.id}','${eid}')"><i class="ti ti-plus"></i> Producto</button>
+              <button class="btn btn-xs btn-danger" onclick="deleteSector('${sec.id}','${sec.nombre}')"><i class="ti ti-trash"></i></button>
+            </div>
+          </div>`;
+        if(!prods.length){
+          h+=`<div style="font-size:12px;color:var(--text2);padding:4px 0">Sin productos. Agregá productos a este sector.</div>`;
+        } else {
+          h+=`<table class="stock-tbl"><thead><tr>
+            <th style="text-align:left">Area</th><th style="text-align:left">Producto</th>
+            <th style="text-align:right;width:100px">Cajas max</th>
+            <th style="text-align:right;width:110px">% Mix</th>
+            <th style="text-align:right;width:110px">Cajas mix</th>
+            <th style="width:34px"></th>
+          </tr></thead><tbody>`;
+          prods.forEach(p=>{
+            const mix=mixData.find(m=>m.empresa_id===p.empresa_id&&m.area===p.area&&m.producto===p.producto);
+            const caja=cajasData.find(c=>c.empresa_id===p.empresa_id&&c.area===p.area&&c.producto===p.producto);
+            const pct=mix?mix.porcentaje:0;
+            const ujc=caja?caja.unidades_por_caja:1;
+            const cajasCalc=pct>0&&p.max_cajas>0?Math.floor(p.max_cajas*(pct/100)):0;
+            h+=`<tr>
+              <td style="font-size:12px;color:var(--text2)">${p.area}</td>
+              <td style="font-weight:500">${p.producto}</td>
+              <td style="text-align:right">
+                <input class="stock-input" type="number" min="0" id="cp-${p.id}" value="${p.max_cajas||''}" placeholder="0" style="width:80px" onchange="updCamProd('${p.id}',this.value)"/>
+              </td>
+              <td style="text-align:right;color:${pct>0?'var(--text)':'var(--text3)'}">
+                ${pct>0?pct.toFixed(1)+'%':'<span style="font-size:11px">Sin mix</span>'}
+              </td>
+              <td style="text-align:right;font-weight:700;color:${cajasCalc>0?'var(--green)':'var(--text3)'}">
+                ${cajasCalc>0?cajasCalc.toLocaleString('es-AR')+'<span style="font-size:10px;font-weight:400;color:var(--text2)"> cajas</span>':'--'}
+              </td>
+              <td><button class="btn btn-xs btn-danger" onclick="deleteCamProd('${p.id}')"><i class="ti ti-x"></i></button></td>
+            </tr>`;
+          });
+          h+=`</tbody></table>`;
+        }
+        h+=`</div>`;
+      });
+    }
+    h+=`</div>`;
+  });
+  el.innerHTML=h;
+}
+
+async function addCamara(){
+  const eid=document.getElementById('cam-esel').value;
+  const nombre=document.getElementById('cam-nueva').value.trim();
+  if(!eid||!nombre){alert('Seleccioná empresa y escribí un nombre.');return}
+  ss('saving','Guardando...');
+  try{
+    const res=await ins('camaras',{empresa_id:eid,nombre});
+    camarasData.push(res[0]);
+    document.getElementById('cam-nueva').value='';
+    renderCamaras();ss('online','Camara agregada');
+  }catch(e){ss('error','Error: '+e.message)}
+}
+
+async function deleteCamara(id,nombre){
+  if(!confirm(`¿Eliminar camara "${nombre}"? Se eliminan todos sus sectores y productos.`))return;
+  try{
+    await fetch(`${SB}/rest/v1/camaras?id=eq.${id}`,{method:'DELETE',headers:H});
+    camarasData=camarasData.filter(c=>c.id!==id);
+    sectoresData=sectoresData.filter(s=>s.camara_id!==id);
+    renderCamaras();ss('online','Eliminado');
+  }catch(e){ss('error','Error')}
+}
+
+async function addSector(camaraId){
+  const inp=document.getElementById(`sec-nueva-${camaraId}`);
+  const nombre=inp?.value.trim();
+  if(!nombre)return;
+  ss('saving','Guardando...');
+  try{
+    const res=await ins('camara_sectores',{camara_id:camaraId,nombre});
+    sectoresData.push(res[0]);
+    if(inp)inp.value='';
+    renderCamaras();ss('online','Sector agregado');
+  }catch(e){ss('error','Error: '+e.message)}
+}
+
+async function deleteSector(id,nombre){
+  if(!confirm(`¿Eliminar sector "${nombre}"?`))return;
+  try{
+    await fetch(`${SB}/rest/v1/camara_sectores?id=eq.${id}`,{method:'DELETE',headers:H});
+    sectoresData=sectoresData.filter(s=>s.id!==id);
+    camProdData=camProdData.filter(p=>p.sector_id!==id);
+    renderCamaras();ss('online','Eliminado');
+  }catch(e){ss('error','Error')}
+}
+
+function showAddProdCamara(camaraId,sectorId,eid){
+  // Modal para elegir area + producto
+  const prods=st.Pr.filter(p=>p.empresa_id===eid);
+  if(!prods.length){alert('No hay productos para esta empresa.');return}
+  const overlay=document.createElement('div');overlay.className='modal-overlay';overlay.id='modal-add-camprod';
+  const byArea={};prods.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';if(!byArea[a])byArea[a]=[];byArea[a].push(p)});
+  let opts='';
+  Object.entries(byArea).forEach(([area,items])=>{
+    opts+=`<optgroup label="${area}">`;
+    items.forEach(p=>opts+=`<option value="${p.empresa_id}||${area}||${p.nombre}">${p.nombre}</option>`);
+    opts+=`</optgroup>`;
+  });
+  overlay.innerHTML=`<div class="modal" style="width:380px">
+    <div class="modal-title"><i class="ti ti-box"></i> Agregar producto</div>
+    <div style="margin-bottom:1rem">
+      <select id="modal-prod-sel" style="width:100%;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)">${opts}</select>
+    </div>
+    <div class="modal-btns">
+      <button class="btn" onclick="document.getElementById('modal-add-camprod').remove()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarAddCamProd('${camaraId}','${sectorId}')">Agregar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function confirmarAddCamProd(camaraId,sectorId){
+  const sel=document.getElementById('modal-prod-sel');
+  if(!sel?.value)return;
+  const [eid,area,producto]=sel.value.split('||');
+  document.getElementById('modal-add-camprod')?.remove();
+  // Verificar que no exista ya
+  if(camProdData.find(p=>p.sector_id===sectorId&&p.area===area&&p.producto===producto)){
+    alert('Este producto ya está en este sector.');return;
+  }
+  ss('saving','Guardando...');
+  try{
+    const res=await ins('camara_productos',{camara_id:camaraId,sector_id:sectorId,empresa_id:eid,area,producto,max_cajas:0});
+    camProdData.push(res[0]);
+    renderCamaras();ss('online','Producto agregado');
+  }catch(e){ss('error','Error: '+e.message)}
+}
+
+async function updCamProd(id,val){
+  const max_cajas=parseFloat(val)||0;
+  const p=camProdData.find(x=>x.id===id);
+  if(!p)return;
+  try{
+    await fetch(`${SB}/rest/v1/camara_productos?id=eq.${id}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({max_cajas,updated_at:new Date().toISOString()})});
+    p.max_cajas=max_cajas;
+    // Re-renderizar solo los números sin recargar todo
+    renderCamaras();
+  }catch(e){ss('error','Error')}
+}
+
+async function deleteCamProd(id){
+  try{
+    await fetch(`${SB}/rest/v1/camara_productos?id=eq.${id}`,{method:'DELETE',headers:H});
+    camProdData=camProdData.filter(p=>p.id!==id);
+    renderCamaras();ss('online','Eliminado');
+  }catch(e){ss('error','Error')}
+}
 let mixData=[];
 
 async function renderMix(){
@@ -1979,13 +2193,14 @@ async function guardarCajas(){
 let stockSeg=[];
 
 function showStockSubTab(t){
-  ['hist','seg','mix','cajas'].forEach(id=>{
+  ['hist','seg','mix','cajas','cam'].forEach(id=>{
     document.getElementById('stock-sub-'+id).style.display=id===t?'block':'none';
     document.getElementById('stab-'+id).classList.toggle('active',id===t);
   });
   if(t==='seg')renderSeguridad();
   if(t==='mix')renderMix();
   if(t==='cajas')renderCajas();
+  if(t==='cam')initCamaras();
 }
 
 async function renderSeguridad(){
