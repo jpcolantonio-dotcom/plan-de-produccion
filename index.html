@@ -218,7 +218,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v2.4</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v2.7</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -283,6 +283,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div id="rload" class="loading-overlay" style="display:none"><span class="spinner spinner-dark"></span> Cargando...</div>
   </div>
   <div id="ract" style="display:none;justify-content:flex-end;gap:8px;margin-top:8px">
+    <button class="btn" onclick="loadReal2()" title="Recargar datos frescos de Supabase"><i class="ti ti-refresh"></i> Actualizar</button>
     <button class="btn btn-primary" id="btnsaver" onclick="saveReal()"><i class="ti ti-device-floppy"></i> Guardar produccion</button>
   </div>
   <div id="rmsg" style="display:none;margin-top:8px" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
@@ -815,9 +816,9 @@ async function savePlan(){
 async function loadReal2(){
   const k=document.getElementById('rwsel').value;if(!k)return;
   document.getElementById('rload').style.display='flex';
+  // Siempre forzar recarga fresca desde Supabase
   delete st.P[k]; delete st.R[k];
-  await lp(k);  // plan primero
-  await lr(k);  // real después (necesita el plan para normalizar)
+  await lp(k);await lr(k);
   document.getElementById('rload').style.display='none';renderReal();
 }
 function renderReal(){
@@ -919,6 +920,11 @@ async function saveReal(){
     ss('online','Guardado');fl('rmsg');
     await actualizarStockDesdeReal(k);
     stockData=await get('stock','order=area.asc,producto.asc').catch(()=>stockData);
+    // Si el dashboard está activo y es la misma semana, refrescarlo
+    if(document.getElementById('tab-dash')?.classList.contains('active')){
+      const dk=document.getElementById('dash-wsel')?.value||st.w;
+      if(dk===k){buildDashItems(dk,document.getElementById('dash-esel')?.value||'all');renderDashPage(false);}
+    }
   }catch(e){ss('error','Error');document.getElementById('rerrtxt').textContent=e.message;fl('rerr')}
   btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar produccion';btn.disabled=false;
 }
@@ -1000,8 +1006,26 @@ function renderCmp(){
   let tp=0,tr2=0,cu=0;
   plan.forEach((r,i)=>{const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);const rk=rKey(r);const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);const rv=(re[rk]||re[oi]||[]).reduce((a,b)=>a+(b||0),0);tp+=pv;tr2+=rv;if(rv>=pv&&pv>0)cu++});
   const pct=tp>0?Math.round(tr2/tp*100):0;const cls=pct>=90?'good':pct>=70?'warn':'bad';
+  // Calcular cumplimiento del dia actual — solo items con real > 0
+  const dHoy=tc(k);
+  let tpHoy=0,trHoy=0,itemsConReal=0;
+  plan.forEach(r=>{
+    const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
+    const rk=rKey(r);
+    const rdReal=re[rk]||re[oi]||Array(7).fill(0);
+    const pvHoy=(r.days&&r.days[dHoy])||0;
+    const rvHoy=rdReal[dHoy]||0;
+    if(rvHoy>0){tpHoy+=pvHoy;trHoy+=rvHoy;itemsConReal++;}
+  });
+  const pctHoy=tpHoy>0?Math.round(trHoy/tpHoy*100):0;
+  const clsHoy=pctHoy>=90?'good':pctHoy>=70?'warn':'bad';
   let html=`<div class="metric-grid">
     <div class="metric"><div class="metric-label">Cumplimiento global</div><div class="metric-val ${cls}">${pct}%</div></div>
+    <div class="metric" style="border:2px solid var(--blue);border-radius:var(--radius-lg)">
+      <div class="metric-label" style="color:var(--blue)">Cumplimiento hoy <span style="font-size:10px">(${itemsConReal} items cargados)</span></div>
+      <div class="metric-val ${clsHoy}">${itemsConReal>0?pctHoy+'%':'--'}</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:2px">${trHoy>0?trHoy.toLocaleString('es-AR'):''} / ${tpHoy>0?tpHoy.toLocaleString('es-AR'):''}</div>
+    </div>
     <div class="metric"><div class="metric-label">Total planificado</div><div class="metric-val">${tp.toLocaleString('es-AR')}</div></div>
     <div class="metric"><div class="metric-label">Total producido</div><div class="metric-val">${tr2.toLocaleString('es-AR')}</div></div>
     <div class="metric"><div class="metric-label">Items cumplidos</div><div class="metric-val">${cu}/${plan.filter(r=>(r.days||[]).some(v=>v>0)).length}</div></div>
@@ -1673,11 +1697,10 @@ function startDashTimer(k,ef){
     if(dashCountdown<=0){
       dashCountdown=DASH_INTERVAL;
       dashPage=(dashPage+1)%dashTotalPages;
-      if(dashPage===0){
-        delete st.P[k]; delete st.R[k];
-        await lp(k); await lr(k);
-        buildDashItems(k,ef);
-      }
+      // Siempre recargar datos frescos desde Supabase
+      delete st.P[k]; delete st.R[k];
+      await lp(k); await lr(k);
+      buildDashItems(k,ef);
       renderDashPage(true);
     }
   },1000);
