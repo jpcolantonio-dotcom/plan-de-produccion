@@ -218,7 +218,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v2.3</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v2.4</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -885,24 +885,39 @@ async function saveReal(){
   const k=document.getElementById('rwsel').value;
   const btn=document.getElementById('btnsaver');btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;ss('saving','Guardando...');
   try{
-    const datos=JSON.parse(JSON.stringify(st.R[k]||{}));
-    const existing=await get('produccion_real',`semana=eq.${k}&select=id`);
-    if(existing.length){
+    // 1. Leer datos frescos de Supabase AHORA para evitar sobreescribir cambios de otros usuarios
+    const freshData=await get('produccion_real',`semana=eq.${k}&select=datos,id`);
+    const datosRemoto=freshData.length?freshData[0].datos:{};
+    
+    // 2. Mergear: los datos remotos son la base, los locales tienen prioridad solo para los productos que este usuario tocó
+    const datosLocal=st.R[k]||{};
+    const datosMerge={...datosRemoto};
+    // Solo sobreescribir las claves que el usuario local modificó (las que tienen valores > 0)
+    Object.entries(datosLocal).forEach(([rk,days])=>{
+      if(days&&days.some(v=>v>0)){
+        datosMerge[rk]=days;
+      }
+    });
+    
+    // 3. Guardar el merge
+    if(freshData.length){
       await fetch(`${SB}/rest/v1/produccion_real?semana=eq.${k}`,{
         method:'PATCH',headers:{...H,'Prefer':'return=minimal'},
-        body:JSON.stringify({datos,updated_at:new Date().toISOString()})
+        body:JSON.stringify({datos:datosMerge,updated_at:new Date().toISOString()})
       }).then(r=>{if(!r.ok)throw new Error('Error al actualizar')});
     } else {
       await fetch(`${SB}/rest/v1/produccion_real`,{
         method:'POST',headers:{...H,'Prefer':'return=minimal'},
-        body:JSON.stringify({semana:k,datos,updated_at:new Date().toISOString()})
+        body:JSON.stringify({semana:k,datos:datosMerge,updated_at:new Date().toISOString()})
       }).then(r=>{if(!r.ok)throw new Error('Error al insertar')});
     }
+    
+    // 4. Actualizar cache local con el merge final
+    st.R[k]=datosMerge;
+    
     if(!st.Sem.includes(k))st.Sem.push(k);
     ss('online','Guardado');fl('rmsg');
-    // Actualizar stock automaticamente con produccion de hoy
     await actualizarStockDesdeReal(k);
-    // Recargar cache de stock
     stockData=await get('stock','order=area.asc,producto.asc').catch(()=>stockData);
   }catch(e){ss('error','Error');document.getElementById('rerrtxt').textContent=e.message;fl('rerr')}
   btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar produccion';btn.disabled=false;
