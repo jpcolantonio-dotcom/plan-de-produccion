@@ -218,7 +218,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v2.8</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v2.9</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -453,8 +453,10 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   </div>
   <!-- SUB-TABS -->
   <div class="proy-subtabs">
-    <button class="proy-tab active" id="stab-hist" onclick="showStockSubTab('hist')"><i class="ti ti-history"></i> Historial de conteos</button>
-    <button class="proy-tab" id="stab-seg" onclick="showStockSubTab('seg')"><i class="ti ti-shield-check"></i> Stock de seguridad</button>
+    <button class="proy-tab active" id="stab-hist" onclick="showStockSubTab('hist')"><i class="ti ti-history"></i> Historial</button>
+    <button class="proy-tab" id="stab-seg" onclick="showStockSubTab('seg')"><i class="ti ti-shield-check"></i> Stock seguridad</button>
+    <button class="proy-tab" id="stab-mix" onclick="showStockSubTab('mix')"><i class="ti ti-chart-pie"></i> Mix ventas</button>
+    <button class="proy-tab" id="stab-cajas" onclick="showStockSubTab('cajas')"><i class="ti ti-box"></i> Cajas</button>
   </div>
   <!-- HISTORIAL -->
   <div id="stock-sub-hist">
@@ -473,6 +475,26 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <button class="btn btn-primary" onclick="guardarSeguridad()"><i class="ti ti-device-floppy"></i> Guardar stock de seguridad</button>
     </div>
     <div id="stock-seg-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Stock de seguridad guardado.</div>
+  </div>
+
+  <!-- MIX VENTAS -->
+  <div id="stock-sub-mix" style="display:none">
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Ingresá el % de participación de cada producto en el total de ventas. La suma por empresa debería ser 100%.</div>
+    <div id="stock-mix-content"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+      <button class="btn btn-primary" onclick="guardarMix()"><i class="ti ti-device-floppy"></i> Guardar mix</button>
+    </div>
+    <div id="stock-mix-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Mix guardado.</div>
+  </div>
+
+  <!-- CAJAS -->
+  <div id="stock-sub-cajas" style="display:none">
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Ingresá cuántas unidades entran en cada caja por producto.</div>
+    <div id="stock-cajas-content"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+      <button class="btn btn-primary" onclick="guardarCajas()"><i class="ti ti-device-floppy"></i> Guardar cajas</button>
+    </div>
+    <div id="stock-cajas-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Cajas guardado.</div>
   </div>
 </div>
 
@@ -1786,15 +1808,184 @@ function showStockTab(t){
   if(t==='init')renderStockInit();
 }
 
-// ── STOCK DE SEGURIDAD ────────────────────────────────────────────
+// ── MIX VENTAS ────────────────────────────────────────────────────
+let mixData=[];
+
+async function renderMix(){
+  const ef=document.getElementById('stock-hist-esel').value;
+  const el=document.getElementById('stock-mix-content');
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
+  try{
+    let f='order=area.asc,producto.asc';
+    if(ef!=='all')f+=`&empresa_id=eq.${ef}`;
+    mixData=await get('mix_ventas',f);
+  }catch{mixData=[]}
+  let prods=st.Pr;
+  if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
+  if(!prods.length){el.innerHTML='<div class="empty">Sin productos.</div>';return}
+
+  // Calcular totales por empresa para mostrar suma
+  const totEmp={};
+  prods.forEach(p=>{
+    const area=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';
+    const m=mixData.find(x=>x.empresa_id===p.empresa_id&&x.area===area&&x.producto===p.nombre);
+    const val=m?m.porcentaje:0;
+    if(!totEmp[p.empresa_id])totEmp[p.empresa_id]=0;
+    totEmp[p.empresa_id]+=val;
+  });
+
+  const byE={};prods.forEach(p=>{const eid=p.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(p)});
+  let h=`<div class="stock-card"><table class="stock-tbl"><thead><tr>
+    <th style="text-align:left">Empresa / Area / Producto</th>
+    <th style="text-align:left;width:70px">Unidad</th>
+    <th style="text-align:right;width:120px">% Mix ventas</th>
+  </tr></thead><tbody>`;
+
+  Object.entries(byE).forEach(([eid,items])=>{
+    const clr=ec(eid);const nm=en(eid)||'SE';
+    const tot=totEmp[eid]||0;
+    const totCls=Math.abs(tot-100)<0.1?'color:var(--green)':tot>100?'color:var(--red)':'color:var(--amber)';
+    h+=`<tr><td colspan="3" style="background:var(--bg2);padding:6px 12px;font-size:12px;border-top:2px solid ${clr}">
+      <span style="font-weight:700;color:${clr}">${nm}</span>
+      <span style="float:right;font-size:12px;font-weight:700;${totCls}">Total: ${tot.toFixed(1)}%</span>
+    </td></tr>`;
+    const byArea={};items.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';if(!byArea[a])byArea[a]=[];byArea[a].push(p)});
+    Object.entries(byArea).forEach(([area,aItems])=>{
+      h+=`<tr><td colspan="3" style="padding:4px 12px 4px 20px;font-size:11px;color:${clr};font-weight:600">${area}</td></tr>`;
+      aItems.forEach(p=>{
+        const m=mixData.find(x=>x.empresa_id===eid&&x.area===area&&x.producto===p.nombre);
+        const val=m?m.porcentaje:'';
+        const pid=`mix-${eid}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+        h+=`<tr>
+          <td style="font-weight:500;padding-left:28px">${p.nombre}</td>
+          <td style="font-size:12px;color:var(--text2)">${p.unidad}</td>
+          <td style="text-align:right">
+            <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
+              <input class="proy-input" type="number" min="0" max="100" step="0.1" id="${pid}" value="${val}" placeholder="0" style="width:80px"/>
+              <span style="font-size:12px;color:var(--text2)">%</span>
+            </div>
+          </td>
+        </tr>`;
+      });
+    });
+  });
+  h+=`</tbody></table></div>`;
+  el.innerHTML=h;
+}
+
+async function guardarMix(){
+  const ef=document.getElementById('stock-hist-esel').value;
+  let prods=st.Pr;if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
+  ss('saving','Guardando...');
+  try{
+    for(const p of prods){
+      const area=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';
+      const pid=`mix-${p.empresa_id}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+      const inp=document.getElementById(pid);
+      if(!inp||inp.value==='')continue;
+      const porcentaje=parseFloat(inp.value)||0;
+      const existing=mixData.find(x=>x.empresa_id===p.empresa_id&&x.area===area&&x.producto===p.nombre);
+      if(existing){
+        await fetch(`${SB}/rest/v1/mix_ventas?id=eq.${existing.id}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({porcentaje,updated_at:new Date().toISOString()})});
+        existing.porcentaje=porcentaje;
+      } else {
+        const res=await ins('mix_ventas',{empresa_id:p.empresa_id,area,producto:p.nombre,porcentaje});
+        if(res&&res[0])mixData.push(res[0]);
+      }
+    }
+    ss('online','Guardado');
+    const msg=document.getElementById('stock-mix-msg');msg.style.display='flex';
+    setTimeout(()=>msg.style.display='none',3000);
+    renderMix();
+  }catch(e){ss('error','Error: '+e.message)}
+}
+
+// ── CAJAS POR PRODUCTO ────────────────────────────────────────────
+let cajasData=[];
+
+async function renderCajas(){
+  const ef=document.getElementById('stock-hist-esel').value;
+  const el=document.getElementById('stock-cajas-content');
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
+  try{
+    let f='order=area.asc,producto.asc';
+    if(ef!=='all')f+=`&empresa_id=eq.${ef}`;
+    cajasData=await get('cajas_producto',f);
+  }catch{cajasData=[]}
+  let prods=st.Pr;
+  if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
+  if(!prods.length){el.innerHTML='<div class="empty">Sin productos.</div>';return}
+
+  const byE={};prods.forEach(p=>{const eid=p.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(p)});
+  let h=`<div class="stock-card"><table class="stock-tbl"><thead><tr>
+    <th style="text-align:left">Empresa / Area / Producto</th>
+    <th style="text-align:left;width:70px">Unidad</th>
+    <th style="text-align:right;width:160px">Unidades por caja</th>
+  </tr></thead><tbody>`;
+
+  Object.entries(byE).forEach(([eid,items])=>{
+    const clr=ec(eid);const nm=en(eid)||'SE';
+    h+=`<tr><td colspan="3" style="background:var(--bg2);padding:6px 12px;font-size:12px;font-weight:700;color:${clr};border-top:2px solid ${clr}">${nm}</td></tr>`;
+    const byArea={};items.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';if(!byArea[a])byArea[a]=[];byArea[a].push(p)});
+    Object.entries(byArea).forEach(([area,aItems])=>{
+      h+=`<tr><td colspan="3" style="padding:4px 12px 4px 20px;font-size:11px;color:${clr};font-weight:600">${area}</td></tr>`;
+      aItems.forEach(p=>{
+        const c=cajasData.find(x=>x.empresa_id===eid&&x.area===area&&x.producto===p.nombre);
+        const val=c?c.unidades_por_caja:'';
+        const pid=`caja-${eid}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+        h+=`<tr>
+          <td style="font-weight:500;padding-left:28px">${p.nombre}</td>
+          <td style="font-size:12px;color:var(--text2)">${p.unidad}</td>
+          <td style="text-align:right">
+            <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
+              <input class="proy-input" type="number" min="0" id="${pid}" value="${val}" placeholder="0" style="width:90px"/>
+              <span style="font-size:12px;color:var(--text2)">${p.unidad}/caja</span>
+            </div>
+          </td>
+        </tr>`;
+      });
+    });
+  });
+  h+=`</tbody></table></div>`;
+  el.innerHTML=h;
+}
+
+async function guardarCajas(){
+  const ef=document.getElementById('stock-hist-esel').value;
+  let prods=st.Pr;if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
+  ss('saving','Guardando...');
+  try{
+    for(const p of prods){
+      const area=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';
+      const pid=`caja-${p.empresa_id}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+      const inp=document.getElementById(pid);
+      if(!inp||inp.value==='')continue;
+      const unidades_por_caja=parseFloat(inp.value)||0;
+      const existing=cajasData.find(x=>x.empresa_id===p.empresa_id&&x.area===area&&x.producto===p.nombre);
+      if(existing){
+        await fetch(`${SB}/rest/v1/cajas_producto?id=eq.${existing.id}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({unidades_por_caja,updated_at:new Date().toISOString()})});
+        existing.unidades_por_caja=unidades_por_caja;
+      } else {
+        const res=await ins('cajas_producto',{empresa_id:p.empresa_id,area,producto:p.nombre,unidades_por_caja});
+        if(res&&res[0])cajasData.push(res[0]);
+      }
+    }
+    ss('online','Guardado');
+    const msg=document.getElementById('stock-cajas-msg');msg.style.display='flex';
+    setTimeout(()=>msg.style.display='none',3000);
+    renderCajas();
+  }catch(e){ss('error','Error: '+e.message)}
+}
 let stockSeg=[];
 
 function showStockSubTab(t){
-  ['hist','seg'].forEach(id=>{
+  ['hist','seg','mix','cajas'].forEach(id=>{
     document.getElementById('stock-sub-'+id).style.display=id===t?'block':'none';
     document.getElementById('stab-'+id).classList.toggle('active',id===t);
   });
   if(t==='seg')renderSeguridad();
+  if(t==='mix')renderMix();
+  if(t==='cajas')renderCajas();
 }
 
 async function renderSeguridad(){
