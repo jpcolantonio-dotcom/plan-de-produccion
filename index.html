@@ -218,7 +218,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v2.7</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v2.8</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -371,6 +371,8 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <select id="dash-esel" onchange="initDash()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
     </div>
   </div>
+  <!-- PANEL FIJO CUMPLIMIENTO POR EMPRESA -->
+  <div id="dash-cumplimiento" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:var(--bg2);border-radius:var(--radius-lg);border:.5px solid var(--border)"></div>
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
     <div style="display:flex;align-items:center;gap:8px">
       <button class="btn btn-sm" onclick="navDash(-1)" id="dash-prev"><i class="ti ti-chevron-left"></i></button>
@@ -1567,6 +1569,50 @@ async function delCausa(id){
 }
 
 // ── DASHBOARD ────────────────────────────────────────────────────
+function renderCumplimientoEmpresas(k){
+  const el=document.getElementById('dash-cumplimiento');
+  if(!el)return;
+  const dia=getDashDia();
+  const plan=st.P[k]||[];
+  const real=st.R[k]||{};
+  const ef=document.getElementById('dash-esel')?.value||'all';
+  // Calcular por empresa — solo items con real > 0
+  const byEmp={};
+  plan.forEach(r=>{
+    const eid=r.empresa_id||'_';
+    if(ef!=='all'&&eid!==ef)return;
+    const rk=rKey(r);
+    const oi=plan.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
+    const pv=(r.days&&r.days[dia])||0;
+    const rv=(real[rk]||real[oi]||[])[dia]||0;
+    if(pv>0&&rv>0){
+      if(!byEmp[eid])byEmp[eid]={plan:0,real:0,nm:en(eid)||'SE',clr:ec(eid)};
+      byEmp[eid].plan+=pv;
+      byEmp[eid].real+=rv;
+    }
+  });
+  if(!Object.keys(byEmp).length){
+    el.innerHTML=`<span style="font-size:13px;color:var(--text2)"><i class="ti ti-moon"></i> Sin produccion cargada hoy</span>`;
+    return;
+  }
+  const dname=dia>=0&&dia<=6?DAYS[dia]:'--';
+  let h=`<span style="font-size:12px;font-weight:600;color:var(--text2);margin-right:4px">Cumplimiento ${dname}:</span>`;
+  Object.entries(byEmp).forEach(([eid,{plan:p,real:r,nm,clr}])=>{
+    const pct=p>0?Math.round(r/p*100):0;
+    const bg=pct>=95?'#1D9E75':pct>=80?'#EF9F27':'#E24B4A';
+    const txt=pct>=95?'#fff':pct>=80?'#412402':'#fff';
+    h+=`<div style="display:flex;align-items:center;gap:10px;background:${bg};color:${txt};padding:8px 18px;border-radius:var(--radius-lg);flex:1;min-width:160px;max-width:280px">
+      <span style="width:10px;height:10px;border-radius:50%;background:${txt};opacity:.7;flex-shrink:0"></span>
+      <div>
+        <div style="font-size:13px;font-weight:700">${nm}</div>
+        <div style="font-size:11px;opacity:.85">${r.toLocaleString('es-AR')} / ${p.toLocaleString('es-AR')}</div>
+      </div>
+      <div style="font-size:26px;font-weight:800;margin-left:auto">${pct}%</div>
+    </div>`;
+  });
+  el.innerHTML=h;
+}
+
 function navDash(dir){
   dashPage=(dashPage+dir+dashTotalPages)%dashTotalPages;
   renderDashPage(true);
@@ -1590,6 +1636,7 @@ async function initDash(){
   await lp(k); await lr(k);
   buildDashItems(k,ef);
   dashPage=0;
+  renderCumplimientoEmpresas(k);
   renderDashPage(false);
   startDashTimer(k,ef);
 }
@@ -1701,6 +1748,7 @@ function startDashTimer(k,ef){
       delete st.P[k]; delete st.R[k];
       await lp(k); await lr(k);
       buildDashItems(k,ef);
+      renderCumplimientoEmpresas(k);
       renderDashPage(true);
     }
   },1000);
