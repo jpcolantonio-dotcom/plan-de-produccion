@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -218,7 +219,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v3.0</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v3.1</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1810,10 +1811,9 @@ function showStockTab(t){
 }
 
 // ── CAMARAS DE FRIO ───────────────────────────────────────────────
-let camarasData=[], sectoresData=[], camProdData=[];
+let camarasData=[], torresData=[], camProdData=[];
 
 async function initCamaras(){
-  // Poblar selector empresa
   const se=document.getElementById('cam-esel');
   if(se.options.length<=1){
     se.innerHTML='<option value="">Empresa...</option>';
@@ -1827,17 +1827,20 @@ async function initCamaras(){
 async function loadCamaras(){
   const eid=document.getElementById('cam-esel').value;
   try{
-    let f=eid?`empresa_id=eq.${eid}`:'';
-    camarasData=await get('camaras',f?f+'&order=nombre.asc':'order=nombre.asc');
+    const f=eid?`empresa_id=eq.${eid}&order=nombre.asc`:'order=nombre.asc';
+    camarasData=await get('camaras',f);
     if(camarasData.length){
       const ids=camarasData.map(c=>c.id);
-      sectoresData=await get('camara_sectores',`camara_id=in.(${ids.join(',')})&order=nombre.asc`);
-      const secIds=sectoresData.map(s=>s.id);
-      camProdData=secIds.length?await get('camara_productos',`sector_id=in.(${secIds.join(',')})&order=area.asc,producto.asc`):[];
-    } else {
-      sectoresData=[];camProdData=[];
-    }
-  }catch(e){console.error(e);camarasData=[];sectoresData=[];camProdData=[];}
+      torresData=await get('camara_torres',`camara_id=in.(${ids.join(',')})&order=nombre.asc`);
+      const tids=torresData.map(t=>t.id);
+      camProdData=tids.length?await get('camara_productos',`torre_id=in.(${tids.join(',')})&order=area.asc,producto.asc`):[];
+    } else {torresData=[];camProdData=[];}
+  }catch(e){console.error(e);camarasData=[];torresData=[];camProdData=[];}
+}
+
+function calcColumnas(cajasRaw,altura){
+  const columnas=Math.floor(cajasRaw/altura);
+  return{columnas,cajas:columnas*altura};
 }
 
 function renderCamaras(){
@@ -1845,71 +1848,68 @@ function renderCamaras(){
   const eid=document.getElementById('cam-esel').value;
   if(!eid){el.innerHTML='<div class="empty"><i class="ti ti-building"></i>Seleccioná una empresa.</div>';return}
   if(!camarasData.length){el.innerHTML='<div class="empty"><i class="ti ti-temperature-snow"></i>Sin camaras. Agregá una arriba.</div>';return}
-
   let h='';
   camarasData.forEach(cam=>{
-    const secs=sectoresData.filter(s=>s.camara_id===cam.id);
+    const torres=torresData.filter(t=>t.camara_id===cam.id);
     h+=`<div class="stock-card" style="margin-bottom:1.5rem">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:.5px solid var(--border);background:var(--bg2)">
         <div style="font-size:15px;font-weight:700"><i class="ti ti-temperature-snow" style="color:var(--blue)"></i> Camara ${cam.nombre}</div>
-        <div style="display:flex;gap:8px">
-          <input type="text" id="sec-nueva-${cam.id}" placeholder="Nuevo sector (ej: Torres)" style="width:160px;padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
-          <button class="btn btn-sm" onclick="addSector('${cam.id}')"><i class="ti ti-plus"></i> Sector</button>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input type="text" id="tor-nueva-${cam.id}" placeholder="Nombre torre" style="width:120px;padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+          <input type="number" id="tor-alt-${cam.id}" placeholder="Altura" min="1" max="30" value="8" style="width:65px;padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+          <button class="btn btn-sm" onclick="addTorre('${cam.id}')"><i class="ti ti-plus"></i> Torre</button>
           <button class="btn btn-xs btn-danger" onclick="deleteCamara('${cam.id}','${cam.nombre}')"><i class="ti ti-trash"></i></button>
         </div>
       </div>`;
-
-    if(!secs.length){
-      h+=`<div style="padding:12px;font-size:13px;color:var(--text2)">Agregá un sector para esta camara.</div>`;
+    if(!torres.length){
+      h+=`<div style="padding:12px;font-size:13px;color:var(--text2)">Agregá torres a esta camara.</div>`;
     } else {
-      secs.forEach(sec=>{
-        const prods=camProdData.filter(p=>p.sector_id===sec.id);
-        // Calcular distribución según mix
-        const totalCajas=prods.reduce((s,p)=>s+p.max_cajas,0);
-        h+=`<div style="padding:10px 14px;border-bottom:.5px solid var(--border)">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <div style="font-weight:600;font-size:13px"><i class="ti ti-layout-rows" style="color:var(--amber)"></i> Sector ${sec.nombre}</div>
-            <div style="display:flex;gap:8px;align-items:center">
-              <span style="font-size:12px;color:var(--text2)">Total: <b>${totalCajas.toLocaleString('es-AR')} cajas</b></span>
-              <button class="btn btn-xs" onclick="showAddProdCamara('${cam.id}','${sec.id}','${eid}')"><i class="ti ti-plus"></i> Producto</button>
-              <button class="btn btn-xs btn-danger" onclick="deleteSector('${sec.id}','${sec.nombre}')"><i class="ti ti-trash"></i></button>
+      h+=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;padding:12px">`;
+      torres.forEach(tor=>{
+        const prods=camProdData.filter(p=>p.torre_id===tor.id);
+        h+=`<div style="border:.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden">
+          <div style="background:var(--bg2);padding:8px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:.5px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-weight:700;font-size:13px">Torre ${tor.nombre}</span>
+              <span style="font-size:10px;color:var(--text2)">h:</span>
+              <input type="number" value="${tor.altura_cajas}" min="1" max="30" style="width:44px;padding:2px 4px;font-size:11px;border:.5px solid var(--border2);border-radius:var(--radius);text-align:center" onchange="updTorreAltura('${tor.id}',this.value)"/>
+              <span style="font-size:10px;color:var(--text2)">cajas</span>
             </div>
-          </div>`;
+            <div style="display:flex;gap:4px">
+              <button class="btn btn-xs" onclick="showAddProdTorre('${cam.id}','${tor.id}','${eid}')"><i class="ti ti-plus"></i></button>
+              <button class="btn btn-xs btn-danger" onclick="deleteTorre('${tor.id}','${tor.nombre}')"><i class="ti ti-trash"></i></button>
+            </div>
+          </div>
+          <div style="padding:8px">`;
         if(!prods.length){
-          h+=`<div style="font-size:12px;color:var(--text2);padding:4px 0">Sin productos. Agregá productos a este sector.</div>`;
+          h+=`<div style="font-size:12px;color:var(--text3);text-align:center;padding:8px">Sin productos</div>`;
         } else {
-          h+=`<table class="stock-tbl"><thead><tr>
-            <th style="text-align:left">Area</th><th style="text-align:left">Producto</th>
-            <th style="text-align:right;width:100px">Cajas max</th>
-            <th style="text-align:right;width:110px">% Mix</th>
-            <th style="text-align:right;width:110px">Cajas mix</th>
-            <th style="width:34px"></th>
-          </tr></thead><tbody>`;
           prods.forEach(p=>{
             const mix=mixData.find(m=>m.empresa_id===p.empresa_id&&m.area===p.area&&m.producto===p.producto);
             const caja=cajasData.find(c=>c.empresa_id===p.empresa_id&&c.area===p.area&&c.producto===p.producto);
             const pct=mix?mix.porcentaje:0;
-            const ujc=caja?caja.unidades_por_caja:1;
-            const cajasCalc=pct>0&&p.max_cajas>0?Math.floor(p.max_cajas*(pct/100)):0;
-            h+=`<tr>
-              <td style="font-size:12px;color:var(--text2)">${p.area}</td>
-              <td style="font-weight:500">${p.producto}</td>
-              <td style="text-align:right">
-                <input class="stock-input" type="number" min="0" id="cp-${p.id}" value="${p.max_cajas||''}" placeholder="0" style="width:80px" onchange="updCamProd('${p.id}',this.value)"/>
-              </td>
-              <td style="text-align:right;color:${pct>0?'var(--text)':'var(--text3)'}">
-                ${pct>0?pct.toFixed(1)+'%':'<span style="font-size:11px">Sin mix</span>'}
-              </td>
-              <td style="text-align:right;font-weight:700;color:${cajasCalc>0?'var(--green)':'var(--text3)'}">
-                ${cajasCalc>0?cajasCalc.toLocaleString('es-AR')+'<span style="font-size:10px;font-weight:400;color:var(--text2)"> cajas</span>':'--'}
-              </td>
-              <td><button class="btn btn-xs btn-danger" onclick="deleteCamProd('${p.id}')"><i class="ti ti-x"></i></button></td>
-            </tr>`;
+            const ujc=caja?caja.unidades_por_caja:0;
+            const maxC=p.max_cajas||0;
+            const {columnas,cajas}=pct>0&&maxC>0?calcColumnas(maxC*(pct/100),tor.altura_cajas):{columnas:0,cajas:0};
+            const unidades=cajas*ujc;
+            h+=`<div style="padding:5px 0;border-bottom:.5px solid var(--border)">
+              <div style="display:flex;align-items:center;gap:6px">
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.producto}</div>
+                  <div style="font-size:10px;color:var(--text2)">${p.area}${pct>0?' · '+pct.toFixed(1)+'%':' · sin mix'}</div>
+                </div>
+                <div style="text-align:right;flex-shrink:0">
+                  <input type="number" min="0" value="${maxC||''}" placeholder="máx" style="width:70px;padding:3px;font-size:11px;border:.5px solid var(--border2);border-radius:var(--radius);text-align:right" onchange="updCamProdMax('${p.id}',this.value)"/>
+                  ${pct>0&&maxC>0?`<div style="font-size:10px;margin-top:2px;color:var(--green);font-weight:600">${columnas}×${tor.altura_cajas}=<b>${cajas}</b> cajas${ujc>0?` / ${unidades.toLocaleString('es-AR')} uds`:''}</div>`:''}
+                </div>
+                <button class="btn btn-xs btn-danger" onclick="deleteCamProd('${p.id}')"><i class="ti ti-x"></i></button>
+              </div>
+            </div>`;
           });
-          h+=`</tbody></table>`;
         }
-        h+=`</div>`;
+        h+=`</div></div>`;
       });
+      h+=`</div>`;
     }
     h+=`</div>`;
   });
@@ -1930,42 +1930,52 @@ async function addCamara(){
 }
 
 async function deleteCamara(id,nombre){
-  if(!confirm(`¿Eliminar camara "${nombre}"? Se eliminan todos sus sectores y productos.`))return;
+  if(!confirm(`¿Eliminar camara "${nombre}"?`))return;
   try{
     await fetch(`${SB}/rest/v1/camaras?id=eq.${id}`,{method:'DELETE',headers:H});
     camarasData=camarasData.filter(c=>c.id!==id);
-    sectoresData=sectoresData.filter(s=>s.camara_id!==id);
+    torresData=torresData.filter(t=>t.camara_id!==id);
     renderCamaras();ss('online','Eliminado');
   }catch(e){ss('error','Error')}
 }
 
-async function addSector(camaraId){
-  const inp=document.getElementById(`sec-nueva-${camaraId}`);
+async function addTorre(camaraId){
+  const inp=document.getElementById(`tor-nueva-${camaraId}`);
+  const altInp=document.getElementById(`tor-alt-${camaraId}`);
   const nombre=inp?.value.trim();
+  const altura=parseInt(altInp?.value)||8;
   if(!nombre)return;
   ss('saving','Guardando...');
   try{
-    const res=await ins('camara_sectores',{camara_id:camaraId,nombre});
-    sectoresData.push(res[0]);
+    const res=await ins('camara_torres',{camara_id:camaraId,nombre,altura_cajas:altura});
+    torresData.push(res[0]);
     if(inp)inp.value='';
-    renderCamaras();ss('online','Sector agregado');
+    renderCamaras();ss('online','Torre agregada');
   }catch(e){ss('error','Error: '+e.message)}
 }
 
-async function deleteSector(id,nombre){
-  if(!confirm(`¿Eliminar sector "${nombre}"?`))return;
+async function updTorreAltura(id,val){
+  const altura=parseInt(val)||8;
+  const t=torresData.find(x=>x.id===id);if(!t)return;
   try{
-    await fetch(`${SB}/rest/v1/camara_sectores?id=eq.${id}`,{method:'DELETE',headers:H});
-    sectoresData=sectoresData.filter(s=>s.id!==id);
-    camProdData=camProdData.filter(p=>p.sector_id!==id);
+    await fetch(`${SB}/rest/v1/camara_torres?id=eq.${id}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({altura_cajas:altura})});
+    t.altura_cajas=altura;renderCamaras();
+  }catch(e){ss('error','Error')}
+}
+
+async function deleteTorre(id,nombre){
+  if(!confirm(`¿Eliminar torre "${nombre}"?`))return;
+  try{
+    await fetch(`${SB}/rest/v1/camara_torres?id=eq.${id}`,{method:'DELETE',headers:H});
+    torresData=torresData.filter(t=>t.id!==id);
+    camProdData=camProdData.filter(p=>p.torre_id!==id);
     renderCamaras();ss('online','Eliminado');
   }catch(e){ss('error','Error')}
 }
 
-function showAddProdCamara(camaraId,sectorId,eid){
-  // Modal para elegir area + producto
+function showAddProdTorre(camaraId,torreId,eid){
   const prods=st.Pr.filter(p=>p.empresa_id===eid);
-  if(!prods.length){alert('No hay productos para esta empresa.');return}
+  if(!prods.length){alert('No hay productos.');return}
   const overlay=document.createElement('div');overlay.className='modal-overlay';overlay.id='modal-add-camprod';
   const byArea={};prods.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';if(!byArea[a])byArea[a]=[];byArea[a].push(p)});
   let opts='';
@@ -1975,54 +1985,45 @@ function showAddProdCamara(camaraId,sectorId,eid){
     opts+=`</optgroup>`;
   });
   overlay.innerHTML=`<div class="modal" style="width:380px">
-    <div class="modal-title"><i class="ti ti-box"></i> Agregar producto</div>
-    <div style="margin-bottom:1rem">
-      <select id="modal-prod-sel" style="width:100%;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)">${opts}</select>
-    </div>
+    <div class="modal-title"><i class="ti ti-box"></i> Agregar producto a torre</div>
+    <select id="modal-prod-sel" style="width:100%;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);margin-bottom:1rem">${opts}</select>
     <div class="modal-btns">
       <button class="btn" onclick="document.getElementById('modal-add-camprod').remove()">Cancelar</button>
-      <button class="btn btn-primary" onclick="confirmarAddCamProd('${camaraId}','${sectorId}')">Agregar</button>
+      <button class="btn btn-primary" onclick="confirmarAddCamProd('${camaraId}','${torreId}')">Agregar</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
 }
 
-async function confirmarAddCamProd(camaraId,sectorId){
+async function confirmarAddCamProd(camaraId,torreId){
   const sel=document.getElementById('modal-prod-sel');
   if(!sel?.value)return;
-  const [eid,area,producto]=sel.value.split('||');
+  const[eid,area,producto]=sel.value.split('||');
   document.getElementById('modal-add-camprod')?.remove();
-  // Verificar que no exista ya
-  if(camProdData.find(p=>p.sector_id===sectorId&&p.area===area&&p.producto===producto)){
-    alert('Este producto ya está en este sector.');return;
-  }
+  if(camProdData.find(p=>p.torre_id===torreId&&p.area===area&&p.producto===producto)){alert('Ya existe.');return}
   ss('saving','Guardando...');
   try{
-    const res=await ins('camara_productos',{camara_id:camaraId,sector_id:sectorId,empresa_id:eid,area,producto,max_cajas:0});
-    camProdData.push(res[0]);
-    renderCamaras();ss('online','Producto agregado');
+    const res=await ins('camara_productos',{camara_id:camaraId,torre_id:torreId,empresa_id:eid,area,producto,max_cajas:0});
+    camProdData.push(res[0]);renderCamaras();ss('online','Agregado');
   }catch(e){ss('error','Error: '+e.message)}
 }
 
-async function updCamProd(id,val){
+async function updCamProdMax(id,val){
   const max_cajas=parseFloat(val)||0;
-  const p=camProdData.find(x=>x.id===id);
-  if(!p)return;
+  const p=camProdData.find(x=>x.id===id);if(!p)return;
   try{
     await fetch(`${SB}/rest/v1/camara_productos?id=eq.${id}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({max_cajas,updated_at:new Date().toISOString()})});
-    p.max_cajas=max_cajas;
-    // Re-renderizar solo los números sin recargar todo
-    renderCamaras();
+    p.max_cajas=max_cajas;renderCamaras();
   }catch(e){ss('error','Error')}
 }
 
 async function deleteCamProd(id){
   try{
     await fetch(`${SB}/rest/v1/camara_productos?id=eq.${id}`,{method:'DELETE',headers:H});
-    camProdData=camProdData.filter(p=>p.id!==id);
-    renderCamaras();ss('online','Eliminado');
+    camProdData=camProdData.filter(p=>p.id!==id);renderCamaras();ss('online','Eliminado');
   }catch(e){ss('error','Error')}
 }
+
 let mixData=[];
 
 async function renderMix(){
