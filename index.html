@@ -218,7 +218,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v3.6</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v3.8</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -438,7 +438,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <select id="stats-esel" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Empresa...</option></select>
       <select id="stats-dia" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
         <option value="1">Lunes</option>
-        <option value="2">Martes</option>
+        <option value="2" selected>Martes</option>
         <option value="3">Miercoles</option>
         <option value="4">Jueves</option>
         <option value="5">Viernes</option>
@@ -449,6 +449,10 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <span style="font-size:13px;color:var(--text2)">Ultimas</span>
         <input type="number" id="stats-semanas" value="4" min="1" max="52" style="width:60px;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
         <span style="font-size:13px;color:var(--text2)">semanas</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:13px;color:var(--text2)">Desde:</span>
+        <input type="date" id="stats-desde" value="2026-05-18" style="padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
       </div>
       <button class="btn btn-primary" onclick="renderStats()"><i class="ti ti-chart-bar"></i> Generar</button>
     </div>
@@ -3595,8 +3599,9 @@ function initStats(){
 
 async function renderStats(){
   const eid=document.getElementById('stats-esel').value;
-  const diaSel=parseInt(document.getElementById('stats-dia').value); // 0=dom,1=lun...
+  const diaSel=parseInt(document.getElementById('stats-dia').value);
   const nSemanas=parseInt(document.getElementById('stats-semanas').value)||4;
+  const desdeMin=document.getElementById('stats-desde').value||'2026-05-18';
   const el=document.getElementById('stats-content');
   if(!eid){alert('Seleccioná una empresa.');return}
   el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando datos...</div>';
@@ -3609,7 +3614,8 @@ async function renderStats(){
     const hoy=new Date();
     for(let i=0;fechasDia.length<nSemanas&&i<365;i++){
       const d=new Date(hoy);d.setDate(hoy.getDate()-i);
-      if(d.getDay()===diaSel){fechasDia.push(d.toISOString().slice(0,10));}
+      const dStr=d.toISOString().slice(0,10);
+      if(d.getDay()===diaSel&&dStr>=desdeMin){fechasDia.push(dStr);}
     }
     if(!fechasDia.length){el.innerHTML='<div class="empty">Sin fechas encontradas.</div>';return}
 
@@ -3625,9 +3631,9 @@ async function renderStats(){
     // Agrupar por producto y calcular promedios
     const porProd={};
     dataFiltrada.forEach(d=>{
-      if(!d.vendedores&&!d.tyc)return;
+      if(!vend&&!tyc)return;
       const k=d.producto;
-      if(!porProd[k])porProd[k]={vend:[],tyc:[],area:d.area};
+      if(!porProd[k])porProd[k]={vend:Array(nSemanas).fill(0),tyc:Array(nSemanas).fill(0),area:d.area};
       // Agregar a la fecha correspondiente
       const fi=fechasDia.indexOf(d.fecha);
       if(!porProd[k].vend[fi])porProd[k].vend[fi]=0;
