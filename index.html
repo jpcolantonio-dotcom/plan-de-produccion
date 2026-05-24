@@ -218,7 +218,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v3.9</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.0</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -434,29 +434,35 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   </div>
   <!-- ESTADISTICAS -->
   <div id="proy-stats" style="display:none">
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
-      <select id="stats-esel" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Empresa...</option></select>
-      <select id="stats-dia" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
-        <option value="1">Lunes</option>
-        <option value="2" selected>Martes</option>
-        <option value="3">Miercoles</option>
-        <option value="4">Jueves</option>
-        <option value="5">Viernes</option>
-        <option value="6">Sabado</option>
-        <option value="0">Domingo</option>
-      </select>
-      <div style="display:flex;align-items:center;gap:6px">
-        <span style="font-size:13px;color:var(--text2)">Ultimas</span>
-        <input type="number" id="stats-semanas" value="4" min="1" max="52" style="width:60px;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
-        <span style="font-size:13px;color:var(--text2)">semanas</span>
+    <div style="margin-bottom:1rem">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+        <select id="stats-esel" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Empresa...</option></select>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:13px;color:var(--text2)">Ultimas</span>
+          <input type="number" id="stats-semanas" value="4" min="1" max="52" style="width:60px;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+          <span style="font-size:13px;color:var(--text2)">semanas</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:13px;color:var(--text2)">Desde:</span>
+          <input type="date" id="stats-desde" value="2026-05-18" style="padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        </div>
+        <button class="btn btn-primary" onclick="renderStats()"><i class="ti ti-chart-bar"></i> Generar</button>
       </div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <span style="font-size:13px;color:var(--text2)">Desde:</span>
-        <input type="date" id="stats-desde" value="2026-05-18" style="padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:12px;color:var(--text2)">Dias:</span>
+        ${[['1','Lun'],['2','Mar'],['3','Mie'],['4','Jue'],['5','Vie'],['6','Sab'],['0','Dom']].map(([v,l])=>
+          `<label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer">
+            <input type="checkbox" class="stats-dia-cb" value="${v}" ${v==='6'?'checked':''}> ${l}
+          </label>`).join('')}
       </div>
-      <button class="btn btn-primary" onclick="renderStats()"><i class="ti ti-chart-bar"></i> Generar</button>
     </div>
     <div id="stats-content"></div>
+    <div style="margin-top:1rem;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:12px;color:var(--text2)">Feriado trasladado:</span>
+      <input type="date" id="stats-feriado-fecha" style="padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <button class="btn btn-sm" onclick="agregarFeriadoExtra()"><i class="ti ti-plus"></i> Agregar</button>
+      <span id="stats-feriados-lista" style="font-size:11px;color:var(--text2)"></span>
+    </div>
   </div>
   <!-- RESUMEN -->
   <div id="proy-resumen" style="display:none">
@@ -3588,6 +3594,21 @@ function pdfHorarios(){
 // ── ESTADISTICAS ──────────────────────────────────────────────────
 let statsCharts=[];
 
+function agregarFeriadoExtra(){
+  const fecha=document.getElementById('stats-feriado-fecha').value;
+  if(!fecha)return;
+  if(!feriadosExtra.includes(fecha)){
+    feriadosExtra.push(fecha);
+    localStorage.setItem('feriadosExtra',JSON.stringify(feriadosExtra));
+  }
+  mostrarFeriadosExtra();
+}
+
+function mostrarFeriadosExtra(){
+  const el=document.getElementById('stats-feriados-lista');
+  if(el)el.textContent=feriadosExtra.length?'Trasladados: '+feriadosExtra.join(', '):'';
+}
+
 function initStats(){
   const se=document.getElementById('stats-esel');
   if(se.options.length<=1){
@@ -3597,9 +3618,21 @@ function initStats(){
   }
 }
 
+// Feriados fijos Argentina
+const FERIADOS_FIJOS=['01-01','24-03','02-04','01-05','25-05','20-06','09-07','17-08','12-10','20-11','08-12','25-12'];
+let feriadosExtra=JSON.parse(localStorage.getItem('feriadosExtra')||'[]');
+
+function esFeriado(fechaStr){
+  const mmdd=fechaStr.slice(5).replace('-','-');// mm-dd
+  if(FERIADOS_FIJOS.includes(mmdd))return'Feriado nacional';
+  if(feriadosExtra.includes(fechaStr))return'Feriado trasladado';
+  return null;
+}
+
 async function renderStats(){
   const eid=document.getElementById('stats-esel').value;
-  const diaSel=parseInt(document.getElementById('stats-dia').value);
+  const diasSel=[...document.querySelectorAll('.stats-dia-cb:checked')].map(c=>parseInt(c.value));
+  if(!diasSel.length){alert('Seleccioná al menos un día.');return}
   const nSemanas=parseInt(document.getElementById('stats-semanas').value)||4;
   const desdeMin=document.getElementById('stats-desde').value||'2026-05-18';
   const el=document.getElementById('stats-content');
@@ -3608,15 +3641,16 @@ async function renderStats(){
   statsCharts.forEach(c=>{try{c.destroy()}catch{}});statsCharts=[];
 
   try{
-    // Buscar las últimas N ocurrencias del día elegido
+    // Buscar las últimas N ocurrencias de los días elegidos
     const diasNombre=['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
     const fechasDia=[];
     const hoy=new Date();
-    for(let i=0;fechasDia.length<nSemanas&&i<365;i++){
+    for(let i=0;i<365&&fechasDia.filter(f=>diasSel.includes(new Date(f+'T00:00:00').getDay())).length<nSemanas*diasSel.length;i++){
       const d=new Date(hoy);d.setDate(hoy.getDate()-i);
       const dStr=d.toISOString().slice(0,10);
-      if(d.getDay()===diaSel&&dStr>=desdeMin){fechasDia.push(dStr);}
+      if(diasSel.includes(d.getDay())&&dStr>=desdeMin&&!fechasDia.includes(dStr)){fechasDia.push(dStr);}
     }
+    fechasDia.sort();
     if(!fechasDia.length){el.innerHTML='<div class="empty">Sin fechas encontradas.</div>';return}
 
     // Cargar datos de todas esas fechas
@@ -3646,8 +3680,9 @@ async function renderStats(){
 
     // Calcular promedios
     const promedios=Object.entries(porProd).map(([prod,v])=>{
-      const avgVend=v.vend.reduce((a,b)=>a+(b||0),0)/nSemanas;
-      const avgTyc=v.tyc.reduce((a,b)=>a+(b||0),0)/nSemanas;
+      const diasConDatos=v.vend.filter((x,i)=>x>0||v.tyc[i]>0).length||1;
+      const avgVend=v.vend.reduce((a,b)=>a+(b||0),0)/diasConDatos;
+      const avgTyc=v.tyc.reduce((a,b)=>a+(b||0),0)/diasConDatos;
       return{prod,area:v.area,avgVend,avgTyc,total:avgVend+avgTyc,
         vendPorFecha:fechasDia.map((_,i)=>v.vend[i]||0),
         tycPorFecha:fechasDia.map((_,i)=>v.tyc[i]||0)};
@@ -3702,14 +3737,14 @@ async function renderStats(){
         <div style="font-size:13px;font-weight:600;margin-bottom:10px"><i class="ti ti-table"></i> Detalle por producto</div>
         <table class="stock-tbl"><thead><tr>
           <th style="text-align:left">Producto</th><th style="text-align:left">Area</th>
-          ${fechasDiaRev.map(f=>{const d=new Date(f+'T00:00:00');return`<th style="text-align:right">${d.getDate()}/${d.getMonth()+1}</th>`}).join('')}
+          ${fechasDiaRev.map(f=>{const d=new Date(f+'T00:00:00');const fer=esFeriado(f);const dia=diasNombre[d.getDay()];return`<th style="text-align:right;background:${fer?'#FFF3CD':''}" title="${fer||''}">${fer?'🎌 ':''}${dia.slice(0,3)} ${d.getDate()}/${d.getMonth()+1}</th>`}).join('')}
           <th style="text-align:right;background:#E6F1FB;color:#0C447C">Prom. Vend</th>
           <th style="text-align:right;background:#FFF8EE;color:#854F0B">Prom. T&C</th>
         </tr></thead><tbody>
         ${promedios.map(p=>`<tr>
           <td style="font-weight:500">${p.prod}</td>
           <td class="muted">${p.area}</td>
-          ${fechasDiaRev.map((_,i)=>{const v=p.vendPorFecha[i]||0;const t=p.tycPorFecha[i]||0;return`<td style="text-align:right;font-size:11px">${v>0||t>0?`<span style="color:var(--blue)">${v}</span>/<span style="color:var(--amber)">${t}</span>`:'--'}</td>`}).join('')}
+          ${fechasDiaRev.map((f,i)=>{const v=p.vendPorFecha[i]||0;const t=p.tycPorFecha[i]||0;const fer=esFeriado(f);return`<td style="text-align:right;font-size:11px;background:${fer?'#FFF3CD':''}" title="${fer||''}">${fer?'🎌 ':''}${v>0||t>0?`<span style="color:var(--blue)">${v}</span>/<span style="color:var(--amber)">${t}</span>`:'--'}</td>`}).join('')}
           <td style="text-align:right;font-weight:700;background:#E6F1FB;color:#0C447C">${Math.round(p.avgVend).toLocaleString('es-AR')}</td>
           <td style="text-align:right;font-weight:700;background:#FFF8EE;color:#854F0B">${Math.round(p.avgTyc).toLocaleString('es-AR')}</td>
         </tr>`).join('')}
