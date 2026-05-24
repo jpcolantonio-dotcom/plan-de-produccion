@@ -218,7 +218,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.1</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.2</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -3636,6 +3636,8 @@ async function renderStats(){
   const eid=document.getElementById('stats-esel').value;
   const diasSel=[...document.querySelectorAll('.stats-dia-cb:checked')].map(c=>parseInt(c.value));
   if(!diasSel.length){alert('Seleccioná al menos un día.');return}
+  const diasNombreCorto=['Dom','Lun','Mar','Mie','Jue','Vie','Sab'];
+  const diasLabel=diasSel.map(d=>diasNombreCorto[d]).join('+');
   const nSemanas=parseInt(document.getElementById('stats-semanas').value)||4;
   const desdeMin=document.getElementById('stats-desde').value||'2026-05-18';
   const el=document.getElementById('stats-content');
@@ -3705,30 +3707,30 @@ async function renderStats(){
     el.innerHTML=`
       <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
         <div class="stock-card" style="padding:12px 18px;flex:1;min-width:200px;text-align:center">
-          <div style="font-size:12px;color:var(--text2)">Promedio Vendedores / ${diasNombre[diaSel]}</div>
+          <div style="font-size:12px;color:var(--text2)">Promedio Vendedores / ${diasLabel}</div>
           <div style="font-size:28px;font-weight:700;color:var(--blue)">${Math.round(totalVend).toLocaleString('es-AR')}</div>
         </div>
         <div class="stock-card" style="padding:12px 18px;flex:1;min-width:200px;text-align:center">
-          <div style="font-size:12px;color:var(--text2)">Promedio T&C / ${diasNombre[diaSel]}</div>
+          <div style="font-size:12px;color:var(--text2)">Promedio T&C / ${diasLabel}</div>
           <div style="font-size:28px;font-weight:700;color:var(--amber)">${Math.round(totalTyc).toLocaleString('es-AR')}</div>
         </div>
         <div class="stock-card" style="padding:12px 18px;flex:1;min-width:200px;text-align:center">
-          <div style="font-size:12px;color:var(--text2)">Total promedio / ${diasNombre[diaSel]}</div>
+          <div style="font-size:12px;color:var(--text2)">Total promedio / ${diasLabel}</div>
           <div style="font-size:28px;font-weight:700;color:var(--green)">${Math.round(totalVend+totalTyc).toLocaleString('es-AR')}</div>
         </div>
         <div class="stock-card" style="padding:12px 18px;flex:1;min-width:200px;text-align:center">
           <div style="font-size:12px;color:var(--text2)">Basado en</div>
           <div style="font-size:28px;font-weight:700;color:var(--text)">${nSemanas}</div>
-          <div style="font-size:11px;color:var(--text2)">${diasNombre[diaSel]}s</div>
+          <div style="font-size:11px;color:var(--text2)">${diasLabel}s</div>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
         <div class="stock-card" style="padding:14px">
-          <div style="font-size:13px;font-weight:600;margin-bottom:10px"><i class="ti ti-trending-up"></i> Tendencia por ${diasNombre[diaSel]} — Vendedores</div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px"><i class="ti ti-trending-up"></i> Tendencia por ${diasLabel} — Vendedores</div>
           <canvas id="chart-tend-vend" height="200"></canvas>
         </div>
         <div class="stock-card" style="padding:14px">
-          <div style="font-size:13px;font-weight:600;margin-bottom:10px"><i class="ti ti-trending-up"></i> Tendencia por ${diasNombre[diaSel]} — T&C</div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px"><i class="ti ti-trending-up"></i> Tendencia por ${diasLabel} — T&C</div>
           <canvas id="chart-tend-tyc" height="200"></canvas>
         </div>
       </div>

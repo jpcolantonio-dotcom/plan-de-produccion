@@ -1,4 +1,4 @@
-const CACHE = 'papo-v4.1';
+const CACHE = 'papo-v4.2';
 const ASSETS = [
   '/plan-de-produccion/',
   '/plan-de-produccion/index.html',
