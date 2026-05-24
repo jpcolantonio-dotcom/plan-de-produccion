@@ -218,7 +218,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v3.3</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v3.4</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -410,6 +410,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab active" id="ptab-conteo" onclick="showProyTab('conteo')"><i class="ti ti-clipboard-check"></i> 1. Conteo de stock</button>
     <button class="proy-tab" id="ptab-ventas" onclick="showProyTab('ventas')"><i class="ti ti-shopping-cart"></i> 2. Ventas del dia</button>
     <button class="proy-tab" id="ptab-resumen" onclick="showProyTab('resumen')"><i class="ti ti-table"></i> 3. Resumen</button>
+    <button class="proy-tab" id="ptab-stats" onclick="showProyTab('stats')"><i class="ti ti-chart-bar"></i> 4. Estadisticas</button>
   </div>
   <!-- CONTEO -->
   <div id="proy-conteo">
@@ -431,8 +432,19 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <button class="btn btn-primary" onclick="guardarVentas()"><i class="ti ti-device-floppy"></i> Guardar ventas</button>
     </div>
   </div>
-  <!-- RESUMEN -->
-  <div id="proy-resumen" style="display:none">
+  <!-- ESTADISTICAS -->
+  <div id="proy-stats" style="display:none">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+      <select id="stats-esel" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Empresa...</option></select>
+      <select id="stats-periodo" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+        <option value="30">Ultimos 30 dias</option>
+        <option value="60">Ultimos 60 dias</option>
+        <option value="90">Ultimos 90 dias</option>
+      </select>
+      <button class="btn btn-primary" onclick="renderStats()"><i class="ti ti-chart-bar"></i> Generar</button>
+    </div>
+    <div id="stats-content"></div>
+  </div>
     <div id="proy-resumen-content"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
       <button class="btn" onclick="imprimirResumen()"><i class="ti ti-printer"></i> Imprimir resumen</button>
@@ -2951,7 +2963,7 @@ async function confirmarImport(){
 let proyData = []; // cache proyeccion del dia
 
 function showProyTab(t){
-  ['conteo','ventas','resumen'].forEach(id=>{
+  ['conteo','ventas','resumen','stats'].forEach(id=>{
     document.getElementById('proy-'+id).style.display=id===t?'block':'none';
     document.getElementById('ptab-'+id).classList.toggle('active',id===t);
   });
@@ -2961,6 +2973,7 @@ function showProyTab(t){
     // Cargar plan y real antes de renderizar
     Promise.all([lp(semKey),lr(semKey)]).then(()=>renderResumen());
   }
+  if(t==='stats')initStats();
 }
 
 async function initProy(){
@@ -3556,6 +3569,164 @@ function pdfHorarios(){
   else alert('Permití ventanas emergentes.');
 }
 
+
+// ── ESTADISTICAS ──────────────────────────────────────────────────
+let statsCharts=[];
+
+function initStats(){
+  const se=document.getElementById('stats-esel');
+  if(se.options.length<=1){
+    se.innerHTML='<option value="">Empresa...</option>';
+    st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se.appendChild(o)});
+    if(st.E.length===1)se.value=st.E[0].id;
+  }
+}
+
+async function renderStats(){
+  const eid=document.getElementById('stats-esel').value;
+  const dias=parseInt(document.getElementById('stats-periodo').value)||30;
+  const el=document.getElementById('stats-content');
+  if(!eid){alert('Seleccioná una empresa.');return}
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando datos...</div>';
+  // Destruir charts anteriores
+  statsCharts.forEach(c=>{try{c.destroy()}catch{}});statsCharts=[];
+  try{
+    // Cargar datos de proyeccion_diaria de los últimos N días
+    const desde=new Date();desde.setDate(desde.getDate()-dias);
+    const desdeStr=desde.toISOString().slice(0,10);
+    const data=await get('proyeccion_diaria',`empresa_id=eq.${eid}&fecha=gte.${desdeStr}&order=fecha.asc`);
+    if(!data.length){el.innerHTML='<div class="empty"><i class="ti ti-chart-off"></i>Sin datos de ventas en este periodo.</div>';return}
+
+    // Procesar datos
+    const diasSemana=['Lunes','Martes','Miercoles','Jueves','Viernes','Sabado','Domingo'];
+    const porDiaSemana={vend:Array(7).fill(0),tyc:Array(7).fill(0),cnt:Array(7).fill(0)};
+    const porFechaVend={}, porFechaTyc={};
+    const porProductoVend={}, porProductoTyc={};
+
+    data.forEach(d=>{
+      const fecha=new Date(d.fecha+'T00:00:00');
+      const diaSem=(fecha.getDay()+6)%7; // 0=lunes
+      const vend=d.vendedores||0;
+      const tyc=d.tyc||0;
+      if(!vend&&!tyc)return;
+      // Por día de semana
+      porDiaSemana.vend[diaSem]+=vend;
+      porDiaSemana.tyc[diaSem]+=tyc;
+      porDiaSemana.cnt[diaSem]++;
+      // Por fecha (para tendencia)
+      if(!porFechaVend[d.fecha])porFechaVend[d.fecha]=0;
+      if(!porFechaTyc[d.fecha])porFechaTyc[d.fecha]=0;
+      porFechaVend[d.fecha]+=vend;
+      porFechaTyc[d.fecha]+=tyc;
+      // Por producto
+      if(vend>0){
+        if(!porProductoVend[d.producto])porProductoVend[d.producto]=0;
+        porProductoVend[d.producto]+=vend;
+      }
+      if(tyc>0){
+        if(!porProductoTyc[d.producto])porProductoTyc[d.producto]=0;
+        porProductoTyc[d.producto]+=tyc;
+      }
+    });
+
+    // Promedios por día de semana
+    const avgVend=porDiaSemana.vend.map((v,i)=>porDiaSemana.cnt[i]>0?Math.round(v/porDiaSemana.cnt[i]):0);
+    const avgTyc=porDiaSemana.tyc.map((v,i)=>porDiaSemana.cnt[i]>0?Math.round(v/porDiaSemana.cnt[i]):0);
+
+    // Fechas para tendencia
+    const fechas=Object.keys(porFechaVend).sort();
+    const vendTend=fechas.map(f=>porFechaVend[f]||0);
+    const tycTend=fechas.map(f=>porFechaTyc[f]||0);
+
+    // Top 10 productos por canal
+    const topVend=Object.entries(porProductoVend).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    const topTyc=Object.entries(porProductoTyc).sort((a,b)=>b[1]-a[1]).slice(0,10);
+
+    // Colores
+    const azul='rgba(55,138,221,0.8)', azulB='rgba(55,138,221,1)';
+    const naranja='rgba(255,80,0,0.8)', naranjaB='rgba(255,80,0,1)';
+    const verde='rgba(29,158,117,0.8)', verdeB='rgba(29,158,117,1)';
+
+    el.innerHTML=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div class="stock-card" style="padding:14px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px"><i class="ti ti-calendar-week"></i> Promedio de ventas por dia de semana</div>
+          <canvas id="chart-diasem" height="200"></canvas>
+        </div>
+        <div class="stock-card" style="padding:14px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px"><i class="ti ti-users"></i> Vendedores vs T&C por dia</div>
+          <canvas id="chart-canal" height="200"></canvas>
+        </div>
+      </div>
+      <div class="stock-card" style="padding:14px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px"><i class="ti ti-trending-up"></i> Tendencia de ventas — ultimos ${dias} dias</div>
+        <canvas id="chart-tend" height="120"></canvas>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div class="stock-card" style="padding:14px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px"><i class="ti ti-star"></i> Top productos — Vendedores</div>
+          <canvas id="chart-top-vend" height="220"></canvas>
+        </div>
+        <div class="stock-card" style="padding:14px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px"><i class="ti ti-building-store"></i> Top productos — T&C</div>
+          <canvas id="chart-top-tyc" height="220"></canvas>
+        </div>
+      </div>`;
+
+    // Cargar Chart.js si no está
+    if(!window.Chart){
+      await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js';s.onload=res;s.onerror=rej;document.head.appendChild(s)});
+    }
+    const font={family:'system-ui',size:11};
+    const gridColor='rgba(128,128,128,0.1)';
+
+    // 1. Promedio por día de semana (barras apiladas)
+    statsCharts.push(new Chart(document.getElementById('chart-diasem'),{
+      type:'bar',
+      data:{labels:diasSemana,datasets:[
+        {label:'Vendedores',data:avgVend,backgroundColor:azul,borderColor:azulB,borderWidth:1},
+        {label:'T&C',data:avgTyc,backgroundColor:naranja,borderColor:naranjaB,borderWidth:1}
+      ]},
+      options:{responsive:true,plugins:{legend:{labels:{font}},tooltip:{mode:'index'}},scales:{x:{stacked:false,ticks:{font}},y:{ticks:{font},grid:{color:gridColor}}}}
+    }));
+
+    // 2. Canal por día
+    statsCharts.push(new Chart(document.getElementById('chart-canal'),{
+      type:'bar',
+      data:{labels:diasSemana,datasets:[
+        {label:'Vendedores',data:porDiaSemana.vend,backgroundColor:azul},
+        {label:'T&C',data:porDiaSemana.tyc,backgroundColor:naranja}
+      ]},
+      options:{responsive:true,plugins:{legend:{labels:{font}}},scales:{x:{stacked:true,ticks:{font}},y:{stacked:true,ticks:{font},grid:{color:gridColor}}}}
+    }));
+
+    // 3. Tendencia
+    const fechasLabel=fechas.map(f=>{const d=new Date(f+'T00:00:00');return`${d.getDate()}/${d.getMonth()+1}`});
+    statsCharts.push(new Chart(document.getElementById('chart-tend'),{
+      type:'line',
+      data:{labels:fechasLabel,datasets:[
+        {label:'Vendedores',data:vendTend,borderColor:azulB,backgroundColor:'rgba(55,138,221,0.1)',fill:true,tension:0.3,pointRadius:2},
+        {label:'T&C',data:tycTend,borderColor:naranjaB,backgroundColor:'rgba(255,80,0,0.1)',fill:true,tension:0.3,pointRadius:2}
+      ]},
+      options:{responsive:true,plugins:{legend:{labels:{font}}},scales:{x:{ticks:{font,maxTicksLimit:15}},y:{ticks:{font},grid:{color:gridColor}}}}
+    }));
+
+    // 4. Top productos Vendedores
+    statsCharts.push(new Chart(document.getElementById('chart-top-vend'),{
+      type:'bar',
+      data:{labels:topVend.map(x=>x[0]),datasets:[{label:'Vendedores',data:topVend.map(x=>x[1]),backgroundColor:azul,borderColor:azulB,borderWidth:1}]},
+      options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{font},grid:{color:gridColor}},y:{ticks:{font}}}}
+    }));
+
+    // 5. Top productos T&C
+    statsCharts.push(new Chart(document.getElementById('chart-top-tyc'),{
+      type:'bar',
+      data:{labels:topTyc.map(x=>x[0]),datasets:[{label:'T&C',data:topTyc.map(x=>x[1]),backgroundColor:naranja,borderColor:naranjaB,borderWidth:1}]},
+      options:{indexAxis:'y',responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{font},grid:{color:gridColor}},y:{ticks:{font}}}}
+    }));
+
+  }catch(e){el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> Error: ${e.message}</div>`}
+}
 
 init();
 
