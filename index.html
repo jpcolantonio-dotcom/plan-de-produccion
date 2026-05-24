@@ -218,7 +218,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.2</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.3</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -3646,14 +3646,18 @@ async function renderStats(){
   statsCharts.forEach(c=>{try{c.destroy()}catch{}});statsCharts=[];
 
   try{
-    // Buscar las últimas N ocurrencias de los días elegidos
+    // Buscar las últimas N ocurrencias de cada día elegido
     const diasNombre=['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
     const fechasDia=[];
     const hoy=new Date();
-    for(let i=0;i<365&&fechasDia.filter(f=>diasSel.includes(new Date(f+'T00:00:00').getDay())).length<nSemanas*diasSel.length;i++){
+    for(let i=0;i<365;i++){
       const d=new Date(hoy);d.setDate(hoy.getDate()-i);
       const dStr=d.toISOString().slice(0,10);
-      if(diasSel.includes(d.getDay())&&dStr>=desdeMin&&!fechasDia.includes(dStr)){fechasDia.push(dStr);}
+      if(diasSel.includes(d.getDay())&&dStr>=desdeMin){
+        fechasDia.push(dStr);
+      }
+      // Parar cuando tenemos N semanas * cantidad de días
+      if(fechasDia.length>=nSemanas*diasSel.length)break;
     }
     fechasDia.sort();
     if(!fechasDia.length){el.innerHTML='<div class="empty">Sin fechas encontradas.</div>';return}
