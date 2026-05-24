@@ -218,7 +218,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v3.4</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v3.5</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -436,15 +436,26 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <div id="proy-stats" style="display:none">
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
       <select id="stats-esel" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Empresa...</option></select>
-      <select id="stats-periodo" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
-        <option value="30">Ultimos 30 dias</option>
-        <option value="60">Ultimos 60 dias</option>
-        <option value="90">Ultimos 90 dias</option>
+      <select id="stats-dia" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+        <option value="1">Lunes</option>
+        <option value="2">Martes</option>
+        <option value="3">Miercoles</option>
+        <option value="4">Jueves</option>
+        <option value="5">Viernes</option>
+        <option value="6">Sabado</option>
+        <option value="0">Domingo</option>
       </select>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:13px;color:var(--text2)">Ultimas</span>
+        <input type="number" id="stats-semanas" value="4" min="1" max="52" style="width:60px;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+        <span style="font-size:13px;color:var(--text2)">semanas</span>
+      </div>
       <button class="btn btn-primary" onclick="renderStats()"><i class="ti ti-chart-bar"></i> Generar</button>
     </div>
     <div id="stats-content"></div>
   </div>
+  <!-- RESUMEN -->
+  <div id="proy-resumen" style="display:none">
     <div id="proy-resumen-content"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:1rem">
       <button class="btn" onclick="imprimirResumen()"><i class="ti ti-printer"></i> Imprimir resumen</button>
@@ -3584,7 +3595,155 @@ function initStats(){
 
 async function renderStats(){
   const eid=document.getElementById('stats-esel').value;
-  const dias=parseInt(document.getElementById('stats-periodo').value)||30;
+  const diaSel=parseInt(document.getElementById('stats-dia').value); // 0=dom,1=lun...
+  const nSemanas=parseInt(document.getElementById('stats-semanas').value)||4;
+  const el=document.getElementById('stats-content');
+  if(!eid){alert('Seleccioná una empresa.');return}
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando datos...</div>';
+  statsCharts.forEach(c=>{try{c.destroy()}catch{}});statsCharts=[];
+
+  try{
+    // Buscar las últimas N ocurrencias del día elegido
+    const diasNombre=['Domingo','Lunes','Martes','Miercoles','Jueves','Viernes','Sabado'];
+    const fechasDia=[];
+    const hoy=new Date();
+    for(let i=0;fechasDia.length<nSemanas&&i<365;i++){
+      const d=new Date(hoy);d.setDate(hoy.getDate()-i);
+      if(d.getDay()===diaSel){fechasDia.push(d.toISOString().slice(0,10));}
+    }
+    if(!fechasDia.length){el.innerHTML='<div class="empty">Sin fechas encontradas.</div>';return}
+
+    // Cargar datos de todas esas fechas
+    const desde=fechasDia[fechasDia.length-1];
+    const hasta=fechasDia[0];
+    const data=await get('proyeccion_diaria',
+      `empresa_id=eq.${eid}&fecha=gte.${desde}&fecha=lte.${hasta}&order=fecha.asc`
+    );
+    const dataFiltrada=data.filter(d=>fechasDia.includes(d.fecha));
+    if(!dataFiltrada.length){el.innerHTML='<div class="empty"><i class="ti ti-chart-off"></i>Sin datos de ventas para esas fechas.</div>';return}
+
+    // Agrupar por producto y calcular promedios
+    const porProd={};
+    dataFiltrada.forEach(d=>{
+      if(!d.vendedores&&!d.tyc)return;
+      const k=d.producto;
+      if(!porProd[k])porProd[k]={vend:[],tyc:[],area:d.area};
+      // Agregar a la fecha correspondiente
+      const fi=fechasDia.indexOf(d.fecha);
+      if(!porProd[k].vend[fi])porProd[k].vend[fi]=0;
+      if(!porProd[k].tyc[fi])porProd[k].tyc[fi]=0;
+      porProd[k].vend[fi]+=d.vendedores||0;
+      porProd[k].tyc[fi]+=d.tyc||0;
+    });
+
+    // Calcular promedios
+    const promedios=Object.entries(porProd).map(([prod,v])=>{
+      const avgVend=v.vend.reduce((a,b)=>a+(b||0),0)/nSemanas;
+      const avgTyc=v.tyc.reduce((a,b)=>a+(b||0),0)/nSemanas;
+      return{prod,area:v.area,avgVend,avgTyc,total:avgVend+avgTyc,
+        vendPorFecha:fechasDia.map((_,i)=>v.vend[i]||0),
+        tycPorFecha:fechasDia.map((_,i)=>v.tyc[i]||0)};
+    }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total);
+
+    // Labels de fechas (dd/mm)
+    const labels=fechasDia.map(f=>{const d=new Date(f+'T00:00:00');return`${d.getDate()}/${d.getMonth()+1}`}).reverse();
+    const fechasDiaRev=[...fechasDia].reverse();
+
+    const azul='rgba(55,138,221,0.8)';const naranja='rgba(255,80,0,0.8)';
+    const font={family:'system-ui',size:11};const gridColor='rgba(128,128,128,0.1)';
+
+    // Resumen promedio
+    const totalVend=promedios.reduce((s,p)=>s+p.avgVend,0);
+    const totalTyc=promedios.reduce((s,p)=>s+p.avgTyc,0);
+
+    el.innerHTML=`
+      <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+        <div class="stock-card" style="padding:12px 18px;flex:1;min-width:200px;text-align:center">
+          <div style="font-size:12px;color:var(--text2)">Promedio Vendedores / ${diasNombre[diaSel]}</div>
+          <div style="font-size:28px;font-weight:700;color:var(--blue)">${Math.round(totalVend).toLocaleString('es-AR')}</div>
+        </div>
+        <div class="stock-card" style="padding:12px 18px;flex:1;min-width:200px;text-align:center">
+          <div style="font-size:12px;color:var(--text2)">Promedio T&C / ${diasNombre[diaSel]}</div>
+          <div style="font-size:28px;font-weight:700;color:var(--amber)">${Math.round(totalTyc).toLocaleString('es-AR')}</div>
+        </div>
+        <div class="stock-card" style="padding:12px 18px;flex:1;min-width:200px;text-align:center">
+          <div style="font-size:12px;color:var(--text2)">Total promedio / ${diasNombre[diaSel]}</div>
+          <div style="font-size:28px;font-weight:700;color:var(--green)">${Math.round(totalVend+totalTyc).toLocaleString('es-AR')}</div>
+        </div>
+        <div class="stock-card" style="padding:12px 18px;flex:1;min-width:200px;text-align:center">
+          <div style="font-size:12px;color:var(--text2)">Basado en</div>
+          <div style="font-size:28px;font-weight:700;color:var(--text)">${nSemanas}</div>
+          <div style="font-size:11px;color:var(--text2)">${diasNombre[diaSel]}s</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div class="stock-card" style="padding:14px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px"><i class="ti ti-trending-up"></i> Tendencia por ${diasNombre[diaSel]} — Vendedores</div>
+          <canvas id="chart-tend-vend" height="200"></canvas>
+        </div>
+        <div class="stock-card" style="padding:14px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:10px"><i class="ti ti-trending-up"></i> Tendencia por ${diasNombre[diaSel]} — T&C</div>
+          <canvas id="chart-tend-tyc" height="200"></canvas>
+        </div>
+      </div>
+      <div class="stock-card" style="padding:14px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px"><i class="ti ti-star"></i> Promedio por producto — Top ${Math.min(promedios.length,15)}</div>
+        <canvas id="chart-prods" height="150"></canvas>
+      </div>
+      <div class="stock-card" style="padding:14px">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px"><i class="ti ti-table"></i> Detalle por producto</div>
+        <table class="stock-tbl"><thead><tr>
+          <th style="text-align:left">Producto</th><th style="text-align:left">Area</th>
+          ${fechasDiaRev.map(f=>{const d=new Date(f+'T00:00:00');return`<th style="text-align:right">${d.getDate()}/${d.getMonth()+1}</th>`}).join('')}
+          <th style="text-align:right;background:#E6F1FB;color:#0C447C">Prom. Vend</th>
+          <th style="text-align:right;background:#FFF8EE;color:#854F0B">Prom. T&C</th>
+        </tr></thead><tbody>
+        ${promedios.map(p=>`<tr>
+          <td style="font-weight:500">${p.prod}</td>
+          <td class="muted">${p.area}</td>
+          ${fechasDiaRev.map((_,i)=>{const v=p.vendPorFecha[i]||0;const t=p.tycPorFecha[i]||0;return`<td style="text-align:right;font-size:11px">${v>0||t>0?`<span style="color:var(--blue)">${v}</span>/<span style="color:var(--amber)">${t}</span>`:'--'}</td>`}).join('')}
+          <td style="text-align:right;font-weight:700;background:#E6F1FB;color:#0C447C">${Math.round(p.avgVend).toLocaleString('es-AR')}</td>
+          <td style="text-align:right;font-weight:700;background:#FFF8EE;color:#854F0B">${Math.round(p.avgTyc).toLocaleString('es-AR')}</td>
+        </tr>`).join('')}
+        </tbody></table>
+      </div>`;
+
+    // Cargar Chart.js
+    if(!window.Chart){
+      await new Promise((res,rej)=>{const s=document.createElement('script');s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js';s.onload=res;s.onerror=rej;document.head.appendChild(s)});
+    }
+
+    // Top productos para gráfico
+    const top=promedios.slice(0,15);
+
+    // Gráfico tendencia Vendedores por fecha
+    const vendPorFechaTotal=fechasDiaRev.map((_,i)=>promedios.reduce((s,p)=>s+(p.vendPorFecha[i]||0),0));
+    statsCharts.push(new Chart(document.getElementById('chart-tend-vend'),{
+      type:'bar',
+      data:{labels,datasets:[{label:'Vendedores',data:vendPorFechaTotal,backgroundColor:azul,borderColor:'rgba(55,138,221,1)',borderWidth:1}]},
+      options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{font}},y:{ticks:{font},grid:{color:gridColor}}}}
+    }));
+
+    // Gráfico tendencia T&C por fecha
+    const tycPorFechaTotal=fechasDiaRev.map((_,i)=>promedios.reduce((s,p)=>s+(p.tycPorFecha[i]||0),0));
+    statsCharts.push(new Chart(document.getElementById('chart-tend-tyc'),{
+      type:'bar',
+      data:{labels,datasets:[{label:'T&C',data:tycPorFechaTotal,backgroundColor:naranja,borderColor:'rgba(255,80,0,1)',borderWidth:1}]},
+      options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{font}},y:{ticks:{font},grid:{color:gridColor}}}}
+    }));
+
+    // Gráfico top productos
+    statsCharts.push(new Chart(document.getElementById('chart-prods'),{
+      type:'bar',
+      data:{labels:top.map(p=>p.prod),datasets:[
+        {label:'Prom. Vendedores',data:top.map(p=>Math.round(p.avgVend)),backgroundColor:azul},
+        {label:'Prom. T&C',data:top.map(p=>Math.round(p.avgTyc)),backgroundColor:naranja}
+      ]},
+      options:{responsive:true,plugins:{legend:{labels:{font}}},scales:{x:{stacked:true,ticks:{font,maxRotation:45}},y:{stacked:true,ticks:{font},grid:{color:gridColor}}}}
+    }));
+
+  }catch(e){el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> Error: ${e.message}</div>`}
+}
   const el=document.getElementById('stats-content');
   if(!eid){alert('Seleccioná una empresa.');return}
   el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando datos...</div>';
