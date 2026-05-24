@@ -218,7 +218,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v3.8</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v3.9</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -3631,6 +3631,8 @@ async function renderStats(){
     // Agrupar por producto y calcular promedios
     const porProd={};
     dataFiltrada.forEach(d=>{
+      const vend=d.vendedores||0;
+      const tyc=d.tyc||0;
       if(!vend&&!tyc)return;
       const k=d.producto;
       if(!porProd[k])porProd[k]={vend:Array(nSemanas).fill(0),tyc:Array(nSemanas).fill(0),area:d.area};
