@@ -1921,7 +1921,9 @@ function renderDepConfig(){
     h+=`<div class="stock-card" style="margin-bottom:1.5rem">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:.5px solid var(--border);background:var(--bg2)">
         <div>
-          <span style="font-size:15px;font-weight:700"><i class="ti ti-temperature-snow" style="color:var(--blue)"></i> ${dep.nombre}</span>
+          <span style="font-size:15px;font-weight:700"><i class="ti ti-temperature-snow" style="color:var(--blue)"></i>
+            <span id="dep-nombre-${dep.id}" onclick="editDepNombre('${dep.id}')" title="Click para editar" style="cursor:pointer;border-bottom:1px dashed var(--border2)">${dep.nombre}</span>
+          </span>
           <span style="font-size:12px;color:var(--text2);margin-left:10px">Capacidad total: <b>${capTotal} cajas</b></span>
         </div>
         <button class="btn btn-xs btn-danger" onclick="deleteDeposito('${dep.id}','${dep.nombre}')"><i class="ti ti-trash"></i></button>
@@ -2102,6 +2104,33 @@ async function deleteDepProd(id){
   }catch(e){ss('error','Error')}
 }
 
+function editDepNombre(depId){
+  const span=document.getElementById(`dep-nombre-${depId}`);
+  if(!span||span.querySelector('input'))return;
+  const nombreActual=depositosData.find(d=>d.id===depId)?.nombre||'';
+  span.innerHTML=`<input type="text" value="${nombreActual}" 
+    style="font-size:15px;font-weight:700;border:none;border-bottom:2px solid var(--blue);background:transparent;outline:none;width:200px;padding:0 2px"
+    onblur="guardarDepNombre('${depId}',this.value)"
+    onkeydown="if(event.key==='Enter')this.blur();if(event.key==='Escape'){this.value='${nombreActual}';this.blur()}"
+  />`;
+  span.querySelector('input').focus();
+}
+
+async function guardarDepNombre(depId,nuevoNombre){
+  nuevoNombre=nuevoNombre.trim();
+  const dep=depositosData.find(d=>d.id===depId);
+  if(!dep||!nuevoNombre||nuevoNombre===dep.nombre){renderDepConfig();return}
+  ss('saving','Guardando...');
+  try{
+    await fetch(`${SB}/rest/v1/depositos?id=eq.${depId}`,{
+      method:'PATCH',headers:{...H,'Content-Type':'application/json'},
+      body:JSON.stringify({nombre:nuevoNombre})
+    });
+    dep.nombre=nuevoNombre;
+    renderDepConfig();ss('online','Nombre actualizado');
+  }catch(e){ss('error','Error: '+e.message);renderDepConfig();}
+}
+
 async function addDepFamilia(depId){
   const cod=(document.getElementById(`nf-cod-${depId}`)?.value||'').trim().toUpperCase();
   const nom=(document.getElementById(`nf-nom-${depId}`)?.value||'').trim();
@@ -2199,6 +2228,7 @@ function renderDepCalc(){
         </td></tr>`;
       }
 
+      let subtotalCajas=0; let subtotalUds=0;
       fProds.forEach(p=>{
         const mix=mixData.find(m=>m.empresa_id===p.empresa_id&&m.area===p.area&&m.producto===p.producto);
         const caja=cajasData.find(c=>c.empresa_id===p.empresa_id&&c.area===p.area&&c.producto===p.producto);
@@ -2213,8 +2243,8 @@ function renderDepCalc(){
         const torresCompletas=Math.floor(cajasRaw/cajasXtorre);
         const cajasReales=torresCompletas*cajasXtorre;
         const unidades=cajasReales*ujc;
-        totalCajasUsadas+=cajasReales;
-        if(ujc>0)totalUnidades+=unidades;
+        totalCajasUsadas+=cajasReales; subtotalCajas+=cajasReales;
+        if(ujc>0){totalUnidades+=unidades; subtotalUds+=unidades;}
         h+=`<tr>
           <td style="font-weight:500">${p.producto}</td>
           <td class="muted">${p.area}</td>
@@ -2225,6 +2255,16 @@ function renderDepCalc(){
           <td style="text-align:right;color:var(--text2)">${ujc>0?unidades.toLocaleString('es-AR')+'<span style="font-size:10px"> uds</span>':'--'}</td>
         </tr>`;
       });
+      // Subtotal por familia
+      if(famsDep2.length && fProds.length>0){
+        const famColor=famObj?'var(--amber)':'var(--text3)';
+        const sobranteFam=capFam-subtotalCajas;
+        h+=`<tr style="background:${famObj?'var(--amber)09':'var(--bg2)'}">
+          <td colspan="5" style="padding:5px 12px;font-size:12px;font-weight:600;color:${famColor}">Subtotal ${famObj?famObj.nombre:''}</td>
+          <td style="text-align:right;font-weight:700;color:${famColor}">${subtotalCajas.toLocaleString('es-AR')} <span style="font-size:10px;font-weight:400;color:var(--text2)">· sob: ${sobranteFam}</span></td>
+          <td style="text-align:right;font-weight:700;color:${famColor}">${subtotalUds>0?subtotalUds.toLocaleString('es-AR')+'<span style="font-size:10px"> uds</span>':'--'}</td>
+        </tr>`;
+      }
     });
 
     const sobrante=capTotal-totalCajasUsadas;
