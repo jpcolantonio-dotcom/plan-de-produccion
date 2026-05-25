@@ -1869,7 +1869,7 @@ function showStockTab(t){
 }
 
 // ── DEPOSITOS ─────────────────────────────────────────────────────
-let depositosData=[], depTorresData=[], depProdData=[];
+let depositosData=[], depTorresData=[], depProdData=[], depFamiliasData=[];
 
 function showDepTab(t){
   ['config','calc'].forEach(id=>{
@@ -1896,9 +1896,12 @@ async function loadDepositos(){
     depositosData=await get('depositos',`empresa_id=eq.${eid}&order=nombre.asc`);
     if(depositosData.length){
       const ids=depositosData.map(d=>d.id);
-      depTorresData=await get('deposito_torres',`deposito_id=in.(${ids.join(',')})&order=created_at.asc`);
-      depProdData=await get('deposito_productos',`deposito_id=in.(${ids.join(',')})&order=area.asc,producto.asc`);
-    } else {depTorresData=[];depProdData=[];}
+      [depTorresData,depProdData,depFamiliasData]=await Promise.all([
+        get('deposito_torres',`deposito_id=in.(${ids.join(',')})&order=created_at.asc`),
+        get('deposito_productos',`deposito_id=in.(${ids.join(',')})&order=area.asc,producto.asc`),
+        get('deposito_familias',`deposito_id=in.(${ids.join(',')})&order=nombre.asc`)
+      ]);
+    } else {depTorresData=[];depProdData=[];depFamiliasData=[];}
   }catch(e){console.error(e)}
   renderDepConfig();
 }
@@ -1924,14 +1927,37 @@ function renderDepConfig(){
         <button class="btn btn-xs btn-danger" onclick="deleteDeposito('${dep.id}','${dep.nombre}')"><i class="ti ti-trash"></i></button>
       </div>
 
+      <!-- Familias -->
+      <div style="padding:12px;border-bottom:.5px solid var(--border)">
+        <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">FAMILIAS DE TORRES</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">`;
+    const fams=depFamiliasData.filter(f=>f.deposito_id===dep.id);
+    fams.forEach(f=>{
+      h+=`<div style="background:var(--amber)11;border:.5px solid var(--amber)55;border-radius:var(--radius);padding:5px 12px;font-size:12px;display:flex;align-items:center;gap:8px">
+        <span style="font-weight:700;color:var(--amber)">${f.codigo}</span>
+        <span style="color:var(--text)">${f.nombre}</span>
+        <button class="btn btn-xs btn-danger" onclick="deleteDepFamilia('${f.id}')"><i class="ti ti-x"></i></button>
+      </div>`;
+    });
+    if(!fams.length)h+=`<span style="font-size:12px;color:var(--text3)">Sin familias. Agregá una para organizar las torres.</span>`;
+    h+=`</div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="text" id="nf-cod-${dep.id}" placeholder="Código (ej: B)" maxlength="5" style="width:80px;padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+          <input type="text" id="nf-nom-${dep.id}" placeholder="Nombre (ej: Burritos)" style="width:160px;padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+          <button class="btn btn-sm" onclick="addDepFamilia('${dep.id}')"><i class="ti ti-plus"></i> Agregar familia</button>
+        </div>
+      </div>
+
       <!-- Torres -->
       <div style="padding:12px;border-bottom:.5px solid var(--border)">
         <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:8px">TORRES</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">`;
 
+    const famsDep=depFamiliasData.filter(f=>f.deposito_id===dep.id);
     torres.forEach(t=>{
       const cap=t.cantidad*t.altura_cajas*(t.doble?2:1);
-      const famBadge=t.familia?`<span style="background:var(--amber)22;border:.5px solid var(--amber)66;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;color:var(--amber)">Fam. ${t.familia}</span>`:'';
+      const famObj=famsDep.find(f=>f.codigo===t.familia);
+      const famBadge=famObj?`<span style="background:var(--amber)22;border:.5px solid var(--amber)66;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;color:var(--amber)">${famObj.codigo} · ${famObj.nombre}</span>`:'';
       h+=`<div style="background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:12px;display:flex;align-items:center;gap:8px">
         ${famBadge}<span><b>${t.cantidad}</b> torre${t.cantidad>1?'s':''} × <b>${t.altura_cajas}</b> cajas${t.doble?' <span style="color:var(--blue)">(doble)</span>':''} = <b style="color:var(--green)">${cap}</b> cajas</span>
         <button class="btn btn-xs btn-danger" onclick="deleteTorreDeposito('${t.id}')"><i class="ti ti-x"></i></button>
@@ -1942,7 +1968,10 @@ function renderDepConfig(){
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <input type="number" id="nt-cant-${dep.id}" placeholder="Cant. torres" min="1" value="1" style="width:90px;padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
           <input type="number" id="nt-alt-${dep.id}" placeholder="Altura cajas" min="1" value="8" style="width:90px;padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
-          <input type="text" id="nt-fam-${dep.id}" placeholder="Familia (ej: B, P)" style="width:110px;padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+          <select id="nt-fam-${dep.id}" style="padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)">
+            <option value="">Sin familia</option>
+            ${famsDep.map(f=>`<option value="${f.codigo}">${f.codigo} · ${f.nombre}</option>`).join('')}
+          </select>
           <label style="font-size:12px;display:flex;align-items:center;gap:4px">
             <input type="checkbox" id="nt-doble-${dep.id}"/> Doble
           </label>
@@ -2034,20 +2063,17 @@ function showAddProdDeposito(depId,eid){
     opts+=`</optgroup>`;
   });
   // Familias disponibles en este depósito
-  const torres=depTorresData.filter(t=>t.deposito_id===depId);
-  const familias=[...new Set(torres.map(t=>t.familia).filter(Boolean))];
-  const famOpts=familias.length
-    ?familias.map(f=>`<option value="${f}">${f}</option>`).join('')
-    :'<option value="">Sin familias definidas</option>';
+  const famsDep=depFamiliasData.filter(f=>f.deposito_id===depId);
+  const famOpts=famsDep.map(f=>`<option value="${f.codigo}">${f.codigo} · ${f.nombre}</option>`).join('');
   overlay.innerHTML=`<div class="modal" style="width:420px">
     <div class="modal-title"><i class="ti ti-box"></i> Asignar producto al deposito</div>
     <select id="modal-dep-prod-sel" style="width:100%;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);margin-bottom:10px">${opts}</select>
-    ${familias.length?`<div style="margin-bottom:1rem">
-      <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Familia de torres (opcional)</label>
-      <select id="modal-dep-prod-fam" style="width:100%;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)">
+    <div style="margin-bottom:1rem">
+      <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Familia de torres${famsDep.length?'':' <span style="color:var(--amber)">(definí familias primero en Configuración)</span>'}</label>
+      <select id="modal-dep-prod-fam" style="width:100%;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"${famsDep.length?'':' disabled'}>
         <option value="">Sin familia asignada</option>${famOpts}
       </select>
-    </div>`:''}
+    </div>
     <div class="modal-btns">
       <button class="btn" onclick="document.getElementById('modal-dep-prod').remove()">Cancelar</button>
       <button class="btn btn-primary" onclick="confirmarAddDepProd('${depId}')">Asignar</button>
@@ -2073,6 +2099,30 @@ async function deleteDepProd(id){
   try{
     await fetch(`${SB}/rest/v1/deposito_productos?id=eq.${id}`,{method:'DELETE',headers:H});
     depProdData=depProdData.filter(p=>p.id!==id);renderDepConfig();ss('online','Eliminado');
+  }catch(e){ss('error','Error')}
+}
+
+async function addDepFamilia(depId){
+  const cod=(document.getElementById(`nf-cod-${depId}`)?.value||'').trim().toUpperCase();
+  const nom=(document.getElementById(`nf-nom-${depId}`)?.value||'').trim();
+  if(!cod||!nom){alert('Completá el código y el nombre de la familia.');return}
+  if(depFamiliasData.find(f=>f.deposito_id===depId&&f.codigo===cod)){alert(`Ya existe la familia "${cod}" en este deposito.`);return}
+  ss('saving','Guardando...');
+  try{
+    const res=await ins('deposito_familias',{deposito_id:depId,codigo:cod,nombre:nom});
+    depFamiliasData.push(res[0]);
+    document.getElementById(`nf-cod-${depId}`).value='';
+    document.getElementById(`nf-nom-${depId}`).value='';
+    renderDepConfig();ss('online','Familia agregada');
+  }catch(e){ss('error','Error: '+e.message)}
+}
+
+async function deleteDepFamilia(id){
+  const fam=depFamiliasData.find(f=>f.id===id);
+  if(fam&&!confirm(`¿Eliminar familia "${fam.codigo} · ${fam.nombre}"? Las torres y productos con esta familia quedarán sin asignar.`))return;
+  try{
+    await fetch(`${SB}/rest/v1/deposito_familias?id=eq.${id}`,{method:'DELETE',headers:H});
+    depFamiliasData=depFamiliasData.filter(f=>f.id!==id);renderDepConfig();ss('online','Familia eliminada');
   }catch(e){ss('error','Error')}
 }
 
@@ -2113,37 +2163,68 @@ function renderDepCalc(){
         <th style="text-align:right">Unidades</th>
       </tr></thead><tbody>`;
 
+    // Calcular capacidad por familia de torres
+    const famsDep2=depFamiliasData.filter(f=>f.deposito_id===dep.id);
+    const capPorFam={};
+    if(famsDep2.length){
+      famsDep2.forEach(f=>{
+        const tFam=torres.filter(t=>t.familia===f.codigo);
+        capPorFam[f.codigo]=tFam.reduce((s,t)=>s+t.cantidad*t.altura_cajas*(t.doble?2:1),0);
+      });
+    }
+    // Agrupar productos por familia
+    const prodsPorFam={};
+    prods.forEach(p=>{
+      const k=p.familia_torre||'_SIN_';
+      if(!prodsPorFam[k])prodsPorFam[k]=[];
+      prodsPorFam[k].push(p);
+    });
+
     let totalCajasUsadas=0;
     let totalUnidades=0;
-    prods.forEach(p=>{
-      const mix=mixData.find(m=>m.empresa_id===p.empresa_id&&m.area===p.area&&m.producto===p.producto);
-      const caja=cajasData.find(c=>c.empresa_id===p.empresa_id&&c.area===p.area&&c.producto===p.producto);
-      const pct=mix?mix.porcentaje:0;
-      const ujc=caja?caja.unidades_por_caja:0;
-      if(!pct){
-        h+=`<tr><td style="font-weight:500">${p.producto}</td><td class="muted">${p.area}</td>
-          <td colspan="5" style="text-align:center;color:var(--text3);font-size:12px">Sin % mix definido</td></tr>`;
-        return;
+
+    Object.entries(prodsPorFam).forEach(([famCod,fProds])=>{
+      const famObj=famsDep2.find(f=>f.codigo===famCod);
+      const capFam=famObj&&capPorFam[famCod]?capPorFam[famCod]:capTotal;
+      const torresFam=famObj?torres.filter(t=>t.familia===famCod):torres;
+      const alturaRef=torresFam.length?torresFam[0].altura_cajas:(torres[0]?.altura_cajas||8);
+      const cajasXtorre=alturaRef*(torresFam[0]?.doble||torres[0]?.doble?2:1);
+
+      // Encabezado de familia si hay familias definidas
+      if(famsDep2.length){
+        const famLabel=famObj?`${famObj.codigo} · ${famObj.nombre}`:'Sin familia asignada';
+        const famColor=famObj?'var(--amber)':'var(--text3)';
+        h+=`<tr style="background:var(--bg2)"><td colspan="7" style="padding:6px 12px;font-size:11px;font-weight:700;color:${famColor};border-top:1.5px solid ${famColor}44">
+          ${famLabel} — Capacidad: <b>${capFam} cajas</b>
+        </td></tr>`;
       }
-      // Buscar la altura de torre más común para este depósito
-      const alturaRef=torres.length?torres[0].altura_cajas:8;
-      const cajasXtorre=alturaRef*(torres[0]?.doble?2:1);
-      const cajasRaw=capTotal*(pct/100);
-      // Columnas completas sin mezclar = floor(cajasRaw / cajasXtorre) * cajasXtorre
-      const torresCompletas=Math.floor(cajasRaw/cajasXtorre);
-      const cajasReales=torresCompletas*cajasXtorre;
-      const unidades=cajasReales*ujc;
-      totalCajasUsadas+=cajasReales;
-      if(ujc>0)totalUnidades+=unidades;
-      h+=`<tr>
-        <td style="font-weight:500">${p.producto}</td>
-        <td class="muted">${p.area}</td>
-        <td style="text-align:right">${pct.toFixed(1)}%</td>
-        <td style="text-align:right;color:var(--text2)">${cajasRaw.toFixed(1)}</td>
-        <td style="text-align:right">${torresCompletas}</td>
-        <td style="text-align:right;font-weight:700;color:var(--green)">${cajasReales.toLocaleString('es-AR')}</td>
-        <td style="text-align:right;color:var(--text2)">${ujc>0?unidades.toLocaleString('es-AR')+'<span style="font-size:10px"> uds</span>':'--'}</td>
-      </tr>`;
+
+      fProds.forEach(p=>{
+        const mix=mixData.find(m=>m.empresa_id===p.empresa_id&&m.area===p.area&&m.producto===p.producto);
+        const caja=cajasData.find(c=>c.empresa_id===p.empresa_id&&c.area===p.area&&c.producto===p.producto);
+        const pct=mix?mix.porcentaje:0;
+        const ujc=caja?caja.unidades_por_caja:0;
+        if(!pct){
+          h+=`<tr><td style="font-weight:500">${p.producto}</td><td class="muted">${p.area}</td>
+            <td colspan="5" style="text-align:center;color:var(--text3);font-size:12px">Sin % mix definido</td></tr>`;
+          return;
+        }
+        const cajasRaw=capFam*(pct/100);
+        const torresCompletas=Math.floor(cajasRaw/cajasXtorre);
+        const cajasReales=torresCompletas*cajasXtorre;
+        const unidades=cajasReales*ujc;
+        totalCajasUsadas+=cajasReales;
+        if(ujc>0)totalUnidades+=unidades;
+        h+=`<tr>
+          <td style="font-weight:500">${p.producto}</td>
+          <td class="muted">${p.area}</td>
+          <td style="text-align:right">${pct.toFixed(1)}%</td>
+          <td style="text-align:right;color:var(--text2)">${cajasRaw.toFixed(1)}</td>
+          <td style="text-align:right">${torresCompletas}</td>
+          <td style="text-align:right;font-weight:700;color:var(--green)">${cajasReales.toLocaleString('es-AR')}</td>
+          <td style="text-align:right;color:var(--text2)">${ujc>0?unidades.toLocaleString('es-AR')+'<span style="font-size:10px"> uds</span>':'--'}</td>
+        </tr>`;
+      });
     });
 
     const sobrante=capTotal-totalCajasUsadas;
