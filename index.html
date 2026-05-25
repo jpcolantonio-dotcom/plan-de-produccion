@@ -1665,9 +1665,8 @@ function renderCumplimientoEmpresas(k){
     const eid=r.empresa_id||'_';
     if(ef!=='all'&&eid!==ef)return;
     const rk=rKey(r);
-    const oi=plan.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
     const pv=(r.days&&r.days[dia])||0;
-    const rv=(real[rk]||real[oi]||[])[dia]||0;
+    const _rv=real[rk]?.[dia];const rv=(_rv!==undefined&&_rv!==null)?_rv:0;
     if(pv>0&&rv>0){
       if(!byEmp[eid])byEmp[eid]={plan:0,real:0,nm:en(eid)||'SE',clr:ec(eid)};
       byEmp[eid].plan+=pv;
@@ -1732,9 +1731,8 @@ function buildDashItems(k,ef){
   let filtered=ef==='all'?plan:plan.filter(r=>r.empresa_id===ef);
   filtered.forEach(r=>{
     const rk=rKey(r);
-    const oi=(st.P[k]||[]).findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
     const pv=(r.days&&r.days[dia])||0;
-    const rv=(real[rk]||real[oi]||[])[dia]||0;
+    const _rv2=real[rk]?.[dia];const rv=(_rv2!==undefined&&_rv2!==null)?_rv2:0;
     if(pv>0){
       if(!byArea[r.area])byArea[r.area]={empresa_id:r.empresa_id,items:[]};
       byArea[r.area].items.push({produto:r.producto,area:r.area,unidad:r.unidad,empresa_id:r.empresa_id,pv,rv});
@@ -2654,7 +2652,8 @@ async function showCerrarDiaModal(){
   const diaIdx=new Date().getDay();const di=(diaIdx+6)%7; // convertir a lunes=0
   const items=[];
   plan.forEach((r,oi)=>{
-    const rv=(real[oi]&&real[oi][di])||0;
+    const rk=rKey(r);
+    const _rv3=real[rk]?.[di];const rv=(_rv3!==undefined&&_rv3!==null)?_rv3:0;
     if(rv>0)items.push({oi,producto:r.producto,area:r.area,unidad:r.unidad,empresa_id:r.empresa_id,cantidad:rv});
   });
   if(!items.length){alert('No hay produccion real cargada para hoy.');return}
@@ -3213,7 +3212,8 @@ function renderResumen(){
     // Buscar produccion real del dia
     const oi=plan.findIndex(r=>r.producto===p.nombre&&r.empresa_id===eid&&r.area===area);
     const rk=`${eid}||${area}||${p.nombre}`;
-    const realDia=(real[rk]&&real[rk][diIdx])||(real[oi]&&real[oi][diIdx])||0;
+    const _rkVal=real[rk]?.[diIdx];
+    const realDia=(_rkVal!==undefined&&_rkVal!==null)?_rkVal:0;
     const proy=getProyItem(eid,area,p.nombre);
     const stock=proy?proy.stock:0;
     const vend=proy?proy.vendedores:0;
