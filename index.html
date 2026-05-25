@@ -218,7 +218,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.4</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.5</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1384,7 +1384,7 @@ async function renderCon(){
     const fr=document.getElementById('cfrom').value;const to=document.getElementById('cto').value;
     if(!fr||!to){el.innerHTML='<div class="alert alert-info"><i class="ti ti-info-circle"></i> Selecciona el rango.</div>';return}
     sems=st.Sem.filter(w=>{const we=addW(w,1);return w<=to&&we>fr});
-    if(!sems.length)sems=[wk(new Date(fr))];
+    if(!sems.length)sems=[wk(new Date(fr+'T00:00:00'))];
   }
   el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Calculando...</div>';
   await Promise.all(sems.map(w=>lp(w)));
@@ -2992,7 +2992,7 @@ function showProyTab(t){
   });
   if(t==='resumen'){
     const fecha=document.getElementById('proy-fecha').value;
-    const semKey=wk(new Date(fecha));
+    const semKey=wk(new Date(fecha+'T00:00:00'));
     // Forzar recarga fresca
     delete st.P[semKey]; delete st.R[semKey];
     Promise.all([lp(semKey),lr(semKey)]).then(()=>renderResumen());
@@ -3025,7 +3025,7 @@ async function initProy(){
   st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se.appendChild(o)});
   if(cur)se.value=cur;
   // Cargar plan del dia
-  const semKey=wk(new Date(hoy));
+  const semKey=wk(new Date(hoy+'T00:00:00'));
   await lp(semKey);
   await loadProy();
 }
@@ -3195,7 +3195,7 @@ function renderResumen(){
   const fecha=document.getElementById('proy-fecha').value;
   const ef=document.getElementById('proy-esel').value;
   const el=document.getElementById('proy-resumen-content');
-  const semKey=wk(new Date(fecha));
+  const semKey=wk(new Date(fecha+'T00:00:00'));
   const diIdx=(new Date(fecha+'T00:00:00').getDay()+6)%7;
   const plan=st.P[semKey]||[];
   const real=st.R[semKey]||{};
