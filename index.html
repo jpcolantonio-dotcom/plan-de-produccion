@@ -2155,11 +2155,10 @@ async function deleteDepFamilia(id){
   }catch(e){ss('error','Error')}
 }
 
-function renderDepCalc(){
+async function renderDepCalc(){
   const eid=document.getElementById('dep-calc-esel').value;
   const el=document.getElementById('dep-calc-content');
   if(!eid){
-    // Sincronizar empresa con la de config
     const eselConf=document.getElementById('dep-esel').value;
     if(eselConf){document.getElementById('dep-calc-esel').value=eselConf;}
   }
@@ -2167,6 +2166,18 @@ function renderDepCalc(){
   if(!eidFinal){el.innerHTML='<div class="empty">Seleccioná una empresa.</div>';return}
   const deps=depositosData.filter(d=>d.empresa_id===eidFinal);
   if(!deps.length){el.innerHTML='<div class="empty">Sin depositos configurados.</div>';return}
+  // Asegurar que mixData y cajasData están cargados para esta empresa
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando...</div>';
+  try{
+    let fMix='order=area.asc,producto.asc';
+    if(eidFinal!=='all')fMix+=`&empresa_id=eq.${eidFinal}`;
+    const[freshMix,freshCajas]=await Promise.all([
+      get('mix_ventas',fMix),
+      get('cajas_producto',`empresa_id=eq.${eidFinal}`)
+    ]);
+    if(freshMix.length)mixData=freshMix;
+    if(freshCajas.length)cajasData=freshCajas;
+  }catch(e){console.error('Error cargando mix/cajas:',e)}
 
   let h='';
   deps.forEach(dep=>{
