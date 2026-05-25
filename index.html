@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -1930,8 +1931,9 @@ function renderDepConfig(){
 
     torres.forEach(t=>{
       const cap=t.cantidad*t.altura_cajas*(t.doble?2:1);
+      const famBadge=t.familia?`<span style="background:var(--amber)22;border:.5px solid var(--amber)66;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;color:var(--amber)">Fam. ${t.familia}</span>`:'';
       h+=`<div style="background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:12px;display:flex;align-items:center;gap:8px">
-        <span><b>${t.cantidad}</b> torre${t.cantidad>1?'s':''} × <b>${t.altura_cajas}</b> cajas${t.doble?' <span style="color:var(--blue)">(doble)</span>':''} = <b style="color:var(--green)">${cap}</b> cajas</span>
+        ${famBadge}<span><b>${t.cantidad}</b> torre${t.cantidad>1?'s':''} × <b>${t.altura_cajas}</b> cajas${t.doble?' <span style="color:var(--blue)">(doble)</span>':''} = <b style="color:var(--green)">${cap}</b> cajas</span>
         <button class="btn btn-xs btn-danger" onclick="deleteTorreDeposito('${t.id}')"><i class="ti ti-x"></i></button>
       </div>`;
     });
@@ -1940,6 +1942,7 @@ function renderDepConfig(){
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <input type="number" id="nt-cant-${dep.id}" placeholder="Cant. torres" min="1" value="1" style="width:90px;padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
           <input type="number" id="nt-alt-${dep.id}" placeholder="Altura cajas" min="1" value="8" style="width:90px;padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+          <input type="text" id="nt-fam-${dep.id}" placeholder="Familia (ej: B, P)" style="width:110px;padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
           <label style="font-size:12px;display:flex;align-items:center;gap:4px">
             <input type="checkbox" id="nt-doble-${dep.id}"/> Doble
           </label>
@@ -1953,8 +1956,9 @@ function renderDepConfig(){
         <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">`;
 
     prods.forEach(p=>{
+      const famBadge=p.familia_torre?`<span style="background:var(--amber)22;border-radius:8px;padding:1px 6px;font-size:10px;font-weight:700;color:var(--amber)">${p.familia_torre}</span>`:'';
       h+=`<span style="background:var(--blue)14;border:.5px solid var(--blue)44;border-radius:20px;padding:3px 10px;font-size:12px;display:inline-flex;align-items:center;gap:6px">
-        ${p.producto} <span style="font-size:10px;color:var(--text2)">${p.area}</span>
+        ${famBadge}${p.producto} <span style="font-size:10px;color:var(--text2)">${p.area}</span>
         <button onclick="deleteDepProd('${p.id}')" style="background:none;border:none;cursor:pointer;color:var(--red);font-size:12px;padding:0;line-height:1">×</button>
       </span>`;
     });
@@ -1997,9 +2001,10 @@ async function addTorreDeposito(depId){
   const cant=parseInt(document.getElementById(`nt-cant-${depId}`)?.value)||1;
   const alt=parseInt(document.getElementById(`nt-alt-${depId}`)?.value)||8;
   const doble=document.getElementById(`nt-doble-${depId}`)?.checked||false;
+  const familia=(document.getElementById(`nt-fam-${depId}`)?.value||'').trim().toUpperCase()||null;
   ss('saving','Guardando...');
   try{
-    const res=await ins('deposito_torres',{deposito_id:depId,cantidad:cant,altura_cajas:alt,doble});
+    const res=await ins('deposito_torres',{deposito_id:depId,cantidad:cant,altura_cajas:alt,doble,familia});
     depTorresData.push(res[0]);
     renderDepConfig();ss('online','Torres agregadas');
   }catch(e){ss('error','Error: '+e.message)}
@@ -2028,9 +2033,21 @@ function showAddProdDeposito(depId,eid){
     });
     opts+=`</optgroup>`;
   });
-  overlay.innerHTML=`<div class="modal" style="width:400px">
+  // Familias disponibles en este depósito
+  const torres=depTorresData.filter(t=>t.deposito_id===depId);
+  const familias=[...new Set(torres.map(t=>t.familia).filter(Boolean))];
+  const famOpts=familias.length
+    ?familias.map(f=>`<option value="${f}">${f}</option>`).join('')
+    :'<option value="">Sin familias definidas</option>';
+  overlay.innerHTML=`<div class="modal" style="width:420px">
     <div class="modal-title"><i class="ti ti-box"></i> Asignar producto al deposito</div>
-    <select id="modal-dep-prod-sel" style="width:100%;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);margin-bottom:1rem">${opts}</select>
+    <select id="modal-dep-prod-sel" style="width:100%;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);margin-bottom:10px">${opts}</select>
+    ${familias.length?`<div style="margin-bottom:1rem">
+      <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Familia de torres (opcional)</label>
+      <select id="modal-dep-prod-fam" style="width:100%;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)">
+        <option value="">Sin familia asignada</option>${famOpts}
+      </select>
+    </div>`:''}
     <div class="modal-btns">
       <button class="btn" onclick="document.getElementById('modal-dep-prod').remove()">Cancelar</button>
       <button class="btn btn-primary" onclick="confirmarAddDepProd('${depId}')">Asignar</button>
@@ -2043,10 +2060,11 @@ async function confirmarAddDepProd(depId){
   const sel=document.getElementById('modal-dep-prod-sel');
   if(!sel?.value)return;
   const[eid,area,producto]=sel.value.split('||');
+  const familia_torre=document.getElementById('modal-dep-prod-fam')?.value||null;
   document.getElementById('modal-dep-prod')?.remove();
   ss('saving','Guardando...');
   try{
-    const res=await ins('deposito_productos',{deposito_id:depId,empresa_id:eid,area,producto});
+    const res=await ins('deposito_productos',{deposito_id:depId,empresa_id:eid,area,producto,familia_torre});
     depProdData.push(res[0]);renderDepConfig();ss('online','Producto asignado');
   }catch(e){ss('error','Error: '+e.message)}
 }
@@ -2096,6 +2114,7 @@ function renderDepCalc(){
       </tr></thead><tbody>`;
 
     let totalCajasUsadas=0;
+    let totalUnidades=0;
     prods.forEach(p=>{
       const mix=mixData.find(m=>m.empresa_id===p.empresa_id&&m.area===p.area&&m.producto===p.producto);
       const caja=cajasData.find(c=>c.empresa_id===p.empresa_id&&c.area===p.area&&c.producto===p.producto);
@@ -2115,6 +2134,7 @@ function renderDepCalc(){
       const cajasReales=torresCompletas*cajasXtorre;
       const unidades=cajasReales*ujc;
       totalCajasUsadas+=cajasReales;
+      if(ujc>0)totalUnidades+=unidades;
       h+=`<tr>
         <td style="font-weight:500">${p.producto}</td>
         <td class="muted">${p.area}</td>
@@ -2129,8 +2149,10 @@ function renderDepCalc(){
     const sobrante=capTotal-totalCajasUsadas;
     h+=`<tr style="background:var(--bg2)">
       <td colspan="5" style="font-weight:700">Total usado</td>
-      <td style="text-align:right;font-weight:700;color:${totalCajasUsadas>capTotal?'var(--red)':'var(--green)'}">${totalCajasUsadas.toLocaleString('es-AR')}</td>
-      <td style="text-align:right;font-size:12px;color:var(--text2)">sobrante: ${sobrante}</td>
+      <td style="text-align:right;font-weight:700;color:${totalCajasUsadas>capTotal?'var(--red)':'var(--green)'}">
+        ${totalCajasUsadas.toLocaleString('es-AR')} <span style="font-size:10px;font-weight:400;color:var(--text2)">· sobrante: ${sobrante}</span>
+      </td>
+      <td style="text-align:right;font-weight:700;color:var(--green)">${totalUnidades>0?totalUnidades.toLocaleString('es-AR')+'<span style="font-size:10px"> uds</span>':'--'}</td>
     </tr>`;
     h+=`</tbody></table></div>`;
   });
