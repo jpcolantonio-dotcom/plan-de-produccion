@@ -3941,30 +3941,27 @@ async function renderStats(){
       </div>
       <div class="stock-card" style="padding:14px">
         <div style="font-size:13px;font-weight:600;margin-bottom:16px"><i class="ti ti-table"></i> Detalle por producto</div>
-        ${diasSel.map(dw=>{
-          const prDia=promPorDia[dw]||[];
-          const fDia=[...fechasPorDia[dw]].reverse();
-          const dwNom=diasNombre[dw];
-          if(!prDia.length)return'<div style="color:var(--text3);font-size:12px;padding:8px">Sin datos para '+dwNom+'</div>';
-          const totalVDia=prDia.reduce((s,p)=>s+p.avgVend,0);
-          const totalTDia=prDia.reduce((s,p)=>s+p.avgTyc,0);
-          const headerRow=fDia.map(f=>{
-            const dd=new Date(f+'T00:00:00');const fer=esFeriado(f);
-            return'<th style="text-align:right;background:'+(fer?'#FFF3CD':'')+'" title="'+(fer||'')+'">''+(fer?'🎌 ':'')+dd.getDate()+'/'+(dd.getMonth()+1)+'</th>';
-          }).join('');
-          const bodyRows=prDia.map(p=>{
-            const cells=fDia.map((_,i)=>{
-              const v=p.vendPorFecha[i]||0;const t=p.tycPorFecha[i]||0;const fer=esFeriado(fDia[i]);
-              const val=(v>0||t>0)?'<span style="color:var(--blue)">'+v+'</span>/<span style="color:var(--amber)">'+t+'</span>':'--';
-              return'<td style="text-align:right;font-size:11px;background:'+(fer?'#FFF3CD':'')+'">''+(fer?'🎌 ':'')+val+'</td>';
-            }).join('');
-            return'<tr><td style="font-weight:500">'+p.prod+'</td><td class="muted">'+p.area+'</td>'+cells+'<td style="text-align:right;font-weight:700;background:#E6F1FB;color:#0C447C">'+Math.round(p.avgVend).toLocaleString('es-AR')+'</td><td style="text-align:right;font-weight:700;background:#FFF8EE;color:#854F0B">'+Math.round(p.avgTyc).toLocaleString('es-AR')+'</td></tr>';
-          }).join('');
-          return'<div style="margin-bottom:20px">'+
-            '<div style="font-size:12px;font-weight:700;color:var(--blue);padding:6px 0 8px;border-bottom:.5px solid var(--border);margin-bottom:8px">'+
-            '📅 '+dwNom+' — Prom: <span style="color:var(--blue)">'+Math.round(totalVDia).toLocaleString('es-AR')+' vend</span> / <span style="color:var(--amber)">'+Math.round(totalTDia).toLocaleString('es-AR')+' T&C</span> = <span style="color:var(--green)">'+Math.round(totalVDia+totalTDia).toLocaleString('es-AR')+' total</span></div>'+
-            '<table class="stock-tbl"><thead><tr><th style="text-align:left">Producto</th><th style="text-align:left">Area</th>'+headerRow+'<th style="text-align:right;background:#E6F1FB;color:#0C447C">Prom. Vend</th><th style="text-align:right;background:#FFF8EE;color:#854F0B">Prom. T&C</th></tr></thead><tbody>'+bodyRows+'</tbody></table></div>';
-        }).join('')}
+        ${(()=>{
+          let dtHtml='';
+          diasSel.forEach(dw=>{
+            const prDia=promPorDia[dw]||[];
+            const fDia=[...fechasPorDia[dw]].reverse();
+            const dwNom=diasNombre[dw];
+            if(!prDia.length){dtHtml+='<div style="color:var(--text3);font-size:12px;padding:8px">Sin datos para '+dwNom+'</div>';return;}
+            const totalVDia=prDia.reduce((s,p)=>s+p.avgVend,0);
+            const totalTDia=prDia.reduce((s,p)=>s+p.avgTyc,0);
+            let hRow='';
+            fDia.forEach(f=>{const dd=new Date(f+'T00:00:00');const fer=esFeriado(f);hRow+='<th style="text-align:right;background:'+(fer?'#FFF3CD':'')+'" title="'+(fer||'')+'">'+(fer?'🎌 ':'')+dd.getDate()+'/'+(dd.getMonth()+1)+'</th>';});
+            let bRows='';
+            prDia.forEach(p=>{
+              let cells='';
+              fDia.forEach((_,i)=>{const v=p.vendPorFecha[i]||0;const t=p.tycPorFecha[i]||0;const fer=esFeriado(fDia[i]);const val=(v>0||t>0)?'<span style="color:var(--blue)">'+v+'</span>/<span style="color:var(--amber)">'+t+'</span>':'--';cells+='<td style="text-align:right;font-size:11px;background:'+(fer?'#FFF3CD':'')+'">'+(fer?'🎌 ':'')+val+'</td>';});
+              bRows+='<tr><td style="font-weight:500">'+p.prod+'</td><td class="muted">'+p.area+'</td>'+cells+'<td style="text-align:right;font-weight:700;background:#E6F1FB;color:#0C447C">'+Math.round(p.avgVend).toLocaleString('es-AR')+'</td><td style="text-align:right;font-weight:700;background:#FFF8EE;color:#854F0B">'+Math.round(p.avgTyc).toLocaleString('es-AR')+'</td></tr>';
+            });
+            dtHtml+='<div style="margin-bottom:20px"><div style="font-size:12px;font-weight:700;color:var(--blue);padding:6px 0 8px;border-bottom:.5px solid var(--border);margin-bottom:8px">📅 '+dwNom+' — Prom: <span style="color:var(--blue)">'+Math.round(totalVDia).toLocaleString('es-AR')+' vend</span> / <span style="color:var(--amber)">'+Math.round(totalTDia).toLocaleString('es-AR')+' T&C</span> = <span style="color:var(--green)">'+Math.round(totalVDia+totalTDia).toLocaleString('es-AR')+' total</span></div><table class="stock-tbl"><thead><tr><th style="text-align:left">Producto</th><th style="text-align:left">Area</th>'+hRow+'<th style="text-align:right;background:#E6F1FB;color:#0C447C">Prom. Vend</th><th style="text-align:right;background:#FFF8EE;color:#854F0B">Prom. T&C</th></tr></thead><tbody>'+bRows+'</tbody></table></div>';
+          });
+          return dtHtml;
+        })()}
       </div>`;
 
     // Cargar Chart.js
