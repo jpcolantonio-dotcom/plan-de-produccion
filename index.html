@@ -219,7 +219,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.5</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.6</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -3973,19 +3973,28 @@ async function renderStats(){
     // Top productos para gráfico
     const top=promedios.slice(0,15);
 
-    // Gráfico tendencia Vendedores por fecha
-    const vendPorFechaTotal=fechasDiaRev.map((_,i)=>promedios.reduce((s,p)=>s+(p.vendPorFecha[i]||0),0));
+    // Gráfico tendencia: agrupar totales por fecha directamente desde dataFiltrada
+    const tendMap={};
+    dataFiltrada.forEach(d=>{
+      if(!tendMap[d.fecha])tendMap[d.fecha]={vend:0,tyc:0};
+      tendMap[d.fecha].vend+=(d.vendedores||0);
+      tendMap[d.fecha].tyc+=(d.tyc||0);
+    });
+    const tendFechas=[...new Set(dataFiltrada.map(d=>d.fecha))].sort();
+    const tendLabels=tendFechas.map(f=>{const dd=new Date(f+'T00:00:00');return diasNombre[dd.getDay()].slice(0,3)+' '+dd.getDate()+'/'+(dd.getMonth()+1);});
+    const vendPorFechaTotal=tendFechas.map(f=>tendMap[f]?.vend||0);
+    const tycPorFechaTotal=tendFechas.map(f=>tendMap[f]?.tyc||0);
+
     statsCharts.push(new Chart(document.getElementById('chart-tend-vend'),{
       type:'bar',
-      data:{labels,datasets:[{label:'Vendedores',data:vendPorFechaTotal,backgroundColor:azul,borderColor:'rgba(55,138,221,1)',borderWidth:1}]},
+      data:{labels:tendLabels,datasets:[{label:'Vendedores',data:vendPorFechaTotal,backgroundColor:azul,borderColor:'rgba(55,138,221,1)',borderWidth:1}]},
       options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{font}},y:{ticks:{font},grid:{color:gridColor}}}}
     }));
 
     // Gráfico tendencia T&C por fecha
-    const tycPorFechaTotal=fechasDiaRev.map((_,i)=>promedios.reduce((s,p)=>s+(p.tycPorFecha[i]||0),0));
     statsCharts.push(new Chart(document.getElementById('chart-tend-tyc'),{
       type:'bar',
-      data:{labels,datasets:[{label:'T&C',data:tycPorFechaTotal,backgroundColor:naranja,borderColor:'rgba(255,80,0,1)',borderWidth:1}]},
+      data:{labels:tendLabels,datasets:[{label:'T&C',data:tycPorFechaTotal,backgroundColor:naranja,borderColor:'rgba(255,80,0,1)',borderWidth:1}]},
       options:{responsive:true,plugins:{legend:{display:false}},scales:{x:{ticks:{font}},y:{ticks:{font},grid:{color:gridColor}}}}
     }));
 
