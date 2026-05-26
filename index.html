@@ -3842,35 +3842,61 @@ async function renderStats(){
     const dataFiltrada=data.filter(d=>fechasDia.includes(d.fecha));
     if(!dataFiltrada.length){el.innerHTML='<div class="empty"><i class="ti ti-chart-off"></i>Sin datos de ventas para esas fechas.</div>';return}
 
-    // Agrupar por producto y calcular promedios
-    const porProd={};
-    dataFiltrada.forEach(d=>{
-      const vend=d.vendedores||0;
-      const tyc=d.tyc||0;
-      if(!vend&&!tyc)return;
-      const k=d.producto;
-      if(!porProd[k])porProd[k]={vend:Array(nSemanas).fill(0),tyc:Array(nSemanas).fill(0),area:d.area};
-      // Agregar a la fecha correspondiente
-      const fi=fechasDia.indexOf(d.fecha);
-      if(!porProd[k].vend[fi])porProd[k].vend[fi]=0;
-      if(!porProd[k].tyc[fi])porProd[k].tyc[fi]=0;
-      porProd[k].vend[fi]+=d.vendedores||0;
-      porProd[k].tyc[fi]+=d.tyc||0;
+    // Separar fechas por día de semana
+    const diasNombreCorto2=['Dom','Lun','Mar','Mie','Jue','Vie','Sab'];
+    // fechasPorDia: { 1: ['2026-05-18','2026-05-11',...], 4: [...], ... }
+    const fechasPorDia={};
+    diasSel.forEach(d=>{
+      fechasPorDia[d]=fechasDia.filter(f=>new Date(f+'T00:00:00').getDay()===d);
     });
 
-    // Calcular promedios
-    const promedios=Object.entries(porProd).map(([prod,v])=>{
-      const diasConDatos=v.vend.filter((x,i)=>x>0||v.tyc[i]>0).length||1;
-      const avgVend=v.vend.reduce((a,b)=>a+(b||0),0)/diasConDatos;
-      const avgTyc=v.tyc.reduce((a,b)=>a+(b||0),0)/diasConDatos;
-      return{prod,area:v.area,avgVend,avgTyc,total:avgVend+avgTyc,
-        vendPorFecha:fechasDia.map((_,i)=>v.vend[i]||0),
-        tycPorFecha:fechasDia.map((_,i)=>v.tyc[i]||0)};
+    // Agrupar por DIA y luego por producto
+    // porProdPorDia: { 1: { 'BCA': {vend:[...], tyc:[...], area:''}, ... }, 4: {...} }
+    const porProdPorDia={};
+    diasSel.forEach(dw=>{
+      porProdPorDia[dw]={};
+      const fechas=fechasPorDia[dw];
+      dataFiltrada.filter(d=>new Date(d.fecha+'T00:00:00').getDay()===dw).forEach(d=>{
+        const vend=d.vendedores||0; const tyc=d.tyc||0;
+        if(!vend&&!tyc)return;
+        const k=d.producto;
+        if(!porProdPorDia[dw][k])porProdPorDia[dw][k]={vend:Array(fechas.length).fill(0),tyc:Array(fechas.length).fill(0),area:d.area};
+        const fi=fechas.indexOf(d.fecha);
+        if(fi>=0){porProdPorDia[dw][k].vend[fi]+=vend;porProdPorDia[dw][k].tyc[fi]+=tyc;}
+      });
+    });
+
+    // Calcular promedios por día
+    // promPorDia: { 1: [{prod, area, avgVend, avgTyc, vendPorFecha, tycPorFecha}], ... }
+    const promPorDia={};
+    diasSel.forEach(dw=>{
+      const fechas=fechasPorDia[dw];
+      promPorDia[dw]=Object.entries(porProdPorDia[dw]).map(([prod,v])=>{
+        const diasConDatos=v.vend.filter((x,i)=>x>0||v.tyc[i]>0).length||1;
+        const avgVend=v.vend.reduce((a,b)=>a+(b||0),0)/diasConDatos;
+        const avgTyc=v.tyc.reduce((a,b)=>a+(b||0),0)/diasConDatos;
+        return{prod,area:v.area,avgVend,avgTyc,total:avgVend+avgTyc,
+          vendPorFecha:[...v.vend].reverse(),
+          tycPorFecha:[...v.tyc].reverse()};
+      }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total);
+    });
+
+    // Para compatibilidad con el resto del código, promedios = suma de todos los días
+    // (para los gráficos de tendencia general)
+    const todosProds=new Set(Object.values(porProdPorDia).flatMap(dp=>Object.keys(dp)));
+    const promedios=[...todosProds].map(prod=>{
+      let avgVend=0,avgTyc=0,area='';
+      diasSel.forEach(dw=>{
+        const p=promPorDia[dw].find(x=>x.prod===prod);
+        if(p){avgVend+=p.avgVend;avgTyc+=p.avgTyc;area=p.area;}
+      });
+      return{prod,area,avgVend,avgTyc,total:avgVend+avgTyc};
     }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total);
 
-    // Labels de fechas (dd/mm)
-    const labels=fechasDia.map(f=>{const d=new Date(f+'T00:00:00');return`${d.getDate()}/${d.getMonth()+1}`}).reverse();
-    const fechasDiaRev=[...fechasDia].reverse();
+    // Labels de fechas para el gráfico de tendencia (usamos el primer día seleccionado)
+    const dwRef=diasSel[0];
+    const fechasDiaRev=[...fechasPorDia[dwRef]].reverse();
+    const labels=fechasDiaRev.map(f=>{const d=new Date(f+'T00:00:00');return`${d.getDate()}/${d.getMonth()+1}`});
 
     const azul='rgba(55,138,221,0.8)';const naranja='rgba(255,80,0,0.8)';
     const font={family:'system-ui',size:11};const gridColor='rgba(128,128,128,0.1)';
@@ -3914,21 +3940,31 @@ async function renderStats(){
         <canvas id="chart-prods" height="150"></canvas>
       </div>
       <div class="stock-card" style="padding:14px">
-        <div style="font-size:13px;font-weight:600;margin-bottom:10px"><i class="ti ti-table"></i> Detalle por producto</div>
-        <table class="stock-tbl"><thead><tr>
-          <th style="text-align:left">Producto</th><th style="text-align:left">Area</th>
-          ${fechasDiaRev.map(f=>{const d=new Date(f+'T00:00:00');const fer=esFeriado(f);const dia=diasNombre[d.getDay()];return`<th style="text-align:right;background:${fer?'#FFF3CD':''}" title="${fer||''}">${fer?'🎌 ':''}${dia.slice(0,3)} ${d.getDate()}/${d.getMonth()+1}</th>`}).join('')}
-          <th style="text-align:right;background:#E6F1FB;color:#0C447C">Prom. Vend</th>
-          <th style="text-align:right;background:#FFF8EE;color:#854F0B">Prom. T&C</th>
-        </tr></thead><tbody>
-        ${promedios.map(p=>`<tr>
-          <td style="font-weight:500">${p.prod}</td>
-          <td class="muted">${p.area}</td>
-          ${fechasDiaRev.map((f,i)=>{const v=p.vendPorFecha[i]||0;const t=p.tycPorFecha[i]||0;const fer=esFeriado(f);return`<td style="text-align:right;font-size:11px;background:${fer?'#FFF3CD':''}" title="${fer||''}">${fer?'🎌 ':''}${v>0||t>0?`<span style="color:var(--blue)">${v}</span>/<span style="color:var(--amber)">${t}</span>`:'--'}</td>`}).join('')}
-          <td style="text-align:right;font-weight:700;background:#E6F1FB;color:#0C447C">${Math.round(p.avgVend).toLocaleString('es-AR')}</td>
-          <td style="text-align:right;font-weight:700;background:#FFF8EE;color:#854F0B">${Math.round(p.avgTyc).toLocaleString('es-AR')}</td>
-        </tr>`).join('')}
-        </tbody></table>
+        <div style="font-size:13px;font-weight:600;margin-bottom:16px"><i class="ti ti-table"></i> Detalle por producto</div>
+        ${diasSel.map(dw=>{
+          const prDia=promPorDia[dw]||[];
+          const fDia=[...fechasPorDia[dw]].reverse();
+          const dwNom=diasNombre[dw];
+          if(!prDia.length)return'<div style="color:var(--text3);font-size:12px;padding:8px">Sin datos para '+dwNom+'</div>';
+          const totalVDia=prDia.reduce((s,p)=>s+p.avgVend,0);
+          const totalTDia=prDia.reduce((s,p)=>s+p.avgTyc,0);
+          const headerRow=fDia.map(f=>{
+            const dd=new Date(f+'T00:00:00');const fer=esFeriado(f);
+            return'<th style="text-align:right;background:'+(fer?'#FFF3CD':'')+'" title="'+(fer||'')+'">''+(fer?'🎌 ':'')+dd.getDate()+'/'+(dd.getMonth()+1)+'</th>';
+          }).join('');
+          const bodyRows=prDia.map(p=>{
+            const cells=fDia.map((_,i)=>{
+              const v=p.vendPorFecha[i]||0;const t=p.tycPorFecha[i]||0;const fer=esFeriado(fDia[i]);
+              const val=(v>0||t>0)?'<span style="color:var(--blue)">'+v+'</span>/<span style="color:var(--amber)">'+t+'</span>':'--';
+              return'<td style="text-align:right;font-size:11px;background:'+(fer?'#FFF3CD':'')+'">''+(fer?'🎌 ':'')+val+'</td>';
+            }).join('');
+            return'<tr><td style="font-weight:500">'+p.prod+'</td><td class="muted">'+p.area+'</td>'+cells+'<td style="text-align:right;font-weight:700;background:#E6F1FB;color:#0C447C">'+Math.round(p.avgVend).toLocaleString('es-AR')+'</td><td style="text-align:right;font-weight:700;background:#FFF8EE;color:#854F0B">'+Math.round(p.avgTyc).toLocaleString('es-AR')+'</td></tr>';
+          }).join('');
+          return'<div style="margin-bottom:20px">'+
+            '<div style="font-size:12px;font-weight:700;color:var(--blue);padding:6px 0 8px;border-bottom:.5px solid var(--border);margin-bottom:8px">'+
+            '📅 '+dwNom+' — Prom: <span style="color:var(--blue)">'+Math.round(totalVDia).toLocaleString('es-AR')+' vend</span> / <span style="color:var(--amber)">'+Math.round(totalTDia).toLocaleString('es-AR')+' T&C</span> = <span style="color:var(--green)">'+Math.round(totalVDia+totalTDia).toLocaleString('es-AR')+' total</span></div>'+
+            '<table class="stock-tbl"><thead><tr><th style="text-align:left">Producto</th><th style="text-align:left">Area</th>'+headerRow+'<th style="text-align:right;background:#E6F1FB;color:#0C447C">Prom. Vend</th><th style="text-align:right;background:#FFF8EE;color:#854F0B">Prom. T&C</th></tr></thead><tbody>'+bodyRows+'</tbody></table></div>';
+        }).join('')}
       </div>`;
 
     // Cargar Chart.js
