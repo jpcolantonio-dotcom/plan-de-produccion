@@ -3961,6 +3961,41 @@ async function renderStats(){
             });
             dtHtml+='<div style="margin-bottom:20px"><div style="font-size:12px;font-weight:700;color:var(--blue);padding:6px 0 8px;border-bottom:.5px solid var(--border);margin-bottom:8px">📅 '+dwNom+' — Prom: <span style="color:var(--blue)">'+Math.round(totalVDia).toLocaleString('es-AR')+' vend</span> / <span style="color:var(--amber)">'+Math.round(totalTDia).toLocaleString('es-AR')+' T&C</span> = <span style="color:var(--green)">'+Math.round(totalVDia+totalTDia).toLocaleString('es-AR')+' total</span></div><table class="stock-tbl"><thead><tr><th style="text-align:left">Producto</th><th style="text-align:left">Area</th>'+hRow+'<th style="text-align:right;background:#E6F1FB;color:#0C447C">Prom. Vend</th><th style="text-align:right;background:#FFF8EE;color:#854F0B">Prom. T&C</th></tr></thead><tbody>'+bRows+'</tbody></table></div>';
           });
+          // Tabla resumen final: suma de promedios por producto, todos los días
+          const todosLosProds=new Map();
+          diasSel.forEach(dw=>{
+            (promPorDia[dw]||[]).forEach(p=>{
+              if(!todosLosProds.has(p.prod))todosLosProds.set(p.prod,{prod:p.prod,area:p.area,porDia:{}});
+              todosLosProds.get(p.prod).porDia[dw]={vend:p.avgVend,tyc:p.avgTyc};
+            });
+          });
+          const resumenProds=[...todosLosProds.values()].sort((a,b)=>{
+            const totA=Object.values(a.porDia).reduce((s,d)=>s+d.vend+d.tyc,0);
+            const totB=Object.values(b.porDia).reduce((s,d)=>s+d.vend+d.tyc,0);
+            return totB-totA;
+          });
+          let resumenHtml='<div style="margin-top:24px;border-top:2px solid var(--border);padding-top:16px">';
+          resumenHtml+='<div style="font-size:13px;font-weight:700;margin-bottom:12px"><i class="ti ti-sigma"></i> Resumen — Promedio por producto</div>';
+          resumenHtml+='<table class="stock-tbl"><thead><tr><th style="text-align:left">Producto</th><th style="text-align:left">Area</th>';
+          diasSel.forEach(dw=>{resumenHtml+='<th style="text-align:right;color:var(--blue)">'+diasNombre[dw].slice(0,3)+'</th>';});
+          resumenHtml+='<th style="text-align:right;background:#E6F1FB;color:#0C447C">Total prom.</th></tr></thead><tbody>';
+          let gTotVend=Array(diasSel.length).fill(0);let gTotAll=0;
+          resumenProds.forEach(p=>{
+            let rowTotal=0;resumenHtml+='<tr><td style="font-weight:500">'+p.prod+'</td><td class="muted">'+p.area+'</td>';
+            diasSel.forEach((dw,i)=>{
+              const d=p.porDia[dw];const val=d?Math.round(d.vend+d.tyc):0;
+              rowTotal+=val;gTotVend[i]+=val;
+              resumenHtml+='<td style="text-align:right;font-size:12px">'+(val>0?val.toLocaleString('es-AR'):'--')+'</td>';
+            });
+            gTotAll+=rowTotal;
+            resumenHtml+='<td style="text-align:right;font-weight:700;background:#E6F1FB;color:#0C447C">'+rowTotal.toLocaleString('es-AR')+'</td></tr>';
+          });
+          // Fila total
+          resumenHtml+='<tr style="background:var(--bg2);font-weight:700"><td colspan="2">TOTAL</td>';
+          diasSel.forEach((_,i)=>{resumenHtml+='<td style="text-align:right;color:var(--green)">'+gTotVend[i].toLocaleString('es-AR')+'</td>';});
+          resumenHtml+='<td style="text-align:right;background:#E6F1FB;color:#0C447C">'+gTotAll.toLocaleString('es-AR')+'</td></tr>';
+          resumenHtml+='</tbody></table></div>';
+          dtHtml+=resumenHtml;
           return dtHtml;
         })()}
       </div>`;
