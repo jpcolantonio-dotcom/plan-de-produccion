@@ -2227,8 +2227,19 @@ async function renderDepCalc(){
       const famObj=famsDep2.find(f=>f.codigo===famCod);
       const capFam=famObj&&capPorFam[famCod]?capPorFam[famCod]:capTotal;
       const torresFam=famObj?torres.filter(t=>t.familia===famCod):torres;
+      // Calcular unidad mínima de asignación: una torre individual (doble = adelante+atrás juntas)
+      // Una torre doble NUNCA se puede dividir entre dos variedades
+      // Buscamos el mínimo bloque posible dentro de esta familia
+      // Para el cálculo de torres completas usamos el bloque de cada torre individualmente
+      // Si hay mezcla de torres simples y dobles, usamos la altura más común
       const alturaRef=torresFam.length?torresFam[0].altura_cajas:(torres[0]?.altura_cajas||8);
-      const cajasXtorre=alturaRef*(torresFam[0]?.doble||torres[0]?.doble?2:1);
+      // Torre doble: bloque mínimo = altura×2 (no se puede poner una variedad adelante y otra atrás)
+      // Torre simple: bloque mínimo = altura×1
+      // Si hay torres dobles en la familia, el bloque mínimo es el de la primera torre doble
+      const torreDobleFam=torresFam.find(t=>t.doble);
+      const torreSimpleFam=torresFam.find(t=>!t.doble);
+      // cajasXtorre = cajas que ocupa UNA torre completa (el bloque indivisible)
+      const cajasXtorre=alturaRef*(torreDobleFam?2:1);
 
       // Encabezado de familia si hay familias definidas
       if(famsDep2.length){
@@ -2256,12 +2267,17 @@ async function renderDepCalc(){
         const unidades=cajasReales*ujc;
         totalCajasUsadas+=cajasReales; subtotalCajas+=cajasReales;
         if(ujc>0){totalUnidades+=unidades; subtotalUds+=unidades;}
+        // Indicar si ocupa torres dobles (bloque indivisible)
+        const esDoble=!!torreDobleFam;
+        const torreLabel=esDoble
+          ?`${torresCompletas} <span style="font-size:10px;color:var(--blue)">(doble)</span>`
+          :`${torresCompletas}`;
         h+=`<tr>
           <td style="font-weight:500">${p.producto}</td>
           <td class="muted">${p.area}</td>
           <td style="text-align:right">${pct.toFixed(1)}%</td>
           <td style="text-align:right;color:var(--text2)">${cajasRaw.toFixed(1)}</td>
-          <td style="text-align:right">${torresCompletas}</td>
+          <td style="text-align:right">${torreLabel}</td>
           <td style="text-align:right;font-weight:700;color:var(--green)">${cajasReales.toLocaleString('es-AR')}</td>
           <td style="text-align:right;color:var(--text2)">${ujc>0?unidades.toLocaleString('es-AR')+'<span style="font-size:10px"> uds</span>':'--'}</td>
         </tr>`;
