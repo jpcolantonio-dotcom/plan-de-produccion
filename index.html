@@ -3822,20 +3822,20 @@ async function renderStats(){
     const fechasDia=[];
     const hoy=new Date();
     for(let i=0;i<365;i++){
+      // Usar fecha local (no UTC) para evitar desfase horario Argentina
       const d=new Date(hoy);d.setDate(hoy.getDate()-i);
-      const dStr=d.toISOString().slice(0,10);
+      const dStr=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
       if(diasSel.includes(d.getDay())&&dStr>=desdeMin){
         fechasDia.push(dStr);
       }
-      // Parar cuando tenemos N semanas * cantidad de días
       if(fechasDia.length>=nSemanas*diasSel.length)break;
     }
     fechasDia.sort();
     if(!fechasDia.length){el.innerHTML='<div class="empty">Sin fechas encontradas.</div>';return}
 
-    // Cargar datos de todas esas fechas
-    const desde=fechasDia[fechasDia.length-1];
-    const hasta=fechasDia[0];
+    // Cargar datos: desde=más antigua hasta=más reciente
+    const desde=fechasDia[0];
+    const hasta=fechasDia[fechasDia.length-1];
     const data=await get('proyeccion_diaria',
       `empresa_id=eq.${eid}&fecha=gte.${desde}&fecha=lte.${hasta}&order=fecha.asc`
     );
@@ -3894,8 +3894,9 @@ async function renderStats(){
     }).filter(x=>x.total>0).sort((a,b)=>b.total-a.total);
 
     // Labels de fechas para el gráfico de tendencia (usamos el primer día seleccionado)
-    const dwRef=diasSel[0];
-    const fechasDiaRev=[...fechasPorDia[dwRef]].reverse();
+    // Para gráfico de tendencia usamos el primer día que tenga fechas
+    const dwRef=diasSel.find(d=>fechasPorDia[d]&&fechasPorDia[d].length>0)||diasSel[0];
+    const fechasDiaRev=fechasPorDia[dwRef]?[...fechasPorDia[dwRef]].reverse():[];
     const labels=fechasDiaRev.map(f=>{const d=new Date(f+'T00:00:00');return`${d.getDate()}/${d.getMonth()+1}`});
 
     const azul='rgba(55,138,221,0.8)';const naranja='rgba(255,80,0,0.8)';
