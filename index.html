@@ -225,7 +225,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.7</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.8</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -334,7 +334,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
       <input type="text" id="mp-new-nombre" placeholder="Nombre MP (ej: Harina 000)" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);width:220px"/>
       <select id="mp-new-unidad" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)">
-        ${['kg','g','litros','ml','unidades','cajas','sobres','latas','bolsas','metros'].map(u=>`<option>${u}</option>`).join('')}
+        ${['Kg','Gr','Litros','CC','Unidad'].map(u=>`<option>${u}</option>`).join('')}
       </select>
       <button class="btn btn-primary" onclick="addMateriaPrima()"><i class="ti ti-plus"></i> Agregar MP</button>
     </div>
@@ -1366,7 +1366,7 @@ function rRecDet(p){
     <div style="font-size:15px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px"><i class="ti ti-notebook" style="color:var(--purple)"></i>${p}</div>
     <table class="itbl"><thead><tr><th>Ingrediente / MP</th><th style="width:130px">Cant. x unidad</th><th style="width:100px">Unidad</th><th style="width:34px"></th></tr></thead><tbody>`;
   ings.forEach((ing,i)=>{
-    const unOpts=['kg','g','litros','ml','unidades','cajas','sobres','latas','bolsas','metros'].map(u=>`<option${u===ing.unidad?' selected':''}>${u}</option>`).join('');
+    const unOpts=['Kg','Gr','Litros','CC','Unidad'].map(u=>`<option${u===ing.unidad?' selected':''}>${u}</option>`).join('');
     h+=`<tr>
       <td><input value="${ing.ingrediente}" onchange="uIng('${p.replace(/'/g,"\'")}',${i},'ingrediente',this.value)" 
         oninput="mpAC(this)" onfocus="mpAC(this)" onblur="setTimeout(()=>mpHide(this),200)"
@@ -1385,7 +1385,7 @@ function rRecDet(p){
         <div id="ac-${k}" class="mp-ac-drop" style="display:none"></div>
       </div>
       <input type="number" min="0" step="0.001" id="nqty-${k}" placeholder="Cantidad" style="width:90px;padding:5px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-      <select id="nunit-${k}" style="padding:5px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">${['kg','g','litros','ml','unidades','cajas','sobres','latas','bolsas','metros'].map(u=>`<option>${u}</option>`).join('')}</select>
+      <select id="nunit-${k}" style="padding:5px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">${['Kg','Gr','Litros','CC','Unidad'].map(u=>`<option>${u}</option>`).join('')}</select>
       <button class="btn btn-primary btn-sm" onclick="addIng('${p.replace(/'/g,"\'")}')"><i class="ti ti-plus"></i> Agregar</button>
     </div></div>`;
   wrap.innerHTML=h;
@@ -1448,18 +1448,33 @@ function mpPick(e,nombre,unidad){
 
 async function mpPickNew(e,nombre){
   e.preventDefault();
-  const input=e.target.closest('.mp-ac-drop').previousElementSibling||
-               e.target.closest('[style*="position:relative"]')?.querySelector('input');
-  const drop=e.target.closest('.mp-ac-drop');
-  // Ask for unit
-  const unidad=prompt('Unidad para "'+nombre+'":','kg');
-  if(!unidad)return;
+  const acDrop=e.target.closest('.mp-ac-drop');
+  const wrap=acDrop?.parentElement;
+  const input=wrap?.querySelector('input[type="text"]')||wrap?.querySelector('input:not([type="number"])');
+  // Show a mini unit picker inside the dropdown instead of prompt
+  acDrop.innerHTML=`<div style="padding:10px">
+    <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Unidad para "<b>${nombre}</b>":</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px">
+      ${['Kg','Gr','Litros','CC','Unidad'].map(u=>`<button class="btn btn-sm" style="flex:1;min-width:60px" onmousedown="mpConfirmNew(event,'${nombre}','${u}')">${u}</button>`).join('')}
+    </div>
+  </div>`;
+  acDrop.style.display='block';
+}
+
+async function mpConfirmNew(e,nombre,unidad){
+  e.preventDefault();
+  const acDrop=e.target.closest('.mp-ac-drop');
+  const wrap=acDrop?.parentElement;
+  const input=wrap?.querySelector('input[type="text"]')||wrap?.querySelector('input:not([type="number"])');
+  if(acDrop)acDrop.style.display='none';
   ss('saving','Guardando MP...');
   try{
     const res=await ins('materias_primas',{nombre,unidad});
     mpData.push(res[0]);mpData.sort((a,b)=>a.nombre.localeCompare(b.nombre));
     if(input){input.value=nombre;input.dispatchEvent(new Event('change'));}
-    if(drop)drop.style.display='none';
+    // Auto-set unit in nearby select
+    const row=input?.closest('tr');
+    if(row){const sel=row.querySelector('select');if(sel){for(const o of sel.options)if(o.value===unidad){sel.value=unidad;break;}}}
     ss('online','MP "'+nombre+'" agregada');
   }catch(ex){ss('error','Error: '+ex.message)}
 }
@@ -1482,16 +1497,37 @@ async function loadMateriasPrimas(){
 function renderMPList(){
   const el=document.getElementById('mp-list-content');
   if(!mpData.length){el.innerHTML='<div class="empty"><i class="ti ti-packages"></i> Sin materias primas. Agregá la primera.</div>';return}
-  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th>Nombre</th><th>Unidad</th><th style="width:34px"></th></tr></thead><tbody>';
+  const unOpts=u=>['Kg','Gr','Litros','CC','Unidad'].map(x=>`<option${x===u?' selected':''}>${x}</option>`).join('');
+  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th>Nombre</th><th style="width:110px">Unidad</th><th style="width:60px"></th></tr></thead><tbody>';
   mpData.forEach(mp=>{
     h+=`<tr>
-      <td style="font-weight:500">${mp.nombre}</td>
-      <td class="muted">${mp.unidad}</td>
-      <td><button class="btn btn-xs btn-danger" onclick="deleteMP('${mp.id}','${mp.nombre.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button></td>
+      <td><input value="${mp.nombre.replace(/"/g,'&quot;')}" 
+        style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
+        onchange="updateMP('${mp.id}','nombre',this.value)"/></td>
+      <td><select style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
+        onchange="updateMP('${mp.id}','unidad',this.value)">${unOpts(mp.unidad)}</select></td>
+      <td style="text-align:center"><button class="btn btn-xs btn-danger" onclick="deleteMP('${mp.id}','${mp.nombre.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button></td>
     </tr>`;
   });
   h+='</tbody></table></div>';
   el.innerHTML=h;
+}
+
+async function updateMP(id,field,value){
+  value=value.trim();
+  if(!value)return;
+  const mp=mpData.find(m=>m.id===id);
+  if(!mp||mp[field]===value)return;
+  ss('saving','Guardando...');
+  try{
+    await fetch(`${SB}/rest/v1/materias_primas?id=eq.${id}`,{
+      method:'PATCH',headers:{...H,'Content-Type':'application/json'},
+      body:JSON.stringify({[field]:value})
+    });
+    mp[field]=value;
+    if(field==='nombre')mpData.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    ss('online','MP actualizada');
+  }catch(e){ss('error','Error: '+e.message);renderMPList();}
 }
 
 async function addMateriaPrima(){
