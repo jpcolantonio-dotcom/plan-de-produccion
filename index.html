@@ -225,7 +225,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.8</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.9</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -315,6 +315,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1.25rem">
     <button class="proy-tab active" id="rtab-recetas" onclick="showRecTab('recetas')"><i class="ti ti-notebook"></i> Recetas</button>
     <button class="proy-tab" id="rtab-mp" onclick="showRecTab('mp')"><i class="ti ti-packages"></i> Materias Primas</button>
+    <button class="proy-tab" id="rtab-consumo" onclick="showRecTab('consumo')"><i class="ti ti-chart-bar"></i> Consumo MP</button>
   </div>
   <!-- Sub-tab Recetas -->
   <div id="rsub-recetas">
@@ -334,12 +335,26 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
       <input type="text" id="mp-new-nombre" placeholder="Nombre MP (ej: Harina 000)" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);width:220px"/>
       <select id="mp-new-unidad" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)">
-        ${['Kg','Gr','Litros','CC','Unidad'].map(u=>`<option>${u}</option>`).join('')}
+        <option>Kg</option><option>Gr</option><option>Litros</option><option>CC</option><option>Unidad</option>
       </select>
       <button class="btn btn-primary" onclick="addMateriaPrima()"><i class="ti ti-plus"></i> Agregar MP</button>
     </div>
     <div id="mp-list-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
   </div>
+  <!-- Sub-tab Consumo MP -->
+  <div id="rsub-consumo" style="display:none">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--text2)">Empresa:</label>
+      <select id="rcon-esel" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"><option value="all">Todas</option></select>
+      <label style="font-size:13px;color:var(--text2)">Desde:</label>
+      <input type="date" id="rcon-desde" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+      <label style="font-size:13px;color:var(--text2)">Hasta:</label>
+      <input type="date" id="rcon-hasta" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+      <button class="btn btn-primary" onclick="renderConsumoMP()"><i class="ti ti-calculator"></i> Calcular</button>
+    </div>
+    <div id="rcon-content"><div class="empty"><i class="ti ti-package"></i> Seleccioná un rango de fechas y calculá.</div></div>
+  </div>
+
   <div id="recmsg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Recetas guardadas.</div>
 </div>
 
@@ -1479,15 +1494,107 @@ async function mpConfirmNew(e,nombre,unidad){
   }catch(ex){ss('error','Error: '+ex.message)}
 }
 
+async function renderConsumoMP(){
+  const ef=document.getElementById('rcon-esel').value;
+  const desde=document.getElementById('rcon-desde').value;
+  const hasta=document.getElementById('rcon-hasta').value;
+  const el=document.getElementById('rcon-content');
+  if(!desde||!hasta){el.innerHTML='<div class="alert alert-info">Seleccioná el rango de fechas.</div>';return}
+  if(desde>hasta){el.innerHTML='<div class="alert alert-info">La fecha desde debe ser anterior a hasta.</div>';return}
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Calculando...</div>';
+
+  // Get all semanas in range
+  const sems=[];let cur=wk(new Date(desde+'T00:00:00'));const wHasta=wk(new Date(hasta+'T00:00:00'));
+  while(cur<=wHasta){sems.push(cur);cur=addW(cur,1);}
+  await Promise.all(sems.map(w=>lp(w)));
+
+  // For each semana, get days in range and sum plan
+  const cm={};
+  sems.forEach(semKey=>{
+    let plan=st.P[semKey]||[];
+    if(ef!=='all')plan=plan.filter(r=>r.empresa_id===ef);
+    plan.forEach(r=>{
+      // Calculate which days of this semana fall within desde-hasta
+      let total=0;
+      for(let di=0;di<7;di++){
+        const d=new Date(semKey+'T00:00:00');d.setDate(d.getDate()+di);
+        const dStr=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+        if(dStr>=desde&&dStr<=hasta)total+=(r.days&&r.days[di])||0;
+      }
+      if(!total)return;
+      (st.Rec[r.producto]||[]).forEach(ing=>{
+        const key=ing.ingrediente+'||'+ing.unidad;
+        if(!cm[key])cm[key]={ingrediente:ing.ingrediente,unidad:ing.unidad,total:0,det:{}};
+        const c=ing.cantidad*total;
+        cm[key].total=fn(cm[key].total+c);
+        if(!cm[key].det[r.producto])cm[key].det[r.producto]=0;
+        cm[key].det[r.producto]=fn(cm[key].det[r.producto]+c);
+      });
+    });
+  });
+
+  const items=Object.values(cm).sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente));
+  if(!items.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i> Sin consumo para ese rango. Verificá que haya plan y recetas cargadas.</div>';
+    return;
+  }
+
+  const fDesde=new Date(desde+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const fHasta=new Date(hasta+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+
+  let h=`<div class="metric-grid">
+    <div class="metric"><div class="metric-label">Período</div><div style="font-size:13px;font-weight:600;margin-top:2px">${fDesde} → ${fHasta}</div></div>
+    <div class="metric"><div class="metric-label">Semanas</div><div class="metric-val">${sems.length}</div></div>
+    <div class="metric"><div class="metric-label">Ingredientes</div><div class="metric-val">${items.length}</div></div>
+  </div>
+  <div class="grid-card"><table class="stock-tbl"><thead><tr>
+    <th>#</th><th>Ingrediente / MP</th>
+    <th style="text-align:right">Total</th>
+    <th style="width:70px">Unidad</th>
+    <th>Detalle por producto</th>
+  </tr></thead><tbody>`;
+
+  const mx=Math.max(...items.map(i=>i.total));
+  items.forEach((item,idx)=>{
+    const pct=mx>0?Math.round(item.total/mx*100):0;
+    const det=Object.entries(item.det).sort((a,b)=>b[1]-a[1])
+      .map(([p,c])=>`<span style="margin-right:8px"><b>${p}</b>: ${c.toLocaleString('es-AR')} ${item.unidad}</span>`).join('');
+    h+=`<tr>
+      <td style="color:var(--text3);font-size:12px">${idx+1}</td>
+      <td><span class="ichip">${item.ingrediente}</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
+      </td>
+      <td style="text-align:right;font-size:16px;font-weight:700">${item.total.toLocaleString('es-AR')}</td>
+      <td class="muted">${item.unidad}</td>
+      <td class="muted" style="font-size:12px">${det||'--'}</td>
+    </tr>`;
+  });
+  h+=`</tbody></table></div>`;
+  el.innerHTML=h;
+}
+
 // MATERIAS PRIMAS
 let mpData=[];
 
 function showRecTab(t){
-  ['recetas','mp'].forEach(x=>{
+  ['recetas','mp','consumo'].forEach(x=>{
     document.getElementById('rsub-'+x).style.display=x===t?'':'none';
     document.getElementById('rtab-'+x).classList.toggle('active',x===t);
   });
+  document.getElementById('btnsaverec2').style.display=t==='recetas'?'':'none';
   if(t==='mp')renderMPList();
+  if(t==='consumo'){
+    // Populate empresa selector
+    const sel=document.getElementById('rcon-esel');
+    sel.innerHTML='<option value="all">Todas</option>';
+    st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;sel.appendChild(o);});
+    // Default dates: current week
+    if(!document.getElementById('rcon-desde').value){
+      document.getElementById('rcon-desde').value=W0;
+      const hasta=new Date(W0+'T00:00:00');hasta.setDate(hasta.getDate()+6);
+      document.getElementById('rcon-hasta').value=hasta.getFullYear()+'-'+String(hasta.getMonth()+1).padStart(2,'0')+'-'+String(hasta.getDate()).padStart(2,'0');
+    }
+  }
 }
 
 async function loadMateriasPrimas(){
