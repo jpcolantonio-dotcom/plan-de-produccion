@@ -124,6 +124,12 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 .rrow:hover{background:var(--bg2)}
 .rrow.sel{background:var(--blue-bg)}
 .rdetail{background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem}
+.mp-ac-drop{position:absolute;top:100%;left:0;width:260px;background:var(--bg);border:.5px solid var(--border2);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:1000;max-height:200px;overflow-y:auto}
+.mp-ac-item{padding:7px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.mp-ac-item:hover{background:var(--blue)18}
+.mp-ac-item .mp-ac-unit{font-size:11px;color:var(--text3)}
+.mp-ac-new{padding:7px 12px;font-size:12px;color:var(--blue);cursor:pointer;border-top:.5px solid var(--border)}
+.mp-ac-new:hover{background:var(--blue)11}
 .itbl{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:1rem}
 .itbl th{text-align:left;padding:7px 10px;font-size:12px;font-weight:500;color:var(--text2);border-bottom:.5px solid var(--border);background:var(--bg)}
 .itbl td{padding:7px 10px;border-bottom:.5px solid var(--border);background:var(--bg)}
@@ -219,7 +225,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.6</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.7</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -304,14 +310,35 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <div id="tab-rec" class="section">
   <div class="toolbar">
     <div><div style="font-size:16px;font-weight:600">Recetas</div><div style="font-size:13px;color:var(--text2)">Ingredientes por unidad producida</div></div>
-    <button class="btn btn-primary" id="btnsaverec" onclick="saveRecetas()"><i class="ti ti-device-floppy"></i> Guardar recetas</button>
+    <button class="btn btn-primary" id="btnsaverec" onclick="saveRecetas()" style="display:none"><i class="ti ti-device-floppy"></i> Guardar recetas</button>
   </div>
-  <div style="display:grid;grid-template-columns:270px 1fr;gap:1.5rem">
-    <div>
-      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Productos</div>
-      <div id="rplist" class="rlist"><div class="empty"><i class="ti ti-package-off"></i>Agrega productos en Maestro.</div></div>
+  <div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1.25rem">
+    <button class="proy-tab active" id="rtab-recetas" onclick="showRecTab('recetas')"><i class="ti ti-notebook"></i> Recetas</button>
+    <button class="proy-tab" id="rtab-mp" onclick="showRecTab('mp')"><i class="ti ti-packages"></i> Materias Primas</button>
+  </div>
+  <!-- Sub-tab Recetas -->
+  <div id="rsub-recetas">
+    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+      <button class="btn btn-primary" id="btnsaverec2" onclick="saveRecetas()"><i class="ti ti-device-floppy"></i> Guardar recetas</button>
     </div>
-    <div id="rdetail"><div class="empty"><i class="ti ti-arrow-left"></i>Selecciona un producto.</div></div>
+    <div style="display:grid;grid-template-columns:270px 1fr;gap:1.5rem">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Productos</div>
+        <div id="rplist" class="rlist"><div class="empty"><i class="ti ti-package-off"></i>Agrega productos en Maestro.</div></div>
+      </div>
+      <div id="rdetail"><div class="empty"><i class="ti ti-arrow-left"></i>Selecciona un producto.</div></div>
+    </div>
+  </div>
+  <!-- Sub-tab Materias Primas -->
+  <div id="rsub-mp" style="display:none">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+      <input type="text" id="mp-new-nombre" placeholder="Nombre MP (ej: Harina 000)" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);width:220px"/>
+      <select id="mp-new-unidad" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)">
+        ${['kg','g','litros','ml','unidades','cajas','sobres','latas','bolsas','metros'].map(u=>`<option>${u}</option>`).join('')}
+      </select>
+      <button class="btn btn-primary" onclick="addMateriaPrima()"><i class="ti ti-plus"></i> Agregar MP</button>
+    </div>
+    <div id="mp-list-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
   </div>
   <div id="recmsg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Recetas guardadas.</div>
 </div>
@@ -680,10 +707,11 @@ document.getElementById('hdate').textContent=new Date().toLocaleDateString('es-A
 async function init(){
   ss('saving','Conectando...');
   try{
-    const[pl,re,rr,em,ar,pr]=await Promise.all([
+    const[pl,re,rr,mp,em,ar,pr]=await Promise.all([
       get('planes','select=semana&order=semana.desc'),
       get('produccion_real','select=semana&order=semana.desc'),
       get('recetas','select=datos').catch(()=>[]),
+      get('materias_primas','order=nombre.asc').catch(()=>[]),
       get('empresas','order=nombre.asc'),
       get('areas','order=nombre.asc'),
       get('productos','order=orden.asc,nombre.asc')
@@ -691,6 +719,7 @@ async function init(){
     const ss2=new Set([...pl.map(p=>p.semana),...re.map(r=>r.semana),W0]);
     st.Sem=[...ss2].sort();
     if(rr.length)st.Rec=rr[0].datos||{};
+    mpData=mp||[];
     st.E=em;st.A=ar||[];st.Pr=pr;
     await lp(W0);
     ss('online','Conectado');
@@ -1337,25 +1366,29 @@ function rRecDet(p){
     <div style="font-size:15px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px"><i class="ti ti-notebook" style="color:var(--purple)"></i>${p}</div>
     <table class="itbl"><thead><tr><th>Ingrediente / MP</th><th style="width:130px">Cant. x unidad</th><th style="width:100px">Unidad</th><th style="width:34px"></th></tr></thead><tbody>`;
   ings.forEach((ing,i)=>{
+    const unOpts=['kg','g','litros','ml','unidades','cajas','sobres','latas','bolsas','metros'].map(u=>`<option${u===ing.unidad?' selected':''}>${u}</option>`).join('');
     h+=`<tr>
-      <td><input value="${ing.ingrediente}" onchange="uIng('${p.replace(/'/g,"\'")}',${i},'ingrediente',this.value)" list="ingdl"/></td>
+      <td><input value="${ing.ingrediente}" onchange="uIng('${p.replace(/'/g,"\'")}',${i},'ingrediente',this.value)" 
+        oninput="mpAC(this)" onfocus="mpAC(this)" onblur="setTimeout(()=>mpHide(this),200)"
+        autocomplete="off" style="position:relative"/></td>
       <td><input type="number" min="0" step="0.001" value="${ing.cantidad}" onchange="uIng('${p.replace(/'/g,"\'")}',${i},'cantidad',this.value)" style="width:120px;text-align:right"/></td>
-      <td><select onchange="uIng('${p.replace(/'/g,"\'")}',${i},'unidad',this.value)" style="width:100%">
-        ${['kg','g','litros','ml','unidades','cajas','sobres','latas','bolsas','metros'].map(u=>`<option${u===ing.unidad?' selected':''}>${u}</option>`).join('')}
-      </select></td>
+      <td><select onchange="uIng('${p.replace(/'/g,"\'")}',${i},'unidad',this.value)" style="width:100%">${unOpts}</select></td>
       <td><button class="btn btn-xs btn-danger" onclick="delIng('${p.replace(/'/g,"\'")}',${i})"><i class="ti ti-trash"></i></button></td>
     </tr>`;
   });
-  h+=`</tbody></table><datalist id="ingdl"></datalist>
+  h+=`</tbody></table>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">
-      <input type="text" id="ning-${k}" placeholder="Ingrediente" style="width:180px;padding:5px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)" list="ingdl"/>
+      <div style="position:relative">
+        <input type="text" id="ning-${k}" placeholder="Escribí para buscar MP..." 
+          style="width:220px;padding:5px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
+          oninput="mpAC(this)" onfocus="mpAC(this)" onblur="setTimeout(()=>mpHide(this),200)" autocomplete="off"/>
+        <div id="ac-${k}" class="mp-ac-drop" style="display:none"></div>
+      </div>
       <input type="number" min="0" step="0.001" id="nqty-${k}" placeholder="Cantidad" style="width:90px;padding:5px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
       <select id="nunit-${k}" style="padding:5px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">${['kg','g','litros','ml','unidades','cajas','sobres','latas','bolsas','metros'].map(u=>`<option>${u}</option>`).join('')}</select>
       <button class="btn btn-primary btn-sm" onclick="addIng('${p.replace(/'/g,"\'")}')"><i class="ti ti-plus"></i> Agregar</button>
     </div></div>`;
   wrap.innerHTML=h;
-  const all=new Set();Object.values(st.Rec).forEach(arr=>arr.forEach(i=>all.add(i.ingrediente)));
-  const dl=document.getElementById('ingdl');[...all].forEach(i=>{const o=document.createElement('option');o.value=i;dl.appendChild(o)});
 }
 function uIng(p,i,f,v){if(!st.Rec[p])st.Rec[p]=[];st.Rec[p][i][f]=f==='cantidad'?parseFloat(v)||0:v}
 function delIng(p,i){st.Rec[p].splice(i,1);rRecDet(p);rRec()}
@@ -1368,6 +1401,124 @@ function addIng(p){
   st.Rec[p].push({ingrediente:nm,cantidad:qty,unidad:unit});
   rRecDet(p);rRec();
 }
+// AUTOCOMPLETE MP
+function mpAC(input){
+  const q=(input.value||'').toLowerCase().trim();
+  // Find the dropdown - either sibling div or the ac- div
+  const wrap=input.parentElement;
+  let drop=wrap.querySelector('.mp-ac-drop');
+  if(!drop){drop=document.createElement('div');drop.className='mp-ac-drop';wrap.style.position='relative';wrap.appendChild(drop);}
+  const results=q?mpData.filter(m=>m.nombre.toLowerCase().includes(q)):mpData;
+  if(!results.length&&!q){drop.style.display='none';return}
+  let h='';
+  results.slice(0,10).forEach(m=>{
+    h+=`<div class="mp-ac-item" onmousedown="mpPick(event,'${m.nombre.replace(/'/g,"\'")}','${m.unidad}')">
+      <span>${highlight(m.nombre,q)}</span><span class="mp-ac-unit">${m.unidad}</span>
+    </div>`;
+  });
+  if(q&&!mpData.find(m=>m.nombre.toLowerCase()===q)){
+    h+=`<div class="mp-ac-new" onmousedown="mpPickNew(event,'${q}')"><i class="ti ti-plus"></i> Agregar "${q}" como nueva MP</div>`;
+  }
+  drop.innerHTML=h;drop.style.display='block';
+}
+
+function highlight(text,q){
+  if(!q)return text;
+  const idx=text.toLowerCase().indexOf(q);
+  if(idx<0)return text;
+  return text.slice(0,idx)+'<b style="color:var(--blue)">'+text.slice(idx,idx+q.length)+'</b>'+text.slice(idx+q.length);
+}
+
+function mpHide(input){
+  const drop=input.parentElement?.querySelector('.mp-ac-drop');
+  if(drop)drop.style.display='none';
+}
+
+function mpPick(e,nombre,unidad){
+  e.preventDefault();
+  const input=e.target.closest('.mp-ac-drop').previousElementSibling||
+               e.target.closest('[style*="position:relative"]')?.querySelector('input');
+  const drop=e.target.closest('.mp-ac-drop');
+  if(input){input.value=nombre;input.dispatchEvent(new Event('change'));}
+  // Auto-select matching unit in nearby select
+  const row=input?.closest('tr');
+  if(row){const sel=row.querySelector('select');if(sel&&unidad){for(const o of sel.options)if(o.value===unidad){sel.value=unidad;break;}}}
+  if(drop)drop.style.display='none';
+}
+
+async function mpPickNew(e,nombre){
+  e.preventDefault();
+  const input=e.target.closest('.mp-ac-drop').previousElementSibling||
+               e.target.closest('[style*="position:relative"]')?.querySelector('input');
+  const drop=e.target.closest('.mp-ac-drop');
+  // Ask for unit
+  const unidad=prompt('Unidad para "'+nombre+'":','kg');
+  if(!unidad)return;
+  ss('saving','Guardando MP...');
+  try{
+    const res=await ins('materias_primas',{nombre,unidad});
+    mpData.push(res[0]);mpData.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    if(input){input.value=nombre;input.dispatchEvent(new Event('change'));}
+    if(drop)drop.style.display='none';
+    ss('online','MP "'+nombre+'" agregada');
+  }catch(ex){ss('error','Error: '+ex.message)}
+}
+
+// MATERIAS PRIMAS
+let mpData=[];
+
+function showRecTab(t){
+  ['recetas','mp'].forEach(x=>{
+    document.getElementById('rsub-'+x).style.display=x===t?'':'none';
+    document.getElementById('rtab-'+x).classList.toggle('active',x===t);
+  });
+  if(t==='mp')renderMPList();
+}
+
+async function loadMateriasPrimas(){
+  try{mpData=await get('materias_primas','order=nombre.asc');}catch{mpData=[];}
+}
+
+function renderMPList(){
+  const el=document.getElementById('mp-list-content');
+  if(!mpData.length){el.innerHTML='<div class="empty"><i class="ti ti-packages"></i> Sin materias primas. Agregá la primera.</div>';return}
+  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th>Nombre</th><th>Unidad</th><th style="width:34px"></th></tr></thead><tbody>';
+  mpData.forEach(mp=>{
+    h+=`<tr>
+      <td style="font-weight:500">${mp.nombre}</td>
+      <td class="muted">${mp.unidad}</td>
+      <td><button class="btn btn-xs btn-danger" onclick="deleteMP('${mp.id}','${mp.nombre.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button></td>
+    </tr>`;
+  });
+  h+='</tbody></table></div>';
+  el.innerHTML=h;
+}
+
+async function addMateriaPrima(){
+  const nombre=document.getElementById('mp-new-nombre').value.trim();
+  const unidad=document.getElementById('mp-new-unidad').value;
+  if(!nombre){alert('Ingresá el nombre de la MP.');return}
+  if(mpData.find(m=>m.nombre.toLowerCase()===nombre.toLowerCase())){alert('Ya existe esa MP.');return}
+  ss('saving','Guardando...');
+  try{
+    const res=await ins('materias_primas',{nombre,unidad});
+    mpData.push(res[0]);mpData.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    document.getElementById('mp-new-nombre').value='';
+    renderMPList();ss('online','MP agregada');
+  }catch(e){ss('error','Error: '+e.message)}
+}
+
+async function deleteMP(id,nombre){
+  if(!confirm('¿Eliminar "'+nombre+'"? Se quitará de las recetas que la usen.'))return;
+  try{
+    await fetch(`${SB}/rest/v1/materias_primas?id=eq.${id}`,{method:'DELETE',headers:H});
+    mpData=mpData.filter(m=>m.id!==id);
+    // También limpiar de recetas en memoria
+    Object.keys(st.Rec).forEach(p=>{st.Rec[p]=st.Rec[p].filter(i=>i.ingrediente!==nombre)});
+    renderMPList();rRec();ss('online','MP eliminada');
+  }catch(e){ss('error','Error')}
+}
+
 async function saveRecetas(){
   const btn=document.getElementById('btnsaverec');btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;ss('saving','Guardando...');
   try{await upsert('recetas',{id:1,datos:JSON.parse(JSON.stringify(st.Rec)),updated_at:new Date().toISOString()});ss('online','Guardado');fl('recmsg');}
