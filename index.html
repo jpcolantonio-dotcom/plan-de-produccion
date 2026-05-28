@@ -225,7 +225,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.11</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.12</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2777,28 +2777,50 @@ async function renderDepCalc(){
       }
 
       let subtotalCajas=0; let subtotalUds=0;
+
+      // Paso 1: calcular cajasRaw y torresBase para cada producto con mix
+      const prodsConMix=[];
+      const prodsSinMix=[];
       fProds.forEach(p=>{
         const mix=mixData.find(m=>m.empresa_id===p.empresa_id&&m.area===p.area&&m.producto===p.producto);
         const caja=cajasData.find(c=>c.empresa_id===p.empresa_id&&c.area===p.area&&c.producto===p.producto);
         const pct=mix?mix.porcentaje:0;
         const ujc=caja?caja.unidades_por_caja:0;
-        if(!pct){
-          h+=`<tr><td style="font-weight:500">${p.producto}</td><td class="muted">${p.area}</td>
-            <td colspan="5" style="text-align:center;color:var(--text3);font-size:12px">Sin % mix definido</td></tr>`;
-          return;
-        }
+        if(!pct){prodsSinMix.push(p);return;}
         const cajasRaw=capFam*(pct/100);
-        const torresCompletas=Math.floor(cajasRaw/cajasXtorre);
-        const cajasReales=torresCompletas*cajasXtorre;
+        const torresBase=Math.floor(cajasRaw/cajasXtorre);
+        const fraccion=cajasRaw/cajasXtorre - torresBase;
+        prodsConMix.push({p,pct,ujc,cajasRaw,torresBase,fraccion,torresExtra:0});
+      });
+
+      // Paso 2: distribuir sobrante - asignar torres extra a los de mayor fracción
+      const cajasUsadasBase=prodsConMix.reduce((s,x)=>s+x.torresBase*cajasXtorre,0);
+      let sobranteTorres=Math.floor((capFam-cajasUsadasBase)/cajasXtorre);
+      // Ordenar por fracción descendente para dar prioridad a los más cercanos
+      const porFraccion=[...prodsConMix].sort((a,b)=>b.fraccion-a.fraccion);
+      for(let i=0;i<porFraccion.length&&sobranteTorres>0;i++){
+        porFraccion[i].torresExtra=1;
+        sobranteTorres--;
+      }
+
+      // Paso 3: renderizar
+      prodsSinMix.forEach(p=>{
+        h+=`<tr><td style="font-weight:500">${p.producto}</td><td class="muted">${p.area}</td>
+          <td colspan="5" style="text-align:center;color:var(--text3);font-size:12px">Sin % mix definido</td></tr>`;
+      });
+
+      prodsConMix.forEach(({p,pct,ujc,cajasRaw,torresBase,torresExtra})=>{
+        const torresTotal=torresBase+torresExtra;
+        const cajasReales=torresTotal*cajasXtorre;
         const unidades=cajasReales*ujc;
         totalCajasUsadas+=cajasReales; subtotalCajas+=cajasReales;
         if(ujc>0){totalUnidades+=unidades; subtotalUds+=unidades;}
-        // Indicar si ocupa torres dobles (bloque indivisible)
         const esDoble=!!torreDobleFam;
-        const torreLabel=esDoble
-          ?`${torresCompletas} <span style="font-size:10px;color:var(--blue)">(doble)</span>`
-          :`${torresCompletas}`;
-        h+=`<tr>
+        const extraBadge=torresExtra>0?`<span style="background:var(--blue)22;border-radius:8px;padding:1px 5px;font-size:10px;color:var(--blue)">+1</span>`:'';
+        const torreLabel=(esDoble
+          ?`${torresTotal} <span style="font-size:10px;color:var(--blue)">(doble)</span>`
+          :`${torresTotal}`)+' '+extraBadge;
+        h+=`<tr${torresExtra?` style="background:var(--blue)07"`:'>'}>
           <td style="font-weight:500">${p.producto}</td>
           <td class="muted">${p.area}</td>
           <td style="text-align:right">${pct.toFixed(1)}%</td>
