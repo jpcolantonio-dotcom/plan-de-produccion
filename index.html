@@ -225,7 +225,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.9</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.10</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -299,11 +299,32 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 
 <!-- COMPARACION -->
 <div id="tab-cmp" class="section">
-  <div class="real-sel">
-    <label>Semana:</label><select id="cwsel" onchange="loadCmp()"></select>
-    <label>Empresa:</label><select id="cesel" onchange="renderCmp()"><option value="all">Todas</option></select>
+  <div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1.25rem">
+    <button class="proy-tab active" id="ctab-semanal" onclick="showCmpTab('semanal')"><i class="ti ti-calendar-week"></i> Semanal</button>
+    <button class="proy-tab" id="ctab-mensual" onclick="showCmpTab('mensual')"><i class="ti ti-calendar-month"></i> Produccion mensual</button>
   </div>
-  <div id="ccon"></div>
+  <!-- Sub-tab Semanal -->
+  <div id="csub-semanal">
+    <div class="real-sel">
+      <label>Semana:</label><select id="cwsel" onchange="loadCmp()"></select>
+      <label>Empresa:</label><select id="cesel" onchange="renderCmp()"><option value="all">Todas</option></select>
+    </div>
+    <div id="ccon"></div>
+  </div>
+  <!-- Sub-tab Mensual -->
+  <div id="csub-mensual" style="display:none">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+      <label style="font-size:13px;color:var(--text2)">Empresa:</label>
+      <select id="cmen-esel" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"><option value="all">Todas</option></select>
+      <label style="font-size:13px;color:var(--text2)">Mes:</label>
+      <input type="month" id="cmen-mes" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+      <label style="font-size:13px;color:var(--text2)">o Día:</label>
+      <input type="date" id="cmen-dia" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)" placeholder="Filtrar por día"/>
+      <button class="btn btn-primary" onclick="renderCmpMensual()"><i class="ti ti-search"></i> Buscar</button>
+      <button class="btn" onclick="document.getElementById('cmen-dia').value='';renderCmpMensual()" title="Limpiar filtro día"><i class="ti ti-x"></i></button>
+    </div>
+    <div id="cmen-content"><div class="empty"><i class="ti ti-calendar-month"></i> Seleccioná un mes para ver la producción.</div></div>
+  </div>
 </div>
 
 <!-- RECETAS -->
@@ -1126,6 +1147,184 @@ async function loadCmp(){
   await lp(k);await lr(k);renderCmp();
 }
 let cch=null;
+function showCmpTab(t){
+  ['semanal','mensual'].forEach(x=>{
+    document.getElementById('csub-'+x).style.display=x===t?'':'none';
+    document.getElementById('ctab-'+x).classList.toggle('active',x===t);
+  });
+  if(t==='mensual'){
+    // Populate empresa selector
+    const sel=document.getElementById('cmen-esel');
+    sel.innerHTML='<option value="all">Todas</option>';
+    st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;sel.appendChild(o);});
+    // Default to current month
+    if(!document.getElementById('cmen-mes').value){
+      const now=new Date();
+      document.getElementById('cmen-mes').value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+    }
+  }
+}
+
+async function renderCmpMensual(){
+  const el=document.getElementById('cmen-content');
+  const ef=document.getElementById('cmen-esel').value;
+  const mes=document.getElementById('cmen-mes').value;
+  const diaFiltro=document.getElementById('cmen-dia').value;
+  if(!mes){el.innerHTML='<div class="alert alert-info">Seleccioná un mes.</div>';return}
+
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Calculando...</div>';
+
+  // Build all semanas that overlap with the month
+  const [yr,mo]=mes.split('-').map(Number);
+  const firstDay=new Date(yr,mo-1,1);
+  const lastDay=new Date(yr,mo,0);
+  const firstStr=yr+'-'+String(mo).padStart(2,'0')+'-01';
+  const lastStr=yr+'-'+String(mo).padStart(2,'0')+'-'+String(lastDay.getDate()).padStart(2,'0');
+
+  // Get all semanas that cover this month
+  const sems=st.Sem.filter(w=>{
+    const wEnd=new Date(w+'T00:00:00');wEnd.setDate(wEnd.getDate()+6);
+    const wEndStr=wEnd.getFullYear()+'-'+String(wEnd.getMonth()+1).padStart(2,'0')+'-'+String(wEnd.getDate()).padStart(2,'0');
+    return w<=lastStr&&wEndStr>=firstStr;
+  });
+
+  if(!sems.length){
+    // Try loading semanas for this month
+    const tempSems=[];let d=new Date(firstDay);
+    while(d<=lastDay){
+      const s=wk(d);if(!tempSems.includes(s))tempSems.push(s);
+      d.setDate(d.getDate()+7);
+    }
+    sems.push(...tempSems.filter(s=>!sems.includes(s)));
+  }
+
+  await Promise.all(sems.map(s=>Promise.all([lp(s),lr(s)])));
+
+  // Build daily map: {fecha: {producto_key: {plan, real, producto, area, empresa_id}}}
+  const DAYS_ES=['Lun','Mar','Mie','Jue','Vie','Sab','Dom'];
+  const prodMap={}; // {producto_key: {nombre, area, empresa, dias: {fecha: {plan, real}}}}
+
+  sems.forEach(semKey=>{
+    let plan=st.P[semKey]||[];
+    if(ef!=='all')plan=plan.filter(r=>r.empresa_id===ef);
+    const real=st.R[semKey]||{};
+    plan.forEach(r=>{
+      const rk=rKey(r);
+      const rdReal=real[rk]||Array(7).fill(0);
+      const pk=r.empresa_id+'||'+r.area+'||'+r.producto;
+      if(!prodMap[pk])prodMap[pk]={nombre:r.producto,area:r.area,empresa_id:r.empresa_id,
+        totalPlan:0,totalReal:0,dias:{}};
+      for(let di=0;di<7;di++){
+        const d=new Date(semKey+'T00:00:00');d.setDate(d.getDate()+di);
+        const dStr=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+        if(dStr<firstStr||dStr>lastStr)continue;
+        if(diaFiltro&&dStr!==diaFiltro)continue;
+        const pv=(r.days&&r.days[di])||0;
+        const rv=rdReal[di]||0;
+        if(pv>0||rv>0){
+          prodMap[pk].dias[dStr]={plan:pv,real:rv,dow:di};
+          prodMap[pk].totalPlan+=pv;
+          prodMap[pk].totalReal+=rv;
+        }
+      }
+    });
+  });
+
+  // Remove products with no data
+  Object.keys(prodMap).forEach(k=>{if(!prodMap[k].totalPlan&&!prodMap[k].totalReal)delete prodMap[k];});
+
+  const items=Object.values(prodMap).sort((a,b)=>a.area.localeCompare(b.area)||a.nombre.localeCompare(b.nombre));
+  if(!items.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i> Sin datos de producción para '+(diaFiltro?'el día seleccionado':'este mes')+'.</div>';
+    return;
+  }
+
+  // Get all unique dates in range (sorted)
+  const allDates=[...new Set(items.flatMap(i=>Object.keys(i.dias)))].sort();
+
+  // Summary metrics
+  const totPlan=items.reduce((s,i)=>s+i.totalPlan,0);
+  const totReal=items.reduce((s,i)=>s+i.totalReal,0);
+  const pct=totPlan>0?Math.round(totReal/totPlan*100):0;
+  const cls=pct>=90?'good':pct>=70?'warn':'bad';
+  const nomMes=new Date(yr,mo-1,1).toLocaleString('es-AR',{month:'long',year:'numeric'});
+
+  let h=`<div class="metric-grid">
+    <div class="metric"><div class="metric-label">${diaFiltro?'Día':'Mes'}</div>
+      <div style="font-size:13px;font-weight:600;margin-top:2px">${diaFiltro?new Date(diaFiltro+'T00:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long'}):nomMes}</div></div>
+    <div class="metric"><div class="metric-label">Cumplimiento</div><div class="metric-val ${cls}">${pct}%</div></div>
+    <div class="metric"><div class="metric-label">Total planificado</div><div class="metric-val">${totPlan.toLocaleString('es-AR')}</div></div>
+    <div class="metric"><div class="metric-label">Total producido</div><div class="metric-val">${totReal.toLocaleString('es-AR')}</div></div>
+    <div class="metric"><div class="metric-label">Diferencia</div>
+      <div class="metric-val ${totReal>=totPlan?'good':'bad'}">${(totReal-totPlan>=0?'+':'')+(totReal-totPlan).toLocaleString('es-AR')}</div></div>
+  </div>`;
+
+  // Table - columns are dates (or just total if many dates)
+  const showCols=allDates.length<=14;
+  h+=`<div class="grid-card" style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
+    <th style="text-align:left">Producto</th><th style="text-align:left">Area</th>`;
+  if(showCols){
+    allDates.forEach(d=>{
+      const dd=new Date(d+'T00:00:00');
+      const dow=DAYS_ES[(dd.getDay()+6)%7];
+      h+=`<th style="text-align:right;font-size:11px" colspan="2">${dow} ${dd.getDate()}/${dd.getMonth()+1}</th>`;
+    });
+  }
+  h+=`<th style="text-align:right;background:#E6F1FB;color:#0C447C">Plan total</th>
+      <th style="text-align:right;background:#E8F7F0;color:#1D9E75">Real total</th>
+      <th style="text-align:right">%</th>
+  </tr>`;
+  if(showCols){
+    h+=`<tr style="background:var(--bg2)"><th></th><th></th>`;
+    allDates.forEach(()=>{
+      h+=`<th style="text-align:right;font-size:10px;color:var(--text2)">P</th>`;
+      h+=`<th style="text-align:right;font-size:10px;color:var(--green)">R</th>`;
+    });
+    h+=`<th></th><th></th><th></th></tr>`;
+  }
+  h+=`</thead><tbody>`;
+
+  // Group by area
+  const byArea={};
+  items.forEach(i=>{if(!byArea[i.area])byArea[i.area]=[];byArea[i.area].push(i);});
+
+  Object.entries(byArea).forEach(([area,aItems])=>{
+    const aP=aItems.reduce((s,i)=>s+i.totalPlan,0);
+    const aR=aItems.reduce((s,i)=>s+i.totalReal,0);
+    const aPct=aP>0?Math.round(aR/aP*100):0;
+    h+=`<tr style="background:var(--bg2)">
+      <td colspan="${showCols?2+allDates.length*2:2}" style="font-weight:700;font-size:12px;color:var(--blue);padding:6px 12px">${area}</td>
+      <td style="text-align:right;font-weight:700;background:#E6F1FB;color:#0C447C">${aP.toLocaleString('es-AR')}</td>
+      <td style="text-align:right;font-weight:700;background:#E8F7F0;color:#1D9E75">${aR.toLocaleString('es-AR')}</td>
+      <td style="text-align:right;font-weight:700;color:${aPct>=90?'var(--green)':aPct>=70?'var(--amber)':'var(--red)'}">${aP>0?aPct+'%':'--'}</td>
+    </tr>`;
+
+    aItems.forEach(item=>{
+      const p=item.totalPlan>0?Math.round(item.totalReal/item.totalPlan*100):0;
+      const clr=p>=90?'var(--green)':p>=70?'var(--amber)':'var(--red)';
+      h+=`<tr><td style="font-weight:500;padding-left:16px">${item.nombre}</td><td class="muted">${item.area}</td>`;
+      if(showCols){
+        allDates.forEach(d=>{
+          const dia=item.dias[d];
+          const pv=dia?dia.plan:0;const rv=dia?dia.real:0;
+          const ok=pv>0&&rv>=pv,low=pv>0&&rv>0&&rv<pv,miss=pv>0&&rv===0;
+          h+=`<td style="text-align:right;font-size:11px;color:var(--text2)">${pv>0?pv.toLocaleString('es-AR'):'--'}</td>`;
+          h+=`<td style="text-align:right;font-size:11px;font-weight:${rv>0?'600':'400'};color:${ok?'var(--green)':low?'var(--amber)':miss?'var(--red)':'var(--text3)'}">${rv>0?rv.toLocaleString('es-AR'):'--'}</td>`;
+        });
+      }
+      h+=`<td style="text-align:right;font-weight:700;background:#E6F1FB;color:#0C447C">${item.totalPlan.toLocaleString('es-AR')}</td>`;
+      h+=`<td style="text-align:right;font-weight:700;background:#E8F7F0;color:#1D9E75">${item.totalReal.toLocaleString('es-AR')}</td>`;
+      h+=`<td style="text-align:right;font-weight:600;color:${clr}">${item.totalPlan>0?p+'%':'--'}</td></tr>`;
+    });
+  });
+
+  h+=`</tbody></table></div>`;
+  if(!showCols){
+    h+=`<div style="font-size:12px;color:var(--text2);margin-top:8px;text-align:center"><i class="ti ti-info-circle"></i> El mes tiene más de 14 días con datos — se muestra solo el total. Usá el filtro por día para ver el detalle diario.</div>`;
+  }
+  el.innerHTML=h;
+}
+
 function renderCmp(){
   const k=document.getElementById('cwsel').value;const ef=document.getElementById('cesel').value;
   const el=document.getElementById('ccon');if(!k){el.innerHTML='';return}
