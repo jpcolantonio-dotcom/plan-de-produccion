@@ -225,7 +225,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.10</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.11</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -754,7 +754,7 @@ async function init(){
     ]);
     const ss2=new Set([...pl.map(p=>p.semana),...re.map(r=>r.semana),W0]);
     st.Sem=[...ss2].sort();
-    if(rr.length)st.Rec=rr[0].datos||{};
+    if(rr.length){st.Rec=rr[0].datos||{};st.RecTanda=rr[0].tandas||{};}
     mpData=mp||[];
     st.E=em;st.A=ar||[];st.Pr=pr;
     await lp(W0);
@@ -1576,34 +1576,64 @@ function selRec(p){arec=p;rRec()}
 function rRecDet(p){
   const ings=st.Rec[p]||[];const wrap=document.getElementById('rdetail');
   const k=p.replace(/[\s']/g,'_');
+  const tanda=st.RecTanda&&st.RecTanda[p]?st.RecTanda[p]:1;
+  // Calcular cant x unidad = cant x tanda / unidades x tanda
+  h_xund=(cant)=>tanda>0?`<span style="font-size:10px;color:var(--text3);margin-left:4px">= ${fn(cant/tanda)} x ud</span>`:'';
   let h=`<div class="rdetail">
-    <div style="font-size:15px;font-weight:600;margin-bottom:1rem;display:flex;align-items:center;gap:8px"><i class="ti ti-notebook" style="color:var(--purple)"></i>${p}</div>
-    <table class="itbl"><thead><tr><th>Ingrediente / MP</th><th style="width:130px">Cant. x unidad</th><th style="width:100px">Unidad</th><th style="width:34px"></th></tr></thead><tbody>`;
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:10px">
+      <div style="font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px">
+        <i class="ti ti-notebook" style="color:var(--purple)"></i>${p}
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);padding:6px 12px">
+        <i class="ti ti-stack-2" style="color:var(--blue)"></i>
+        <label style="font-size:12px;color:var(--text2)">Unidades por tanda:</label>
+        <input type="number" min="1" step="1" value="${tanda}" 
+          style="width:70px;padding:4px 8px;font-size:13px;font-weight:700;text-align:center;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg)"
+          onchange="setTanda('${p.replace(/'/g,"\'")}',this.value)"
+          title="Cuántas unidades del producto produce una tanda completa"/>
+        <span style="font-size:11px;color:var(--text2)">uds/tanda</span>
+      </div>
+    </div>
+    <table class="itbl"><thead><tr>
+      <th>Ingrediente / MP</th>
+      <th style="width:130px">Cant. x tanda</th>
+      <th style="width:130px;color:var(--green)">Cant. x unidad</th>
+      <th style="width:100px">Unidad</th>
+      <th style="width:34px"></th>
+    </tr></thead><tbody>`;
   ings.forEach((ing,i)=>{
     const unOpts=['Kg','Gr','Litros','CC','Unidad'].map(u=>`<option${u===ing.unidad?' selected':''}>${u}</option>`).join('');
+    const xUnd=tanda>0?fn(ing.cantidad/tanda):0;
     h+=`<tr>
       <td><input value="${ing.ingrediente}" onchange="uIng('${p.replace(/'/g,"\'")}',${i},'ingrediente',this.value)" 
         oninput="mpAC(this)" onfocus="mpAC(this)" onblur="setTimeout(()=>mpHide(this),200)"
         autocomplete="off" style="position:relative"/></td>
-      <td><input type="number" min="0" step="0.001" value="${ing.cantidad}" onchange="uIng('${p.replace(/'/g,"\'")}',${i},'cantidad',this.value)" style="width:120px;text-align:right"/></td>
-      <td><select onchange="uIng('${p.replace(/'/g,"\'")}',${i},'unidad',this.value)" style="width:100%">${unOpts}</select></td>
+      <td><input type="number" min="0" step="0.001" value="${ing.cantidad}" onchange="uIng('${p.replace(/'/g,"\'")}',${i},'cantidad',this.value);rRecDet('${p.replace(/'/g,"\'")}');" style="width:110px;text-align:right"/></td>
+      <td style="text-align:right;font-weight:600;color:var(--green);font-size:13px">${xUnd.toLocaleString('es-AR',{maximumFractionDigits:4})} <span style="font-size:10px;font-weight:400;color:var(--text3)">${ing.unidad}</span></td>
+      <td><select onchange="uIng('${p.replace(/'/g,"\'")}',${i},'unidad',this.value);rRecDet('${p.replace(/'/g,"\'")}');" style="width:100%">${unOpts}</select></td>
       <td><button class="btn btn-xs btn-danger" onclick="delIng('${p.replace(/'/g,"\'")}',${i})"><i class="ti ti-trash"></i></button></td>
     </tr>`;
   });
   h+=`</tbody></table>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
       <div style="position:relative">
         <input type="text" id="ning-${k}" placeholder="Escribí para buscar MP..." 
           style="width:220px;padding:5px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
           oninput="mpAC(this)" onfocus="mpAC(this)" onblur="setTimeout(()=>mpHide(this),200)" autocomplete="off"/>
         <div id="ac-${k}" class="mp-ac-drop" style="display:none"></div>
       </div>
-      <input type="number" min="0" step="0.001" id="nqty-${k}" placeholder="Cantidad" style="width:90px;padding:5px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-      <select id="nunit-${k}" style="padding:5px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">${['Kg','Gr','Litros','CC','Unidad'].map(u=>`<option>${u}</option>`).join('')}</select>
+      <input type="number" min="0" step="0.001" id="nqty-${k}" placeholder="Cant. x tanda" style="width:110px;padding:5px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <select id="nunit-${k}" style="padding:5px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option>Kg</option><option>Gr</option><option>Litros</option><option>CC</option><option>Unidad</option></select>
       <button class="btn btn-primary btn-sm" onclick="addIng('${p.replace(/'/g,"\'")}')"><i class="ti ti-plus"></i> Agregar</button>
     </div></div>`;
   wrap.innerHTML=h;
 }
+function setTanda(p,v){
+  if(!st.RecTanda)st.RecTanda={};
+  st.RecTanda[p]=parseInt(v)||1;
+  rRecDet(p);
+}
+
 function uIng(p,i,f,v){if(!st.Rec[p])st.Rec[p]=[];st.Rec[p][i][f]=f==='cantidad'?parseFloat(v)||0:v}
 function delIng(p,i){st.Rec[p].splice(i,1);rRecDet(p);rRec()}
 function addIng(p){
@@ -1721,10 +1751,13 @@ async function renderConsumoMP(){
         if(dStr>=desde&&dStr<=hasta)total+=(r.days&&r.days[di])||0;
       }
       if(!total)return;
+      const tanda=(st.RecTanda&&st.RecTanda[r.producto])||1;
       (st.Rec[r.producto]||[]).forEach(ing=>{
         const key=ing.ingrediente+'||'+ing.unidad;
         if(!cm[key])cm[key]={ingrediente:ing.ingrediente,unidad:ing.unidad,total:0,det:{}};
-        const c=ing.cantidad*total;
+        // cantidad x unidad = cantidad x tanda / unidades x tanda
+        const cantXUnidad=tanda>0?ing.cantidad/tanda:ing.cantidad;
+        const c=cantXUnidad*total;
         cm[key].total=fn(cm[key].total+c);
         if(!cm[key].det[r.producto])cm[key].det[r.producto]=0;
         cm[key].det[r.producto]=fn(cm[key].det[r.producto]+c);
@@ -1863,7 +1896,7 @@ async function deleteMP(id,nombre){
 
 async function saveRecetas(){
   const btn=document.getElementById('btnsaverec');btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;ss('saving','Guardando...');
-  try{await upsert('recetas',{id:1,datos:JSON.parse(JSON.stringify(st.Rec)),updated_at:new Date().toISOString()});ss('online','Guardado');fl('recmsg');}
+  try{await upsert('recetas',{id:1,datos:JSON.parse(JSON.stringify(st.Rec)),tandas:JSON.parse(JSON.stringify(st.RecTanda||{})),updated_at:new Date().toISOString()});ss('online','Guardado');fl('recmsg');}
   catch(e){ss('error','Error');alert('Error: '+e.message)}
   btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar recetas';btn.disabled=false;
 }
