@@ -226,7 +226,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.15</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.16</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -4119,12 +4119,19 @@ async function copiarSemanaAnterior(){
     let copiados=0;
     for(const emp of empleados){
       const src=horAnt[emp.id];
-      // Si no tiene horario en semana anterior, saltear (no pisar con nulls)
       if(!src)continue;
+      // Solo copiar si tiene al menos un horario real (no todo null)
+      const tieneHorario=DIAS_HOR.some(dia=>src[`${dia}_entrada`]||src[`${dia}_novedad`]);
+      if(!tieneHorario)continue;
       const row={empleado_id:emp.id,semana:horSemana,updated_at:new Date().toISOString()};
       DIAS_HOR.forEach(dia=>{
-        row[`${dia}_entrada`]=src[`${dia}_entrada`]||null;
-        row[`${dia}_salida`]=src[`${dia}_salida`]||null;
+        // Normalizar formato de hora (quitar segundos si vienen como "05:00:00")
+        let e=src[`${dia}_entrada`]||null;
+        let s=src[`${dia}_salida`]||null;
+        if(e&&e.length===8&&e[5]===':')e=e.slice(0,5);
+        if(s&&s.length===8&&s[5]===':')s=s.slice(0,5);
+        row[`${dia}_entrada`]=e;
+        row[`${dia}_salida`]=s;
         row[`${dia}_novedad`]=src[`${dia}_novedad`]||null;
       });
       const existId=horActId[emp.id];
@@ -4162,8 +4169,6 @@ async function loadHorariosSemana(sem){
   horarios={};
   try{
     const data=await get('horarios',`semana=eq.${sem}`);
-    console.log('HORARIOS loaded:',data.length,'records for sem',sem);
-    if(data.length)console.log('First record entrada:',JSON.stringify({id:data[0].empleado_id,lu:data[0].lunes_entrada}));
     data.forEach(h=>{
       // Normalizar: nulls a '' y recortar segundos de time (ej: "06:00:00" -> "06:00")
       DIAS_HOR.forEach(dia=>{
@@ -4220,7 +4225,6 @@ function renderHorarios(){
     h+=`<tr><td colspan="${2*7+2}" style="background:${eid!=='_'?`${clr}18`:'var(--bg2)'};padding:6px 12px;font-size:12px;font-weight:700;color:${clr};border-top:2px solid ${clr}">${nm}</td></tr>`;
   eEmps.forEach(emp=>{
     const hor=horarios[emp.id]||{};
-    if(emp.nombre==='ACEVEDO GABRIEL')console.log('ACEVEDO hor:',JSON.stringify({id:emp.id,entrada:hor.lunes_entrada,keys:Object.keys(horarios).length}));
     h+=`<tr><td style="font-weight:500;white-space:nowrap">${emp.nombre}</td>`;
     // Calcular primer día de la semana actual para saber a partir de cuándo marcar cambios
     const hoyStr=(()=>{const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0')})();
