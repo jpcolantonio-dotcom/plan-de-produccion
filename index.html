@@ -4057,44 +4057,40 @@ async function copiarSemanaAnterior(){
   if(!confirm(`¿Copiar los horarios de la semana ${wlb(semAnterior)} a esta semana (${wlb(horSemana)})?\nSe sobreescribirán los horarios actuales.`))return;
   ss('saving','Copiando horarios...');
   try{
-    // Cargar semana anterior directo con fetch para ver el error exacto
-    const urlAnt=`${SB}/rest/v1/horarios?semana=eq.${semAnterior}`;
-    const respAnt=await fetch(urlAnt,{headers:H});
-    if(!respAnt.ok){const err=await respAnt.text();throw new Error('Fetch anterior: '+err);}
+    // Cargar TODOS los horarios de la semana anterior indexados por empleado_id
+    const respAnt=await fetch(`${SB}/rest/v1/horarios?semana=eq.${semAnterior}`,{headers:H});
+    if(!respAnt.ok)throw new Error(await respAnt.text());
     const dataAnt=await respAnt.json();
-    if(!dataAnt.length){alert('La semana '+semAnterior+' no tiene horarios en Supabase.');ss('online','Sin horarios en semana anterior.');return;}
+    const horAnt={};
+    dataAnt.forEach(h=>horAnt[h.empleado_id]=h);
 
-    let copiados=0;let errores=[];
-    for(const h of dataAnt){
-      const nuevo={empleado_id:h.empleado_id,semana:horSemana};
+    // Cargar registros existentes de la semana actual para hacer PATCH o INSERT
+    const respAct=await fetch(`${SB}/rest/v1/horarios?semana=eq.${horSemana}&select=id,empleado_id`,{headers:H});
+    const dataAct=respAct.ok?await respAct.json():[];
+    const horActId={};
+    dataAct.forEach(h=>horActId[h.empleado_id]=h.id);
+
+    // Iterar sobre TODOS los empleados activos (igual que saveHorarios)
+    let copiados=0;
+    for(const emp of empleados){
+      const src=horAnt[emp.id];
+      // Si no tiene horario en semana anterior, igual creamos registro vacío
+      const row={empleado_id:emp.id,semana:horSemana,updated_at:new Date().toISOString()};
       DIAS_HOR.forEach(dia=>{
-        nuevo[`${dia}_entrada`]=h[`${dia}_entrada`]||null;
-        nuevo[`${dia}_salida`]=h[`${dia}_salida`]||null;
-        nuevo[`${dia}_novedad`]=h[`${dia}_novedad`]||'';
+        row[`${dia}_entrada`]=src?src[`${dia}_entrada`]||null:null;
+        row[`${dia}_salida`]=src?src[`${dia}_salida`]||null:null;
+        row[`${dia}_novedad`]=src?src[`${dia}_novedad`]||null:null;
       });
-      // Buscar si ya existe registro para este empleado en la semana actual
-      const urlEx=`${SB}/rest/v1/horarios?semana=eq.${horSemana}&empleado_id=eq.${h.empleado_id}&select=id`;
-      const respEx=await fetch(urlEx,{headers:H});
-      const existing=respEx.ok?await respEx.json():[];
-      let r;
-      if(existing.length){
-        r=await fetch(`${SB}/rest/v1/horarios?id=eq.${existing[0].id}`,{
-          method:'PATCH',headers:{...H,'Content-Type':'application/json','Prefer':'return=minimal'},
-          body:JSON.stringify(nuevo)
-        });
-      } else {
-        r=await fetch(`${SB}/rest/v1/horarios`,{
-          method:'POST',headers:{...H,'Content-Type':'application/json','Prefer':'return=minimal'},
-          body:JSON.stringify(nuevo)
-        });
-      }
-      if(r.ok){copiados++;}else{const e=await r.text();errores.push(e);}
+      const existId=horActId[emp.id];
+      const r=existId
+        ?await fetch(`${SB}/rest/v1/horarios?id=eq.${existId}`,{method:'PATCH',headers:{...H,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(row)})
+        :await fetch(`${SB}/rest/v1/horarios`,{method:'POST',headers:{...H,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(row)});
+      if(r.ok)copiados++;
     }
-    if(errores.length)alert('Errores:\n'+errores.slice(0,3).join('\n'));
     await loadHorariosSemana(horSemana);
     renderHorarios();
-    ss('online',copiados+' horarios copiados ✓');
-  }catch(e){ss('error','Error');alert('Error detallado: '+e.message);}
+    ss('online',copiados+' empleados actualizados ✓');
+  }catch(e){ss('error','Error');alert('Error: '+e.message);}
 }
 
 async function initHorarios(){
