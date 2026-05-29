@@ -1673,36 +1673,6 @@ function mpAC(input){
     h+=`<div class="mp-ac-new" onmousedown="mpPickNew(event,'${q}')"><i class="ti ti-plus"></i> Agregar "${q}" como nueva MP</div>`;
   }
   drop.innerHTML=h;drop.style.display='block';
-  if(!input._mpKbd){
-    input._mpKbd=true;
-    input.addEventListener('keydown',function(e){
-      const d=wrap.querySelector('.mp-ac-drop');
-      if(!d||d.style.display==='none')return;
-      const items=[...d.querySelectorAll('.mp-ac-item,.mp-ac-new')];
-      if(!items.length)return;
-      const cur=d.querySelector('.mp-ac-hover');
-      const ci=cur?items.indexOf(cur):-1;
-      if(e.key==='ArrowDown'){
-        e.preventDefault();
-        const ni=Math.min(ci+1,items.length-1);
-        items.forEach(i=>i.classList.remove('mp-ac-hover'));
-        items[ni].classList.add('mp-ac-hover');
-        items[ni].scrollIntoView({block:'nearest'});
-      } else if(e.key==='ArrowUp'){
-        e.preventDefault();
-        const ni=Math.max(ci-1,0);
-        items.forEach(i=>i.classList.remove('mp-ac-hover'));
-        items[ni].classList.add('mp-ac-hover');
-        items[ni].scrollIntoView({block:'nearest'});
-      } else if(e.key==='Enter'){
-        e.preventDefault();
-        const hov=d.querySelector('.mp-ac-hover');
-        if(hov)hov.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
-      } else if(e.key==='Escape'){
-        d.style.display='none';
-      }
-    });
-  }
 }
 
 function highlight(text,q){
@@ -1716,6 +1686,41 @@ function mpHide(input){
   const drop=input.parentElement?.querySelector('.mp-ac-drop');
   if(drop)drop.style.display='none';
 }
+
+// Keyboard navigation for all MP autocomplete dropdowns (global, works even after DOM rebuild)
+document.addEventListener('keydown',function(e){
+  // Find the currently focused input that has an open dropdown
+  const active=document.activeElement;
+  if(!active||active.tagName!=='INPUT')return;
+  const wrap=active.parentElement;
+  if(!wrap)return;
+  const drop=wrap.querySelector('.mp-ac-drop');
+  if(!drop||drop.style.display==='none')return;
+  const items=[...drop.querySelectorAll('.mp-ac-item,.mp-ac-new')];
+  if(!items.length)return;
+  const cur=drop.querySelector('.mp-ac-hover');
+  const ci=cur?items.indexOf(cur):-1;
+  if(e.key==='ArrowDown'){
+    e.preventDefault();
+    const ni=Math.min(ci+1,items.length-1);
+    items.forEach(i=>i.classList.remove('mp-ac-hover'));
+    items[ni].classList.add('mp-ac-hover');
+    items[ni].scrollIntoView({block:'nearest'});
+  } else if(e.key==='ArrowUp'){
+    e.preventDefault();
+    const ni=Math.max(ci-1,0);
+    items.forEach(i=>i.classList.remove('mp-ac-hover'));
+    items[ni].classList.add('mp-ac-hover');
+    items[ni].scrollIntoView({block:'nearest'});
+  } else if(e.key==='Enter'){
+    if(ci>=0){
+      e.preventDefault();
+      items[ci].dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
+    }
+  } else if(e.key==='Escape'){
+    drop.style.display='none';
+  }
+});
 
 function mpPick(e,nombre,unidad){
   e.preventDefault();
@@ -4088,7 +4093,8 @@ function calcSalida(entrada){
 }
 
 function horOptsSel(val){
-  return`<option value="">--</option>${HOR_OPTS.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}`;
+  const v=val||'';
+  return`<option value="">--</option>${HOR_OPTS.map(o=>`<option${o===v?' selected':''}>${o}</option>`).join('')}`;
 }
 
 async function copiarSemanaAnterior(){
@@ -4113,12 +4119,13 @@ async function copiarSemanaAnterior(){
     let copiados=0;
     for(const emp of empleados){
       const src=horAnt[emp.id];
-      // Si no tiene horario en semana anterior, igual creamos registro vacío
+      // Si no tiene horario en semana anterior, saltear (no pisar con nulls)
+      if(!src)continue;
       const row={empleado_id:emp.id,semana:horSemana,updated_at:new Date().toISOString()};
       DIAS_HOR.forEach(dia=>{
-        row[`${dia}_entrada`]=src?src[`${dia}_entrada`]||null:null;
-        row[`${dia}_salida`]=src?src[`${dia}_salida`]||null:null;
-        row[`${dia}_novedad`]=src?src[`${dia}_novedad`]||null:null;
+        row[`${dia}_entrada`]=src[`${dia}_entrada`]||null;
+        row[`${dia}_salida`]=src[`${dia}_salida`]||null;
+        row[`${dia}_novedad`]=src[`${dia}_novedad`]||null;
       });
       const existId=horActId[emp.id];
       const r=existId
@@ -4156,10 +4163,13 @@ async function loadHorariosSemana(sem){
   try{
     const data=await get('horarios',`semana=eq.${sem}`);
     data.forEach(h=>{
-      horarios[h.empleado_id]=h;
+      // Normalizar nulls a strings vacíos para evitar problemas en selects
       DIAS_HOR.forEach(dia=>{
-        if(h[`${dia}_novedad`])horarios[h.empleado_id][`${dia}_novedad`]=h[`${dia}_novedad`];
+        h[`${dia}_entrada`]=h[`${dia}_entrada`]||'';
+        h[`${dia}_salida`]=h[`${dia}_salida`]||'';
+        h[`${dia}_novedad`]=h[`${dia}_novedad`]||'';
       });
+      horarios[h.empleado_id]=h;
     });
   }catch{}
   // Guardar snapshot del horario original para detectar cambios
