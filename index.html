@@ -2486,7 +2486,7 @@ function renderDepConfig(){
   depositosData.forEach(dep=>{
     const torres=depTorresData.filter(t=>t.deposito_id===dep.id);
     const prods=depProdData.filter(p=>p.deposito_id===dep.id);
-    const capTotal=torres.reduce((s,t)=>s+t.cantidad*t.altura_cajas*(t.doble?2:1),0);
+    const capTotal=torres.reduce((s,t)=>s+t.cantidad*t.altura_cajas*(t.estantes||1)*(t.doble?2:1),0);
 
     h+=`<div class="stock-card" style="margin-bottom:1.5rem">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:.5px solid var(--border);background:var(--bg2)">
@@ -2527,11 +2527,12 @@ function renderDepConfig(){
 
     const famsDep=depFamiliasData.filter(f=>f.deposito_id===dep.id);
     torres.forEach(t=>{
-      const cap=t.cantidad*t.altura_cajas*(t.doble?2:1);
+      const est=t.estantes||1;
+      const cap=t.cantidad*t.altura_cajas*est*(t.doble?2:1);
       const famObj=famsDep.find(f=>f.codigo===t.familia);
       const famBadge=famObj?`<span style="background:var(--amber)22;border:.5px solid var(--amber)66;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;color:var(--amber)">${famObj.codigo} · ${famObj.nombre}</span>`:'';
       h+=`<div style="background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:12px;display:flex;align-items:center;gap:8px">
-        ${famBadge}<span><b>${t.cantidad}</b> torre${t.cantidad>1?'s':''} × <b>${t.altura_cajas}</b> cajas${t.doble?' <span style="color:var(--blue)">(doble)</span>':''} = <b style="color:var(--green)">${cap}</b> cajas</span>
+        ${famBadge}<span><b>${t.cantidad}</b> torre${t.cantidad>1?'s':''} × <b>${t.altura_cajas}</b> cajas × <b>${est}</b> est.${t.doble?' <span style="color:var(--blue)">(doble)</span>':''} = <b style="color:var(--green)">${cap}</b> cajas</span>
         <button class="btn btn-xs btn-danger" onclick="deleteTorreDeposito('${t.id}')"><i class="ti ti-x"></i></button>
       </div>`;
     });
@@ -2539,7 +2540,8 @@ function renderDepConfig(){
     h+=`</div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <input type="number" id="nt-cant-${dep.id}" placeholder="Cant. torres" min="1" value="1" style="width:90px;padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
-          <input type="number" id="nt-alt-${dep.id}" placeholder="Altura cajas" min="1" value="8" style="width:90px;padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+          <input type="number" id="nt-alt-${dep.id}" placeholder="Cajas x estante" min="1" value="8" style="width:90px;padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+          <input type="number" id="nt-est-${dep.id}" placeholder="Estantes" min="1" value="1" style="width:80px;padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)" title="Cantidad de estantes por torre"/>
           <select id="nt-fam-${dep.id}" style="padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)">
             <option value="">Sin familia</option>
             ${famsDep.map(f=>`<option value="${f.codigo}">${f.codigo} · ${f.nombre}</option>`).join('')}
@@ -2601,11 +2603,12 @@ async function deleteDeposito(id,nombre){
 async function addTorreDeposito(depId){
   const cant=parseInt(document.getElementById(`nt-cant-${depId}`)?.value)||1;
   const alt=parseInt(document.getElementById(`nt-alt-${depId}`)?.value)||8;
+  const estantes=parseInt(document.getElementById(`nt-est-${depId}`)?.value)||1;
   const doble=document.getElementById(`nt-doble-${depId}`)?.checked||false;
   const familia=(document.getElementById(`nt-fam-${depId}`)?.value||'').trim().toUpperCase()||null;
   ss('saving','Guardando...');
   try{
-    const res=await ins('deposito_torres',{deposito_id:depId,cantidad:cant,altura_cajas:alt,doble,familia});
+    const res=await ins('deposito_torres',{deposito_id:depId,cantidad:cant,altura_cajas:alt,estantes,doble,familia});
     depTorresData.push(res[0]);
     renderDepConfig();ss('online','Torres agregadas');
   }catch(e){ss('error','Error: '+e.message)}
@@ -2753,7 +2756,7 @@ async function renderDepCalc(){
   deps.forEach(dep=>{
     const torres=depTorresData.filter(t=>t.deposito_id===dep.id);
     const prods=depProdData.filter(p=>p.deposito_id===dep.id);
-    const capTotal=torres.reduce((s,t)=>s+t.cantidad*t.altura_cajas*(t.doble?2:1),0);
+    const capTotal=torres.reduce((s,t)=>s+t.cantidad*t.altura_cajas*(t.estantes||1)*(t.doble?2:1),0);
     if(!capTotal||!prods.length)return;
 
     h+=`<div class="stock-card" style="margin-bottom:1.5rem">
@@ -2779,7 +2782,7 @@ async function renderDepCalc(){
     if(famsDep2.length){
       famsDep2.forEach(f=>{
         const tFam=torres.filter(t=>t.familia===f.codigo);
-        capPorFam[f.codigo]=tFam.reduce((s,t)=>s+t.cantidad*t.altura_cajas*(t.doble?2:1),0);
+        capPorFam[f.codigo]=tFam.reduce((s,t)=>s+t.cantidad*t.altura_cajas*(t.estantes||1)*(t.doble?2:1),0);
       });
     }
     // Agrupar productos por familia
@@ -2809,7 +2812,8 @@ async function renderDepCalc(){
       const torreDobleFam=torresFam.find(t=>t.doble);
       const torreSimpleFam=torresFam.find(t=>!t.doble);
       // cajasXtorre = cajas que ocupa UNA torre completa (el bloque indivisible)
-      const cajasXtorre=alturaRef*(torreDobleFam?2:1);
+      const estRef=torresFam.length?(torresFam[0].estantes||1):(torres[0]?.estantes||1);
+      const cajasXtorre=alturaRef*estRef*(torreDobleFam?2:1);
 
       // Encabezado de familia si hay familias definidas
       if(famsDep2.length){
@@ -4071,7 +4075,6 @@ function imprimirResumen(){
 let horSemana=wk(new Date());
 let empleados=[];
 let horarios={};
-let horariosOrig={};  // {empleado_id: {lunes_entrada, lunes_salida, ...}}
 
 // Generar opciones de horario: 03:00 a 23:30 cada 30 min
 const HOR_OPTS=(()=>{
@@ -4170,21 +4173,12 @@ async function loadHorariosSemana(sem){
   try{
     const data=await get('horarios',`semana=eq.${sem}`);
     data.forEach(h=>{
-      // Normalizar: nulls a '' y recortar segundos de time (ej: "06:00:00" -> "06:00")
-      DIAS_HOR.forEach(dia=>{
-        let e=h[`${dia}_entrada`]||'';
-        let s=h[`${dia}_salida`]||'';
-        if(e.length===8&&e[5]===':')e=e.slice(0,5);
-        if(s.length===8&&s[5]===':')s=s.slice(0,5);
-        h[`${dia}_entrada`]=e;
-        h[`${dia}_salida`]=s;
-        h[`${dia}_novedad`]=h[`${dia}_novedad`]||'';
-      });
       horarios[h.empleado_id]=h;
+      DIAS_HOR.forEach(dia=>{
+        if(h[`${dia}_novedad`])horarios[h.empleado_id][`${dia}_novedad`]=h[`${dia}_novedad`];
+      });
     });
   }catch{}
-  // Guardar snapshot del horario original para detectar cambios
-  horariosOrig=JSON.parse(JSON.stringify(horarios));
 }
 
 function changeHorSemana(n){
@@ -4226,8 +4220,6 @@ function renderHorarios(){
   eEmps.forEach(emp=>{
     const hor=horarios[emp.id]||{};
     h+=`<tr><td style="font-weight:500;white-space:nowrap">${emp.nombre}</td>`;
-    // Calcular primer día de la semana actual para saber a partir de cuándo marcar cambios
-    const hoyStr=(()=>{const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0')})();
     DIAS_HOR.forEach((dia,di)=>{
       const eVal=hor[`${dia}_entrada`]||'';
       const sVal=hor[`${dia}_salida`]||'';
@@ -4235,36 +4227,24 @@ function renderHorarios(){
         ?`onchange="onLunesEntrada('${emp.id}',this.value)"`
         :`onchange="updEntrada('${emp.id}','${dia}',this.value)"`;
       const novVal=hor[`${dia}_novedad`]||'';
-      // Verificar si este día es >= hoy (dentro de la semana en curso)
-      const diaDate=new Date(horSemana+'T00:00:00');diaDate.setDate(diaDate.getDate()+di);
-      const diaStr=diaDate.getFullYear()+'-'+String(diaDate.getMonth()+1).padStart(2,'0')+'-'+String(diaDate.getDate()).padStart(2,'0');
-      const esPasado=diaStr<hoyStr;
-      // Detectar cambio respecto al original
-      const orig=horariosOrig[emp.id]||{};
-      const cambioEntrada=!esPasado&&eVal!==(orig[`${dia}_entrada`]||'');
-      const cambioSalida=!esPasado&&sVal!==(orig[`${dia}_salida`]||'');
-      const cambioNov=!esPasado&&novVal!==(orig[`${dia}_novedad`]||'');
-      const cambiado=cambioEntrada||cambioSalida||cambioNov;
-      const bgCambiado=cambiado?'background:var(--amber)18;':'';
-      const borderCambiado=cambiado?'box-shadow:inset 0 0 0 1.5px var(--amber)55;border-radius:4px;':'';
       if(novVal){
-        h+=`<td colspan="2" class="day-cell" style="padding:4px;vertical-align:middle;text-align:center;\${bgCambiado}\${borderCambiado}">
-          <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:3px">\${novVal}\${cambiado?' <span style="font-size:9px;color:var(--amber)">✎</span>':''}</div>
-          <select class="day-input" style="width:100%;font-size:9px;padding:1px;color:var(--text2)" onchange="updNovedad('\${emp.id}','\${dia}',this.value)">
+        h+=`<td colspan="2" class="day-cell" style="padding:4px;vertical-align:middle;text-align:center">
+          <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:3px">${novVal}</div>
+          <select class="day-input" style="width:100%;font-size:9px;padding:1px;color:var(--text2)" onchange="updNovedad('${emp.id}','${dia}',this.value)">
             <option value="">-- quitar --</option>
-            <option value="Lic. Vacaciones"\${novVal==='Lic. Vacaciones'?' selected':''}>Vacaciones</option>
-            <option value="Lic. Medica"\${novVal==='Lic. Medica'?' selected':''}>Lic. Medica</option>
-            <option value="Libre"\${novVal==='Libre'?' selected':''}>Libre</option>
+            <option value="Lic. Vacaciones"${novVal==='Lic. Vacaciones'?' selected':''}>Vacaciones</option>
+            <option value="Lic. Medica"${novVal==='Lic. Medica'?' selected':''}>Lic. Medica</option>
+            <option value="Libre"${novVal==='Libre'?' selected':''}>Libre</option>
           </select>
         </td>`;
       } else {
-        h+=`<td class="day-cell" style="padding:2px;vertical-align:top;\${cambioEntrada?bgCambiado+borderCambiado:''}">
-          <select class="day-input" style="width:70px;font-size:11px;padding:2px\${cambioEntrada?';background:transparent':''}" \${onChangeEntrada}>\${horOptsSel(eVal)}</select>
+        h+=`<td class="day-cell" style="padding:2px;vertical-align:top">
+          <select class="day-input" style="width:70px;font-size:11px;padding:2px" ${onChangeEntrada}>${horOptsSel(eVal)}</select>
         </td>
-        <td class="day-cell" style="padding:2px;vertical-align:top;\${cambioSalida?bgCambiado+borderCambiado:''}">
-          <select class="day-input" style="width:70px;font-size:11px;padding:2px\${cambioSalida?';background:transparent':''}" data-sal="\${emp.id}-\${dia}" onchange="updHorario('\${emp.id}','\${dia}_salida',this.value)">\${horOptsSel(sVal)}</select>
+        <td class="day-cell" style="padding:2px;vertical-align:top">
+          <select class="day-input" style="width:70px;font-size:11px;padding:2px" data-sal="${emp.id}-${dia}" onchange="updHorario('${emp.id}','${dia}_salida',this.value)">${horOptsSel(sVal)}</select>
           <div style="margin-top:2px">
-            <select class="day-input" style="width:70px;font-size:9px;padding:1px;color:var(--text2)" onchange="updNovedad('\${emp.id}','\${dia}',this.value)">
+            <select class="day-input" style="width:70px;font-size:9px;padding:1px;color:var(--text2)" onchange="updNovedad('${emp.id}','${dia}',this.value)">
               <option value="">novedad</option>
               <option value="Lic. Vacaciones">Vacaciones</option>
               <option value="Lic. Medica">Lic. Medica</option>
