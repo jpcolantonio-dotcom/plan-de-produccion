@@ -126,7 +126,8 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 .rdetail{background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem}
 .mp-ac-drop{position:absolute;top:100%;left:0;width:260px;background:var(--bg);border:.5px solid var(--border2);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:1000;max-height:200px;overflow-y:auto}
 .mp-ac-item{padding:7px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
-.mp-ac-item:hover{background:var(--blue)18}
+.mp-ac-item:hover,.mp-ac-item.mp-ac-hover{background:var(--blue)18}
+.mp-ac-new:hover,.mp-ac-new.mp-ac-hover{background:var(--blue)11}
 .mp-ac-item .mp-ac-unit{font-size:11px;color:var(--text3)}
 .mp-ac-new{padding:7px 12px;font-size:12px;color:var(--blue);cursor:pointer;border-top:.5px solid var(--border)}
 .mp-ac-new:hover{background:var(--blue)11}
@@ -225,7 +226,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.13</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.15</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1645,6 +1646,13 @@ function addIng(p){
   if(!nm)return;if(!st.Rec[p])st.Rec[p]=[];
   st.Rec[p].push({ingrediente:nm,cantidad:qty,unidad:unit});
   rRecDet(p);rRec();
+  // Volver foco al input de MP y limpiar campos
+  requestAnimationFrame(()=>{
+    const inp=document.getElementById(`ning-${k}`);
+    if(inp){inp.value='';inp.focus();}
+    const qty2=document.getElementById(`nqty-${k}`);
+    if(qty2)qty2.value='';
+  });
 }
 // AUTOCOMPLETE MP
 function mpAC(input){
@@ -1656,7 +1664,7 @@ function mpAC(input){
   const results=q?mpData.filter(m=>m.nombre.toLowerCase().includes(q)):mpData;
   if(!results.length&&!q){drop.style.display='none';return}
   let h='';
-  results.slice(0,10).forEach(m=>{
+  results.slice(0,10).forEach((m,idx)=>{
     h+=`<div class="mp-ac-item" onmousedown="mpPick(event,'${m.nombre.replace(/'/g,"\'")}','${m.unidad}')">
       <span>${highlight(m.nombre,q)}</span><span class="mp-ac-unit">${m.unidad}</span>
     </div>`;
@@ -1665,6 +1673,36 @@ function mpAC(input){
     h+=`<div class="mp-ac-new" onmousedown="mpPickNew(event,'${q}')"><i class="ti ti-plus"></i> Agregar "${q}" como nueva MP</div>`;
   }
   drop.innerHTML=h;drop.style.display='block';
+  if(!input._mpKbd){
+    input._mpKbd=true;
+    input.addEventListener('keydown',function(e){
+      const d=wrap.querySelector('.mp-ac-drop');
+      if(!d||d.style.display==='none')return;
+      const items=[...d.querySelectorAll('.mp-ac-item,.mp-ac-new')];
+      if(!items.length)return;
+      const cur=d.querySelector('.mp-ac-hover');
+      const ci=cur?items.indexOf(cur):-1;
+      if(e.key==='ArrowDown'){
+        e.preventDefault();
+        const ni=Math.min(ci+1,items.length-1);
+        items.forEach(i=>i.classList.remove('mp-ac-hover'));
+        items[ni].classList.add('mp-ac-hover');
+        items[ni].scrollIntoView({block:'nearest'});
+      } else if(e.key==='ArrowUp'){
+        e.preventDefault();
+        const ni=Math.max(ci-1,0);
+        items.forEach(i=>i.classList.remove('mp-ac-hover'));
+        items[ni].classList.add('mp-ac-hover');
+        items[ni].scrollIntoView({block:'nearest'});
+      } else if(e.key==='Enter'){
+        e.preventDefault();
+        const hov=d.querySelector('.mp-ac-hover');
+        if(hov)hov.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
+      } else if(e.key==='Escape'){
+        d.style.display='none';
+      }
+    });
+  }
 }
 
 function highlight(text,q){
@@ -4027,7 +4065,8 @@ function imprimirResumen(){
 // ── HORARIOS ──────────────────────────────────────────────────────
 let horSemana=wk(new Date());
 let empleados=[];
-let horarios={};  // {empleado_id: {lunes_entrada, lunes_salida, ...}}
+let horarios={};
+let horariosOrig={};  // {empleado_id: {lunes_entrada, lunes_salida, ...}}
 
 // Generar opciones de horario: 03:00 a 23:30 cada 30 min
 const HOR_OPTS=(()=>{
@@ -4118,12 +4157,13 @@ async function loadHorariosSemana(sem){
     const data=await get('horarios',`semana=eq.${sem}`);
     data.forEach(h=>{
       horarios[h.empleado_id]=h;
-      // Cargar novedades
       DIAS_HOR.forEach(dia=>{
         if(h[`${dia}_novedad`])horarios[h.empleado_id][`${dia}_novedad`]=h[`${dia}_novedad`];
       });
     });
   }catch{}
+  // Guardar snapshot del horario original para detectar cambios
+  horariosOrig=JSON.parse(JSON.stringify(horarios));
 }
 
 function changeHorSemana(n){
@@ -4165,6 +4205,8 @@ function renderHorarios(){
   eEmps.forEach(emp=>{
     const hor=horarios[emp.id]||{};
     h+=`<tr><td style="font-weight:500;white-space:nowrap">${emp.nombre}</td>`;
+    // Calcular primer día de la semana actual para saber a partir de cuándo marcar cambios
+    const hoyStr=(()=>{const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0')})();
     DIAS_HOR.forEach((dia,di)=>{
       const eVal=hor[`${dia}_entrada`]||'';
       const sVal=hor[`${dia}_salida`]||'';
@@ -4172,24 +4214,36 @@ function renderHorarios(){
         ?`onchange="onLunesEntrada('${emp.id}',this.value)"`
         :`onchange="updEntrada('${emp.id}','${dia}',this.value)"`;
       const novVal=hor[`${dia}_novedad`]||'';
+      // Verificar si este día es >= hoy (dentro de la semana en curso)
+      const diaDate=new Date(horSemana+'T00:00:00');diaDate.setDate(diaDate.getDate()+di);
+      const diaStr=diaDate.getFullYear()+'-'+String(diaDate.getMonth()+1).padStart(2,'0')+'-'+String(diaDate.getDate()).padStart(2,'0');
+      const esPasado=diaStr<hoyStr;
+      // Detectar cambio respecto al original
+      const orig=horariosOrig[emp.id]||{};
+      const cambioEntrada=!esPasado&&eVal!==(orig[`${dia}_entrada`]||'');
+      const cambioSalida=!esPasado&&sVal!==(orig[`${dia}_salida`]||'');
+      const cambioNov=!esPasado&&novVal!==(orig[`${dia}_novedad`]||'');
+      const cambiado=cambioEntrada||cambioSalida||cambioNov;
+      const bgCambiado=cambiado?'background:var(--amber)18;':'';
+      const borderCambiado=cambiado?'box-shadow:inset 0 0 0 1.5px var(--amber)55;border-radius:4px;':'';
       if(novVal){
-        h+=`<td colspan="2" class="day-cell" style="padding:4px;vertical-align:middle;text-align:center">
-          <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:3px">${novVal}</div>
-          <select class="day-input" style="width:100%;font-size:9px;padding:1px;color:var(--text2)" onchange="updNovedad('${emp.id}','${dia}',this.value)">
+        h+=`<td colspan="2" class="day-cell" style="padding:4px;vertical-align:middle;text-align:center;\${bgCambiado}\${borderCambiado}">
+          <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:3px">\${novVal}\${cambiado?' <span style="font-size:9px;color:var(--amber)">✎</span>':''}</div>
+          <select class="day-input" style="width:100%;font-size:9px;padding:1px;color:var(--text2)" onchange="updNovedad('\${emp.id}','\${dia}',this.value)">
             <option value="">-- quitar --</option>
-            <option value="Lic. Vacaciones"${novVal==='Lic. Vacaciones'?' selected':''}>Vacaciones</option>
-            <option value="Lic. Medica"${novVal==='Lic. Medica'?' selected':''}>Lic. Medica</option>
-            <option value="Libre"${novVal==='Libre'?' selected':''}>Libre</option>
+            <option value="Lic. Vacaciones"\${novVal==='Lic. Vacaciones'?' selected':''}>Vacaciones</option>
+            <option value="Lic. Medica"\${novVal==='Lic. Medica'?' selected':''}>Lic. Medica</option>
+            <option value="Libre"\${novVal==='Libre'?' selected':''}>Libre</option>
           </select>
         </td>`;
       } else {
-        h+=`<td class="day-cell" style="padding:2px;vertical-align:top">
-          <select class="day-input" style="width:70px;font-size:11px;padding:2px" ${onChangeEntrada}>${horOptsSel(eVal)}</select>
+        h+=`<td class="day-cell" style="padding:2px;vertical-align:top;\${cambioEntrada?bgCambiado+borderCambiado:''}">
+          <select class="day-input" style="width:70px;font-size:11px;padding:2px\${cambioEntrada?';background:transparent':''}" \${onChangeEntrada}>\${horOptsSel(eVal)}</select>
         </td>
-        <td class="day-cell" style="padding:2px;vertical-align:top">
-          <select class="day-input" style="width:70px;font-size:11px;padding:2px" data-sal="${emp.id}-${dia}" onchange="updHorario('${emp.id}','${dia}_salida',this.value)">${horOptsSel(sVal)}</select>
+        <td class="day-cell" style="padding:2px;vertical-align:top;\${cambioSalida?bgCambiado+borderCambiado:''}">
+          <select class="day-input" style="width:70px;font-size:11px;padding:2px\${cambioSalida?';background:transparent':''}" data-sal="\${emp.id}-\${dia}" onchange="updHorario('\${emp.id}','\${dia}_salida',this.value)">\${horOptsSel(sVal)}</select>
           <div style="margin-top:2px">
-            <select class="day-input" style="width:70px;font-size:9px;padding:1px;color:var(--text2)" onchange="updNovedad('${emp.id}','${dia}',this.value)">
+            <select class="day-input" style="width:70px;font-size:9px;padding:1px;color:var(--text2)" onchange="updNovedad('\${emp.id}','\${dia}',this.value)">
               <option value="">novedad</option>
               <option value="Lic. Vacaciones">Vacaciones</option>
               <option value="Lic. Medica">Lic. Medica</option>
