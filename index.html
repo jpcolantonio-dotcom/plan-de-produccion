@@ -4162,11 +4162,16 @@ async function loadHorariosSemana(sem){
   horarios={};
   try{
     const data=await get('horarios',`semana=eq.${sem}`);
+    if(data.length)console.log('HORARIOS RAW sample:',JSON.stringify(data[0]));
     data.forEach(h=>{
-      // Normalizar nulls a strings vacíos para evitar problemas en selects
+      // Normalizar: nulls a '' y recortar segundos de time (ej: "06:00:00" -> "06:00")
       DIAS_HOR.forEach(dia=>{
-        h[`${dia}_entrada`]=h[`${dia}_entrada`]||'';
-        h[`${dia}_salida`]=h[`${dia}_salida`]||'';
+        let e=h[`${dia}_entrada`]||'';
+        let s=h[`${dia}_salida`]||'';
+        if(e.length===8&&e[5]===':')e=e.slice(0,5);
+        if(s.length===8&&s[5]===':')s=s.slice(0,5);
+        h[`${dia}_entrada`]=e;
+        h[`${dia}_salida`]=s;
         h[`${dia}_novedad`]=h[`${dia}_novedad`]||'';
       });
       horarios[h.empleado_id]=h;
