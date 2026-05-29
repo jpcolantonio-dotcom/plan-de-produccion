@@ -1,4 +1,4 @@
-
+  
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -225,7 +225,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.12</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.13</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -637,6 +637,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <button class="btn btn-sm" onclick="changeHorSemana(1)"><i class="ti ti-chevron-right"></i></button>
       </div>
       <select id="hor-esel" onchange="renderHorarios()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
+      <button class="btn" onclick="copiarSemanaAnterior()" title="Copiar horarios de la semana anterior" style="gap:6px"><i class="ti ti-copy"></i> Copiar sem. anterior</button>
       <button class="btn btn-pdf" onclick="pdfHorarios()"><i class="ti ti-file-type-pdf"></i> PDF</button>
       <button class="btn btn-primary" onclick="saveHorarios()"><i class="ti ti-device-floppy"></i> Guardar</button>
     </div>
@@ -4049,6 +4050,40 @@ function calcSalida(entrada){
 
 function horOptsSel(val){
   return`<option value="">--</option>${HOR_OPTS.map(o=>`<option${o===val?' selected':''}>${o}</option>`).join('')}`;
+}
+
+async function copiarSemanaAnterior(){
+  const semAnterior=addW(horSemana,-1);
+  if(!confirm(`¿Copiar los horarios de la semana ${wlb(semAnterior)} a esta semana (${wlb(horSemana)})?\nSe sobreescribirán los horarios actuales.`))return;
+  ss('saving','Copiando horarios...');
+  try{
+    // Cargar horarios de la semana anterior
+    const dataAnt=await get('horarios',`semana=eq.${semAnterior}`);
+    if(!dataAnt.length){ss('online','La semana anterior no tiene horarios cargados.');return;}
+
+    let copiados=0;
+    for(const h of dataAnt){
+      // Armar objeto con los mismos datos pero nueva semana
+      const nuevo={empleado_id:h.empleado_id,semana:horSemana};
+      DIAS_HOR.forEach(dia=>{
+        if(h[`${dia}_entrada`]!==undefined)nuevo[`${dia}_entrada`]=h[`${dia}_entrada`];
+        if(h[`${dia}_salida`]!==undefined)nuevo[`${dia}_salida`]=h[`${dia}_salida`];
+        if(h[`${dia}_novedad`])nuevo[`${dia}_novedad`]=h[`${dia}_novedad`];
+        else nuevo[`${dia}_novedad`]='';
+      });
+      // Upsert (insert o update si ya existe)
+      await fetch(`${SB}/rest/v1/horarios`,{
+        method:'POST',
+        headers:{...H,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},
+        body:JSON.stringify(nuevo)
+      });
+      copiados++;
+    }
+    // Recargar la semana actual
+    await loadHorariosSemana(horSemana);
+    renderHorarios();
+    ss('online',`${copiados} horarios copiados de la semana anterior ✓`);
+  }catch(e){ss('error','Error: '+e.message);}
 }
 
 async function initHorarios(){
