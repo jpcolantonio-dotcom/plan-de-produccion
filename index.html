@@ -4162,7 +4162,8 @@ async function loadHorariosSemana(sem){
   horarios={};
   try{
     const data=await get('horarios',`semana=eq.${sem}`);
-    if(data.length)console.log('HORARIOS RAW sample:',JSON.stringify(data[0]));
+    console.log('HORARIOS loaded:',data.length,'records for sem',sem);
+    if(data.length)console.log('First record entrada:',JSON.stringify({id:data[0].empleado_id,lu:data[0].lunes_entrada}));
     data.forEach(h=>{
       // Normalizar: nulls a '' y recortar segundos de time (ej: "06:00:00" -> "06:00")
       DIAS_HOR.forEach(dia=>{
@@ -4219,6 +4220,7 @@ function renderHorarios(){
     h+=`<tr><td colspan="${2*7+2}" style="background:${eid!=='_'?`${clr}18`:'var(--bg2)'};padding:6px 12px;font-size:12px;font-weight:700;color:${clr};border-top:2px solid ${clr}">${nm}</td></tr>`;
   eEmps.forEach(emp=>{
     const hor=horarios[emp.id]||{};
+    if(emp.nombre==='ACEVEDO GABRIEL')console.log('ACEVEDO hor:',JSON.stringify({id:emp.id,entrada:hor.lunes_entrada,keys:Object.keys(horarios).length}));
     h+=`<tr><td style="font-weight:500;white-space:nowrap">${emp.nombre}</td>`;
     // Calcular primer día de la semana actual para saber a partir de cuándo marcar cambios
     const hoyStr=(()=>{const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0')})();
