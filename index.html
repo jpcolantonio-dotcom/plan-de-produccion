@@ -881,7 +881,22 @@ function rG(){
         if(ri===0)h+=`<td rowspan="${aIt.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${ab(area,as)};color:${ac(area,as)}">${area}</span></td>`;
         h+=`<td class="prod-name"><input class="prod-input" value="${r.producto}" onchange="uf(${r._i},'producto',this.value)"/></td>`;
         h+=`<td><input value="${r.unidad||''}" list="udl" onchange="uf(${r._i},'unidad',this.value)" style="width:100%;padding:3px 5px;font-size:12px;border:.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`;
-        for(let di=0;di<7;di++){const v=(r.days&&r.days[di])||0;h+=`<td class="day-cell${di===t?' today-col':''}"><input class="day-input${v>0?' has-val':''}" type="number" min="0" value="${v||''}" placeholder="--" onchange="ud(${r._i},${di},this.value);this.classList.toggle('has-val',this.value!='')"/></td>`}
+        for(let di=0;di<7;di++){
+          const v=(r.days&&r.days[di])||0;
+          const prodObj=st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id);
+          const tanda=prodObj&&prodObj.unidades_tanda?parseInt(prodObj.unidades_tanda):0;
+          if(tanda>0){
+            const maxT=6;let opts='';
+            for(let t2=0;t2<=maxT;t2++){
+              const val=t2*tanda;
+              opts+=`<option value="${val}"${val===v?' selected':''}>${t2===0?'--':`${t2}T · ${val.toLocaleString('es-AR')}`}</option>`;
+            }
+            if(v>0&&v%tanda!==0)opts=`<option value="${v}" selected>${v} ✎</option>`+opts;
+            h+=`<td class="day-cell${di===t?' today-col':''}"><select class="day-input${v>0?' has-val':''}" style="width:100%;font-size:11px;padding:2px" onchange="ud(${r._i},${di},this.value);this.classList.toggle('has-val',this.value!='0'&&this.value!='');">${opts}</select></td>`;
+          } else {
+            h+=`<td class="day-cell${di===t?' today-col':''}"><input class="day-input${v>0?' has-val':''}" type="number" min="0" value="${v||''}" placeholder="--" onchange="ud(${r._i},${di},this.value);this.classList.toggle('has-val',this.value!='')"/></td>`;
+          }
+        }
         h+=`<td class="total-cell">${fmt(rt)}</td><td style="text-align:center"><button class="btn btn-xs btn-danger" onclick="delRow(${r._i})"><i class="ti ti-trash"></i></button></td></tr>`;
         ef=false;
       });
@@ -1658,7 +1673,9 @@ function rProdDetail(aid){
   </div>`;
   if(prods.length){
     h+=`<div class="grid-card" style="margin-bottom:1rem"><table class="ptbl">
-      <thead><tr><th style="width:56px">Orden</th><th>Producto</th><th style="width:120px">Unidad</th><th style="width:100px;text-align:center" title="Habilita campos de hora inicio, hora fin, desperdicio y cantidad al cargar producción">Detalle proceso</th><th style="width:34px"></th></tr></thead><tbody>`;
+      <thead><tr><th style="width:56px">Orden</th><th>Producto</th><th style="width:120px">Unidad</th><th style="width:100px;text-align:center" title="Habilita campos de hora inicio, hora fin, desperdicio y cantidad al cargar producción">Detalle proceso</th>
+      <th style="width:110px;text-align:center" title="Si se define, la planificación usa múltiplos de este valor">Uds. x tanda</th>
+      <th style="width:34px"></th></tr></thead><tbody>`;
     prods.forEach((p,idx)=>{
       h+=`<tr>
         <td style="text-align:center">
@@ -1674,6 +1691,12 @@ function rProdDetail(aid){
             <input type="checkbox" ${p.detalle_proceso?'checked':''} onchange="updP('${p.id}','detalle_proceso',this.checked)" style="width:16px;height:16px;cursor:pointer"/>
             <span style="font-size:11px;color:${p.detalle_proceso?'var(--green)':'var(--text3)'}">${p.detalle_proceso?'Sí':'No'}</span>
           </label>
+        </td>
+        <td style="width:110px">
+          <input type="number" min="0" step="1" value="${p.unidades_tanda||''}" placeholder="Sin tanda"
+            onchange="updP('${p.id}','unidades_tanda',this.value?parseInt(this.value):null)"
+            style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
+            title="Unidades producidas por tanda. Si se define, la planificación muestra múltiplos (0, 1 tanda, 2 tandas...)."/>
         </td>
         <td><button class="btn btn-xs btn-danger" onclick="delProd('${p.id}')"><i class="ti ti-trash"></i></button></td>
       </tr>`;
