@@ -2463,7 +2463,11 @@ let dashTimer=null,dashCountdown=0,dashPage=0,dashItems=[],dashPages=[],dashTota
 
 function getDashDia(){
   const sel=document.getElementById('dash-dsel');
-  if(!sel||sel.value==='')return tc(st.w);
+  if(!sel||sel.value===''||sel.value==='hoy'){
+    // Usar la semana del dashboard, no st.w
+    const k=document.getElementById('dash-wsel')?.value||st.w;
+    return tc(k);
+  }
   return parseInt(sel.value);
 }
 
