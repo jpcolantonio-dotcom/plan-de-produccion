@@ -243,6 +243,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('proy')"><i class="ti ti-chart-dots"></i> Proyeccion</button>
   <button class="tab" onclick="T('rec')"><i class="ti ti-notebook"></i> Recetas</button>
   <button class="tab" onclick="T('con')"><i class="ti ti-package"></i> Consumo MP</button>
+  <button class="tab" onclick="T('rend')"><i class="ti ti-speedometer"></i> Rendimiento</button>
   <button class="tab" onclick="T('hor')"><i class="ti ti-clock"></i> Horarios</button>
   <button class="tab" onclick="T('mae')"><i class="ti ti-building"></i> Maestro</button>
 </div>
@@ -376,6 +377,24 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   </div>
 
   <div id="recmsg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Recetas guardadas.</div>
+</div>
+
+<!-- RENDIMIENTO -->
+<div id="tab-rend" class="section">
+  <div class="toolbar">
+    <div><div style="font-size:16px;font-weight:600">Rendimiento de proceso</div>
+    <div style="font-size:13px;color:var(--text2)">Tiempo de máquina, productividad y desperdicio por producto</div></div>
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+    <label style="font-size:13px;color:var(--text2)">Empresa:</label>
+    <select id="rend-esel" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"><option value="all">Todas</option></select>
+    <label style="font-size:13px;color:var(--text2)">Desde:</label>
+    <input type="date" id="rend-desde" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+    <label style="font-size:13px;color:var(--text2)">Hasta:</label>
+    <input type="date" id="rend-hasta" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+    <button class="btn btn-primary" onclick="renderRendimiento()"><i class="ti ti-search"></i> Buscar</button>
+  </div>
+  <div id="rend-content"><div class="empty"><i class="ti ti-speedometer"></i> Seleccioná un rango de fechas.</div></div>
 </div>
 
 <!-- CONSUMO -->
@@ -794,7 +813,7 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['plan','real','cmp','desv','dash','stock','proy','hor','rec','con','mae'];
+const TABS=['plan','real','cmp','desv','dash','stock','proy','hor','rec','con','mae','rend'];
 function T(t){
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',TABS[i]===t));
   document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));
@@ -809,6 +828,7 @@ function T(t){
   if(t==='rec')rRec();
   if(t==='con'){pSC();renderCon()}
   if(t==='mae')rMae();
+  if(t==='rend')initRend();
 }
 function pS(id){
   const s=document.getElementById(id);const c=s.value||st.w;
@@ -1200,21 +1220,45 @@ function dpRemove(key,k,i){
   const ov=document.getElementById('modal-detalle-proc');
   if(ov&&ov._render)ov._render();
 }
-function dpGuardar(key,k,rk,di){
-  // Auto-fill cantidad en el input real si solo hay 1 proceso con cantidad
+async function dpGuardar(key,k,rk,di){
   const procesos=st.DP[k][key]||[];
   const totCant=procesos.reduce((s,p)=>s+(p.cantidad||0),0);
   if(totCant>0){
     uR(k,rk,di,totCant);
-    // Update the input visually
     const trId=`rtot-${rk.replace(/[|]/g,'-')}`;
     updRealTot(trId,rk,k);
-    // Find and update the input
     document.querySelectorAll(`input[onchange*="${rk}"][onchange*=",${di},"]`).forEach(inp=>{
       inp.value=totCant;inp.classList.add('has-val');
     });
   }
   document.getElementById('modal-detalle-proc')?.remove();
+
+  // Guardar en Supabase
+  const[eid,area,producto]=rk.split('||');
+  const semKey=k;
+  const diaDate=new Date(semKey+'T00:00:00');
+  diaDate.setDate(diaDate.getDate()+di);
+  const fecha=diaDate.getFullYear()+'-'+String(diaDate.getMonth()+1).padStart(2,'0')+'-'+String(diaDate.getDate()).padStart(2,'0');
+
+  ss('saving','Guardando rendimiento...');
+  try{
+    // Borrar registros anteriores del mismo dia/producto
+    await fetch(`${SB}/rest/v1/rendimiento_proceso?empresa_id=eq.${eid}&area=eq.${encodeURIComponent(area)}&producto=eq.${encodeURIComponent(producto)}&fecha=eq.${fecha}`,
+      {method:'DELETE',headers:H});
+    // Insertar nuevos
+    for(const p of procesos){
+      if(!p.hora_inicio&&!p.hora_fin&&!p.cantidad)continue;
+      await ins('rendimiento_proceso',{
+        empresa_id:eid,area,producto,fecha,semana:semKey,
+        hora_inicio:p.hora_inicio||null,
+        hora_fin:p.hora_fin||null,
+        cantidad:p.cantidad||0,
+        desperdicio:p.desperdicio||0
+      });
+    }
+    ss('online','Rendimiento guardado ✓');
+  }catch(e){ss('error','Error guardando rendimiento: '+e.message);}
+
   renderReal();
 }
 
@@ -4664,6 +4708,134 @@ function pdfHorarios(){
   else alert('Permití ventanas emergentes para generar el PDF.');
 }
 
+
+// ── RENDIMIENTO ──────────────────────────────────────────────────
+function initRend(){
+  const sel=document.getElementById('rend-esel');
+  sel.innerHTML='<option value="all">Todas</option>';
+  st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;sel.appendChild(o);});
+  // Default: last 30 days
+  if(!document.getElementById('rend-desde').value){
+    const hoy=new Date();
+    const hace30=new Date(hoy);hace30.setDate(hace30.getDate()-30);
+    document.getElementById('rend-hasta').value=hoy.getFullYear()+'-'+String(hoy.getMonth()+1).padStart(2,'0')+'-'+String(hoy.getDate()).padStart(2,'0');
+    document.getElementById('rend-desde').value=hace30.getFullYear()+'-'+String(hace30.getMonth()+1).padStart(2,'0')+'-'+String(hace30.getDate()).padStart(2,'0');
+  }
+}
+
+async function renderRendimiento(){
+  const el=document.getElementById('rend-content');
+  const ef=document.getElementById('rend-esel').value;
+  const desde=document.getElementById('rend-desde').value;
+  const hasta=document.getElementById('rend-hasta').value;
+  if(!desde||!hasta){el.innerHTML='<div class="alert alert-info">Seleccioná el rango.</div>';return}
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando...</div>';
+  try{
+    let q=`fecha=gte.${desde}&fecha=lte.${hasta}&order=fecha.desc,producto.asc`;
+    if(ef!=='all')q+=`&empresa_id=eq.${ef}`;
+    const data=await get('rendimiento_proceso',q);
+    if(!data.length){
+      el.innerHTML='<div class="empty"><i class="ti ti-speedometer"></i> Sin registros para ese período.</div>';
+      return;
+    }
+
+    // Agrupar por producto
+    const byProd={};
+    data.forEach(r=>{
+      const k2=r.empresa_id+'||'+r.area+'||'+r.producto;
+      if(!byProd[k2])byProd[k2]={empresa_id:r.empresa_id,area:r.area,producto:r.producto,registros:[]};
+      byProd[k2].registros.push(r);
+    });
+
+    // KPIs globales
+    const totCant=data.reduce((s,r)=>s+(r.cantidad||0),0);
+    const totDesp=data.reduce((s,r)=>s+(r.desperdicio||0),0);
+    const totMinutos=data.reduce((s,r)=>{
+      if(!r.hora_inicio||!r.hora_fin)return s;
+      const[h1,m1]=r.hora_inicio.split(':').map(Number);
+      const[h2,m2]=r.hora_fin.split(':').map(Number);
+      let d=(h2*60+m2)-(h1*60+m1);if(d<0)d+=1440;
+      return s+d;
+    },0);
+    const pctDesp=totCant+totDesp>0?((totDesp/(totCant+totDesp))*100).toFixed(1):0;
+    const udsPorHora=totMinutos>0?Math.round((totCant/(totMinutos/60))):0;
+
+    let h=`<div class="metric-grid" style="margin-bottom:20px">
+      <div class="metric"><div class="metric-label">Total producido</div><div class="metric-val">${totCant.toLocaleString('es-AR')}</div></div>
+      <div class="metric"><div class="metric-label">Total desperdicio</div><div class="metric-val" style="color:var(--red)">${totDesp.toLocaleString('es-AR')}</div></div>
+      <div class="metric"><div class="metric-label">% Desperdicio</div><div class="metric-val ${parseFloat(pctDesp)>5?'bad':parseFloat(pctDesp)>2?'warn':'good'}">${pctDesp}%</div></div>
+      <div class="metric"><div class="metric-label">Uds / hora promedio</div><div class="metric-val">${udsPorHora.toLocaleString('es-AR')}</div></div>
+      <div class="metric"><div class="metric-label">Registros</div><div class="metric-val">${data.length}</div></div>
+    </div>`;
+
+    // Tabla por producto
+    Object.values(byProd).forEach(prod=>{
+      const clr=ec(prod.empresa_id);
+      const pCant=prod.registros.reduce((s,r)=>s+(r.cantidad||0),0);
+      const pDesp=prod.registros.reduce((s,r)=>s+(r.desperdicio||0),0);
+      const pMin=prod.registros.reduce((s,r)=>{
+        if(!r.hora_inicio||!r.hora_fin)return s;
+        const[h1,m1]=r.hora_inicio.split(':').map(Number);
+        const[h2,m2]=r.hora_fin.split(':').map(Number);
+        let d=(h2*60+m2)-(h1*60+m1);if(d<0)d+=1440;
+        return s+d;
+      },0);
+      const pPct=pCant+pDesp>0?((pDesp/(pCant+pDesp))*100).toFixed(1):0;
+      const pUPH=pMin>0?Math.round((pCant/(pMin/60))):0;
+
+      h+=`<div class="stock-card" style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg2);border-bottom:.5px solid var(--border);border-radius:var(--radius-lg) var(--radius-lg) 0 0">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="emp-tag" style="background:${clr}18;color:${clr}">${en(prod.empresa_id)||''}</span>
+            <span style="font-size:12px;color:var(--text2)">${prod.area}</span>
+            <span style="font-weight:700">${prod.producto}</span>
+          </div>
+          <div style="display:flex;gap:16px;font-size:12px">
+            <span><span style="color:var(--text2)">Prod: </span><b>${pCant.toLocaleString('es-AR')}</b></span>
+            <span><span style="color:var(--text2)">Desp: </span><b style="color:var(--red)">${pDesp.toLocaleString('es-AR')}</b> <span style="color:var(--text3)">(${pPct}%)</span></span>
+            <span><span style="color:var(--text2)">Uds/h: </span><b style="color:var(--blue)">${pUPH.toLocaleString('es-AR')}</b></span>
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+        <table class="stock-tbl"><thead><tr>
+          <th>Fecha</th><th>Inicio</th><th>Fin</th>
+          <th style="text-align:right">Duración</th>
+          <th style="text-align:right">Producido</th>
+          <th style="text-align:right">Desperdicio</th>
+          <th style="text-align:right">% Desp.</th>
+          <th style="text-align:right">Uds/hora</th>
+        </tr></thead><tbody>`;
+
+      prod.registros.forEach(r=>{
+        const dd=new Date(r.fecha+'T00:00:00');
+        const fechaStr=dd.toLocaleDateString('es-AR',{weekday:'short',day:'2-digit',month:'2-digit'});
+        let dur='--';let uph='--';
+        if(r.hora_inicio&&r.hora_fin){
+          const[h1,m1]=r.hora_inicio.split(':').map(Number);
+          const[h2,m2]=r.hora_fin.split(':').map(Number);
+          let d=(h2*60+m2)-(h1*60+m1);if(d<0)d+=1440;
+          dur=`${Math.floor(d/60)}h ${d%60}m`;
+          if(r.cantidad>0)uph=Math.round(r.cantidad/(d/60)).toLocaleString('es-AR');
+        }
+        const pct2=r.cantidad+r.desperdicio>0?((r.desperdicio/(r.cantidad+r.desperdicio))*100).toFixed(1):0;
+        const pctColor=parseFloat(pct2)>5?'var(--red)':parseFloat(pct2)>2?'var(--amber)':'var(--green)';
+        h+=`<tr>
+          <td>${fechaStr}</td>
+          <td style="text-align:center">${r.hora_inicio||'--'}</td>
+          <td style="text-align:center">${r.hora_fin||'--'}</td>
+          <td style="text-align:right">${dur}</td>
+          <td style="text-align:right;font-weight:600;color:var(--green)">${(r.cantidad||0).toLocaleString('es-AR')}</td>
+          <td style="text-align:right;color:var(--red)">${(r.desperdicio||0).toLocaleString('es-AR')}</td>
+          <td style="text-align:right;font-weight:600;color:${pctColor}">${pct2}%</td>
+          <td style="text-align:right;color:var(--blue)">${uph}</td>
+        </tr>`;
+      });
+      h+=`</tbody></table></div></div>`;
+    });
+
+    el.innerHTML=h;
+  }catch(e){el.innerHTML='<div class="alert alert-err">Error: '+e.message+'</div>';}
+}
 
 // ── ESTADISTICAS ──────────────────────────────────────────────────
 let statsCharts=[];
