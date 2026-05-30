@@ -4406,7 +4406,15 @@ function renderHorarios(){
   Object.entries(byEmp).forEach(([eid,eEmps])=>{
     const clr=eid!=='_'?ec(eid):'var(--text2)';
     const nm=eid!=='_'?en(eid)||'Sin empresa':'Sin empresa';
-    h+=`<tr><td colspan="${2*7+2}" style="background:${eid!=='_'?`${clr}18`:'var(--bg2)'};padding:6px 12px;font-size:12px;font-weight:700;color:${clr};border-top:2px solid ${clr}">${nm}</td></tr>`;
+    // Contar empleados activos (con al menos un horario cargado) y total
+    const conHorario=eEmps.filter(e=>{const h2=horarios[e.id]||{};return DIAS_HOR.some(d=>h2[`${d}_entrada`]);}).length;
+    h+=`<tr><td colspan="${2*7+2}" style="background:${eid!=='_'?`${clr}18`:'var(--bg2)'};padding:6px 12px;font-size:12px;font-weight:700;color:${clr};border-top:2px solid ${clr};display:flex;align-items:center;justify-content:space-between">
+      <span>${nm}</span>
+      <span style="font-weight:400;font-size:11px;color:${clr};opacity:.8">
+        <span style="font-weight:700">${eEmps.length}</span> empleados
+        ${conHorario>0?`· <span style="font-weight:700">${conHorario}</span> con horario`:''}
+      </span>
+    </td></tr>`;
   eEmps.forEach(emp=>{
     const hor=horarios[emp.id]||{};
     h+=`<tr><td style="font-weight:500;white-space:nowrap">${emp.nombre}</td>`;
