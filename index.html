@@ -4565,46 +4565,80 @@ async function saveHorarios(){
 
 function pdfHorarios(){
   const ef=document.getElementById('hor-esel')?.value||'all';
-  const emps=ef==='all'?empleados:empleados.filter(e=>e.empresa_id===ef);
-  if(!emps.length){alert('No hay empleados para imprimir.');return}
-  const semNum=horSemana.split('-')[1]||'';
   const semLabel=wlb(horSemana);
   const fecha=new Date().toLocaleDateString('es-AR');
-  let filas=emps.map(emp=>{
-    const hor=horarios[emp.id]||{};
-    const celdas=DIAS_HOR.map(dia=>{
-      const e=hor[`${dia}_entrada`]||'';
-      const s=hor[`${dia}_salida`]||'';
-      const nov=hor[`${dia}_novedad`]||'';
-      if(nov) return`<td style="text-align:center;font-size:9pt;font-weight:600;color:#1B3A6B">${nov}</td>`;
-      return`<td style="text-align:center;font-size:9pt">${e?`${e}<br>${s}`:'-'}</td>`;
-    }).join('');
-    const empNm=emp.empresa_id?` <span style="font-size:8pt;color:#888">(${en(emp.empresa_id)||''})</span>`:'';
-    return`<tr><td style="font-weight:500">${emp.nombre}${empNm}</td>${celdas}</tr>`;
-  }).join('');
   const hdrs=DIAS_HOR_LBL.map((d,i)=>`<th>${d}<br><span style="font-weight:400;font-size:8pt">${ddate(horSemana,i)}</span></th>`).join('');
+
+  // Determinar qué empresas imprimir
+  const empresasImprimir=ef==='all'?st.E:st.E.filter(e=>e.id===ef);
+  if(!empresasImprimir.length){alert('No hay empresas para imprimir.');return}
+
+  // Generar un solo HTML con todas las empresas, cada una en página separada
+  const secciones=[];
+  empresasImprimir.forEach(empresa=>{
+    const eEmps=empleados.filter(e=>e.empresa_id===empresa.id);
+    if(!eEmps.length)return;
+    const clr=empresa.color||'#1B3A6B';
+    const filas=eEmps.map(emp=>{
+      const hor=horarios[emp.id]||{};
+      const celdas=DIAS_HOR.map(dia=>{
+        const e=hor[`${dia}_entrada`]||'';
+        const s=hor[`${dia}_salida`]||'';
+        const nov=hor[`${dia}_novedad`]||'';
+        if(nov)return`<td class="nov" style="color:${clr}">${nov}</td>`;
+        return`<td>${e?`<b>${e}</b><br><span style="color:#888">${s}</span>`:'-'}</td>`;
+      }).join('');
+      return`<tr><td class="emp">${emp.nombre}</td>${celdas}</tr>`;
+    }).join('');
+    secciones.push(`
+      <div class="pagina">
+        <div class="header" style="border-color:${clr}">
+          <div>
+            <div class="empresa" style="color:${clr}">${empresa.nombre}</div>
+            <div class="semana">Horarios — ${semLabel}</div>
+          </div>
+          <div class="meta">Generado: ${fecha} · ${eEmps.length} empleados</div>
+        </div>
+        <table>
+          <thead><tr><th class="th-emp">Empleado</th>${hdrs.replace(/background:[^;]+;/g,`background:${clr};`)}</tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>`);
+  });
+
+  if(!secciones.length){alert('Sin empleados para imprimir.');return}
+
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
-  <title>Horarios Sem ${semNum}</title>
-  <style>*{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:Arial,sans-serif;font-size:10pt;padding:10mm}
-  h2{font-size:14pt;margin-bottom:4px}
-  .sub{font-size:10pt;color:#666;margin-bottom:12px}
-  table{width:100%;border-collapse:collapse;font-size:9pt}
-  th{background:#1B3A6B;color:#fff;padding:6px 8px;text-align:center;border:1px solid #1B3A6B;line-height:1.4}
-  th:first-child{text-align:left}
-  td{padding:6px 8px;border:1px solid #d0d0d0;vertical-align:middle}
-  tr:nth-child(even) td{background:#f9f9f8}
-  @media print{@page{size:A4 landscape;margin:8mm}}</style>
+  <title>Horarios ${semLabel}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:9.5pt;background:#fff}
+    .pagina{padding:10mm;page-break-after:always}
+    .pagina:last-child{page-break-after:avoid}
+    .header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;border-bottom:3px solid #1B3A6B;padding-bottom:8px}
+    .empresa{font-size:15pt;font-weight:700}
+    .semana{font-size:10pt;color:#444;margin-top:2px}
+    .meta{font-size:8.5pt;color:#888;text-align:right}
+    table{width:100%;border-collapse:collapse;font-size:8.5pt}
+    th{color:#fff;padding:5px 6px;text-align:center;border:1px solid rgba(0,0,0,.15);line-height:1.4;background:#1B3A6B}
+    .th-emp{text-align:left;width:150px}
+    td{padding:5px 6px;border:1px solid #ddd;vertical-align:middle;text-align:center}
+    td.emp{text-align:left;font-weight:500}
+    td.nov{text-align:center;font-weight:600;font-size:8pt}
+    tr:nth-child(even) td{background:#f8f8f8}
+    @media print{
+      @page{size:A4 landscape;margin:6mm}
+      .pagina{padding:0;margin:0}
+    }
+  </style>
   </head><body>
-  <h2>Horarios — ${semLabel}</h2>
-  <div class="sub">Generado: ${fecha}</div>
-  <table><thead><tr><th style="width:150px;text-align:left">Empleado</th>${hdrs}</tr></thead>
-  <tbody>${filas}</tbody></table>
-  <script>window.onload=()=>{window.print()}<\/script>
+  ${secciones.join('')}
+  <script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script>
   </body></html>`;
-  const w=window.open('','_blank',`width=1050,height=750`);
+
+  const w=window.open('','_blank','width=1200,height=800');
   if(w){w.document.write(html);w.document.close();}
-  else alert('Permití ventanas emergentes.');
+  else alert('Permití ventanas emergentes para generar el PDF.');
 }
 
 
