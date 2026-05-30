@@ -226,7 +226,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.16</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.17</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1044,12 +1044,23 @@ function renderRealEmpresa(k,eid,items){
     const tp=(r.days||[]).reduce((a,b)=>a+(b||0),0);
     const tr2=rd.reduce((a,b)=>a+(b||0),0);
     const trId=`rtot-${rk.replace(/[|]/g,'-')}`;
-    h+=`<tr><td style="font-weight:500">${r.producto}</td><td style="font-size:12px;color:var(--text2)">${r.unidad}</td>`;
+    const prodObj=st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id);
+    const tieneDetalle=prodObj&&prodObj.detalle_proceso;
+    h+=`<tr><td style="font-weight:500">${r.producto}${tieneDetalle?'<span style="margin-left:4px;font-size:10px;background:var(--blue)18;color:var(--blue);border-radius:4px;padding:1px 4px">⏱</span>':''}</td><td style="font-size:12px;color:var(--text2)">${r.unidad}</td>`;
     for(let di=0;di<7;di++){
       const pv=(r.days&&r.days[di])||0;const rv=rd[di]||0;
       const desvio=pv>0&&rv>0&&rv<pv;
+      const detalleKey=`${rk}||${di}`;
+      const dpros=st.DP&&st.DP[k]&&st.DP[k][detalleKey]||[];
+      const hasDP=dpros.length>0;
       h+=`<td class="day-cell${di===t?' today-col':''}" style="font-size:12px;color:var(--text2)">${pv>0?pv:'--'}</td>`;
-      h+=`<td class="day-cell${di===t?' today-col':''}" style="position:relative"><input class="day-input${rv>0?' has-val':''}" type="number" min="0" value="${rv||''}" placeholder="--" onchange="uR('${k}','${rk}',${di},this.value);this.classList.toggle('has-val',this.value!='');updRealTot('${trId}','${rk}','${k}')" style="border-color:rgba(29,158,117,.3)"/>${desvio?`<button onclick="showCausaModal('${k}',${oi},${di},${pv},${rv},'${r.empresa_id}','${r.area}','${r.producto.replace(/'/g,"\'")}','${r.unidad}')" style="position:absolute;right:2px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--amber);font-size:14px" title="Registrar causa"><i class="ti ti-alert-triangle"></i></button>`:''}</td>`;
+      h+=`<td class="day-cell${di===t?' today-col':''}" style="position:relative">
+        <input class="day-input${rv>0?' has-val':''}" type="number" min="0" value="${rv||''}" placeholder="--"
+          onchange="uR('${k}','${rk}',${di},this.value);this.classList.toggle('has-val',this.value!='');updRealTot('${trId}','${rk}','${k}')"
+          style="border-color:rgba(29,158,117,.3)"/>
+        ${desvio?`<button onclick="showCausaModal('${k}',${oi},${di},${pv},${rv},'${r.empresa_id}','${r.area}','${r.producto.replace(/'/g,"\'")}','${r.unidad}')" style="position:absolute;right:2px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--amber);font-size:14px" title="Registrar causa"><i class="ti ti-alert-triangle"></i></button>`:''}
+        ${tieneDetalle?`<button onclick="showDetalleModal('${k}','${rk}',${di},'${r.producto.replace(/'/g,"\'")}','${r.unidad}')" style="position:absolute;left:2px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:${hasDP?'var(--blue)':'var(--text3)'};font-size:13px" title="Detalle proceso"><i class="ti ti-clock-hour-4"></i>${hasDP?`<span style="position:absolute;top:-4px;right:-4px;background:var(--blue);color:#fff;border-radius:50%;width:8px;height:8px;font-size:8px;display:flex;align-items:center;justify-content:center">${dpros.length}</span>`:''}  </button>`:''}
+      </td>`;
     }
     h+=`<td class="total-cell" style="font-size:12px">${fmt(tp)}</td><td class="total-cell" style="color:var(--green)" id="${trId}">${tr2>0?fmt(tr2):'--'}</td></tr>`;
   });
@@ -1073,6 +1084,125 @@ function realSetArea(eid,area){
   const bE={};ap.forEach(r=>{const e=r.empresa_id||'_';if(!bE[e])bE[e]=[];bE[e].push(r)});
   renderRealEmpresa(k,eid,bE[eid]||[]);
 }
+// DETALLE PROCESO
+if(!st.DP)st.DP={};
+
+function showDetalleModal(k,rk,di,producto,unidad){
+  if(!st.DP[k])st.DP[k]={};
+  const key=`${rk}||${di}`;
+  if(!st.DP[k][key])st.DP[k][key]=[];
+  const procesos=st.DP[k][key];
+  // Asegurar al menos 1 proceso
+  if(!procesos.length)procesos.push({hora_inicio:'',hora_fin:'',cantidad:0,desperdicio:0});
+
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay';overlay.id='modal-detalle-proc';
+
+  function renderProcesos(){
+    const rows=procesos.map((p,i)=>`
+      <div style="background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <span style="font-size:12px;font-weight:600;color:var(--text2)">Proceso ${i+1}</span>
+          ${procesos.length>1?`<button class="btn btn-xs btn-danger" onclick="dpRemove('${key}','${k}',${i})"><i class="ti ti-trash"></i></button>`:''}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <div>
+            <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px">Hora inicio</label>
+            <input type="time" value="${p.hora_inicio||''}" onchange="dpSet('${key}','${k}',${i},'hora_inicio',this.value)"
+              style="width:100%;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px">Hora fin</label>
+            <input type="time" value="${p.hora_fin||''}" onchange="dpSet('${key}','${k}',${i},'hora_fin',this.value)"
+              style="width:100%;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px">Cantidad producida (${unidad})</label>
+            <input type="number" min="0" step="0.01" value="${p.cantidad||''}" placeholder="0"
+              onchange="dpSet('${key}','${k}',${i},'cantidad',parseFloat(this.value)||0)"
+              style="width:100%;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+          </div>
+          <div>
+            <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px">Desperdicio (${unidad})</label>
+            <input type="number" min="0" step="0.01" value="${p.desperdicio||''}" placeholder="0"
+              onchange="dpSet('${key}','${k}',${i},'desperdicio',parseFloat(this.value)||0)"
+              style="width:100%;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+          </div>
+        </div>
+      </div>`).join('');
+
+    const totCant=procesos.reduce((s,p)=>s+(p.cantidad||0),0);
+    const totDesp=procesos.reduce((s,p)=>s+(p.desperdicio||0),0);
+    const totMin=procesos.reduce((s,p)=>{
+      if(!p.hora_inicio||!p.hora_fin)return s;
+      const[h1,m1]=p.hora_inicio.split(':').map(Number);
+      const[h2,m2]=p.hora_fin.split(':').map(Number);
+      let diff=(h2*60+m2)-(h1*60+m1);
+      if(diff<0)diff+=1440;
+      return s+diff;
+    },0);
+    const durStr=totMin>0?`${Math.floor(totMin/60)}h ${totMin%60}m`:'--';
+
+    document.getElementById('dp-rows').innerHTML=rows;
+    document.getElementById('dp-summary').innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);padding:12px">
+        <div style="text-align:center"><div style="font-size:11px;color:var(--text2)">Total producido</div><div style="font-size:16px;font-weight:700;color:var(--green)">${totCant.toLocaleString('es-AR')} ${unidad}</div></div>
+        <div style="text-align:center"><div style="font-size:11px;color:var(--text2)">Total desperdicio</div><div style="font-size:16px;font-weight:700;color:var(--red)">${totDesp.toLocaleString('es-AR')} ${unidad}</div></div>
+        <div style="text-align:center"><div style="font-size:11px;color:var(--text2)">Duración total</div><div style="font-size:16px;font-weight:700;color:var(--blue)">${durStr}</div></div>
+      </div>`;
+  }
+
+  overlay.innerHTML=`<div class="modal" style="width:520px;max-height:85vh;overflow-y:auto">
+    <div class="modal-title"><i class="ti ti-clock-hour-4"></i> Detalle de proceso — ${producto}</div>
+    <div id="dp-summary" style="margin-bottom:14px"></div>
+    <div id="dp-rows"></div>
+    <button class="btn btn-sm" onclick="dpAdd('${key}','${k}')" style="margin-bottom:14px;width:100%"><i class="ti ti-plus"></i> Agregar otro proceso</button>
+    <div class="modal-btns">
+      <button class="btn" onclick="document.getElementById('modal-detalle-proc').remove()">Cancelar</button>
+      <button class="btn btn-primary" onclick="dpGuardar('${key}','${k}','${rk}',${di})">Guardar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  renderProcesos();
+  // Save renderProcesos ref for updates
+  overlay._render=renderProcesos;
+}
+
+function dpSet(key,k,i,field,val){
+  st.DP[k][key][i][field]=val;
+  const ov=document.getElementById('modal-detalle-proc');
+  if(ov&&ov._render)ov._render();
+}
+function dpAdd(key,k){
+  st.DP[k][key].push({hora_inicio:'',hora_fin:'',cantidad:0,desperdicio:0});
+  const ov=document.getElementById('modal-detalle-proc');
+  if(ov&&ov._render)ov._render();
+}
+function dpRemove(key,k,i){
+  st.DP[k][key].splice(i,1);
+  const ov=document.getElementById('modal-detalle-proc');
+  if(ov&&ov._render)ov._render();
+}
+function dpGuardar(key,k,rk,di){
+  // Auto-fill cantidad en el input real si solo hay 1 proceso con cantidad
+  const procesos=st.DP[k][key]||[];
+  const totCant=procesos.reduce((s,p)=>s+(p.cantidad||0),0);
+  if(totCant>0){
+    uR(k,rk,di,totCant);
+    // Update the input visually
+    const trId=`rtot-${rk.replace(/[|]/g,'-')}`;
+    updRealTot(trId,rk,k);
+    // Find and update the input
+    document.querySelectorAll(`input[onchange*="${rk}"][onchange*=",${di},"]`).forEach(inp=>{
+      inp.value=totCant;inp.classList.add('has-val');
+    });
+  }
+  document.getElementById('modal-detalle-proc')?.remove();
+  renderReal();
+}
+
 function updRealTot(trId,rk,k){
   const days=st.R[k]?.[rk]||Array(7).fill(0);
   const tot=days.reduce((a,b)=>a+(b||0),0);
@@ -1528,7 +1658,7 @@ function rProdDetail(aid){
   </div>`;
   if(prods.length){
     h+=`<div class="grid-card" style="margin-bottom:1rem"><table class="ptbl">
-      <thead><tr><th style="width:56px">Orden</th><th>Producto</th><th style="width:120px">Unidad</th><th style="width:34px"></th></tr></thead><tbody>`;
+      <thead><tr><th style="width:56px">Orden</th><th>Producto</th><th style="width:120px">Unidad</th><th style="width:100px;text-align:center" title="Habilita campos de hora inicio, hora fin, desperdicio y cantidad al cargar producción">Detalle proceso</th><th style="width:34px"></th></tr></thead><tbody>`;
     prods.forEach((p,idx)=>{
       h+=`<tr>
         <td style="text-align:center">
@@ -1539,6 +1669,12 @@ function rProdDetail(aid){
         </td>
         <td><input value="${p.nombre}" onchange="updP('${p.id}','nombre',this.value)"/></td>
         <td><select onchange="updP('${p.id}','unidad',this.value)" style="width:100%;padding:4px 6px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">${UNITS.map(u=>`<option${u===p.unidad?' selected':''}>${u}</option>`).join('')}</select></td>
+        <td style="text-align:center">
+          <label style="display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer">
+            <input type="checkbox" ${p.detalle_proceso?'checked':''} onchange="updP('${p.id}','detalle_proceso',this.checked)" style="width:16px;height:16px;cursor:pointer"/>
+            <span style="font-size:11px;color:${p.detalle_proceso?'var(--green)':'var(--text3)'}">${p.detalle_proceso?'Sí':'No'}</span>
+          </label>
+        </td>
         <td><button class="btn btn-xs btn-danger" onclick="delProd('${p.id}')"><i class="ti ti-trash"></i></button></td>
       </tr>`;
     });
