@@ -283,17 +283,15 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <div id="tab-real" class="section">
   <div class="real-sel">
     <label>Semana:</label><select id="rwsel" onchange="loadReal2()"></select>
-    <label>Empresa:</label><select id="resel" onchange="renderReal()"><option value="all">Todas</option></select>
+    <button class="btn" onclick="loadReal2()" title="Recargar"><i class="ti ti-refresh"></i></button>
+    <button class="btn btn-primary" id="btnsaver" onclick="saveReal()"><i class="ti ti-device-floppy"></i> Guardar</button>
   </div>
   <div id="rnop" class="alert alert-info" style="display:none"><i class="ti ti-info-circle"></i> No hay plan para esta semana.</div>
-  <div style="position:relative">
-    <div class="grid-card" id="rcard" style="display:none"><div class="grid-scroll" id="rgrid"></div></div>
-    <div id="rload" class="loading-overlay" style="display:none"><span class="spinner spinner-dark"></span> Cargando...</div>
-  </div>
-  <div id="ract" style="display:none;justify-content:flex-end;gap:8px;margin-top:8px">
-    <button class="btn" onclick="loadReal2()" title="Recargar datos frescos de Supabase"><i class="ti ti-refresh"></i> Actualizar</button>
-    <button class="btn btn-primary" id="btnsaver" onclick="saveReal()"><i class="ti ti-device-floppy"></i> Guardar produccion</button>
-  </div>
+  <!-- Tabs por empresa -->
+  <div id="real-emp-tabs" style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:0;flex-wrap:wrap"></div>
+  <!-- Contenido empresa activa -->
+  <div id="real-emp-content"></div>
+  <div id="rload" class="loading-overlay" style="display:none"><span class="spinner spinner-dark"></span> Cargando...</div>
   <div id="rmsg" style="display:none;margin-top:8px" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
   <div id="rerr" style="display:none;margin-top:8px" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="rerrtxt"></span></div>
 </div>
@@ -974,54 +972,106 @@ async function loadReal2(){
   await lp(k);await lr(k);
   document.getElementById('rload').style.display='none';renderReal();
 }
+let realActiveEmp=null;
+let realActiveArea={};
+
 function renderReal(){
   const k=document.getElementById('rwsel').value;if(!k)return;
-  const ef=document.getElementById('resel').value;
-  const ap=st.P[k]||[];let plan=ef==='all'?ap:ap.filter(r=>r.empresa_id===ef);
-  const np=document.getElementById('rnop');const cd=document.getElementById('rcard');const ac2=document.getElementById('ract');
-  if(!plan.length){np.style.display='flex';cd.style.display='none';ac2.style.display='none';return}
-  np.style.display='none';cd.style.display='block';ac2.style.display='flex';
-  const re=st.R[k]||{};const as=gas(plan);const t=tc(k);
-  let h=`<div style="overflow-x:auto"><table class="plan-grid"><thead><tr><th class="left">Empresa</th><th class="left">Area</th><th class="left">Producto</th><th class="left" style="width:65px">Unidad</th>`;
-  DAYS.forEach((d,i)=>{h+=`<th class="${i===t?'today-head':''}" colspan="2" style="font-size:11px;text-align:center">${d.slice(0,3)} ${ddate(k,i)}</th>`});
-  h+=`<th>Plan</th><th>Real</th></tr><tr style="background:var(--bg2)"><th></th><th></th><th></th><th></th>`;
-  DAYS.forEach((_,i)=>{h+=`<th style="font-size:10px;font-weight:400;color:var(--text2);text-align:center;padding:3px${i===t?';background:var(--today-head)':''}">P</th><th style="font-size:10px;font-weight:400;color:var(--green);text-align:center;padding:3px${i===t?';background:var(--today-head)':''}">R</th>`});
-  h+=`<th></th><th></th></tr></thead><tbody>`;
-  const bE={};plan.forEach(r=>{const eid=r.empresa_id||'_';if(!bE[eid])bE[eid]=[];bE[eid].push(r)});
-  Object.entries(bE).forEach(([eid,items],gi)=>{
-    const clr=ec(eid);const nm=en(eid)||'SE';const bg=rgba(clr,.12);
-    const bA={};items.forEach(r=>{const a=r.area||'SA';if(!bA[a])bA[a]=[];bA[a].push(r)});
-    let ef=true;
-    Object.entries(bA).forEach(([area,aIt],ai)=>{
-      aIt.forEach((r,ri)=>{
-        const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
-        const rk=rKey(r);
-        const rd=st.R[k]?.[rk]||st.R[k]?.[oi]||Array(7).fill(0);
-        const tp=(r.days||[]).reduce((a,b)=>a+(b||0),0);
-        const tr2=rd.reduce((a,b)=>a+(b||0),0);
-        const trId=`rtot-${rk.replace(/[|]/g,'-')}`;
-        h+=`<tr class="${gi>0&&ef&&ri===0&&ai===0?'emp-sep':!ef&&ri===0&&ai>0?'area-sep':''}">`;
-        if(ef&&ri===0&&ai===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:8px"><span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span></td>`;
-        if(ri===0)h+=`<td rowspan="${aIt.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${ab(area,as)};color:${ac(area,as)}">${area}</span></td>`;
-        h+=`<td style="font-weight:500">${r.producto}</td><td style="font-size:12px;color:var(--text2)">${r.unidad}</td>`;
-        for(let di=0;di<7;di++){
-          const pv=(r.days&&r.days[di])||0;const rv=rd[di]||0;
-          const desvio=pv>0&&rv>0&&rv<pv;
-          h+=`<td class="day-cell${di===t?' today-col':''}" style="font-size:12px;color:var(--text2)">${pv>0?pv:'--'}</td>`;
-          h+=`<td class="day-cell${di===t?' today-col':''}" style="position:relative">
-            <input class="day-input${rv>0?' has-val':''}" type="number" min="0" value="${rv||''}" placeholder="--"
-              onchange="uR('${k}','${rk}',${di},this.value);this.classList.toggle('has-val',this.value!='');updRealTot('${trId}','${rk}','${k}')"
-              style="border-color:rgba(29,158,117,.3)"/>
-            ${desvio?`<button onclick="showCausaModal('${k}',${oi},${di},${pv},${rv},'${r.empresa_id}','${area}','${r.producto.replace(/'/g,"\\'")}','${r.unidad}')" style="position:absolute;right:2px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--amber);font-size:14px" title="Registrar causa"><i class="ti ti-alert-triangle"></i></button>`:''}
-          </td>`;
-        }
-        h+=`<td class="total-cell" style="font-size:12px">${fmt(tp)}</td><td class="total-cell" style="color:var(--green)" id="${trId}">${tr2>0?fmt(tr2):'--'}</td></tr>`;
-        ef=false;
-      });
-    });
+  const ap=st.P[k]||[];
+  const np=document.getElementById('rnop');
+  const empTabsEl=document.getElementById('real-emp-tabs');
+  const empContent=document.getElementById('real-emp-content');
+  if(!ap.length){np.style.display='flex';empTabsEl.innerHTML='';empContent.innerHTML='';return}
+  np.style.display='none';
+  const bE={};
+  ap.forEach(r=>{const eid=r.empresa_id||'_';if(!bE[eid])bE[eid]=[];bE[eid].push(r)});
+  const eids=Object.keys(bE);
+  if(!realActiveEmp||!bE[realActiveEmp])realActiveEmp=eids[0];
+  let tabsH='';
+  eids.forEach(eid=>{
+    const clr=ec(eid);const nm=en(eid)||'SE';
+    const active=eid===realActiveEmp;
+    tabsH+=`<button class="proy-tab${active?' active':''}" onclick="realSetEmp('${eid}')" style="${active?'border-bottom:2px solid '+clr+';color:'+clr:''}"><span class="color-dot" style="background:${clr};display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>${nm}</button>`;
   });
+  empTabsEl.innerHTML=tabsH;
+  renderRealEmpresa(k,realActiveEmp,bE[realActiveEmp]);
+}
+
+function realSetEmp(eid){
+  realActiveEmp=eid;
+  const k=document.getElementById('rwsel').value;
+  const ap=st.P[k]||[];
+  const bE={};ap.forEach(r=>{const e=r.empresa_id||'_';if(!bE[e])bE[e]=[];bE[e].push(r)});
+  document.querySelectorAll('#real-emp-tabs .proy-tab').forEach(btn=>{
+    const isActive=btn.getAttribute('onclick')===`realSetEmp('${eid}')`;
+    btn.classList.toggle('active',isActive);
+    const clr=ec(eid);
+    btn.style.borderBottom=isActive?'2px solid '+clr:'';
+    btn.style.color=isActive?clr:'';
+  });
+  renderRealEmpresa(k,eid,bE[eid]||[]);
+}
+
+function renderRealEmpresa(k,eid,items){
+  const empContent=document.getElementById('real-emp-content');
+  const ap=st.P[k]||[];const as=gas(ap);const t=tc(k);
+  const bA={};
+  items.forEach(r=>{const a=r.area||'SA';if(!bA[a])bA[a]=[];bA[a].push(r)});
+  const areas=Object.keys(bA);
+  if(!realActiveArea[eid]||!bA[realActiveArea[eid]])realActiveArea[eid]=areas[0];
+  const activeArea=realActiveArea[eid];
+  let areaTabsH=`<div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1rem;flex-wrap:wrap">`;
+  areas.forEach(area=>{
+    const bg2=ab(area,as);const ac2=ac(area,as);
+    const isActive=area===activeArea;
+    areaTabsH+=`<button class="proy-tab${isActive?' active':''}" onclick="realSetArea('${eid}','${area.replace(/'/g,"\'")}')"><span style="background:${bg2};color:${ac2};border-radius:4px;padding:1px 6px;font-size:11px">${area}</span></button>`;
+  });
+  areaTabsH+=`</div>`;
+  const aItems=bA[activeArea]||[];
+  let h=areaTabsH;
+  h+=`<div style="overflow-x:auto"><table class="plan-grid"><thead><tr><th class="left">Producto</th><th class="left" style="width:65px">Unidad</th>`;
+  DAYS.forEach((d,i)=>{h+=`<th class="${i===t?'today-head':''}" colspan="2" style="font-size:11px;text-align:center">${d.slice(0,3)} ${ddate(k,i)}</th>`;});
+  h+=`<th>Plan</th><th>Real</th></tr><tr style="background:var(--bg2)"><th></th><th></th>`;
+  DAYS.forEach((_,i)=>{
+    h+=`<th style="font-size:10px;font-weight:400;color:var(--text2);text-align:center;padding:3px${i===t?';background:var(--today-head)':''}">P</th>`;
+    h+=`<th style="font-size:10px;font-weight:400;color:var(--green);text-align:center;padding:3px${i===t?';background:var(--today-head)':''}">R</th>`;
+  });
+  h+=`<th></th><th></th></tr></thead><tbody>`;
+  aItems.forEach(r=>{
+    const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
+    const rk=rKey(r);
+    const rd=st.R[k]?.[rk]||st.R[k]?.[oi]||Array(7).fill(0);
+    const tp=(r.days||[]).reduce((a,b)=>a+(b||0),0);
+    const tr2=rd.reduce((a,b)=>a+(b||0),0);
+    const trId=`rtot-${rk.replace(/[|]/g,'-')}`;
+    h+=`<tr><td style="font-weight:500">${r.producto}</td><td style="font-size:12px;color:var(--text2)">${r.unidad}</td>`;
+    for(let di=0;di<7;di++){
+      const pv=(r.days&&r.days[di])||0;const rv=rd[di]||0;
+      const desvio=pv>0&&rv>0&&rv<pv;
+      h+=`<td class="day-cell${di===t?' today-col':''}" style="font-size:12px;color:var(--text2)">${pv>0?pv:'--'}</td>`;
+      h+=`<td class="day-cell${di===t?' today-col':''}" style="position:relative"><input class="day-input${rv>0?' has-val':''}" type="number" min="0" value="${rv||''}" placeholder="--" onchange="uR('${k}','${rk}',${di},this.value);this.classList.toggle('has-val',this.value!='');updRealTot('${trId}','${rk}','${k}')" style="border-color:rgba(29,158,117,.3)"/>${desvio?`<button onclick="showCausaModal('${k}',${oi},${di},${pv},${rv},'${r.empresa_id}','${r.area}','${r.producto.replace(/'/g,"\'")}','${r.unidad}')" style="position:absolute;right:2px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--amber);font-size:14px" title="Registrar causa"><i class="ti ti-alert-triangle"></i></button>`:''}</td>`;
+    }
+    h+=`<td class="total-cell" style="font-size:12px">${fmt(tp)}</td><td class="total-cell" style="color:var(--green)" id="${trId}">${tr2>0?fmt(tr2):'--'}</td></tr>`;
+  });
+  const totPlan=aItems.reduce((s,r)=>(r.days||[]).reduce((a,b)=>a+(b||0),s),0);
+  const totReal=aItems.reduce((s,r)=>{const rk=rKey(r);const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);const rd=st.R[k]?.[rk]||st.R[k]?.[oi]||Array(7).fill(0);return s+rd.reduce((a,b)=>a+(b||0),0);},0);
+  h+=`<tr style="background:var(--bg2);font-weight:700"><td colspan="2">Total ${activeArea}</td>`;
+  for(let di=0;di<7;di++){
+    const dP=aItems.reduce((s,r)=>s+((r.days&&r.days[di])||0),0);
+    const dR=aItems.reduce((s,r)=>{const rk=rKey(r);const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);const rd=st.R[k]?.[rk]||st.R[k]?.[oi]||Array(7).fill(0);return s+(rd[di]||0);},0);
+    h+=`<td class="total-cell${di===t?' today-col':''}" style="font-size:12px">${dP>0?dP:'--'}</td><td class="total-cell${di===t?' today-col':''}" style="color:var(--green)">${dR>0?dR:'--'}</td>`;
+  }
+  h+=`<td class="total-cell">${fmt(totPlan)}</td><td class="total-cell" style="color:var(--green)">${totReal>0?fmt(totReal):'--'}</td></tr>`;
   h+=`</tbody></table></div>`;
-  document.getElementById('rgrid').innerHTML=h;
+  empContent.innerHTML=h;
+}
+
+function realSetArea(eid,area){
+  realActiveArea[eid]=area;
+  const k=document.getElementById('rwsel').value;
+  const ap=st.P[k]||[];
+  const bE={};ap.forEach(r=>{const e=r.empresa_id||'_';if(!bE[e])bE[e]=[];bE[e].push(r)});
+  renderRealEmpresa(k,eid,bE[eid]||[]);
 }
 function updRealTot(trId,rk,k){
   const days=st.R[k]?.[rk]||Array(7).fill(0);
