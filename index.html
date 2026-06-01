@@ -3229,16 +3229,24 @@ async function renderDepCalc(){
         const mix=mixData.find(m=>m.empresa_id===p.empresa_id&&m.area===p.area&&m.producto===p.producto);
         const caja=cajasData.find(c=>c.empresa_id===p.empresa_id&&c.area===p.area&&c.producto===p.producto);
         const pct=mix?mix.porcentaje:0;
-        const ujc=caja?caja.unidades_por_caja:0;
+        // ujc: primero buscar en cajas_producto, si no buscar unidades_bandeja del maestro
+        const prodMaestro=st.Pr.find(pr=>pr.nombre===p.producto&&pr.empresa_id===p.empresa_id);
+        const ujc=caja?caja.unidades_por_caja:(prodMaestro&&prodMaestro.unidades_bandeja?parseInt(prodMaestro.unidades_bandeja):0);
         if(!pct){prodsSinMix.push(p);return;}
         mixFam.push({p,pct,ujc});
       });
       // Normalizar: suma de % de los productos con mix en esta familia
       const sumPctFam=mixFam.reduce((s,x)=>s+x.pct,0);
+      const nProds=mixFam.length;
+      // Reservar al menos 1 torre por producto, distribuir el resto por %
+      const torresDisponibles=Math.floor(capFam/cajasXtorre);
+      const torresReserva=Math.min(nProds,torresDisponibles); // 1 torre garantizada por producto
+      const cajasSobrantes=capFam-(torresReserva*cajasXtorre); // cajas para distribuir por %
       mixFam.forEach(({p,pct,ujc})=>{
-        // % normalizado relativo a esta familia (suma = 100%)
-        const pctNorm=sumPctFam>0?(pct/sumPctFam)*100:0;
-        const cajasRaw=capFam*(pctNorm/100);
+        const pctNorm=sumPctFam>0?(pct/sumPctFam)*100:100/nProds;
+        // Torre garantizada + distribución proporcional del sobrante
+        const cajasExtra=cajasSobrantes*(pctNorm/100);
+        const cajasRaw=cajasXtorre+cajasExtra; // mínimo 1 torre
         const torresBase=Math.floor(cajasRaw/cajasXtorre);
         const fraccion=cajasRaw/cajasXtorre - torresBase;
         prodsConMix.push({p,pct,pctNorm,ujc,cajasRaw,torresBase,fraccion,torresExtra:0});
@@ -3247,7 +3255,6 @@ async function renderDepCalc(){
       // Paso 2: distribuir sobrante - asignar torres extra a los de mayor fracción
       const cajasUsadasBase=prodsConMix.reduce((s,x)=>s+x.torresBase*cajasXtorre,0);
       let sobranteTorres=Math.floor((capFam-cajasUsadasBase)/cajasXtorre);
-      // Ordenar por fracción descendente para dar prioridad a los más cercanos
       const porFraccion=[...prodsConMix].sort((a,b)=>b.fraccion-a.fraccion);
       for(let i=0;i<porFraccion.length&&sobranteTorres>0;i++){
         porFraccion[i].torresExtra=1;
