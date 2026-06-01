@@ -1127,14 +1127,43 @@ function showDetalleModal(k,rk,di,producto,unidad){
   const key=`${rk}||${di}`;
   if(!st.DP[k][key])st.DP[k][key]=[];
   const procesos=st.DP[k][key];
-  // Asegurar al menos 1 proceso
-  if(!procesos.length)procesos.push({hora_inicio:'',hora_fin:'',cantidad:0,desperdicio:0});
+  if(!procesos.length)procesos.push({hora_inicio:'',hora_fin:'',cantidad:0,desperdicio:0,bandejas:0,sueltas:0});
+
+  // Buscar si el producto tiene unidades_bandeja definido
+  const [eid]=rk.split('||');
+  const prodObj=st.Pr.find(p=>p.nombre===producto&&p.empresa_id===eid);
+  const udsBandeja=prodObj&&prodObj.unidades_bandeja?parseInt(prodObj.unidades_bandeja):0;
 
   const overlay=document.createElement('div');
   overlay.className='modal-overlay';overlay.id='modal-detalle-proc';
 
   function renderProcesos(){
-    const rows=procesos.map((p,i)=>`
+    const rows=procesos.map((p,i)=>{
+      // Calcular cantidad total si usa bandejas
+      const cantTotal=udsBandeja>0?((p.bandejas||0)*udsBandeja)+(p.sueltas||0):p.cantidad||0;
+      const inputCantidad=udsBandeja>0?`
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <label style="font-size:10px;color:var(--text2);display:block;margin-bottom:2px">Bandejas (×${udsBandeja} uds)</label>
+            <input type="number" min="0" step="1" value="${p.bandejas||''}" placeholder="0"
+              onchange="dpSetBandeja('${key}','${k}',${i},'bandejas',this.value,${udsBandeja})"
+              style="width:100%;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+          </div>
+          <div>
+            <label style="font-size:10px;color:var(--text2);display:block;margin-bottom:2px">Sueltas (uds)</label>
+            <input type="number" min="0" step="1" value="${p.sueltas||''}" placeholder="0"
+              onchange="dpSetBandeja('${key}','${k}',${i},'sueltas',this.value,${udsBandeja})"
+              style="width:100%;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+          </div>
+        </div>
+        <div style="margin-top:6px;padding:6px 10px;background:var(--blue)12;border-radius:var(--radius);font-size:12px">
+          Total: <b style="color:var(--blue)">${cantTotal.toLocaleString('es-AR')} ${unidad}</b>
+          ${p.bandejas>0||p.sueltas>0?`<span style="color:var(--text3);margin-left:6px">(${p.bandejas||0} band. × ${udsBandeja} + ${p.sueltas||0} sueltas)</span>`:''}
+        </div>`
+      :`<input type="number" min="0" step="0.01" value="${p.cantidad||''}" placeholder="0"
+          onchange="dpSet('${key}','${k}',${i},'cantidad',parseFloat(this.value)||0)"
+          style="width:100%;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>`;
+      return`
       <div style="background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);padding:12px;margin-bottom:10px">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
           <span style="font-size:12px;font-weight:600;color:var(--text2)">Proceso ${i+1}</span>
@@ -1155,9 +1184,7 @@ function showDetalleModal(k,rk,di,producto,unidad){
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div>
             <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px">Cantidad producida (${unidad})</label>
-            <input type="number" min="0" step="0.01" value="${p.cantidad||''}" placeholder="0"
-              onchange="dpSet('${key}','${k}',${i},'cantidad',parseFloat(this.value)||0)"
-              style="width:100%;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+            ${inputCantidad}
           </div>
           <div>
             <label style="font-size:11px;color:var(--text2);display:block;margin-bottom:3px">Desperdicio (${unidad})</label>
@@ -1166,9 +1193,13 @@ function showDetalleModal(k,rk,di,producto,unidad){
               style="width:100%;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
           </div>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
 
-    const totCant=procesos.reduce((s,p)=>s+(p.cantidad||0),0);
+    const totCant=procesos.reduce((s,p)=>{
+      if(udsBandeja>0)return s+((p.bandejas||0)*udsBandeja)+(p.sueltas||0);
+      return s+(p.cantidad||0);
+    },0);
     const totDesp=procesos.reduce((s,p)=>s+(p.desperdicio||0),0);
     const totMin=procesos.reduce((s,p)=>{
       if(!p.hora_inicio||!p.hora_fin)return s;
@@ -1210,8 +1241,16 @@ function dpSet(key,k,i,field,val){
   const ov=document.getElementById('modal-detalle-proc');
   if(ov&&ov._render)ov._render();
 }
+function dpSetBandeja(key,k,i,field,val,udsBandeja){
+  st.DP[k][key][i][field]=parseInt(val)||0;
+  // Actualizar cantidad total calculada
+  const p=st.DP[k][key][i];
+  p.cantidad=((p.bandejas||0)*udsBandeja)+(p.sueltas||0);
+  const ov=document.getElementById('modal-detalle-proc');
+  if(ov&&ov._render)ov._render();
+}
 function dpAdd(key,k){
-  st.DP[k][key].push({hora_inicio:'',hora_fin:'',cantidad:0,desperdicio:0});
+  st.DP[k][key].push({hora_inicio:'',hora_fin:'',cantidad:0,desperdicio:0,bandejas:0,sueltas:0});
   const ov=document.getElementById('modal-detalle-proc');
   if(ov&&ov._render)ov._render();
 }
@@ -1719,6 +1758,7 @@ function rProdDetail(aid){
     h+=`<div class="grid-card" style="margin-bottom:1rem"><table class="ptbl">
       <thead><tr><th style="width:56px">Orden</th><th>Producto</th><th style="width:120px">Unidad</th><th style="width:100px;text-align:center" title="Habilita campos de hora inicio, hora fin, desperdicio y cantidad al cargar producción">Detalle proceso</th>
       <th style="width:110px;text-align:center" title="Si se define, la planificación usa múltiplos de este valor">Uds. x tanda</th>
+      <th style="width:100px;text-align:center" title="Unidades por bandeja para ingreso en producción (ej: 24 o 36)">Uds. x bandeja</th>
       <th style="width:34px"></th></tr></thead><tbody>`;
     prods.forEach((p,idx)=>{
       h+=`<tr>
@@ -1741,6 +1781,12 @@ function rProdDetail(aid){
             onchange="updP('${p.id}','unidades_tanda',this.value?parseInt(this.value):null)"
             style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
             title="Unidades producidas por tanda. Si se define, la planificación muestra múltiplos (0, 1 tanda, 2 tandas...)."/>
+        </td>
+        <td style="width:100px">
+          <input type="number" min="1" step="1" value="${p.unidades_bandeja||''}" placeholder="Sin bandeja"
+            onchange="updP('${p.id}','unidades_bandeja',this.value?parseInt(this.value):null)"
+            style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
+            title="Unidades por bandeja. Si se define, el ingreso de producción permite bandejas + unidades sueltas."/>
         </td>
         <td><button class="btn btn-xs btn-danger" onclick="delProd('${p.id}')"><i class="ti ti-trash"></i></button></td>
       </tr>`;
