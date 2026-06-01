@@ -1148,16 +1148,26 @@ async function showDetalleModal(k,rk,di,producto,unidad){
   // Si hay datos guardados y st.DP no tiene nada, cargar el último registro
   if(!st.DP[k][key]||!st.DP[k][key].length){
     if(historial.length){
-      st.DP[k][key]=historial.map(h=>({
-        hora_inicio:h.hora_inicio?h.hora_inicio.slice(0,5):'',
-        hora_fin:h.hora_fin?h.hora_fin.slice(0,5):'',
-        cantidad:h.cantidad||0,
-        desperdicio:h.desperdicio||0,
-        relleno_kg:h.relleno_kg||0,
-        bandejas:h.bandejas||0,
-        sueltas:h.sueltas||0,
-        _id:h.id
-      }));
+      st.DP[k][key]=historial.map(h=>{
+        const cant=h.cantidad||0;
+        let bandejas=h.bandejas||0;
+        let sueltas=h.sueltas||0;
+        // Si hay cantidad pero no bandejas/sueltas, calcular bandejas aproximadas
+        if(cant>0&&bandejas===0&&sueltas===0&&udsBandeja>0){
+          bandejas=Math.floor(cant/udsBandeja);
+          sueltas=cant-(bandejas*udsBandeja);
+        }
+        return {
+          hora_inicio:h.hora_inicio?h.hora_inicio.slice(0,5):'',
+          hora_fin:h.hora_fin?h.hora_fin.slice(0,5):'',
+          cantidad:cant,
+          desperdicio:h.desperdicio||0,
+          relleno_kg:h.relleno_kg||0,
+          bandejas,
+          sueltas,
+          _id:h.id
+        };
+      });
     } else {
       st.DP[k][key]=[{hora_inicio:'',hora_fin:'',cantidad:0,desperdicio:0,bandejas:0,sueltas:0,relleno_kg:0}];
     }
