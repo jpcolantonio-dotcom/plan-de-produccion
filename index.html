@@ -1129,10 +1129,12 @@ function showDetalleModal(k,rk,di,producto,unidad){
   const procesos=st.DP[k][key];
   if(!procesos.length)procesos.push({hora_inicio:'',hora_fin:'',cantidad:0,desperdicio:0,bandejas:0,sueltas:0});
 
-  // Buscar si el producto tiene unidades_bandeja definido
+  // Buscar datos del producto
   const [eid]=rk.split('||');
   const prodObj=st.Pr.find(p=>p.nombre===producto&&p.empresa_id===eid);
   const udsBandeja=prodObj&&prodObj.unidades_bandeja?parseInt(prodObj.unidades_bandeja):0;
+  const tieneRelleno=prodObj&&prodObj.tiene_relleno||false;
+  const tipoRelleno=prodObj&&prodObj.tipo_relleno||'Relleno';
 
   const overlay=document.createElement('div');
   overlay.className='modal-overlay';overlay.id='modal-detalle-proc';
@@ -1193,6 +1195,17 @@ function showDetalleModal(k,rk,di,producto,unidad){
               style="width:100%;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
           </div>
         </div>
+        ${tieneRelleno?`<div style="margin-top:10px;padding:10px;background:var(--amber)09;border:.5px solid var(--amber)44;border-radius:var(--radius)">
+          <label style="font-size:11px;color:var(--amber);font-weight:600;display:block;margin-bottom:6px">
+            <i class="ti ti-meat"></i> Relleno usado — ${tipoRelleno} (kg)
+          </label>
+          <input type="number" min="0" step="0.01" value="${p.relleno_kg||''}" placeholder="0"
+            onchange="dpSet('${key}','${k}',${i},'relleno_kg',parseFloat(this.value)||0)"
+            style="width:160px;padding:6px 8px;font-size:13px;border:.5px solid var(--amber)55;border-radius:var(--radius);background:var(--bg)"/>
+          ${p.relleno_kg&&cantTotal>0?`<span style="margin-left:10px;font-size:12px;color:var(--text2)">
+            = <b style="color:var(--amber)">${(p.relleno_kg/cantTotal*1000).toFixed(1)}g</b> / unidad
+          </span>`:''}
+        </div>`:''}
       </div>`;
     }).join('');
 
@@ -1210,13 +1223,19 @@ function showDetalleModal(k,rk,di,producto,unidad){
       return s+diff;
     },0);
     const durStr=totMin>0?`${Math.floor(totMin/60)}h ${totMin%60}m`:'--';
+    const totRelleno=tieneRelleno?procesos.reduce((s,p)=>s+(p.relleno_kg||0),0):0;
+    const gXU=tieneRelleno&&totCant>0?(totRelleno/totCant*1000).toFixed(1):0;
 
     document.getElementById('dp-rows').innerHTML=rows;
     document.getElementById('dp-summary').innerHTML=`
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);padding:12px">
+      <div style="display:grid;grid-template-columns:repeat(${tieneRelleno?4:3},1fr);gap:10px;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);padding:12px">
         <div style="text-align:center"><div style="font-size:11px;color:var(--text2)">Total producido</div><div style="font-size:16px;font-weight:700;color:var(--green)">${totCant.toLocaleString('es-AR')} ${unidad}</div></div>
         <div style="text-align:center"><div style="font-size:11px;color:var(--text2)">Total desperdicio</div><div style="font-size:16px;font-weight:700;color:var(--red)">${totDesp.toLocaleString('es-AR')} ${unidad}</div></div>
         <div style="text-align:center"><div style="font-size:11px;color:var(--text2)">Duración total</div><div style="font-size:16px;font-weight:700;color:var(--blue)">${durStr}</div></div>
+        ${tieneRelleno?`<div style="text-align:center"><div style="font-size:11px;color:var(--amber)">${tipoRelleno} usado</div>
+          <div style="font-size:16px;font-weight:700;color:var(--amber)">${totRelleno.toLocaleString('es-AR')} kg</div>
+          ${totCant>0?`<div style="font-size:11px;color:var(--text3)">${gXU}g / unidad</div>`:''}
+        </div>`:''}
       </div>`;
   }
 
@@ -1292,7 +1311,10 @@ async function dpGuardar(key,k,rk,di){
         hora_inicio:p.hora_inicio||null,
         hora_fin:p.hora_fin||null,
         cantidad:p.cantidad||0,
-        desperdicio:p.desperdicio||0
+        desperdicio:p.desperdicio||0,
+        relleno_kg:p.relleno_kg||0,
+        bandejas:p.bandejas||0,
+        sueltas:p.sueltas||0
       });
     }
     ss('online','Rendimiento guardado ✓');
@@ -1759,6 +1781,8 @@ function rProdDetail(aid){
       <thead><tr><th style="width:56px">Orden</th><th>Producto</th><th style="width:120px">Unidad</th><th style="width:100px;text-align:center" title="Habilita campos de hora inicio, hora fin, desperdicio y cantidad al cargar producción">Detalle proceso</th>
       <th style="width:110px;text-align:center" title="Si se define, la planificación usa múltiplos de este valor">Uds. x tanda</th>
       <th style="width:100px;text-align:center" title="Unidades por bandeja para ingreso en producción (ej: 24 o 36)">Uds. x bandeja</th>
+      <th style="width:80px;text-align:center" title="¿Este producto lleva relleno?">Relleno</th>
+      <th style="width:130px;text-align:center" title="Nombre del relleno (ej: Carne, Jamón, Pollo)">Tipo relleno</th>
       <th style="width:34px"></th></tr></thead><tbody>`;
     prods.forEach((p,idx)=>{
       h+=`<tr>
@@ -1785,8 +1809,18 @@ function rProdDetail(aid){
         <td style="width:100px">
           <input type="number" min="1" step="1" value="${p.unidades_bandeja||''}" placeholder="Sin bandeja"
             onchange="updP('${p.id}','unidades_bandeja',this.value?parseInt(this.value):null)"
-            style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
-            title="Unidades por bandeja. Si se define, el ingreso de producción permite bandejas + unidades sueltas."/>
+            style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        </td>
+        <td style="width:80px;text-align:center">
+          <label style="display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer">
+            <input type="checkbox" ${p.tiene_relleno?'checked':''} onchange="updP('${p.id}','tiene_relleno',this.checked)" style="width:16px;height:16px;cursor:pointer"/>
+            <span style="font-size:11px;color:${p.tiene_relleno?'var(--green)':'var(--text3)'}">${p.tiene_relleno?'Sí':'No'}</span>
+          </label>
+        </td>
+        <td style="width:130px">
+          ${p.tiene_relleno?`<input value="${p.tipo_relleno||''}" placeholder="ej: Carne" onchange="updP('${p.id}','tipo_relleno',this.value)"
+            style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>`
+            :`<span style="font-size:11px;color:var(--text3)">--</span>`}
         </td>
         <td><button class="btn btn-xs btn-danger" onclick="delProd('${p.id}')"><i class="ti ti-trash"></i></button></td>
       </tr>`;
@@ -4828,6 +4862,9 @@ async function renderRendimiento(){
       },0);
       const pPct=pCant+pDesp>0?((pDesp/(pCant+pDesp))*100).toFixed(1):0;
       const pUPH=pMin>0?Math.round((pCant/(pMin/60))):0;
+      const pRelleno=prod.registros.reduce((s,r)=>s+(r.relleno_kg||0),0);
+      const pGxU=pCant>0?(pRelleno/pCant*1000).toFixed(1):0;
+      const hasRelleno=prod.registros.some(r=>r.relleno_kg>0);
 
       h+=`<div class="stock-card" style="margin-bottom:16px">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg2);border-bottom:.5px solid var(--border);border-radius:var(--radius-lg) var(--radius-lg) 0 0">
@@ -4840,6 +4877,7 @@ async function renderRendimiento(){
             <span><span style="color:var(--text2)">Prod: </span><b>${pCant.toLocaleString('es-AR')}</b></span>
             <span><span style="color:var(--text2)">Desp: </span><b style="color:var(--red)">${pDesp.toLocaleString('es-AR')}</b> <span style="color:var(--text3)">(${pPct}%)</span></span>
             <span><span style="color:var(--text2)">Uds/h: </span><b style="color:var(--blue)">${pUPH.toLocaleString('es-AR')}</b></span>
+            ${pRelleno>0?`<span><span style="color:var(--text2)">Relleno: </span><b style="color:var(--amber)">${pRelleno.toLocaleString('es-AR')} kg</b> <span style="color:var(--text3)">(${pGxU}g/ud)</span></span>`:''}
           </div>
         </div>
         <div style="overflow-x:auto">
@@ -4850,6 +4888,7 @@ async function renderRendimiento(){
           <th style="text-align:right">Desperdicio</th>
           <th style="text-align:right">% Desp.</th>
           <th style="text-align:right">Uds/hora</th>
+          ${prod.registros.some(r=>r.relleno_kg>0)?'<th style="text-align:right;color:var(--amber)">Relleno (kg)</th><th style="text-align:right;color:var(--amber)">g/unidad</th>':''}
         </tr></thead><tbody>`;
 
       prod.registros.forEach(r=>{
@@ -4865,6 +4904,8 @@ async function renderRendimiento(){
         }
         const pct2=r.cantidad+r.desperdicio>0?((r.desperdicio/(r.cantidad+r.desperdicio))*100).toFixed(1):0;
         const pctColor=parseFloat(pct2)>5?'var(--red)':parseFloat(pct2)>2?'var(--amber)':'var(--green)';
+        const rellenoRow=r.relleno_kg||0;
+        const gxuRow=r.cantidad>0?(rellenoRow/r.cantidad*1000).toFixed(1):'--';
         h+=`<tr>
           <td>${fechaStr}</td>
           <td style="text-align:center">${r.hora_inicio||'--'}</td>
@@ -4874,6 +4915,8 @@ async function renderRendimiento(){
           <td style="text-align:right;color:var(--red)">${(r.desperdicio||0).toLocaleString('es-AR')}</td>
           <td style="text-align:right;font-weight:600;color:${pctColor}">${pct2}%</td>
           <td style="text-align:right;color:var(--blue)">${uph}</td>
+          ${hasRelleno?`<td style="text-align:right;color:var(--amber);font-weight:600">${rellenoRow>0?rellenoRow.toLocaleString('es-AR'):'--'}</td>
+          <td style="text-align:right;color:var(--text2)">${rellenoRow>0?gxuRow+'g':'--'}</td>`:''}
         </tr>`;
       });
       h+=`</tbody></table></div></div>`;
