@@ -3260,7 +3260,7 @@ async function renderDepCalc(){
           <td colspan="5" style="text-align:center;color:var(--text3);font-size:12px">Sin % mix definido</td></tr>`;
       });
 
-      prodsConMix.forEach(({p,pct,ujc,cajasRaw,torresBase,torresExtra})=>{
+      prodsConMix.forEach(({p,pct,pctNorm,ujc,cajasRaw,torresBase,torresExtra})=>{
         const torresTotal=torresBase+torresExtra;
         const cajasReales=torresTotal*cajasXtorre;
         const unidades=cajasReales*ujc;
