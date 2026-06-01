@@ -1122,19 +1122,47 @@ function realSetArea(eid,area){
 // DETALLE PROCESO
 if(!st.DP)st.DP={};
 
-function showDetalleModal(k,rk,di,producto,unidad){
+async function showDetalleModal(k,rk,di,producto,unidad){
   if(!st.DP[k])st.DP[k]={};
   const key=`${rk}||${di}`;
-  if(!st.DP[k][key])st.DP[k][key]=[];
-  const procesos=st.DP[k][key];
-  if(!procesos.length)procesos.push({hora_inicio:'',hora_fin:'',cantidad:0,desperdicio:0,bandejas:0,sueltas:0});
 
   // Buscar datos del producto
-  const [eid]=rk.split('||');
+  const [eid,area]=rk.split('||');
   const prodObj=st.Pr.find(p=>p.nombre===producto&&p.empresa_id===eid);
   const udsBandeja=prodObj&&prodObj.unidades_bandeja?parseInt(prodObj.unidades_bandeja):0;
   const tieneRelleno=prodObj&&prodObj.tiene_relleno||false;
   const tipoRelleno=prodObj&&prodObj.tipo_relleno||'Relleno';
+
+  // Calcular fecha del día
+  const diaDate=new Date(k+'T00:00:00');diaDate.setDate(diaDate.getDate()+di);
+  const fecha=diaDate.getFullYear()+'-'+String(diaDate.getMonth()+1).padStart(2,'0')+'-'+String(diaDate.getDate()).padStart(2,'0');
+
+  // Cargar historial del día desde Supabase
+  let historial=[];
+  try{
+    historial=await get('rendimiento_proceso',
+      `empresa_id=eq.${eid}&area=eq.${encodeURIComponent(area)}&producto=eq.${encodeURIComponent(producto)}&fecha=eq.${fecha}&order=created_at.desc`
+    );
+  }catch(e){console.warn('No se pudo cargar historial:',e);}
+
+  // Si hay datos guardados y st.DP no tiene nada, cargar el último registro
+  if(!st.DP[k][key]||!st.DP[k][key].length){
+    if(historial.length){
+      st.DP[k][key]=historial.map(h=>({
+        hora_inicio:h.hora_inicio?h.hora_inicio.slice(0,5):'',
+        hora_fin:h.hora_fin?h.hora_fin.slice(0,5):'',
+        cantidad:h.cantidad||0,
+        desperdicio:h.desperdicio||0,
+        relleno_kg:h.relleno_kg||0,
+        bandejas:h.bandejas||0,
+        sueltas:h.sueltas||0,
+        _id:h.id
+      }));
+    } else {
+      st.DP[k][key]=[{hora_inicio:'',hora_fin:'',cantidad:0,desperdicio:0,bandejas:0,sueltas:0,relleno_kg:0}];
+    }
+  }
+  const procesos=st.DP[k][key];
 
   const overlay=document.createElement('div');
   overlay.className='modal-overlay';overlay.id='modal-detalle-proc';
@@ -1239,8 +1267,26 @@ function showDetalleModal(k,rk,di,producto,unidad){
       </div>`;
   }
 
-  overlay.innerHTML=`<div class="modal" style="width:520px;max-height:85vh;overflow-y:auto">
+  // Historial previo (registros anteriores guardados)
+  const histPrevio=historial.length?`
+    <div style="margin-bottom:14px;padding:10px;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius)">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:8px">
+        <i class="ti ti-history"></i> ÚLTIMO REGISTRO GUARDADO — ${new Date(fecha+'T00:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'2-digit'})}
+      </div>
+      ${historial.map((h,i)=>`
+        <div style="font-size:12px;display:flex;gap:16px;align-items:center;padding:5px 0;border-bottom:${i<historial.length-1?'.5px solid var(--border)':'none'}">
+          <span style="color:var(--text2)">Proceso ${i+1}</span>
+          ${h.hora_inicio?`<span><i class="ti ti-clock" style="font-size:10px"></i> ${h.hora_inicio.slice(0,5)} → ${(h.hora_fin||'').slice(0,5)}</span>`:''}
+          <span style="color:var(--green);font-weight:600">${(h.cantidad||0).toLocaleString('es-AR')} ${unidad}</span>
+          ${h.desperdicio>0?`<span style="color:var(--red)">Desp: ${h.desperdicio}</span>`:''}
+          ${h.relleno_kg>0?`<span style="color:var(--amber)">🥩 ${h.relleno_kg}kg</span>`:''}
+          ${h.bandejas>0?`<span style="color:var(--text3);font-size:11px">${h.bandejas} band.</span>`:''}
+        </div>`).join('')}
+    </div>`:'';
+
+  overlay.innerHTML=`<div class="modal" style="width:540px;max-height:88vh;overflow-y:auto">
     <div class="modal-title"><i class="ti ti-clock-hour-4"></i> Detalle de proceso — ${producto}</div>
+    ${histPrevio}
     <div id="dp-summary" style="margin-bottom:14px"></div>
     <div id="dp-rows"></div>
     <button class="btn btn-sm" onclick="dpAdd('${key}','${k}')" style="margin-bottom:14px;width:100%"><i class="ti ti-plus"></i> Agregar otro proceso</button>
