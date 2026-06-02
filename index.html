@@ -863,9 +863,12 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['plan','real','cmp','desv','dash','stock','proy','hor','rec','con','mae','rend','ped'];
+const TABS=['plan','real','cmp','desv','dash','stock','proy','rec','con','rend','hor','ped','mae'];
 function T(t){
-  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',TABS[i]===t));
+  document.querySelectorAll('.tab').forEach(el=>{
+    const m=el.getAttribute('onclick')||'';
+    el.classList.toggle('active',m.includes("'"+t+"'"));
+  });
   document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));
   document.getElementById('tab-'+t).classList.add('active');
   if(t==='real'){pS('rwsel');loadReal2()}
