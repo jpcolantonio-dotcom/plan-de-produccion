@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -226,7 +227,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.17</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.18</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -346,6 +347,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div style="display:grid;grid-template-columns:270px 1fr;gap:1.5rem">
       <div>
         <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Productos</div>
+        <input type="text" id="rec-buscar" placeholder="🔍 Buscar producto..." oninput="rRec()" style="width:100%;padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);margin-bottom:8px"/>
         <div id="rplist" class="rlist"><div class="empty"><i class="ti ti-package-off"></i>Agrega productos en Maestro.</div></div>
       </div>
       <div id="rdetail"><div class="empty"><i class="ti ti-arrow-left"></i>Selecciona un producto.</div></div>
@@ -765,7 +767,7 @@ async function init(){
     const[pl,re,rr,mp,em,ar,pr]=await Promise.all([
       get('planes','select=semana&order=semana.desc'),
       get('produccion_real','select=semana&order=semana.desc'),
-      get('recetas','select=datos').catch(()=>[]),
+      get('recetas','select=datos,tandas').catch(()=>[]),
       get('materias_primas','order=nombre.asc').catch(()=>[]),
       get('empresas','order=nombre.asc'),
       get('areas','order=nombre.asc'),
@@ -1952,8 +1954,11 @@ function gprod(){const all=new Set();st.Pr.forEach(p=>all.add(p.nombre));Object.
 function rRec(){
   const ps=gprod();const list=document.getElementById('rplist');
   if(!ps.length){list.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Agrega productos en Maestro.</div>';return}
+  const filtro=(document.getElementById('rec-buscar')?.value||'').toLowerCase().trim();
+  const psFilt=filtro?ps.filter(p=>p.toLowerCase().includes(filtro)):ps;
   let h='';
-  ps.forEach(p=>{
+  if(!psFilt.length){list.innerHTML='<div class="empty" style="padding:1rem;font-size:13px;color:var(--text2)">Sin resultados para "'+filtro+'"</div>';return}
+  psFilt.forEach(p=>{
     const ings=st.Rec[p]||[];const sel=p===arec;
     const pr=st.Pr.find(x=>x.nombre===p);const ar=pr?st.A.find(a=>a.id===pr.area_id):null;const em=pr?st.E.find(e=>e.id===pr.empresa_id):null;
     h+=`<div class="rrow${sel?' sel':''}" onclick="selRec('${p.replace(/'/g,"\'")}')">
@@ -2081,10 +2086,16 @@ document.addEventListener('keydown',function(e){
   // Find the currently focused input that has an open dropdown
   const active=document.activeElement;
   if(!active||active.tagName!=='INPUT')return;
-  const wrap=active.parentElement;
-  if(!wrap)return;
-  const drop=wrap.querySelector('.mp-ac-drop');
-  if(!drop||drop.style.display==='none')return;
+  // Buscar dropdown abierto: primero en el padre, luego en ancestros cercanos
+  let drop=null;
+  let el=active.parentElement;
+  for(let i=0;i<4;i++){
+    if(!el)break;
+    const d=el.querySelector('.mp-ac-drop');
+    if(d&&d.style.display!=='none'){drop=d;break;}
+    el=el.parentElement;
+  }
+  if(!drop)return;
   const items=[...drop.querySelectorAll('.mp-ac-item,.mp-ac-new')];
   if(!items.length)return;
   const cur=drop.querySelector('.mp-ac-hover');
