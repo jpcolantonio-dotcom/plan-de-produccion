@@ -246,6 +246,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('con')"><i class="ti ti-package"></i> Consumo MP</button>
   <button class="tab" onclick="T('rend')"><i class="ti ti-speedometer"></i> Rendimiento</button>
   <button class="tab" onclick="T('hor')"><i class="ti ti-clock"></i> Horarios</button>
+  <button class="tab" onclick="T('ped')"><i class="ti ti-shopping-cart"></i> Pedidos</button>
   <button class="tab" onclick="T('mae')"><i class="ti ti-building"></i> Maestro</button>
 </div>
 <div class="pad">
@@ -347,7 +348,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div style="display:grid;grid-template-columns:270px 1fr;gap:1.5rem">
       <div>
         <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Productos</div>
-        <input type="text" id="rec-buscar" placeholder="🔍 Buscar producto..." oninput="rRec()" style="width:100%;padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);margin-bottom:8px"/>
         <div id="rplist" class="rlist"><div class="empty"><i class="ti ti-package-off"></i>Agrega productos en Maestro.</div></div>
       </div>
       <div id="rdetail"><div class="empty"><i class="ti ti-arrow-left"></i>Selecciona un producto.</div></div>
@@ -675,8 +675,56 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <div id="hor-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="hor-errtxt"></span></div>
 </div>
 
-<!-- MAESTRO -->
-<div id="tab-mae" class="section">
+<!-- PEDIDOS -->
+<div id="tab-ped" class="section">
+  <div class="toolbar">
+    <div>
+      <div style="font-size:16px;font-weight:600">Pedidos de sucursales</div>
+      <div style="font-size:13px;color:var(--text2)">Pedidos recibidos — tomá los confirmados para planificar</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <input type="date" id="ped-fecha" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <select id="ped-esel" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
+      <button class="btn" onclick="loadPedidos()"><i class="ti ti-refresh"></i> Actualizar</button>
+    </div>
+  </div>
+  <!-- Sub-tabs -->
+  <div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1.25rem">
+    <button class="proy-tab active" id="ptab-recibidos" onclick="showPedTab('recibidos')"><i class="ti ti-inbox"></i> Recibidos</button>
+    <button class="proy-tab" id="ptab-consolidado" onclick="showPedTab('consolidado')"><i class="ti ti-list-check"></i> Consolidado</button>
+    <button class="proy-tab" id="ptab-sucursales" onclick="showPedTab('sucursales')"><i class="ti ti-building-store"></i> Sucursales</button>
+  </div>
+  <!-- Recibidos -->
+  <div id="psub-recibidos">
+    <div id="ped-recibidos-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
+  </div>
+  <!-- Consolidado -->
+  <div id="psub-consolidado" style="display:none">
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Suma de todos los pedidos del día por producto.</div>
+    <div id="ped-consolidado-content"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:1rem;gap:8px">
+      <button class="btn btn-primary" onclick="importarAlPlan()"><i class="ti ti-calendar-plus"></i> Importar al plan semanal</button>
+    </div>
+  </div>
+  <!-- Sucursales config -->
+  <div id="psub-sucursales" style="display:none">
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
+      <input type="text" id="nsuc-nombre" placeholder="Nombre sucursal" style="width:200px;padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <select id="nsuc-empresa" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Empresa...</option></select>
+      <select id="nsuc-tipo" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+        <option value="refrigerado">❄️ Refrigerado (bandejas)</option>
+        <option value="congelado">🧊 Congelado (cajas)</option>
+      </select>
+      <button class="btn btn-primary" onclick="addSucursal()"><i class="ti ti-plus"></i> Agregar sucursal</button>
+    </div>
+    <div id="suc-list-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
+    <div id="suc-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
+  </div>
+  <div id="ped-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> <span id="ped-msgtxt">Listo.</span></div>
+  <div id="ped-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="ped-errtxt"></span></div>
+</div>
+
+
   <div class="toolbar">
     <div><div style="font-size:16px;font-weight:600">Maestro</div><div style="font-size:13px;color:var(--text2)">Empresas &rarr; Areas &rarr; Productos</div></div>
   </div>
@@ -767,7 +815,7 @@ async function init(){
     const[pl,re,rr,mp,em,ar,pr]=await Promise.all([
       get('planes','select=semana&order=semana.desc'),
       get('produccion_real','select=semana&order=semana.desc'),
-      get('recetas','select=datos,tandas').catch(()=>[]),
+      get('recetas','select=datos').catch(()=>[]),
       get('materias_primas','order=nombre.asc').catch(()=>[]),
       get('empresas','order=nombre.asc'),
       get('areas','order=nombre.asc'),
@@ -815,7 +863,7 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['plan','real','cmp','desv','dash','stock','proy','hor','rec','con','mae','rend'];
+const TABS=['plan','real','cmp','desv','dash','stock','proy','hor','rec','con','mae','rend','ped'];
 function T(t){
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',TABS[i]===t));
   document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));
@@ -831,6 +879,7 @@ function T(t){
   if(t==='con'){pSC();renderCon()}
   if(t==='mae')rMae();
   if(t==='rend')initRend();
+  if(t==='ped')initPedidos();
 }
 function pS(id){
   const s=document.getElementById(id);const c=s.value||st.w;
@@ -1954,11 +2003,8 @@ function gprod(){const all=new Set();st.Pr.forEach(p=>all.add(p.nombre));Object.
 function rRec(){
   const ps=gprod();const list=document.getElementById('rplist');
   if(!ps.length){list.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Agrega productos en Maestro.</div>';return}
-  const filtro=(document.getElementById('rec-buscar')?.value||'').toLowerCase().trim();
-  const psFilt=filtro?ps.filter(p=>p.toLowerCase().includes(filtro)):ps;
   let h='';
-  if(!psFilt.length){list.innerHTML='<div class="empty" style="padding:1rem;font-size:13px;color:var(--text2)">Sin resultados para "'+filtro+'"</div>';return}
-  psFilt.forEach(p=>{
+  ps.forEach(p=>{
     const ings=st.Rec[p]||[];const sel=p===arec;
     const pr=st.Pr.find(x=>x.nombre===p);const ar=pr?st.A.find(a=>a.id===pr.area_id):null;const em=pr?st.E.find(e=>e.id===pr.empresa_id):null;
     h+=`<div class="rrow${sel?' sel':''}" onclick="selRec('${p.replace(/'/g,"\'")}')">
@@ -2086,16 +2132,10 @@ document.addEventListener('keydown',function(e){
   // Find the currently focused input that has an open dropdown
   const active=document.activeElement;
   if(!active||active.tagName!=='INPUT')return;
-  // Buscar dropdown abierto: primero en el padre, luego en ancestros cercanos
-  let drop=null;
-  let el=active.parentElement;
-  for(let i=0;i<4;i++){
-    if(!el)break;
-    const d=el.querySelector('.mp-ac-drop');
-    if(d&&d.style.display!=='none'){drop=d;break;}
-    el=el.parentElement;
-  }
-  if(!drop)return;
+  const wrap=active.parentElement;
+  if(!wrap)return;
+  const drop=wrap.querySelector('.mp-ac-drop');
+  if(!drop||drop.style.display==='none')return;
   const items=[...drop.querySelectorAll('.mp-ac-item,.mp-ac-new')];
   if(!items.length)return;
   const cur=drop.querySelector('.mp-ac-hover');
@@ -5291,7 +5331,334 @@ async function renderStats(){
   }catch(e){el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> Error: ${e.message}</div>`}
 }
 
-init();
+// ── PEDIDOS ───────────────────────────────────────────────────────
+let pedidosData=[];
+let sucursalesData=[];
+
+async function initPedidos(){
+  const hoy=new Date().toISOString().slice(0,10);
+  if(!document.getElementById('ped-fecha').value)
+    document.getElementById('ped-fecha').value=hoy;
+  // Poblar selector empresa
+  const se=document.getElementById('ped-esel');
+  se.innerHTML='<option value="all">Todas las empresas</option>';
+  st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se.appendChild(o);});
+  // Poblar selector empresa en sucursales
+  const se2=document.getElementById('nsuc-empresa');
+  se2.innerHTML='<option value="">Empresa...</option>';
+  st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se2.appendChild(o);});
+  document.getElementById('ped-fecha').onchange=()=>loadPedidos();
+  document.getElementById('ped-esel').onchange=()=>renderPedidosRecibidos();
+  await Promise.all([loadPedidos(),loadSucursales()]);
+}
+
+async function loadPedidos(){
+  const fecha=document.getElementById('ped-fecha').value;
+  if(!fecha)return;
+  try{
+    pedidosData=await get('pedidos_sucursal',`fecha=eq.${fecha}&order=created_at.asc`);
+    // Cargar datos de sucursales si no están
+    if(!sucursalesData.length)await loadSucursales();
+    renderPedidosRecibidos();
+    renderConsolidado();
+  }catch(e){console.error(e)}
+}
+
+async function loadSucursales(){
+  try{
+    sucursalesData=await get('sucursales','order=nombre.asc');
+    renderSucursalesList();
+  }catch{}
+}
+
+function showPedTab(t){
+  ['recibidos','consolidado','sucursales'].forEach(x=>{
+    document.getElementById('psub-'+x).style.display=x===t?'block':'none';
+    document.getElementById('ptab-'+x).classList.toggle('active',x===t);
+  });
+  if(t==='consolidado')renderConsolidado();
+  if(t==='sucursales')renderSucursalesList();
+}
+
+function renderPedidosRecibidos(){
+  const ef=document.getElementById('ped-esel').value;
+  const el=document.getElementById('ped-recibidos-content');
+  let peds=pedidosData;
+  if(ef!=='all'){
+    const sucEmp=sucursalesData.filter(s=>s.empresa_id===ef).map(s=>s.id);
+    peds=peds.filter(p=>sucEmp.includes(p.sucursal_id));
+  }
+  if(!peds.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-inbox-off"></i>Sin pedidos para esta fecha. Los pedidos de las sucursales aparecen acá automáticamente.</div>';
+    return;
+  }
+  // Separar por tipo
+  const refs=peds.filter(p=>{const s=sucursalesData.find(x=>x.id===p.sucursal_id);return s&&s.tipo==='refrigerado';});
+  const cons=peds.filter(p=>{const s=sucursalesData.find(x=>x.id===p.sucursal_id);return s&&s.tipo==='congelado';});
+
+  let h='';
+  if(refs.length){
+    h+=`<div style="font-size:12px;font-weight:700;color:var(--blue);margin-bottom:10px;display:flex;align-items:center;gap:6px"><i class="ti ti-snowflake"></i> REFRIGERADO — ${refs.length} sucursal${refs.length>1?'es':''}</div>`;
+    h+=renderPedidoCards(refs);
+  }
+  if(cons.length){
+    h+=`<div style="font-size:12px;font-weight:700;color:#a97ef5;margin-bottom:10px;margin-top:${refs.length?'1.5rem':'0'};display:flex;align-items:center;gap:6px"><i class="ti ti-box"></i> CONGELADO — ${cons.length} sucursal${cons.length>1?'es':''}</div>`;
+    h+=renderPedidoCards(cons);
+  }
+  el.innerHTML=h;
+}
+
+function renderPedidoCards(peds){
+  let h=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:1rem">`;
+  peds.forEach(p=>{
+    const suc=sucursalesData.find(x=>x.id===p.sucursal_id);
+    const nm=suc?suc.nombre:'Sucursal';
+    const tipo=suc?suc.tipo:'refrigerado';
+    const unidad=tipo==='refrigerado'?'bandejas':'cajas';
+    const items=p.items||[];
+    const total=items.reduce((s,it)=>s+(it.cantidad||0),0);
+    const hora=new Date(p.updated_at||p.created_at).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'});
+    const estadoColor=p.estado==='confirmado'?'var(--green)':p.estado==='rechazado'?'var(--red)':'var(--amber)';
+    const estadoLabel=p.estado==='confirmado'?'Confirmado':p.estado==='rechazado'?'Rechazado':'Pendiente';
+    h+=`<div class="stock-card" style="padding:0;overflow:hidden">
+      <div style="padding:10px 14px;background:var(--bg2);border-bottom:.5px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:700;font-size:13px">${nm}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">${hora} hs · <b style="color:${tipo==='refrigerado'?'var(--blue)':'#a97ef5'}">${total.toLocaleString('es-AR')} ${unidad}</b></div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+          <span style="font-size:11px;font-weight:700;color:${estadoColor};background:${estadoColor}22;padding:2px 8px;border-radius:10px">${estadoLabel}</span>
+          <div style="display:flex;gap:4px">
+            ${p.estado!=='confirmado'?`<button class="btn btn-xs" style="color:var(--green);border-color:rgba(29,158,117,.3)" onclick="cambiarEstadoPedido('${p.id}','confirmado')"><i class="ti ti-check"></i></button>`:''}
+            ${p.estado!=='rechazado'?`<button class="btn btn-xs btn-danger" onclick="cambiarEstadoPedido('${p.id}','rechazado')"><i class="ti ti-x"></i></button>`:''}
+          </div>
+        </div>
+      </div>
+      <div style="padding:10px 14px;max-height:180px;overflow-y:auto">
+        ${items.filter(it=>it.cantidad>0).map(it=>`
+          <div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:.5px solid var(--border)">
+            <span>${it.producto}</span>
+            <span style="font-weight:700;color:var(--text)">${it.cantidad} <span style="font-weight:400;color:var(--text2)">${unidad}</span></span>
+          </div>`).join('')}
+        ${p.observaciones?`<div style="margin-top:6px;font-size:11px;color:var(--text2);font-style:italic"><i class="ti ti-message"></i> ${p.observaciones}</div>`:''}
+      </div>
+    </div>`;
+  });
+  h+=`</div>`;
+  return h;
+}
+
+async function cambiarEstadoPedido(id,estado){
+  try{
+    await fetch(`${SB}/rest/v1/pedidos_sucursal?id=eq.${id}`,{
+      method:'PATCH',headers:{...H,'Prefer':'return=minimal'},
+      body:JSON.stringify({estado,updated_at:new Date().toISOString()})
+    });
+    const p=pedidosData.find(x=>x.id===id);
+    if(p)p.estado=estado;
+    renderPedidosRecibidos();
+    renderConsolidado();
+    ss('online',estado==='confirmado'?'Pedido confirmado':'Pedido rechazado');
+  }catch(e){ss('error','Error: '+e.message)}
+}
+
+function renderConsolidado(){
+  const ef=document.getElementById('ped-esel').value;
+  const fecha=document.getElementById('ped-fecha').value;
+  const el=document.getElementById('ped-consolidado-content');
+  // Solo tomar pedidos confirmados o pendientes (no rechazados)
+  let peds=pedidosData.filter(p=>p.estado!=='rechazado');
+  if(ef!=='all'){
+    const sucEmp=sucursalesData.filter(s=>s.empresa_id===ef).map(s=>s.id);
+    peds=peds.filter(p=>sucEmp.includes(p.sucursal_id));
+  }
+  if(!peds.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-list-check"></i>Sin pedidos para consolidar. Confirmalos primero en la pestaña Recibidos.</div>';
+    return;
+  }
+  // Consolidar por tipo y producto
+  const porTipo={refrigerado:{},congelado:{}};
+  peds.forEach(p=>{
+    const suc=sucursalesData.find(x=>x.id===p.sucursal_id);
+    const tipo=suc?suc.tipo:'refrigerado';
+    (p.items||[]).filter(it=>it.cantidad>0).forEach(it=>{
+      if(!porTipo[tipo][it.producto])porTipo[tipo][it.producto]={total:0,sucursales:[]};
+      porTipo[tipo][it.producto].total+=it.cantidad;
+      porTipo[tipo][it.producto].sucursales.push({suc:suc?suc.nombre:'?',cant:it.cantidad});
+    });
+  });
+  const fLabel=new Date(fecha+'T00:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long'});
+  let h=`<div style="font-size:14px;font-weight:600;margin-bottom:1rem">${fLabel} — ${peds.length} sucursal${peds.length>1?'es':''}</div>`;
+
+  ['refrigerado','congelado'].forEach(tipo=>{
+    const items=Object.entries(porTipo[tipo]).sort((a,b)=>b[1].total-a[1].total);
+    if(!items.length)return;
+    const unidad=tipo==='refrigerado'?'bandejas':'cajas';
+    const colorTipo=tipo==='refrigerado'?'var(--blue)':'#a97ef5';
+    const iconTipo=tipo==='refrigerado'?'ti-snowflake':'ti-box';
+    const totalTipo=items.reduce((s,[,v])=>s+v.total,0);
+    h+=`<div class="stock-card" style="margin-bottom:1rem">
+      <div style="padding:10px 14px;background:var(--bg2);border-bottom:.5px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:13px;font-weight:700;color:${colorTipo}"><i class="ti ${iconTipo}"></i> ${tipo==='refrigerado'?'REFRIGERADO':'CONGELADO'}</span>
+        <span style="font-size:13px;font-weight:700">${totalTipo.toLocaleString('es-AR')} ${unidad} total</span>
+      </div>
+      <table class="stock-tbl"><thead><tr>
+        <th style="text-align:left">Producto</th>
+        <th style="text-align:right">TOTAL ${unidad.toUpperCase()}</th>
+        <th>Detalle por sucursal</th>
+      </tr></thead><tbody>`;
+    items.forEach(([prod,data])=>{
+      const det=data.sucursales.map(s=>`<span style="margin-right:8px"><b>${s.suc}</b>: ${s.cant}</span>`).join('');
+      h+=`<tr>
+        <td style="font-weight:600">${prod}</td>
+        <td style="text-align:right;font-size:16px;font-weight:700;color:${colorTipo}">${data.total.toLocaleString('es-AR')}</td>
+        <td style="font-size:12px;color:var(--text2)">${det}</td>
+      </tr>`;
+    });
+    h+=`</tbody></table></div>`;
+  });
+  el.innerHTML=h;
+}
+
+async function importarAlPlan(){
+  const fecha=document.getElementById('ped-fecha').value;
+  if(!confirm(`¿Importar el consolidado del ${fecha} al plan semanal? Se va a sumar a lo que ya hay planificado.`))return;
+  const semKey=wk(new Date(fecha+'T00:00:00'));
+  const diIdx=(new Date(fecha+'T00:00:00').getDay()+6)%7;
+  await lp(semKey);
+  const filas=JSON.parse(JSON.stringify(st.P[semKey]||[]));
+  let peds=pedidosData.filter(p=>p.estado!=='rechazado');
+  // Consolidar
+  const consol={};
+  peds.forEach(p=>{
+    const suc=sucursalesData.find(x=>x.id===p.sucursal_id);
+    const tipo=suc?suc.tipo:'refrigerado';
+    (p.items||[]).filter(it=>it.cantidad>0).forEach(it=>{
+      const k=it.producto_id||it.producto;
+      if(!consol[k])consol[k]={producto:it.producto,cantidad:0,producto_id:it.producto_id};
+      consol[k].cantidad+=it.cantidad;
+    });
+  });
+  let importados=0;
+  Object.values(consol).forEach(item=>{
+    // Buscar el producto en el plan
+    const prodObj=st.Pr.find(p=>p.id===item.producto_id||p.nombre===item.producto);
+    if(!prodObj)return;
+    const area=st.A.find(a=>a.id===prodObj.area_id);
+    const areaNom=area?area.nombre:'SA';
+    let fila=filas.find(f=>f.producto===prodObj.nombre&&f.empresa_id===prodObj.empresa_id&&f.area===areaNom);
+    if(!fila){
+      fila={empresa_id:prodObj.empresa_id,area:areaNom,producto:prodObj.nombre,unidad:prodObj.unidad,days:Array(7).fill(0)};
+      filas.push(fila);
+    }
+    if(!fila.days)fila.days=Array(7).fill(0);
+    fila.days[diIdx]=(fila.days[diIdx]||0)+item.cantidad;
+    importados++;
+  });
+  // Guardar plan
+  ss('saving','Guardando plan...');
+  try{
+    const existing=await get('planes',`semana=eq.${semKey}&select=id`);
+    if(existing.length){
+      await fetch(`${SB}/rest/v1/planes?semana=eq.${semKey}`,{
+        method:'PATCH',headers:{...H,'Prefer':'return=minimal'},
+        body:JSON.stringify({filas,updated_at:new Date().toISOString()})
+      });
+    } else {
+      await fetch(`${SB}/rest/v1/planes`,{
+        method:'POST',headers:{...H,'Prefer':'return=minimal'},
+        body:JSON.stringify({semana:semKey,filas,updated_at:new Date().toISOString()})
+      });
+    }
+    st.P[semKey]=filas;
+    if(!st.Sem.includes(semKey)){st.Sem.push(semKey);st.Sem.sort();}
+    ss('online','Plan actualizado');
+    document.getElementById('ped-msgtxt').textContent=`${importados} productos importados al plan del ${wlb(semKey)}.`;
+    document.getElementById('ped-msg').style.display='flex';
+    setTimeout(()=>document.getElementById('ped-msg').style.display='none',5000);
+  }catch(e){
+    ss('error','Error');
+    document.getElementById('ped-errtxt').textContent=e.message;
+    document.getElementById('ped-err').style.display='flex';
+  }
+}
+
+function renderSucursalesList(){
+  const el=document.getElementById('suc-list-content');
+  if(!sucursalesData.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-building-store"></i>Sin sucursales. Agregá la primera.</div>';
+    return;
+  }
+  const byTipo={refrigerado:sucursalesData.filter(s=>s.tipo==='refrigerado'),congelado:sucursalesData.filter(s=>s.tipo==='congelado')};
+  let h='';
+  ['refrigerado','congelado'].forEach(tipo=>{
+    const items=byTipo[tipo];
+    if(!items.length)return;
+    const colorTipo=tipo==='refrigerado'?'var(--blue)':'#a97ef5';
+    h+=`<div style="font-size:12px;font-weight:700;color:${colorTipo};margin-bottom:8px;margin-top:${tipo==='congelado'?'1.5rem':'0'}">${tipo==='refrigerado'?'❄️ REFRIGERADO':'🧊 CONGELADO'} (${items.length})</div>`;
+    h+=`<div class="stock-card" style="margin-bottom:0"><table class="stock-tbl"><thead><tr>
+      <th style="text-align:left">Nombre</th>
+      <th style="text-align:left">Empresa</th>
+      <th style="text-align:center">Estado</th>
+      <th style="width:60px"></th>
+    </tr></thead><tbody>`;
+    items.forEach(s=>{
+      const emp=st.E.find(e=>e.id===s.empresa_id);
+      h+=`<tr>
+        <td style="font-weight:600">${s.nombre}</td>
+        <td style="font-size:12px;color:var(--text2)">${emp?emp.nombre:'—'}</td>
+        <td style="text-align:center">
+          <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:12px">
+            <input type="checkbox" ${s.activa?'checked':''} onchange="toggleSucursal('${s.id}',this.checked)" style="cursor:pointer"/>
+            <span style="color:${s.activa?'var(--green)':'var(--text3)'}">${s.activa?'Activa':'Inactiva'}</span>
+          </label>
+        </td>
+        <td style="text-align:center">
+          <button class="btn btn-xs btn-danger" onclick="delSucursal('${s.id}','${s.nombre}')"><i class="ti ti-trash"></i></button>
+        </td>
+      </tr>`;
+    });
+    h+=`</tbody></table></div>`;
+  });
+  el.innerHTML=h;
+}
+
+async function addSucursal(){
+  const nombre=document.getElementById('nsuc-nombre').value.trim();
+  const empresa_id=document.getElementById('nsuc-empresa').value;
+  const tipo=document.getElementById('nsuc-tipo').value;
+  if(!nombre||!empresa_id){alert('Completá nombre y empresa.');return}
+  ss('saving','Guardando...');
+  try{
+    const res=await ins('sucursales',{nombre,empresa_id,tipo,activa:true});
+    sucursalesData.push(res[0]);
+    document.getElementById('nsuc-nombre').value='';
+    renderSucursalesList();
+    ss('online','Sucursal agregada');
+    const msg=document.getElementById('suc-msg');msg.style.display='flex';
+    setTimeout(()=>msg.style.display='none',3000);
+  }catch(e){ss('error','Error: '+e.message)}
+}
+
+async function toggleSucursal(id,activa){
+  try{
+    await fetch(`${SB}/rest/v1/sucursales?id=eq.${id}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({activa})});
+    const s=sucursalesData.find(x=>x.id===id);if(s)s.activa=activa;
+    ss('online',activa?'Sucursal activada':'Sucursal desactivada');
+  }catch(e){ss('error','Error')}
+}
+
+async function delSucursal(id,nombre){
+  if(!confirm(`¿Eliminar "${nombre}"? Se borrarán todos sus pedidos.`))return;
+  try{
+    await fetch(`${SB}/rest/v1/sucursales?id=eq.${id}`,{method:'DELETE',headers:H});
+    sucursalesData=sucursalesData.filter(s=>s.id!==id);
+    renderSucursalesList();
+    ss('online','Eliminada');
+  }catch(e){ss('error','Error')}
+}
+
+
 
 // Registrar Service Worker para PWA
 if('serviceWorker' in navigator){
