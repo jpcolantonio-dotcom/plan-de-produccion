@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Planeta Empanada — Pedidos</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0f10;--bg2:#1a1a1c;--bg3:#242428;--bg4:#2e2e33;
+  --text:#f0efec;--text2:#999;--text3:#555;
+  --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.15);
+  --gold:#D4A843;--gold2:#f0c060;--gold-bg:rgba(212,168,67,.12);
+  --green:#1D9E75;--green-bg:rgba(29,158,117,.15);
+  --red:#E24B4A;--red-bg:rgba(226,75,74,.12);
+  --blue:#378ADD;--blue-bg:rgba(55,138,221,.12);
+  --radius:10px;--radius-lg:16px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* HEADER */
+header{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;z-index:100}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-icon{width:36px;height:36px;background:var(--gold);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.logo-text{font-size:15px;font-weight:700;color:var(--text)}
+.logo-sub{font-size:12px;color:var(--text2);font-weight:400}
+.status-chip{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);background:var(--bg3);padding:5px 12px;border-radius:20px;border:.5px solid var(--border)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--text3)}
+.dot.ok{background:var(--green)}
+.dot.saving{background:var(--gold);animation:pulse .8s infinite}
+
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* LOGIN */
+#screen-login{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 60px);padding:2rem}
+.login-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:2.5rem;width:100%;max-width:420px;text-align:center}
+.login-icon{font-size:48px;margin-bottom:1rem;display:block}
+.login-title{font-size:22px;font-weight:700;margin-bottom:6px}
+.login-sub{font-size:14px;color:var(--text2);margin-bottom:2rem}
+.login-select{width:100%;padding:12px 14px;font-size:15px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text);margin-bottom:12px;appearance:none;-webkit-appearance:none;cursor:pointer}
+.login-select:focus{outline:none;border-color:var(--gold)}
+.login-btn{width:100%;padding:13px;font-size:15px;font-weight:600;border:none;border-radius:var(--radius);background:var(--gold);color:#1a1200;cursor:pointer;transition:opacity .15s}
+.login-btn:hover{opacity:.9}
+.login-btn:disabled{opacity:.4;cursor:not-allowed}
+.login-err{font-size:13px;color:var(--red);margin-top:8px;display:none}
+
+/* MAIN */
+#screen-main{display:none;padding:1.5rem;max-width:900px;margin:0 auto}
+.sucursal-header{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem 1.5rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.suc-name{font-size:18px;font-weight:700}
+.suc-tipo{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}
+.suc-tipo.ref{background:var(--blue-bg);color:var(--blue)}
+.suc-tipo.con{background:rgba(134,80,220,.15);color:#a97ef5}
+.fecha-chip{font-size:13px;color:var(--text2);display:flex;align-items:center;gap:6px}
+
+/* PEDIDO */
+.seccion-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;margin-top:1.5rem;display:flex;align-items:center;gap:8px}
+.seccion-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:1rem}
+.prod-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;display:flex;flex-direction:column;gap:8px;transition:border-color .15s}
+.prod-card:focus-within{border-color:var(--gold)}
+.prod-card.has-value{border-color:rgba(212,168,67,.4);background:var(--gold-bg)}
+.prod-codigo{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px}
+.prod-nombre{font-size:13px;font-weight:600;color:var(--text);line-height:1.3}
+.prod-unidad{font-size:11px;color:var(--text2)}
+.prod-input-wrap{display:flex;align-items:center;gap:6px;margin-top:4px}
+.prod-input{flex:1;padding:8px 10px;font-size:16px;font-weight:700;text-align:center;border:1px solid var(--border2);border-radius:8px;background:var(--bg3);color:var(--text);-moz-appearance:textfield}
+.prod-input::-webkit-outer-spin-button,.prod-input::-webkit-inner-spin-button{-webkit-appearance:none}
+.prod-input:focus{outline:none;border-color:var(--gold);background:var(--bg4)}
+.btn-qty{width:32px;height:32px;border:1px solid var(--border2);border-radius:8px;background:var(--bg3);color:var(--text2);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;transition:all .1s;flex-shrink:0}
+.btn-qty:hover{background:var(--bg4);color:var(--text)}
+.btn-qty:active{transform:scale(.92)}
+
+/* RESUMEN */
+.resumen-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1rem}
+.res-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:.5px solid var(--border);font-size:13px}
+.res-row:last-child{border-bottom:none}
+.res-row.total{font-weight:700;font-size:14px;padding-top:10px;color:var(--gold)}
+.res-cant{font-weight:700;color:var(--gold2)}
+
+/* BOTTOM BAR */
+.bottom-bar{position:sticky;bottom:0;background:var(--bg2);border-top:1px solid var(--border);padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.total-display{display:flex;align-items:baseline;gap:6px}
+.total-num{font-size:24px;font-weight:800;color:var(--gold)}
+.total-label{font-size:13px;color:var(--text2)}
+.btn-enviar{padding:12px 28px;font-size:15px;font-weight:700;border:none;border-radius:var(--radius);background:var(--gold);color:#1a1200;cursor:pointer;display:flex;align-items:center;gap:8px;transition:opacity .15s}
+.btn-enviar:hover{opacity:.9}
+.btn-enviar:disabled{opacity:.4;cursor:not-allowed}
+.btn-sec{padding:10px 18px;font-size:13px;font-weight:500;border:1px solid var(--border2);border-radius:var(--radius);background:transparent;color:var(--text2);cursor:pointer}
+.btn-sec:hover{background:var(--bg3)}
+
+/* SUCCESS */
+#screen-success{display:none;align-items:center;justify-content:center;min-height:calc(100vh - 60px);padding:2rem}
+.success-card{background:var(--bg2);border:1px solid rgba(29,158,117,.3);border-radius:var(--radius-lg);padding:3rem 2.5rem;width:100%;max-width:480px;text-align:center}
+.success-icon{font-size:56px;color:var(--green);display:block;margin-bottom:1rem}
+.success-title{font-size:22px;font-weight:700;margin-bottom:8px}
+.success-sub{font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:2rem}
+.success-resumen{background:var(--bg3);border-radius:var(--radius);padding:1rem;margin-bottom:2rem;text-align:left}
+.btn-nuevo{padding:12px 28px;font-size:14px;font-weight:600;border:1px solid var(--border2);border-radius:var(--radius);background:transparent;color:var(--text);cursor:pointer}
+.btn-nuevo:hover{background:var(--bg3)}
+
+/* OBS */
+.obs-input{width:100%;padding:10px 12px;font-size:13px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2);color:var(--text);resize:none;min-height:70px;margin-top:8px}
+.obs-input:focus{outline:none;border-color:var(--gold)}
+
+/* SPINNER */
+.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(26,18,0,.3);border-top-color:#1a1200;border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ALERT */
+.alert{padding:10px 14px;border-radius:var(--radius);font-size:13px;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
+.alert-ok{background:var(--green-bg);color:#6ee7c2;border:.5px solid rgba(29,158,117,.3)}
+.alert-err{background:var(--red-bg);color:#f59090;border:.5px solid rgba(226,75,74,.3)}
+
+@media(max-width:600px){
+  .prod-grid{grid-template-columns:repeat(2,1fr)}
+  .bottom-bar{flex-direction:column;align-items:stretch}
+  .btn-enviar{justify-content:center}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🥟</div>
+    <div>
+      <div class="logo-text">Planeta Empanada</div>
+      <div class="logo-sub">Sistema de Pedidos</div>
+    </div>
+  </div>
+  <div class="status-chip">
+    <span class="dot" id="sdot"></span>
+    <span id="stxt">Conectando...</span>
+  </div>
+</header>
+
+<!-- LOGIN -->
+<div id="screen-login">
+  <div class="login-card">
+    <span class="login-icon">🥟</span>
+    <div class="login-title">Cargar Pedido</div>
+    <div class="login-sub">Seleccioná tu sucursal para comenzar</div>
+    <select id="sel-sucursal" class="login-select">
+      <option value="">Cargando sucursales...</option>
+    </select>
+    <button class="login-btn" id="btn-ingresar" onclick="ingresar()" disabled>Ingresar →</button>
+    <div class="login-err" id="login-err">Sucursal no encontrada.</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="screen-main">
+  <div class="sucursal-header">
+    <div>
+      <div class="suc-name" id="suc-nombre">—</div>
+      <div style="margin-top:4px;display:flex;gap:8px;align-items:center">
+        <span class="suc-tipo" id="suc-tipo-chip">—</span>
+        <span class="fecha-chip"><i class="ti ti-calendar"></i> <span id="hdr-fecha">—</span></span>
+      </div>
+    </div>
+    <button class="btn-sec" onclick="cerrarSesion()"><i class="ti ti-logout"></i> Cambiar sucursal</button>
+  </div>
+
+  <div id="pedido-content"></div>
+
+  <div style="margin-top:1.5rem">
+    <div class="seccion-title"><i class="ti ti-message"></i> Observaciones</div>
+    <textarea class="obs-input" id="obs-input" placeholder="Alguna aclaración para fábrica... (opcional)"></textarea>
+  </div>
+
+  <div id="msg-ok" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Pedido enviado correctamente.</div>
+  <div id="msg-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="msg-errtxt">Error al enviar.</span></div>
+
+  <div style="height:80px"></div>
+</div>
+
+<div class="bottom-bar" id="bottom-bar" style="display:none">
+  <div class="total-display">
+    <span class="total-num" id="total-display">0</span>
+    <span class="total-label" id="total-unidad-label">bandejas</span>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn-sec" onclick="limpiarPedido()"><i class="ti ti-trash"></i> Limpiar</button>
+    <button class="btn-enviar" id="btn-enviar" onclick="enviarPedido()">
+      <i class="ti ti-send"></i> Enviar pedido
+    </button>
+  </div>
+</div>
+
+<!-- SUCCESS -->
+<div id="screen-success">
+  <div class="success-card">
+    <i class="ti ti-circle-check success-icon"></i>
+    <div class="success-title">¡Pedido enviado!</div>
+    <div class="success-sub" id="success-sub">Tu pedido fue recibido por fábrica.</div>
+    <div class="success-resumen" id="success-resumen"></div>
+    <button class="btn-nuevo" onclick="nuevoPedido()"><i class="ti ti-refresh"></i> Cargar nuevo pedido</button>
+  </div>
+</div>
+
+<script>
+const SB='https://ugmjfvgjumpnvbfskcgl.supabase.co';
+const SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnbWpmdmdqdW1wbnZiZnNrY2dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MjU4OTIsImV4cCI6MjA5NDEwMTg5Mn0.fmf7Isp5rDi10mq0VjahWRCgl6J4mD8-ib89DKWtPLs';
+const H={'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK};
+const get=async(t,f='')=>{const r=await fetch(`${SB}/rest/v1/${t}?${f}`,{headers:H});if(!r.ok)throw new Error(await r.text());return r.json()};
+const ins=async(t,d)=>{const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:{...H,'Prefer':'return=representation'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json()};
+const pat=async(t,f,d)=>{const r=await fetch(`${SB}/rest/v1/${t}?${f}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text())};
+
+const ss=(s,t)=>{document.getElementById('sdot').className='dot '+(s==='ok'?'ok':s==='saving'?'saving':'');document.getElementById('stxt').textContent=t};
+
+let sucursales=[];
+let productos=[];
+let sucActual=null;
+let pedidoValues={};
+
+const hoy=new Date().toISOString().slice(0,10);
+const hoyLabel=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+
+async function init(){
+  ss('','Conectando...');
+  try{
+    sucursales=await get('sucursales','activa=eq.true&order=nombre.asc');
+    const sel=document.getElementById('sel-sucursal');
+    sel.innerHTML='<option value="">— Seleccioná tu sucursal —</option>';
+    sucursales.forEach(s=>{
+      const o=document.createElement('option');
+      o.value=s.id;
+      o.textContent=s.nombre+' ('+(s.tipo==='refrigerado'?'Refrig.':'Congelado')+')';
+      sel.appendChild(o);
+    });
+    document.getElementById('btn-ingresar').disabled=false;
+    ss('ok','Conectado');
+  }catch(e){
+    ss('','Sin conexión');
+    document.getElementById('sel-sucursal').innerHTML='<option value="">Error al cargar</option>';
+  }
+}
+
+async function ingresar(){
+  const sid=document.getElementById('sel-sucursal').value;
+  if(!sid)return;
+  sucActual=sucursales.find(s=>s.id===sid);
+  if(!sucActual)return;
+
+  // Cargar productos de la empresa
+  try{
+    productos=await get('productos',`empresa_id=eq.${sucActual.empresa_id}&order=orden.asc,nombre.asc`);
+  }catch{productos=[]}
+
+  document.getElementById('screen-login').style.display='none';
+  document.getElementById('screen-main').style.display='block';
+  document.getElementById('bottom-bar').style.display='flex';
+
+  document.getElementById('suc-nombre').textContent=sucActual.nombre;
+  document.getElementById('hdr-fecha').textContent=hoyLabel;
+
+  const chip=document.getElementById('suc-tipo-chip');
+  if(sucActual.tipo==='refrigerado'){
+    chip.textContent='❄️ Refrigerado';chip.className='suc-tipo ref';
+    document.getElementById('total-unidad-label').textContent='bandejas';
+  } else {
+    chip.textContent='🧊 Congelado';chip.className='suc-tipo con';
+    document.getElementById('total-unidad-label').textContent='cajas';
+  }
+
+  // Verificar si ya hay pedido hoy
+  try{
+    const existing=await get('pedidos_sucursal',`sucursal_id=eq.${sucActual.id}&fecha=eq.${hoy}&select=id,items,observaciones,estado`);
+    if(existing.length){
+      const p=existing[0];
+      pedidoValues={};
+      (p.items||[]).forEach(it=>pedidoValues[it.producto_id]=it.cantidad);
+      document.getElementById('obs-input').value=p.observaciones||'';
+    }
+  }catch{}
+
+  renderPedido();
+}
+
+function cerrarSesion(){
+  sucActual=null;pedidoValues={};
+  document.getElementById('screen-main').style.display='none';
+  document.getElementById('bottom-bar').style.display='none';
+  document.getElementById('screen-login').style.display='flex';
+  document.getElementById('screen-success').style.display='none';
+}
+
+function renderPedido(){
+  const el=document.getElementById('pedido-content');
+  if(!productos.length){
+    el.innerHTML='<div style="text-align:center;padding:3rem;color:var(--text2)">Sin productos configurados.</div>';
+    return;
+  }
+
+  // Agrupar por area
+  const areas={};
+  productos.forEach(p=>{
+    const a=p.area_nombre||p.area_id||'General';
+    if(!areas[a])areas[a]=[];
+    areas[a].push(p);
+  });
+
+  // Si no tiene area_nombre, cargar áreas
+  // Usar código del producto (abrev) si existe, sino nombre
+  const unidad=sucActual.tipo==='refrigerado'?'bandejas':'cajas';
+
+  let h='';
+  // Agrupar productos — si todos en una area, sin secciones
+  const todasAreas=Object.keys(areas);
+
+  // Para sucursales necesitamos mostrar todos los productos con sus códigos
+  // Agrupamos por área si hay más de una
+  if(todasAreas.length>1){
+    todasAreas.forEach(area=>{
+      h+=`<div class="seccion-title"><i class="ti ti-tag"></i> ${area}</div>`;
+      h+=`<div class="prod-grid">`;
+      areas[area].forEach(p=>h+=cardHTML(p,unidad));
+      h+=`</div>`;
+    });
+  } else {
+    h+=`<div class="prod-grid">`;
+    productos.forEach(p=>h+=cardHTML(p,unidad));
+    h+=`</div>`;
+  }
+
+  el.innerHTML=h;
+  actualizarTotal();
+}
+
+function cardHTML(p,unidad){
+  const val=pedidoValues[p.id]||0;
+  const hasVal=val>0;
+  // Obtener código: usar abreviatura del nombre (primeras 2-3 letras) o campo codigo si existe
+  const cod=p.codigo||p.nombre.slice(0,3).toUpperCase();
+  return`<div class="prod-card${hasVal?' has-value':''}" id="card-${p.id}">
+    <div>
+      <div class="prod-codigo">${cod}</div>
+      <div class="prod-nombre">${p.nombre}</div>
+      <div class="prod-unidad">${unidad}</div>
+    </div>
+    <div class="prod-input-wrap">
+      <button class="btn-qty" onclick="cambiarQty('${p.id}',-1,-0.5)">−</button>
+      <input class="prod-input" type="number" min="0" step="0.5" 
+        id="inp-${p.id}" value="${val||''}" placeholder="0"
+        oninput="onInput('${p.id}',this.value)"
+        onchange="onInput('${p.id}',this.value)"/>
+      <button class="btn-qty" onclick="cambiarQty('${p.id}',1,0.5)">+</button>
+    </div>
+  </div>`;
+}
+
+function cambiarQty(pid,dir,step){
+  const inp=document.getElementById(`inp-${pid}`);
+  const cur=parseFloat(inp.value)||0;
+  const nuevo=Math.max(0,Math.round((cur+dir*step)*10)/10);
+  inp.value=nuevo||'';
+  onInput(pid,nuevo);
+}
+
+function onInput(pid,val){
+  const v=parseFloat(val)||0;
+  pedidoValues[pid]=v;
+  const card=document.getElementById(`card-${pid}`);
+  if(card)card.classList.toggle('has-value',v>0);
+  actualizarTotal();
+}
+
+function actualizarTotal(){
+  const tot=Object.values(pedidoValues).reduce((s,v)=>s+(v||0),0);
+  document.getElementById('total-display').textContent=tot.toLocaleString('es-AR',{maximumFractionDigits:1});
+  document.getElementById('btn-enviar').disabled=tot===0;
+}
+
+function limpiarPedido(){
+  if(!confirm('¿Limpiar todos los valores?'))return;
+  pedidoValues={};
+  productos.forEach(p=>{
+    const inp=document.getElementById(`inp-${p.id}`);
+    if(inp)inp.value='';
+    const card=document.getElementById(`card-${p.id}`);
+    if(card)card.classList.remove('has-value');
+  });
+  actualizarTotal();
+}
+
+async function enviarPedido(){
+  const btn=document.getElementById('btn-enviar');
+  btn.innerHTML='<span class="spinner"></span> Enviando...';
+  btn.disabled=true;
+  ss('saving','Enviando...');
+
+  const items=productos
+    .filter(p=>pedidoValues[p.id]>0)
+    .map(p=>({
+      producto_id:p.id,
+      producto:p.nombre,
+      cantidad:pedidoValues[p.id],
+      unidad:sucActual.tipo==='refrigerado'?'bandejas':'cajas'
+    }));
+
+  const obs=document.getElementById('obs-input').value.trim();
+
+  try{
+    // Verificar si ya existe pedido hoy
+    const existing=await get('pedidos_sucursal',`sucursal_id=eq.${sucActual.id}&fecha=eq.${hoy}&select=id`);
+    if(existing.length){
+      await pat('pedidos_sucursal',`id=eq.${existing[0].id}`,{
+        items,observaciones:obs,estado:'pendiente',
+        updated_at:new Date().toISOString()
+      });
+    } else {
+      await ins('pedidos_sucursal',{
+        sucursal_id:sucActual.id,
+        empresa_id:sucActual.empresa_id,
+        fecha:hoy,items,observaciones:obs,estado:'pendiente'
+      });
+    }
+    ss('ok','Enviado');
+    mostrarSuccess(items);
+  }catch(e){
+    ss('','Error');
+    document.getElementById('msg-errtxt').textContent=e.message;
+    document.getElementById('msg-err').style.display='flex';
+    btn.innerHTML='<i class="ti ti-send"></i> Enviar pedido';
+    btn.disabled=false;
+  }
+}
+
+function mostrarSuccess(items){
+  document.getElementById('screen-main').style.display='none';
+  document.getElementById('bottom-bar').style.display='none';
+  document.getElementById('screen-success').style.display='flex';
+
+  const unidad=sucActual.tipo==='refrigerado'?'bandejas':'cajas';
+  const total=items.reduce((s,it)=>s+it.cantidad,0);
+
+  document.getElementById('success-sub').textContent=
+    `${sucActual.nombre} — ${hoyLabel}`;
+
+  let h=`<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">Resumen del pedido</div>`;
+  items.forEach(it=>{
+    h+=`<div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:.5px solid var(--border)">
+      <span>${it.producto}</span>
+      <span style="font-weight:700;color:var(--gold2)">${it.cantidad} ${unidad}</span>
+    </div>`;
+  });
+  h+=`<div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;padding-top:10px;color:var(--gold)">
+    <span>TOTAL</span><span>${total.toLocaleString('es-AR')} ${unidad}</span>
+  </div>`;
+  document.getElementById('success-resumen').innerHTML=h;
+}
+
+function nuevoPedido(){
+  pedidoValues={};
+  document.getElementById('screen-success').style.display='none';
+  document.getElementById('screen-main').style.display='block';
+  document.getElementById('bottom-bar').style.display='flex';
+  document.getElementById('obs-input').value='';
+  document.getElementById('msg-ok').style.display='none';
+  document.getElementById('msg-err').style.display='none';
+  renderPedido();
+}
+
+// Cargar áreas para mostrar nombres
+async function cargarAreas(){
+  try{
+    const areas=await get('areas','order=nombre.asc');
+    productos=productos.map(p=>{
+      const a=areas.find(x=>x.id===p.area_id);
+      return{...p,area_nombre:a?a.nombre:'General'};
+    });
+  }catch{}
+}
+
+// Override ingresar para cargar áreas también
+const _ingresar=ingresar;
+ingresar=async function(){
+  const sid=document.getElementById('sel-sucursal').value;
+  if(!sid)return;
+  sucActual=sucursales.find(s=>s.id===sid);
+  if(!sucActual)return;
+  document.getElementById('btn-ingresar').innerHTML='<span class="spinner"></span> Cargando...';
+  document.getElementById('btn-ingresar').disabled=true;
+  try{
+    productos=await get('productos',`empresa_id=eq.${sucActual.empresa_id}&order=orden.asc,nombre.asc`);
+    await cargarAreas();
+  }catch{productos=[]}
+
+  document.getElementById('screen-login').style.display='none';
+  document.getElementById('screen-main').style.display='block';
+  document.getElementById('bottom-bar').style.display='flex';
+
+  document.getElementById('suc-nombre').textContent=sucActual.nombre;
+  document.getElementById('hdr-fecha').textContent=hoyLabel;
+
+  const chip=document.getElementById('suc-tipo-chip');
+  if(sucActual.tipo==='refrigerado'){
+    chip.textContent='❄️ Refrigerado';chip.className='suc-tipo ref';
+    document.getElementById('total-unidad-label').textContent='bandejas';
+  } else {
+    chip.textContent='🧊 Congelado';chip.className='suc-tipo con';
+    document.getElementById('total-unidad-label').textContent='cajas';
+  }
+
+  // Verificar pedido existente hoy
+  try{
+    const existing=await get('pedidos_sucursal',`sucursal_id=eq.${sucActual.id}&fecha=eq.${hoy}&select=id,items,observaciones`);
+    if(existing.length){
+      pedidoValues={};
+      (existing[0].items||[]).forEach(it=>{pedidoValues[it.producto_id]=it.cantidad;});
+      document.getElementById('obs-input').value=existing[0].observaciones||'';
+    }
+  }catch{}
+
+  document.getElementById('btn-ingresar').innerHTML='Ingresar →';
+  document.getElementById('btn-ingresar').disabled=false;
+  renderPedido();
+};
+
+document.getElementById('sel-sucursal').addEventListener('change',function(){
+  document.getElementById('login-err').style.display='none';
+});
+
+init();
+</script>
+</body>
+</html>
