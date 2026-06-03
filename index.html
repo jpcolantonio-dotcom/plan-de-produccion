@@ -813,8 +813,6 @@ document.getElementById('hdate').textContent=new Date().toLocaleDateString('es-A
 
 async function init(){
   ss('saving','Conectando...');
-async function init(){
-  ss('saving','Conectando...');
   try{
     const[pl,re,rr,mp,em,ar,pr,planActual]=await Promise.all([
       get('planes','select=semana&order=semana.desc').catch(()=>[]),
@@ -835,8 +833,6 @@ async function init(){
     ss('online','Conectado');
     uES();
   }catch(e){ss('error','Sin conexion');console.error(e)}
-  rG();rP();
-}
   rG();rP();
 }
 
