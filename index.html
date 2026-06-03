@@ -813,21 +813,23 @@ document.getElementById('hdate').textContent=new Date().toLocaleDateString('es-A
 async function init(){
   ss('saving','Conectando...');
   try{
-    const[pl,re,rr,mp,em,ar,pr]=await Promise.all([
-      get('planes','select=semana&order=semana.desc'),
-      get('produccion_real','select=semana&order=semana.desc'),
-      get('recetas','select=datos').catch(()=>[]),
+    const[pl,re,rr,mp,em,ar,pr,planActual]=await Promise.all([
+      get('planes','select=semana&order=semana.desc&limit=20'),
+      get('produccion_real','select=semana&order=semana.desc&limit=20'),
+      get('recetas','select=datos,tandas').catch(()=>[]),
       get('materias_primas','order=nombre.asc').catch(()=>[]),
       get('empresas','order=nombre.asc'),
       get('areas','order=nombre.asc'),
-      get('productos','order=orden.asc,nombre.asc')
+      get('productos','order=orden.asc,nombre.asc'),
+      get('planes',`semana=eq.${W0}&select=filas`)
     ]);
     const ss2=new Set([...pl.map(p=>p.semana),...re.map(r=>r.semana),W0]);
     st.Sem=[...ss2].sort();
     if(rr.length){st.Rec=rr[0].datos||{};st.RecTanda=rr[0].tandas||{};}
     mpData=mp||[];
     st.E=em;st.A=ar||[];st.Pr=pr;
-    await lp(W0);
+    // Plan actual ya cargado
+    st.P[W0]=planActual.length?planActual[0].filas:[];
     ss('online','Conectado');
     uES();
   }catch(e){ss('error','Sin conexion');console.error(e)}
