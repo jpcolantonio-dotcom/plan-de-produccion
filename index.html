@@ -228,7 +228,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.20</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.23</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -644,6 +644,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
         <select id="dep-calc-esel" onchange="renderDepCalc()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Empresa...</option></select>
         <button class="btn btn-sm" onclick="renderDepCalc()"><i class="ti ti-refresh"></i> Actualizar</button>
+        <button class="btn btn-pdf btn-sm" onclick="pdfDepCalc()"><i class="ti ti-file-type-pdf"></i> PDF</button>
       </div>
       <div id="dep-calc-content"></div>
     </div>
@@ -3193,6 +3194,161 @@ async function deleteDepFamilia(id){
   }catch(e){ss('error','Error')}
 }
 
+function pdfDepCalc(){
+  const eid=document.getElementById('dep-calc-esel').value;
+  const nm=eid?en(eid):'Todas las empresas';
+  const contenido=document.getElementById('dep-calc-content');
+  if(!contenido||!contenido.innerHTML||contenido.innerHTML.includes('ti-calculator')){
+    alert('Primero cargá el cálculo de stock.');return;
+  }
+  const fecha=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Stock Depositos — ${nm}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:8.5pt;color:#1a1a1a;padding:8mm 10mm}
+    .hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #1B3A6B}
+    .hdr-title{font-size:14pt;font-weight:700;color:#1B3A6B}
+    .hdr-sub{font-size:9pt;color:#555;margin-top:3px}
+    .hdr-fecha{font-size:8pt;color:#888;text-align:right}
+    .dep-title{font-size:11pt;font-weight:700;margin:14px 0 4px;color:#1B3A6B;display:flex;justify-content:space-between;align-items:center;border-bottom:1.5px solid #1B3A6B;padding-bottom:4px}
+    .dep-cap{font-size:8.5pt;font-weight:400;color:#555}
+    .fam-title{font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#8B6914;background:#FDF3DC;padding:4px 8px;margin:6px 0 3px;border-left:3px solid #D4943A}
+    table{width:100%;border-collapse:collapse;font-size:8pt;margin-bottom:8px}
+    th{background:#1B3A6B;color:#fff;padding:5px 7px;text-align:left;border:1px solid #1B3A6B}
+    th.r{text-align:right}
+    td{padding:4px 7px;border:1px solid #d0d0d0;vertical-align:middle}
+    td.r{text-align:right}
+    td.name{font-weight:600}
+    td.muted{color:#777;font-size:7.5pt}
+    tr.subtotal td{background:#FDF3DC;font-weight:700;color:#8B6914;border-top:1.5px solid #D4943A}
+    tr.total td{background:#e8f0fa;font-weight:700;color:#1B3A6B;border-top:2px solid #1B3A6B}
+    tr.sinmix td{color:#aaa;font-style:italic}
+    tr:nth-child(even) td{background:#f8f8f8}
+    tr.subtotal td,tr.total td{background-color:initial}
+    tr.subtotal:nth-child(even) td{background:#FDF3DC}
+    .verde{color:#0F6E56;font-weight:700}
+    .rojo{color:#A32D2D;font-weight:700}
+    @media print{
+      @page{size:A4;margin:8mm 10mm}
+      body{padding:0}
+    }
+  </style></head><body>
+  <div class="hdr">
+    <div>
+      <div class="hdr-title">📦 Cálculo de Stock — Depósitos</div>
+      <div class="hdr-sub">${nm}</div>
+    </div>
+    <div class="hdr-fecha">Generado: ${fecha}</div>
+  </div>
+  ${generarTablasPDF(eid)}
+  <script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script>
+  </body></html>`;
+
+  const w=window.open('','_blank','width=900,height=700');
+  if(w){w.document.write(html);w.document.close();}
+  else alert('Permitir ventanas emergentes para generar el PDF.');
+}
+
+function generarTablasPDF(eid){
+  const eidFinal=eid||document.getElementById('dep-calc-esel').value;
+  const deps=depositosData.filter(d=>eidFinal?d.empresa_id===eidFinal:true);
+  if(!deps.length)return '<p>Sin depósitos configurados.</p>';
+  let out='';
+  deps.forEach(dep=>{
+    const torres=depTorresData.filter(t=>t.deposito_id===dep.id);
+    const prods=depProdData.filter(p=>p.deposito_id===dep.id);
+    const famsDep=depFamiliasData.filter(f=>f.deposito_id===dep.id);
+    const capTotal=torres.reduce((s,t)=>s+t.cantidad*t.altura_cajas*(t.estantes||1)*(t.doble?2:1),0);
+    if(!capTotal||!prods.length)return;
+
+    const capDesc=torres.map(t=>`${t.cantidad}×${t.altura_cajas}${t.estantes>1?'×'+t.estantes+' est.':''}${t.doble?' (doble)':''}`).join(' + ');
+    out+=`<div class="dep-title"><span>${dep.nombre}</span><span class="dep-cap">${capDesc} = ${capTotal} cajas totales</span></div>`;
+    out+=`<table><thead><tr>
+      <th>Producto</th><th>Area</th><th class="r">% Mix</th>
+      <th class="r">Torres</th><th class="r">Cajas reales</th><th class="r">Unidades</th>
+    </tr></thead><tbody>`;
+
+    // Mismo algoritmo de cálculo que renderDepCalc
+    const prodsPorFam={};
+    prods.forEach(p=>{const k=p.familia_torre||'_SIN_';if(!prodsPorFam[k])prodsPorFam[k]=[];prodsPorFam[k].push(p);});
+    let totalCajasUsadas=0;
+
+    Object.entries(prodsPorFam).forEach(([famCod,fProds])=>{
+      const famObj=famsDep.find(f=>f.codigo===famCod);
+      const capPorFam={};
+      famsDep.forEach(f=>{const tF=torres.filter(t=>t.familia===f.codigo);capPorFam[f.codigo]=tF.reduce((s,t)=>s+t.cantidad*t.altura_cajas*(t.estantes||1)*(t.doble?2:1),0);});
+      const capFam=famObj&&capPorFam[famCod]?capPorFam[famCod]:capTotal;
+      const torresFam=famObj?torres.filter(t=>t.familia===famCod):torres;
+      const alturaRef=torresFam.length?torresFam[0].altura_cajas:(torres[0]?.altura_cajas||8);
+      const estRef=torresFam.length?(torresFam[0].estantes||1):(torres[0]?.estantes||1);
+      const torreDobleFam=torresFam.find(t=>t.doble);
+      const cajasXtorreUnit=alturaRef*(torreDobleFam?2:1);
+      const torresReales=torresFam.reduce((s,t)=>s+t.cantidad*(t.estantes||1),0);
+
+      if(famsDep.length&&famObj){
+        out+=`<tr><td colspan="6" class="fam-title" style="padding:3px 7px">${famObj.codigo} · ${famObj.nombre} — ${capFam} cajas</td></tr>`;
+      }
+
+      const mixFam=[];const prodsSinMix=[];
+      fProds.forEach(p=>{
+        const mix=mixData.find(m=>m.empresa_id===p.empresa_id&&m.area===p.area&&m.producto===p.producto);
+        const caja=cajasData.find(c=>c.empresa_id===p.empresa_id&&c.area===p.area&&c.producto===p.producto);
+        const pct=mix?mix.porcentaje:0;
+        const prodMaestro=st.Pr.find(pr=>pr.nombre===p.producto&&pr.empresa_id===p.empresa_id);
+        const ujc=caja?caja.unidades_por_caja:(prodMaestro?.unidades_bandeja?parseInt(prodMaestro.unidades_bandeja):0);
+        if(!pct){prodsSinMix.push(p);return;}
+        mixFam.push({p,pct,ujc});
+      });
+      const sumPctFam=mixFam.reduce((s,x)=>s+x.pct,0);
+      const nProds=mixFam.length;
+      const torresMinimas=Math.min(nProds,torresReales);
+      const torresParaDistribuir=Math.max(0,torresReales-torresMinimas);
+      const torresExactas=mixFam.map(({p,pct,ujc})=>{
+        const pctNorm=sumPctFam>0?(pct/sumPctFam)*100:100/nProds;
+        const torresExtra=torresParaDistribuir*(pctNorm/100);
+        const torresRaw=1+torresExtra;
+        const torresBase=Math.floor(torresRaw);
+        const fraccion=torresRaw-torresBase;
+        return{p,pct,pctNorm,ujc,torresBase,fraccion,torresExtra:0};
+      });
+      const torresAsignadas=torresExactas.reduce((s,x)=>s+x.torresBase,0);
+      let sob=torresReales-torresAsignadas;
+      [...torresExactas].sort((a,b)=>b.fraccion-a.fraccion).forEach((x,i)=>{if(sob>0){x.torresExtra=1;sob--;}});
+
+      prodsSinMix.forEach(p=>{out+=`<tr class="sinmix"><td class="name">${p.producto}</td><td class="muted">${p.area}</td><td colspan="4" style="text-align:center;color:#bbb">Sin % mix</td></tr>`;});
+      let subtotalCajas=0;let subtotalUds=0;
+      torresExactas.forEach(({p,pct,pctNorm,ujc,torresBase,torresExtra})=>{
+        const torresTotal=torresBase+torresExtra;
+        const cajasReales=torresTotal*cajasXtorreUnit;
+        const unidades=cajasReales*ujc;
+        totalCajasUsadas+=cajasReales;subtotalCajas+=cajasReales;
+        if(ujc>0)subtotalUds+=unidades;
+        out+=`<tr><td class="name">${p.producto}</td><td class="muted">${p.area}</td>
+          <td class="r">${pct.toFixed(1)}%${Math.abs(pctNorm-pct)>0.5?` <span style="color:#888;font-size:7pt">(${pctNorm.toFixed(1)}%)</span>`:''}</td>
+          <td class="r">${torresTotal}${torreDobleFam?' <span style="font-size:7pt;color:#888">(d)</span>':''}</td>
+          <td class="r verde">${cajasReales.toLocaleString('es-AR')}</td>
+          <td class="r">${ujc>0?unidades.toLocaleString('es-AR')+' uds':'--'}</td>
+        </tr>`;
+      });
+      if(famsDep.length&&famObj){
+        const sobFam=capFam-subtotalCajas;
+        out+=`<tr class="subtotal"><td colspan="4">Subtotal ${famObj.nombre}</td>
+          <td class="r">${subtotalCajas} <span style="font-size:7pt;font-weight:400">sob: ${sobFam}</span></td>
+          <td class="r">${subtotalUds>0?subtotalUds.toLocaleString('es-AR')+' uds':'--'}</td></tr>`;
+      }
+    });
+
+    const sobrante=capTotal-totalCajasUsadas;
+    out+=`<tr class="total"><td colspan="4">TOTAL USADO</td>
+      <td class="r ${totalCajasUsadas>capTotal?'rojo':'verde'}">${totalCajasUsadas.toLocaleString('es-AR')} <span style="font-size:7pt;font-weight:400">sob: ${sobrante}</span></td>
+      <td class="r"></td></tr>`;
+    out+=`</tbody></table>`;
+  });
+  return out;
+}
+
 async function renderDepCalc(){
   const eid=document.getElementById('dep-calc-esel').value;
   const el=document.getElementById('dep-calc-content');
@@ -3301,37 +3457,48 @@ async function renderDepCalc(){
         const mix=mixData.find(m=>m.empresa_id===p.empresa_id&&m.area===p.area&&m.producto===p.producto);
         const caja=cajasData.find(c=>c.empresa_id===p.empresa_id&&c.area===p.area&&c.producto===p.producto);
         const pct=mix?mix.porcentaje:0;
-        // ujc: primero buscar en cajas_producto, si no buscar unidades_bandeja del maestro
         const prodMaestro=st.Pr.find(pr=>pr.nombre===p.producto&&pr.empresa_id===p.empresa_id);
         const ujc=caja?caja.unidades_por_caja:(prodMaestro&&prodMaestro.unidades_bandeja?parseInt(prodMaestro.unidades_bandeja):0);
         if(!pct){prodsSinMix.push(p);return;}
         mixFam.push({p,pct,ujc});
       });
-      // Normalizar: suma de % de los productos con mix en esta familia
+
+      // Normalizar % entre productos con mix de esta familia
       const sumPctFam=mixFam.reduce((s,x)=>s+x.pct,0);
       const nProds=mixFam.length;
-      // Reservar al menos 1 torre por producto, distribuir el resto por %
-      const torresDisponibles=Math.floor(capFam/cajasXtorre);
-      const torresReserva=Math.min(nProds,torresDisponibles); // 1 torre garantizada por producto
-      const cajasSobrantes=capFam-(torresReserva*cajasXtorre); // cajas para distribuir por %
-      mixFam.forEach(({p,pct,ujc})=>{
+
+      // Unidad mínima = 1 torre (altura × doble)
+      const cajasXtorreUnit=alturaRef*(torreDobleFam?2:1);
+      // Total de torres reales (torres × estantes)
+      const torresReales=torresFam.reduce((s,t)=>s+t.cantidad*(t.estantes||1),0);
+
+      // Garantizar mínimo 1 torre por producto, distribuir el resto proporcionalmente
+      const torresMinimas=Math.min(nProds,torresReales); // 1 por producto (o menos si no alcanza)
+      const torresParaDistribuir=Math.max(0,torresReales-torresMinimas);
+
+      const torresExactas=mixFam.map(({p,pct,ujc})=>{
         const pctNorm=sumPctFam>0?(pct/sumPctFam)*100:100/nProds;
-        // Torre garantizada + distribución proporcional del sobrante
-        const cajasExtra=cajasSobrantes*(pctNorm/100);
-        const cajasRaw=cajasXtorre+cajasExtra; // mínimo 1 torre
-        const torresBase=Math.floor(cajasRaw/cajasXtorre);
-        const fraccion=cajasRaw/cajasXtorre - torresBase;
-        prodsConMix.push({p,pct,pctNorm,ujc,cajasRaw,torresBase,fraccion,torresExtra:0});
+        const torresExtra=torresParaDistribuir*(pctNorm/100);
+        const torresRaw=1+torresExtra; // mínimo 1 + proporcional
+        const torresBase=Math.floor(torresRaw);
+        const fraccion=torresRaw-torresBase;
+        return{p,pct,pctNorm,ujc,torresBase,fraccion,torresExtra:0};
       });
 
-      // Paso 2: distribuir sobrante - asignar torres extra a los de mayor fracción
-      const cajasUsadasBase=prodsConMix.reduce((s,x)=>s+x.torresBase*cajasXtorre,0);
-      let sobranteTorres=Math.floor((capFam-cajasUsadasBase)/cajasXtorre);
-      const porFraccion=[...prodsConMix].sort((a,b)=>b.fraccion-a.fraccion);
+      // Distribuir torres sobrantes a los de mayor fracción
+      const torresAsignadas=torresExactas.reduce((s,x)=>s+x.torresBase,0);
+      let sobranteTorres=torresReales-torresAsignadas;
+      const porFraccion=[...torresExactas].sort((a,b)=>b.fraccion-a.fraccion);
       for(let i=0;i<porFraccion.length&&sobranteTorres>0;i++){
         porFraccion[i].torresExtra=1;
         sobranteTorres--;
       }
+
+      torresExactas.forEach(x=>{prodsConMix.push({
+        ...x,
+        cajasRaw:(x.torresBase+x.torresExtra)*cajasXtorreUnit,
+        torresTotal:x.torresBase+x.torresExtra
+      });});
 
       // Paso 3: renderizar
       prodsSinMix.forEach(p=>{
@@ -3339,9 +3506,8 @@ async function renderDepCalc(){
           <td colspan="5" style="text-align:center;color:var(--text3);font-size:12px">Sin % mix definido</td></tr>`;
       });
 
-      prodsConMix.forEach(({p,pct,pctNorm,ujc,cajasRaw,torresBase,torresExtra})=>{
-        const torresTotal=torresBase+torresExtra;
-        const cajasReales=torresTotal*cajasXtorre;
+      prodsConMix.forEach(({p,pct,pctNorm,ujc,cajasRaw,torresBase,torresExtra,torresTotal})=>{
+        const cajasReales=torresTotal*cajasXtorreUnit;
         const unidades=cajasReales*ujc;
         totalCajasUsadas+=cajasReales; subtotalCajas+=cajasReales;
         if(ujc>0){totalUnidades+=unidades; subtotalUds+=unidades;}
