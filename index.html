@@ -228,7 +228,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.19</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.20</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -349,6 +349,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div style="display:grid;grid-template-columns:270px 1fr;gap:1.5rem">
       <div>
         <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Productos</div>
+        <input type="text" id="rec-buscar" placeholder="🔍 Buscar producto..." oninput="rRec()" style="width:100%;padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);margin-bottom:8px"/>
         <div id="rplist" class="rlist"><div class="empty"><i class="ti ti-package-off"></i>Agrega productos en Maestro.</div></div>
       </div>
       <div id="rdetail"><div class="empty"><i class="ti ti-arrow-left"></i>Selecciona un producto.</div></div>
@@ -395,9 +396,15 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <input type="date" id="rend-desde" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
     <label style="font-size:13px;color:var(--text2)">Hasta:</label>
     <input type="date" id="rend-hasta" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
-    <button class="btn btn-primary" onclick="renderRendimiento()"><i class="ti ti-search"></i> Buscar</button>
+    <button class="btn btn-primary" onclick="buscarRendimiento()"><i class="ti ti-search"></i> Buscar</button>
   </div>
-  <div id="rend-content"><div class="empty"><i class="ti ti-speedometer"></i> Seleccioná un rango de fechas.</div></div>
+  <!-- Subtabs -->
+  <div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1.25rem">
+    <button class="proy-tab active" id="rtab-detalle" onclick="showRendTab('detalle')"><i class="ti ti-list"></i> Detalle</button>
+    <button class="proy-tab" id="rtab-promedio" onclick="showRendTab('promedio')"><i class="ti ti-chart-bar"></i> Promedios</button>
+  </div>
+  <div id="rend-sub-detalle"><div class="empty"><i class="ti ti-speedometer"></i> Seleccioná un rango de fechas.</div></div>
+  <div id="rend-sub-promedio" style="display:none"><div class="empty"><i class="ti ti-chart-bar"></i> Seleccioná un rango de fechas.</div></div>
 </div>
 
 <!-- CONSUMO -->
@@ -2009,8 +2016,11 @@ function gprod(){const all=new Set();st.Pr.forEach(p=>all.add(p.nombre));Object.
 function rRec(){
   const ps=gprod();const list=document.getElementById('rplist');
   if(!ps.length){list.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Agrega productos en Maestro.</div>';return}
+  const filtro=(document.getElementById('rec-buscar')?.value||'').toLowerCase().trim();
+  const psFilt=filtro?ps.filter(p=>p.toLowerCase().includes(filtro)):ps;
+  if(!psFilt.length){list.innerHTML=`<div class="empty" style="padding:1rem;font-size:13px;color:var(--text2)">Sin resultados para "${filtro}"</div>`;return}
   let h='';
-  ps.forEach(p=>{
+  psFilt.forEach(p=>{
     const ings=st.Rec[p]||[];const sel=p===arec;
     const pr=st.Pr.find(x=>x.nombre===p);const ar=pr?st.A.find(a=>a.id===pr.area_id):null;const em=pr?st.E.find(e=>e.id===pr.empresa_id):null;
     h+=`<div class="rrow${sel?' sel':''}" onclick="selRec('${p.replace(/'/g,"\'")}')">
@@ -2135,13 +2145,18 @@ function mpHide(input){
 
 // Keyboard navigation for all MP autocomplete dropdowns (global, works even after DOM rebuild)
 document.addEventListener('keydown',function(e){
-  // Find the currently focused input that has an open dropdown
   const active=document.activeElement;
   if(!active||active.tagName!=='INPUT')return;
-  const wrap=active.parentElement;
-  if(!wrap)return;
-  const drop=wrap.querySelector('.mp-ac-drop');
-  if(!drop||drop.style.display==='none')return;
+  // Buscar dropdown abierto subiendo hasta 5 niveles
+  let drop=null;
+  let el=active.parentElement;
+  for(let i=0;i<5;i++){
+    if(!el)break;
+    const d=el.querySelector('.mp-ac-drop');
+    if(d&&d.style.display!=='none'){drop=d;break;}
+    el=el.parentElement;
+  }
+  if(!drop)return;
   const items=[...drop.querySelectorAll('.mp-ac-item,.mp-ac-new')];
   if(!items.length)return;
   const cur=drop.querySelector('.mp-ac-hover');
@@ -4920,6 +4935,156 @@ function pdfHorarios(){
 
 
 // ── RENDIMIENTO ──────────────────────────────────────────────────
+// ── RENDIMIENTO SUBTABS ──────────────────────────────────────────
+let rendDatos=[]; // cache de datos cargados
+
+function showRendTab(t){
+  ['detalle','promedio'].forEach(x=>{
+    document.getElementById('rend-sub-'+x).style.display=x===t?'block':'none';
+    document.getElementById('rtab-'+x).classList.toggle('active',x===t);
+  });
+  if(t==='promedio'&&rendDatos.length)renderRendPromedios();
+}
+
+async function buscarRendimiento(){
+  await renderRendimiento();
+  // Si está activa la pestaña promedios, también renderizarla
+  if(document.getElementById('rtab-promedio').classList.contains('active'))
+    renderRendPromedios();
+}
+
+function renderRendPromedios(){
+  const el=document.getElementById('rend-sub-promedio');
+  const ef=document.getElementById('rend-esel').value;
+  if(!rendDatos.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-chart-bar"></i>Primero buscá un rango de fechas en Detalle.</div>';
+    return;
+  }
+  let data=ef==='all'?rendDatos:rendDatos.filter(r=>r.empresa_id===ef);
+  if(!data.length){el.innerHTML='<div class="empty">Sin datos para esta empresa.</div>';return;}
+
+  // Agrupar por empresa + producto
+  const byProd={};
+  data.forEach(r=>{
+    const k=r.empresa_id+'||'+r.area+'||'+r.producto;
+    if(!byProd[k])byProd[k]={
+      empresa_id:r.empresa_id,area:r.area,producto:r.producto,
+      registros:[],totalCant:0,totalDesp:0,totalMin:0,totalRelleno:0,
+      cantConTiempo:0,cantConRelleno:0
+    };
+    const p=byProd[k];
+    p.registros.push(r);
+    p.totalCant+=r.cantidad||0;
+    p.totalDesp+=r.desperdicio||0;
+    p.totalRelleno+=r.relleno_kg||0;
+    if(r.relleno_kg>0)p.cantConRelleno++;
+    if(r.hora_inicio&&r.hora_fin){
+      const[h1,m1]=r.hora_inicio.split(':').map(Number);
+      const[h2,m2]=r.hora_fin.split(':').map(Number);
+      let d=(h2*60+m2)-(h1*60+m1);if(d<0)d+=1440;
+      p.totalMin+=d;p.cantConTiempo++;
+    }
+  });
+
+  // Agrupar por empresa
+  const byEmp={};
+  Object.values(byProd).forEach(p=>{
+    if(!byEmp[p.empresa_id])byEmp[p.empresa_id]=[];
+    byEmp[p.empresa_id].push(p);
+  });
+
+  const desde=document.getElementById('rend-desde').value;
+  const hasta=document.getElementById('rend-hasta').value;
+  const fDesde=new Date(desde+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'});
+  const fHasta=new Date(hasta+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'});
+
+  let h=`<div style="font-size:13px;color:var(--text2);margin-bottom:1rem">
+    Promedios del período <b>${fDesde}</b> al <b>${fHasta}</b> — ${data.length} registros
+  </div>`;
+
+  Object.entries(byEmp).forEach(([eid,prods])=>{
+    const clr=ec(eid);const nm=en(eid)||'Sin empresa';
+    // Ordenar por área y producto
+    prods.sort((a,b)=>a.area.localeCompare(b.area)||a.producto.localeCompare(b.producto));
+    const hasRelleno=prods.some(p=>p.cantConRelleno>0);
+
+    h+=`<div class="stock-card" style="margin-bottom:1.25rem">
+      <div style="padding:10px 14px;background:var(--bg2);border-bottom:.5px solid var(--border);display:flex;align-items:center;gap:10px">
+        <span style="width:10px;height:10px;border-radius:50%;background:${clr};display:inline-block"></span>
+        <span style="font-size:14px;font-weight:700;color:${clr}">${nm}</span>
+        <span style="font-size:12px;color:var(--text2)">${prods.length} productos</span>
+      </div>
+      <div style="overflow-x:auto">
+      <table class="stock-tbl"><thead><tr>
+        <th style="text-align:left">Producto</th>
+        <th style="text-align:left;width:100px">Area</th>
+        <th style="text-align:center;width:70px">Registros</th>
+        <th style="text-align:right;width:110px">Total prod.</th>
+        <th style="text-align:right;width:100px" title="Promedio de unidades por hora">Uds/hora prom.</th>
+        <th style="text-align:right;width:100px" title="Porcentaje de desperdicio promedio">% Desp. prom.</th>
+        ${hasRelleno?`<th style="text-align:right;width:110px" title="Gramos de relleno por unidad producida">Relleno g/ud prom.</th>`:''}
+      </tr></thead><tbody>`;
+
+    // Totales para la empresa
+    let totCant=0,totDesp=0,totMin=0,totConTiempo=0;
+    prods.forEach(p=>{
+      totCant+=p.totalCant;totDesp+=p.totalDesp;
+      totMin+=p.totalMin;totConTiempo+=p.cantConTiempo;
+    });
+    const totPct=totCant+totDesp>0?((totDesp/(totCant+totDesp))*100).toFixed(1):0;
+    const totUph=totMin>0?Math.round(totCant/(totMin/60)):0;
+
+    // Por área — separadores
+    let areaActual='';
+    prods.forEach(p=>{
+      if(p.area!==areaActual){
+        areaActual=p.area;
+        h+=`<tr><td colspan="${hasRelleno?7:6}" style="background:var(--bg2);padding:5px 12px;font-size:11px;font-weight:700;color:${clr};text-transform:uppercase;letter-spacing:.4px">${p.area}</td></tr>`;
+      }
+      const uph=p.totalMin>0?Math.round(p.totalCant/(p.totalMin/60)):0;
+      const pctDesp=p.totalCant+p.totalDesp>0?((p.totalDesp/(p.totalCant+p.totalDesp))*100).toFixed(1):0;
+      const gxu=p.cantConRelleno>0&&p.totalCant>0?(p.totalRelleno/p.totalCant*1000).toFixed(1):null;
+      const clrUph=uph>1500?'var(--green)':uph>800?'var(--amber)':uph>0?'var(--red)':'var(--text3)';
+      const clrDesp=parseFloat(pctDesp)<=2?'var(--green)':parseFloat(pctDesp)<=5?'var(--amber)':'var(--red)';
+
+      h+=`<tr>
+        <td style="font-weight:600;padding-left:20px">${p.producto}</td>
+        <td style="font-size:12px;color:var(--text2)">${p.area}</td>
+        <td style="text-align:center;font-size:12px;color:var(--text2)">${p.registros.length}</td>
+        <td style="text-align:right;font-weight:600">${p.totalCant.toLocaleString('es-AR')}</td>
+        <td style="text-align:right;font-weight:700;color:${clrUph}">${uph>0?uph.toLocaleString('es-AR'):'--'}</td>
+        <td style="text-align:right;font-weight:700;color:${clrDesp}">${pctDesp}%</td>
+        ${hasRelleno?`<td style="text-align:right;font-weight:600;color:var(--amber)">${gxu?gxu+'g':'--'}</td>`:''}
+      </tr>`;
+    });
+
+    // Fila total empresa
+    h+=`<tr style="background:var(--bg2);border-top:2px solid var(--border2)">
+      <td colspan="3" style="font-weight:700;padding:8px 12px">TOTAL ${nm}</td>
+      <td style="text-align:right;font-weight:700">${totCant.toLocaleString('es-AR')}</td>
+      <td style="text-align:right;font-weight:700;color:${totUph>1500?'var(--green)':totUph>800?'var(--amber)':'var(--red)'}">${totUph>0?totUph.toLocaleString('es-AR'):'--'}</td>
+      <td style="text-align:right;font-weight:700;color:${parseFloat(totPct)<=2?'var(--green)':parseFloat(totPct)<=5?'var(--amber)':'var(--red)'}">${totPct}%</td>
+      ${hasRelleno?`<td></td>`:''}
+    </tr>`;
+
+    h+=`</tbody></table></div></div>`;
+  });
+
+  // Leyenda colores
+  h+=`<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:.75rem;font-size:12px;color:var(--text2)">
+    <span style="font-weight:600">Velocidad:</span>
+    <span><span style="color:var(--green)">●</span> &gt;1500 uds/h</span>
+    <span><span style="color:var(--amber)">●</span> 800-1500</span>
+    <span><span style="color:var(--red)">●</span> &lt;800</span>
+    <span style="margin-left:8px;font-weight:600">Desperdicio:</span>
+    <span><span style="color:var(--green)">●</span> ≤2%</span>
+    <span><span style="color:var(--amber)">●</span> 2-5%</span>
+    <span><span style="color:var(--red)">●</span> &gt;5%</span>
+  </div>`;
+
+  el.innerHTML=h;
+}
+
 function initRend(){
   const sel=document.getElementById('rend-esel');
   sel.innerHTML='<option value="all">Todas</option>';
@@ -4934,7 +5099,7 @@ function initRend(){
 }
 
 async function renderRendimiento(){
-  const el=document.getElementById('rend-content');
+  const el=document.getElementById('rend-sub-detalle');
   const ef=document.getElementById('rend-esel').value;
   const desde=document.getElementById('rend-desde').value;
   const hasta=document.getElementById('rend-hasta').value;
@@ -4944,6 +5109,7 @@ async function renderRendimiento(){
     let q=`fecha=gte.${desde}&fecha=lte.${hasta}&order=fecha.desc,producto.asc`;
     if(ef!=='all')q+=`&empresa_id=eq.${ef}`;
     const data=await get('rendimiento_proceso',q);
+    rendDatos=data; // guardar cache para promedios
     if(!data.length){
       el.innerHTML='<div class="empty"><i class="ti ti-speedometer"></i> Sin registros para ese período.</div>';
       return;
