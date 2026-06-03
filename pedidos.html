@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -8,114 +9,135 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0f0f10;--bg2:#1a1a1c;--bg3:#242428;--bg4:#2e2e33;
-  --text:#f0efec;--text2:#999;--text3:#555;
-  --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.15);
-  --gold:#D4A843;--gold2:#f0c060;--gold-bg:rgba(212,168,67,.12);
-  --green:#1D9E75;--green-bg:rgba(29,158,117,.15);
-  --red:#E24B4A;--red-bg:rgba(226,75,74,.12);
-  --blue:#378ADD;--blue-bg:rgba(55,138,221,.12);
+  --bg:#1a1208;--bg2:#231910;--bg3:#2e2015;--bg4:#3a2a1a;
+  --text:#f5ede0;--text2:#a08060;--text3:#6a4f35;
+  --border:rgba(210,160,80,.12);--border2:rgba(210,160,80,.25);
+  --gold:#D4943A;--gold2:#f0b060;--gold-bg:rgba(212,148,58,.15);
+  --green:#2aad7a;--green-bg:rgba(42,173,122,.15);
+  --red:#d95f4b;--red-bg:rgba(217,95,75,.15);
+  --blue:#5b9bd5;--blue-bg:rgba(91,155,213,.15);
+  --warm:#c8824a;--warm-bg:rgba(200,130,74,.15);
   --radius:10px;--radius-lg:16px;
 }
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
 
-/* HEADER */
-header{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:60px;position:sticky;top:0;z-index:100}
+header{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 1.25rem;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100}
 .logo{display:flex;align-items:center;gap:10px}
-.logo-icon{width:36px;height:36px;background:var(--gold);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px}
-.logo-text{font-size:15px;font-weight:700;color:var(--text)}
-.logo-sub{font-size:12px;color:var(--text2);font-weight:400}
-.status-chip{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);background:var(--bg3);padding:5px 12px;border-radius:20px;border:.5px solid var(--border)}
-.dot{width:7px;height:7px;border-radius:50%;background:var(--text3)}
-.dot.ok{background:var(--green)}
-.dot.saving{background:var(--gold);animation:pulse .8s infinite}
-
+.logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--gold),var(--warm));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px}
+.logo-text{font-size:14px;font-weight:700;color:var(--text)}
+.logo-sub{font-size:11px;color:var(--text2)}
+.status-chip{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);background:var(--bg3);padding:4px 10px;border-radius:20px;border:.5px solid var(--border)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--text3)}
+.dot.ok{background:var(--green)}.dot.saving{background:var(--gold);animation:pulse .8s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
 /* LOGIN */
-#screen-login{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 60px);padding:2rem}
-.login-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:2.5rem;width:100%;max-width:420px;text-align:center}
-.login-icon{font-size:48px;margin-bottom:1rem;display:block}
-.login-title{font-size:22px;font-weight:700;margin-bottom:6px}
-.login-sub{font-size:14px;color:var(--text2);margin-bottom:2rem}
-.login-select{width:100%;padding:12px 14px;font-size:15px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text);margin-bottom:12px;appearance:none;-webkit-appearance:none;cursor:pointer}
+#screen-login{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 56px);padding:1.5rem}
+.login-card{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:2.5rem;width:100%;max-width:400px;text-align:center}
+.login-emoji{font-size:44px;margin-bottom:1rem;display:block}
+.login-title{font-size:20px;font-weight:700;margin-bottom:6px;color:var(--text)}
+.login-sub{font-size:13px;color:var(--text2);margin-bottom:1.75rem;line-height:1.5}
+.login-select{width:100%;padding:11px 14px;font-size:14px;border:1px solid var(--border2);border-radius:var(--radius);background:var(--bg3);color:var(--text);margin-bottom:10px;cursor:pointer}
 .login-select:focus{outline:none;border-color:var(--gold)}
-.login-btn{width:100%;padding:13px;font-size:15px;font-weight:600;border:none;border-radius:var(--radius);background:var(--gold);color:#1a1200;cursor:pointer;transition:opacity .15s}
-.login-btn:hover{opacity:.9}
+.login-btn{width:100%;padding:12px;font-size:14px;font-weight:700;border:none;border-radius:var(--radius);background:linear-gradient(135deg,var(--gold),var(--warm));color:#1a0f00;cursor:pointer;transition:opacity .15s}
+.login-btn:hover{opacity:.88}
 .login-btn:disabled{opacity:.4;cursor:not-allowed}
-.login-err{font-size:13px;color:var(--red);margin-top:8px;display:none}
 
-/* MAIN */
-#screen-main{display:none;padding:1.5rem;max-width:900px;margin:0 auto}
-.sucursal-header{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem 1.5rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
-.suc-name{font-size:18px;font-weight:700}
-.suc-tipo{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}
-.suc-tipo.ref{background:var(--blue-bg);color:var(--blue)}
-.suc-tipo.con{background:rgba(134,80,220,.15);color:#a97ef5}
-.fecha-chip{font-size:13px;color:var(--text2);display:flex;align-items:center;gap:6px}
+/* SUCURSAL HEADER */
+#screen-main{display:none;padding:1rem;max-width:700px;margin:0 auto}
+.suc-header{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1rem 1.25rem;margin-bottom:1.25rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+.suc-name{font-size:17px;font-weight:700;color:var(--text)}
+.suc-chips{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.chip-ref{background:var(--blue-bg);color:var(--blue)}
+.chip-con{background:rgba(160,100,200,.15);color:#c090f0}
+.chip-fecha{background:var(--bg3);color:var(--text2);border:.5px solid var(--border)}
+.btn-cambiar{padding:7px 14px;font-size:12px;font-weight:500;border:1px solid var(--border2);border-radius:var(--radius);background:transparent;color:var(--text2);cursor:pointer}
+.btn-cambiar:hover{background:var(--bg3)}
 
-/* PEDIDO */
-.seccion-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;margin-top:1.5rem;display:flex;align-items:center;gap:8px}
-.seccion-title::after{content:'';flex:1;height:1px;background:var(--border)}
+/* TABS internos */
+.inner-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:1.25rem}
+.inner-tab{padding:9px 16px;font-size:13px;font-weight:500;border:none;background:none;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;align-items:center;gap:6px;transition:color .15s}
+.inner-tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+.inner-tab:hover:not(.active){color:var(--text)}
 
-.prod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:1rem}
-.prod-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px;display:flex;flex-direction:column;gap:8px;transition:border-color .15s}
-.prod-card:focus-within{border-color:var(--gold)}
-.prod-card.has-value{border-color:rgba(212,168,67,.4);background:var(--gold-bg)}
-.prod-codigo{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px}
-.prod-nombre{font-size:13px;font-weight:600;color:var(--text);line-height:1.3}
-.prod-unidad{font-size:11px;color:var(--text2)}
-.prod-input-wrap{display:flex;align-items:center;gap:6px;margin-top:4px}
-.prod-input{flex:1;padding:8px 10px;font-size:16px;font-weight:700;text-align:center;border:1px solid var(--border2);border-radius:8px;background:var(--bg3);color:var(--text);-moz-appearance:textfield}
-.prod-input::-webkit-outer-spin-button,.prod-input::-webkit-inner-spin-button{-webkit-appearance:none}
-.prod-input:focus{outline:none;border-color:var(--gold);background:var(--bg4)}
-.btn-qty{width:32px;height:32px;border:1px solid var(--border2);border-radius:8px;background:var(--bg3);color:var(--text2);cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;transition:all .1s;flex-shrink:0}
-.btn-qty:hover{background:var(--bg4);color:var(--text)}
-.btn-qty:active{transform:scale(.92)}
+/* LISTA DE PRODUCTOS */
+.prod-list{display:flex;flex-direction:column;gap:6px}
+.prod-row{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;display:grid;grid-template-columns:1fr auto auto auto;align-items:center;gap:12px;transition:border-color .15s}
+.prod-row:focus-within{border-color:var(--gold)}
+.prod-row.has-value{border-color:rgba(212,148,58,.35);background:var(--gold-bg)}
+.prod-row.pausado{opacity:.45;pointer-events:none}
+.prod-info{min-width:0}
+.prod-nombre{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prod-sub{font-size:11px;color:var(--text2);margin-top:2px;display:flex;gap:10px}
+.stock-info{display:flex;flex-direction:column;align-items:center;min-width:64px}
+.stock-label{font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.stock-val{font-size:13px;font-weight:700}
+.stock-actual{color:var(--warm)}
+.stock-ideal{color:var(--text2)}
+.sug-badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:20px;background:var(--green-bg);color:var(--green);white-space:nowrap;cursor:pointer;border:.5px solid rgba(42,173,122,.3);transition:all .15s}
+.sug-badge:hover{background:rgba(42,173,122,.25)}
+.sug-badge.zero{background:var(--bg3);color:var(--text3);border-color:var(--border);cursor:default}
+.qty-wrap{display:flex;align-items:center;gap:5px}
+.qty-btn{width:30px;height:30px;border:1px solid var(--border2);border-radius:8px;background:var(--bg3);color:var(--text2);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .1s}
+.qty-btn:hover{background:var(--bg4);color:var(--text)}
+.qty-input{width:60px;padding:5px 6px;font-size:15px;font-weight:700;text-align:center;border:1px solid var(--border2);border-radius:8px;background:var(--bg3);color:var(--text);-moz-appearance:textfield}
+.qty-input::-webkit-outer-spin-button,.qty-input::-webkit-inner-spin-button{-webkit-appearance:none}
+.qty-input:focus{outline:none;border-color:var(--gold);background:var(--bg4)}
 
-/* RESUMEN */
-.resumen-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:1.25rem;margin-bottom:1rem}
-.res-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:.5px solid var(--border);font-size:13px}
-.res-row:last-child{border-bottom:none}
-.res-row.total{font-weight:700;font-size:14px;padding-top:10px;color:var(--gold)}
-.res-cant{font-weight:700;color:var(--gold2)}
+/* STOCK TAB */
+.stock-row{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:12px;margin-bottom:6px}
+.ideal-wrap{display:flex;align-items:center;gap:6px}
+.ideal-label{font-size:11px;color:var(--text2);white-space:nowrap}
+.ideal-input{width:70px;padding:5px 8px;font-size:14px;font-weight:700;text-align:center;border:1px solid var(--border2);border-radius:8px;background:var(--bg3);color:var(--gold);-moz-appearance:textfield}
+.ideal-input::-webkit-outer-spin-button,.ideal-input::-webkit-inner-spin-button{-webkit-appearance:none}
+.ideal-input:focus{outline:none;border-color:var(--gold)}
+.actual-wrap{display:flex;align-items:center;gap:6px}
 
 /* BOTTOM BAR */
-.bottom-bar{position:sticky;bottom:0;background:var(--bg2);border-top:1px solid var(--border);padding:1rem 1.5rem;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.total-display{display:flex;align-items:baseline;gap:6px}
-.total-num{font-size:24px;font-weight:800;color:var(--gold)}
-.total-label{font-size:13px;color:var(--text2)}
-.btn-enviar{padding:12px 28px;font-size:15px;font-weight:700;border:none;border-radius:var(--radius);background:var(--gold);color:#1a1200;cursor:pointer;display:flex;align-items:center;gap:8px;transition:opacity .15s}
-.btn-enviar:hover{opacity:.9}
+.bottom-bar{position:sticky;bottom:0;background:var(--bg2);border-top:1px solid var(--border);padding:.875rem 1.25rem;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.total-disp{display:flex;align-items:baseline;gap:5px}
+.total-num{font-size:22px;font-weight:800;color:var(--gold)}
+.total-lbl{font-size:12px;color:var(--text2)}
+.btn-enviar{padding:11px 24px;font-size:14px;font-weight:700;border:none;border-radius:var(--radius);background:linear-gradient(135deg,var(--gold),var(--warm));color:#1a0f00;cursor:pointer;display:flex;align-items:center;gap:7px;transition:opacity .15s}
+.btn-enviar:hover{opacity:.88}
 .btn-enviar:disabled{opacity:.4;cursor:not-allowed}
-.btn-sec{padding:10px 18px;font-size:13px;font-weight:500;border:1px solid var(--border2);border-radius:var(--radius);background:transparent;color:var(--text2);cursor:pointer}
-.btn-sec:hover{background:var(--bg3)}
+.btn-limpiar{padding:9px 16px;font-size:13px;border:1px solid var(--border2);border-radius:var(--radius);background:transparent;color:var(--text2);cursor:pointer}
+.btn-limpiar:hover{background:var(--bg3)}
+.btn-guardar-stock{padding:9px 16px;font-size:13px;font-weight:600;border:none;border-radius:var(--radius);background:var(--green-bg);color:var(--green);border:.5px solid rgba(42,173,122,.3);cursor:pointer}
+.btn-guardar-stock:hover{background:rgba(42,173,122,.25)}
 
 /* SUCCESS */
-#screen-success{display:none;align-items:center;justify-content:center;min-height:calc(100vh - 60px);padding:2rem}
-.success-card{background:var(--bg2);border:1px solid rgba(29,158,117,.3);border-radius:var(--radius-lg);padding:3rem 2.5rem;width:100%;max-width:480px;text-align:center}
-.success-icon{font-size:56px;color:var(--green);display:block;margin-bottom:1rem}
-.success-title{font-size:22px;font-weight:700;margin-bottom:8px}
-.success-sub{font-size:14px;color:var(--text2);line-height:1.6;margin-bottom:2rem}
-.success-resumen{background:var(--bg3);border-radius:var(--radius);padding:1rem;margin-bottom:2rem;text-align:left}
-.btn-nuevo{padding:12px 28px;font-size:14px;font-weight:600;border:1px solid var(--border2);border-radius:var(--radius);background:transparent;color:var(--text);cursor:pointer}
+#screen-success{display:none;align-items:center;justify-content:center;min-height:calc(100vh - 56px);padding:1.5rem}
+.success-card{background:var(--bg2);border:1px solid rgba(42,173,122,.3);border-radius:var(--radius-lg);padding:2.5rem;width:100%;max-width:460px;text-align:center}
+.success-icon{font-size:50px;color:var(--green);display:block;margin-bottom:.75rem}
+.success-title{font-size:20px;font-weight:700;margin-bottom:6px}
+.success-sub{font-size:13px;color:var(--text2);margin-bottom:1.5rem;line-height:1.6}
+.success-res{background:var(--bg3);border-radius:var(--radius);padding:1rem;margin-bottom:1.5rem;text-align:left;max-height:260px;overflow-y:auto}
+.btn-nuevo{padding:11px 24px;font-size:13px;font-weight:600;border:1px solid var(--border2);border-radius:var(--radius);background:transparent;color:var(--text);cursor:pointer}
 .btn-nuevo:hover{background:var(--bg3)}
 
 /* OBS */
-.obs-input{width:100%;padding:10px 12px;font-size:13px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2);color:var(--text);resize:none;min-height:70px;margin-top:8px}
+.obs-wrap{margin-top:1rem}
+.obs-label{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.obs-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.obs-input{width:100%;padding:10px 12px;font-size:13px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg2);color:var(--text);resize:none;min-height:60px}
 .obs-input:focus{outline:none;border-color:var(--gold)}
 
-/* SPINNER */
-.spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(26,18,0,.3);border-top-color:#1a1200;border-radius:50%;animation:spin .7s linear infinite}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(26,15,0,.3);border-top-color:#1a0f00;border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+.alert{padding:9px 13px;border-radius:var(--radius);font-size:13px;margin-top:1rem;display:flex;align-items:center;gap:7px}
+.alert-ok{background:var(--green-bg);color:#6ee7b7;border:.5px solid rgba(42,173,122,.3)}
+.alert-err{background:var(--red-bg);color:#fca5a5;border:.5px solid rgba(217,95,75,.3)}
+.empty{text-align:center;padding:2.5rem;color:var(--text2);font-size:13px}
+.empty i{font-size:28px;display:block;margin-bottom:8px;color:var(--text3)}
 
-/* ALERT */
-.alert{padding:10px 14px;border-radius:var(--radius);font-size:13px;margin-bottom:1rem;display:flex;align-items:center;gap:8px}
-.alert-ok{background:var(--green-bg);color:#6ee7c2;border:.5px solid rgba(29,158,117,.3)}
-.alert-err{background:var(--red-bg);color:#f59090;border:.5px solid rgba(226,75,74,.3)}
+.sec-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin:1rem 0 8px;display:flex;align-items:center;gap:8px}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border)}
 
-@media(max-width:600px){
-  .prod-grid{grid-template-columns:repeat(2,1fr)}
+@media(max-width:560px){
+  .prod-row{grid-template-columns:1fr auto auto}
+  .stock-info{display:none}
   .bottom-bar{flex-direction:column;align-items:stretch}
   .btn-enviar{justify-content:center}
 }
@@ -131,63 +153,78 @@ header{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 1.5
       <div class="logo-sub">Sistema de Pedidos</div>
     </div>
   </div>
-  <div class="status-chip">
-    <span class="dot" id="sdot"></span>
-    <span id="stxt">Conectando...</span>
-  </div>
+  <div class="status-chip"><span class="dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
 </header>
 
 <!-- LOGIN -->
 <div id="screen-login">
   <div class="login-card">
-    <span class="login-icon">🥟</span>
+    <span class="login-emoji">🥟</span>
     <div class="login-title">Cargar Pedido</div>
-    <div class="login-sub">Seleccioná tu sucursal para comenzar</div>
+    <div class="login-sub">Seleccioná tu sucursal para comenzar a cargar el pedido del día</div>
     <select id="sel-sucursal" class="login-select">
       <option value="">Cargando sucursales...</option>
     </select>
     <button class="login-btn" id="btn-ingresar" onclick="ingresar()" disabled>Ingresar →</button>
-    <div class="login-err" id="login-err">Sucursal no encontrada.</div>
   </div>
 </div>
 
 <!-- MAIN -->
 <div id="screen-main">
-  <div class="sucursal-header">
+  <div class="suc-header">
     <div>
       <div class="suc-name" id="suc-nombre">—</div>
-      <div style="margin-top:4px;display:flex;gap:8px;align-items:center">
-        <span class="suc-tipo" id="suc-tipo-chip">—</span>
-        <span class="fecha-chip"><i class="ti ti-calendar"></i> <span id="hdr-fecha">—</span></span>
+      <div class="suc-chips">
+        <span class="chip" id="suc-tipo-chip">—</span>
+        <span class="chip chip-fecha"><i class="ti ti-calendar" style="font-size:10px"></i> <span id="hdr-fecha">—</span></span>
       </div>
     </div>
-    <button class="btn-sec" onclick="cerrarSesion()"><i class="ti ti-logout"></i> Cambiar sucursal</button>
+    <button class="btn-cambiar" onclick="cerrarSesion()"><i class="ti ti-logout"></i> Cambiar sucursal</button>
   </div>
 
-  <div id="pedido-content"></div>
-
-  <div style="margin-top:1.5rem">
-    <div class="seccion-title"><i class="ti ti-message"></i> Observaciones</div>
-    <textarea class="obs-input" id="obs-input" placeholder="Alguna aclaración para fábrica... (opcional)"></textarea>
+  <div class="inner-tabs">
+    <button class="inner-tab active" id="itab-pedido" onclick="showTab('pedido')"><i class="ti ti-shopping-cart"></i> Pedido</button>
+    <button class="inner-tab" id="itab-stock" onclick="showTab('stock')"><i class="ti ti-warehouse"></i> Mi stock ideal</button>
   </div>
 
-  <div id="msg-ok" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Pedido enviado correctamente.</div>
-  <div id="msg-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="msg-errtxt">Error al enviar.</span></div>
+  <!-- TAB PEDIDO -->
+  <div id="tab-pedido">
+    <div id="pedido-content"></div>
+    <div class="obs-wrap">
+      <div class="obs-label"><i class="ti ti-message" style="font-size:11px"></i> Observaciones</div>
+      <textarea class="obs-input" id="obs-input" placeholder="Alguna aclaración para fábrica... (opcional)"></textarea>
+    </div>
+    <div id="msg-ok" style="display:none" class="alert alert-ok"><i class="ti ti-check"></i> Pedido enviado correctamente.</div>
+    <div id="msg-err" style="display:none" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="msg-errtxt"></span></div>
+    <div style="height:80px"></div>
+  </div>
 
-  <div style="height:80px"></div>
+  <!-- TAB STOCK IDEAL -->
+  <div id="tab-stock" style="display:none">
+    <div class="alert alert-ok" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Definí cuánto stock deberías tener de cada producto. Se usa para calcular el pedido sugerido.</div>
+    <div id="stock-ideal-content"></div>
+    <div style="height:80px"></div>
+  </div>
 </div>
 
-<div class="bottom-bar" id="bottom-bar" style="display:none">
-  <div class="total-display">
+<!-- BOTTOM BAR PEDIDO -->
+<div class="bottom-bar" id="bottom-pedido" style="display:none">
+  <div class="total-disp">
     <span class="total-num" id="total-display">0</span>
-    <span class="total-label" id="total-unidad-label">bandejas</span>
+    <span class="total-lbl" id="total-unidad-label">bandejas</span>
   </div>
   <div style="display:flex;gap:8px">
-    <button class="btn-sec" onclick="limpiarPedido()"><i class="ti ti-trash"></i> Limpiar</button>
-    <button class="btn-enviar" id="btn-enviar" onclick="enviarPedido()">
+    <button class="btn-limpiar" onclick="limpiarPedido()"><i class="ti ti-trash"></i></button>
+    <button class="btn-enviar" id="btn-enviar" onclick="enviarPedido()" disabled>
       <i class="ti ti-send"></i> Enviar pedido
     </button>
   </div>
+</div>
+
+<!-- BOTTOM BAR STOCK -->
+<div class="bottom-bar" id="bottom-stock" style="display:none">
+  <span style="font-size:13px;color:var(--text2)">Guardá tu stock ideal para calcular pedidos sugeridos</span>
+  <button class="btn-guardar-stock" onclick="guardarStockIdeal()"><i class="ti ti-device-floppy"></i> Guardar stock ideal</button>
 </div>
 
 <!-- SUCCESS -->
@@ -196,7 +233,7 @@ header{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 1.5
     <i class="ti ti-circle-check success-icon"></i>
     <div class="success-title">¡Pedido enviado!</div>
     <div class="success-sub" id="success-sub">Tu pedido fue recibido por fábrica.</div>
-    <div class="success-resumen" id="success-resumen"></div>
+    <div class="success-res" id="success-res"></div>
     <button class="btn-nuevo" onclick="nuevoPedido()"><i class="ti ti-refresh"></i> Cargar nuevo pedido</button>
   </div>
 </div>
@@ -207,17 +244,14 @@ const SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6I
 const H={'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK};
 const get=async(t,f='')=>{const r=await fetch(`${SB}/rest/v1/${t}?${f}`,{headers:H});if(!r.ok)throw new Error(await r.text());return r.json()};
 const ins=async(t,d)=>{const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:{...H,'Prefer':'return=representation'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json()};
-const pat=async(t,f,d)=>{const r=await fetch(`${SB}/rest/v1/${t}?${f}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text())};
-
+const pat=async(url,d)=>{const r=await fetch(url,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text())};
+const upsert=async(t,d)=>{const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=representation'},body:JSON.stringify(d)});if(!r.ok)throw new Error(await r.text());return r.json()};
 const ss=(s,t)=>{document.getElementById('sdot').className='dot '+(s==='ok'?'ok':s==='saving'?'saving':'');document.getElementById('stxt').textContent=t};
-
-let sucursales=[];
-let productos=[];
-let sucActual=null;
-let pedidoValues={};
 
 const hoy=new Date().toISOString().slice(0,10);
 const hoyLabel=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+
+let sucursales=[], sucActual=null, productos=[], stockIdeal={}, pedidoValues={}, stockActualValues={}, tabActivo='pedido';
 
 async function init(){
   ss('','Conectando...');
@@ -226,17 +260,13 @@ async function init(){
     const sel=document.getElementById('sel-sucursal');
     sel.innerHTML='<option value="">— Seleccioná tu sucursal —</option>';
     sucursales.forEach(s=>{
-      const o=document.createElement('option');
-      o.value=s.id;
+      const o=document.createElement('option');o.value=s.id;
       o.textContent=s.nombre+' ('+(s.tipo==='refrigerado'?'Refrig.':'Congelado')+')';
       sel.appendChild(o);
     });
     document.getElementById('btn-ingresar').disabled=false;
     ss('ok','Conectado');
-  }catch(e){
-    ss('','Sin conexión');
-    document.getElementById('sel-sucursal').innerHTML='<option value="">Error al cargar</option>';
-  }
+  }catch(e){ss('','Sin conexión');document.getElementById('sel-sucursal').innerHTML='<option>Error al cargar</option>';}
 }
 
 async function ingresar(){
@@ -244,285 +274,292 @@ async function ingresar(){
   if(!sid)return;
   sucActual=sucursales.find(s=>s.id===sid);
   if(!sucActual)return;
-
-  // Cargar productos de la empresa
+  const btn=document.getElementById('btn-ingresar');
+  btn.innerHTML='<span class="spinner"></span> Cargando...';btn.disabled=true;
   try{
-    productos=await get('productos',`empresa_id=eq.${sucActual.empresa_id}&order=orden.asc,nombre.asc`);
-  }catch{productos=[]}
+    // Cargar productos asignados a esta sucursal
+    const asignados=await get('sucursal_productos',`sucursal_id=eq.${sucActual.id}&activo=eq.true`);
+    if(asignados.length){
+      // Cargar solo los productos asignados
+      const ids=asignados.map(a=>a.producto_id).filter(Boolean);
+      if(ids.length){
+        productos=await get('productos',`id=in.(${ids.join(',')})&order=orden.asc,nombre.asc`);
+      } else {
+        // Tiene asignaciones por nombre
+        productos=await get('productos',`empresa_id=eq.${sucActual.empresa_id}&order=orden.asc,nombre.asc`);
+        const nombresAsig=asignados.map(a=>a.producto);
+        productos=productos.filter(p=>nombresAsig.includes(p.nombre));
+      }
+    } else {
+      // Sin configuración específica: mostrar todos los de la empresa
+      productos=await get('productos',`empresa_id=eq.${sucActual.empresa_id}&order=orden.asc,nombre.asc`);
+    }
+    // Cargar áreas para agrupar
+    const areas=await get('areas','order=nombre.asc');
+    productos=productos.map(p=>{const a=areas.find(x=>x.id===p.area_id);return{...p,area_nombre:a?a.nombre:'General'};});
+    // Cargar stock ideal guardado
+    const ideal=await get('sucursal_stock_ideal',`sucursal_id=eq.${sucActual.id}`);
+    stockIdeal={};ideal.forEach(i=>stockIdeal[i.producto_id||i.producto]=i.cantidad||0);
+    // Cargar pedido existente hoy
+    pedidoValues={};
+    const existing=await get('pedidos_sucursal',`sucursal_id=eq.${sucActual.id}&fecha=eq.${hoy}&select=items,observaciones`);
+    if(existing.length){
+      (existing[0].items||[]).forEach(it=>{pedidoValues[it.producto_id]=it.cantidad;});
+      document.getElementById('obs-input').value=existing[0].observaciones||'';
+    }
+    mostrarMain();
+  }catch(e){ss('error','Error al cargar');alert('Error: '+e.message);}
+  btn.innerHTML='Ingresar →';btn.disabled=false;
+}
 
+function mostrarMain(){
   document.getElementById('screen-login').style.display='none';
   document.getElementById('screen-main').style.display='block';
-  document.getElementById('bottom-bar').style.display='flex';
-
   document.getElementById('suc-nombre').textContent=sucActual.nombre;
   document.getElementById('hdr-fecha').textContent=hoyLabel;
-
   const chip=document.getElementById('suc-tipo-chip');
-  if(sucActual.tipo==='refrigerado'){
-    chip.textContent='❄️ Refrigerado';chip.className='suc-tipo ref';
-    document.getElementById('total-unidad-label').textContent='bandejas';
-  } else {
-    chip.textContent='🧊 Congelado';chip.className='suc-tipo con';
-    document.getElementById('total-unidad-label').textContent='cajas';
-  }
-
-  // Verificar si ya hay pedido hoy
-  try{
-    const existing=await get('pedidos_sucursal',`sucursal_id=eq.${sucActual.id}&fecha=eq.${hoy}&select=id,items,observaciones,estado`);
-    if(existing.length){
-      const p=existing[0];
-      pedidoValues={};
-      (p.items||[]).forEach(it=>pedidoValues[it.producto_id]=it.cantidad);
-      document.getElementById('obs-input').value=p.observaciones||'';
-    }
-  }catch{}
-
-  renderPedido();
+  if(sucActual.tipo==='refrigerado'){chip.textContent='❄️ Refrigerado';chip.className='chip chip-ref';}
+  else{chip.textContent='🧊 Congelado';chip.className='chip chip-con';}
+  document.getElementById('total-unidad-label').textContent=sucActual.tipo==='refrigerado'?'bandejas':'cajas';
+  showTab('pedido');
 }
 
-function cerrarSesion(){
-  sucActual=null;pedidoValues={};
-  document.getElementById('screen-main').style.display='none';
-  document.getElementById('bottom-bar').style.display='none';
-  document.getElementById('screen-login').style.display='flex';
-  document.getElementById('screen-success').style.display='none';
+function showTab(t){
+  tabActivo=t;
+  ['pedido','stock'].forEach(x=>{
+    document.getElementById('tab-'+x).style.display=x===t?'block':'none';
+    document.getElementById('itab-'+x).classList.toggle('active',x===t);
+  });
+  document.getElementById('bottom-pedido').style.display=t==='pedido'?'flex':'none';
+  document.getElementById('bottom-stock').style.display=t==='stock'?'flex':'none';
+  if(t==='pedido')renderPedido();
+  if(t==='stock')renderStockIdeal();
 }
+
+function getIdeal(p){return stockIdeal[p.id]||stockIdeal[p.nombre]||0;}
+function getActual(p){return stockActualValues[p.id]||0;}
+function getSugerido(p){const s=getIdeal(p)-getActual(p);return Math.max(0,s);}
 
 function renderPedido(){
   const el=document.getElementById('pedido-content');
-  if(!productos.length){
-    el.innerHTML='<div style="text-align:center;padding:3rem;color:var(--text2)">Sin productos configurados.</div>';
-    return;
-  }
-
-  // Agrupar por area
-  const areas={};
-  productos.forEach(p=>{
-    const a=p.area_nombre||p.area_id||'General';
-    if(!areas[a])areas[a]=[];
-    areas[a].push(p);
-  });
-
-  // Si no tiene area_nombre, cargar áreas
-  // Usar código del producto (abrev) si existe, sino nombre
+  if(!productos.length){el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin productos asignados.</div>';return;}
   const unidad=sucActual.tipo==='refrigerado'?'bandejas':'cajas';
-
+  // Agrupar por área
+  const areas={};
+  productos.forEach(p=>{const a=p.area_nombre||'General';if(!areas[a])areas[a]=[];areas[a].push(p);});
+  const multiArea=Object.keys(areas).length>1;
   let h='';
-  // Agrupar productos — si todos en una area, sin secciones
-  const todasAreas=Object.keys(areas);
-
-  // Para sucursales necesitamos mostrar todos los productos con sus códigos
-  // Agrupamos por área si hay más de una
-  if(todasAreas.length>1){
-    todasAreas.forEach(area=>{
-      h+=`<div class="seccion-title"><i class="ti ti-tag"></i> ${area}</div>`;
-      h+=`<div class="prod-grid">`;
-      areas[area].forEach(p=>h+=cardHTML(p,unidad));
-      h+=`</div>`;
+  Object.entries(areas).forEach(([area,prods])=>{
+    if(multiArea)h+=`<div class="sec-title"><i class="ti ti-tag" style="font-size:10px"></i> ${area}</div>`;
+    h+=`<div class="prod-list">`;
+    prods.forEach(p=>{
+      const val=pedidoValues[p.id]||0;
+      const ideal=getIdeal(p);const actual=getActual(p);
+      const sug=getSugerido(p);
+      const hasVal=val>0;
+      const tieneIdeal=ideal>0;
+      h+=`<div class="prod-row${hasVal?' has-value':''}" id="prow-${p.id}">
+        <div class="prod-info">
+          <div class="prod-nombre">${p.nombre}</div>
+          <div class="prod-sub">
+            <span style="color:var(--text3)">${unidad}</span>
+            ${tieneIdeal?`<span style="color:var(--text3)">ideal: <b style="color:var(--text2)">${ideal}</b></span>`:''}
+            ${actual>0?`<span style="color:var(--warm)">stock: <b>${actual}</b></span>`:''}
+          </div>
+        </div>
+        ${tieneIdeal?`<div class="stock-info">
+          <div class="stock-label">Sugerido</div>
+          <span class="sug-badge${sug===0?' zero':''}" onclick="aplicarSugerido('${p.id}',${sug})" title="${sug>0?'Click para aplicar sugerido':'Stock completo'}">${sug>0?'+ '+sug:'✓ OK'}</span>
+        </div>`:`<div style="min-width:48px"></div>`}
+        <div class="qty-wrap">
+          <button class="qty-btn" onclick="cambiarQty('${p.id}',-0.5)">−</button>
+          <input class="qty-input" type="number" min="0" step="0.5"
+            id="inp-${p.id}" value="${val||''}" placeholder="0"
+            oninput="onInput('${p.id}',this.value)"/>
+          <button class="qty-btn" onclick="cambiarQty('${p.id}',0.5)">+</button>
+        </div>
+      </div>`;
     });
-  } else {
-    h+=`<div class="prod-grid">`;
-    productos.forEach(p=>h+=cardHTML(p,unidad));
     h+=`</div>`;
-  }
-
+  });
   el.innerHTML=h;
   actualizarTotal();
 }
 
-function cardHTML(p,unidad){
-  const val=pedidoValues[p.id]||0;
-  const hasVal=val>0;
-  // Obtener código: usar abreviatura del nombre (primeras 2-3 letras) o campo codigo si existe
-  const cod=p.codigo||p.nombre.slice(0,3).toUpperCase();
-  return`<div class="prod-card${hasVal?' has-value':''}" id="card-${p.id}">
-    <div>
-      <div class="prod-codigo">${cod}</div>
-      <div class="prod-nombre">${p.nombre}</div>
-      <div class="prod-unidad">${unidad}</div>
-    </div>
-    <div class="prod-input-wrap">
-      <button class="btn-qty" onclick="cambiarQty('${p.id}',-1,-0.5)">−</button>
-      <input class="prod-input" type="number" min="0" step="0.5" 
-        id="inp-${p.id}" value="${val||''}" placeholder="0"
-        oninput="onInput('${p.id}',this.value)"
-        onchange="onInput('${p.id}',this.value)"/>
-      <button class="btn-qty" onclick="cambiarQty('${p.id}',1,0.5)">+</button>
-    </div>
-  </div>`;
+function renderStockIdeal(){
+  const el=document.getElementById('stock-ideal-content');
+  if(!productos.length){el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin productos.</div>';return;}
+  const unidad=sucActual.tipo==='refrigerado'?'bandejas':'cajas';
+  const areas={};
+  productos.forEach(p=>{const a=p.area_nombre||'General';if(!areas[a])areas[a]=[];areas[a].push(p);});
+  const multiArea=Object.keys(areas).length>1;
+  let h='';
+  Object.entries(areas).forEach(([area,prods])=>{
+    if(multiArea)h+=`<div class="sec-title"><i class="ti ti-tag" style="font-size:10px"></i> ${area}</div>`;
+    prods.forEach(p=>{
+      const ideal=getIdeal(p);
+      const actual=getActual(p);
+      h+=`<div class="stock-row">
+        <div>
+          <div style="font-size:14px;font-weight:600">${p.nombre}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">${unidad}</div>
+        </div>
+        <div class="actual-wrap">
+          <span class="ideal-label">Stock actual:</span>
+          <input type="number" min="0" step="0.5" class="ideal-input" style="color:var(--warm)"
+            id="actual-${p.id}" value="${actual||''}" placeholder="0"
+            oninput="onActual('${p.id}',this.value)"/>
+        </div>
+        <div class="ideal-wrap">
+          <span class="ideal-label">Stock ideal:</span>
+          <input type="number" min="0" step="0.5" class="ideal-input"
+            id="ideal-${p.id}" value="${ideal||''}" placeholder="0"
+            oninput="onIdeal('${p.id}',this.value)"/>
+        </div>
+      </div>`;
+    });
+  });
+  el.innerHTML=h;
 }
 
-function cambiarQty(pid,dir,step){
+function onIdeal(pid,val){
+  const p=productos.find(x=>x.id===pid);
+  if(!p)return;
+  const key=p.id||p.nombre;
+  stockIdeal[key]=parseFloat(val)||0;
+}
+function onActual(pid,val){
+  stockActualValues[pid]=parseFloat(val)||0;
+}
+function aplicarSugerido(pid,sug){
+  if(sug<=0)return;
+  pedidoValues[pid]=sug;
   const inp=document.getElementById(`inp-${pid}`);
-  const cur=parseFloat(inp.value)||0;
-  const nuevo=Math.max(0,Math.round((cur+dir*step)*10)/10);
-  inp.value=nuevo||'';
+  if(inp){inp.value=sug;inp.classList.add('has-val');}
+  const row=document.getElementById(`prow-${pid}`);
+  if(row)row.classList.add('has-value');
+  actualizarTotal();
+}
+function cambiarQty(pid,step){
+  const inp=document.getElementById(`inp-${pid}`);
+  const cur=parseFloat(inp?.value)||0;
+  const nuevo=Math.max(0,Math.round((cur+step)*10)/10);
+  if(inp)inp.value=nuevo||'';
   onInput(pid,nuevo);
 }
-
 function onInput(pid,val){
   const v=parseFloat(val)||0;
   pedidoValues[pid]=v;
-  const card=document.getElementById(`card-${pid}`);
-  if(card)card.classList.toggle('has-value',v>0);
+  const row=document.getElementById(`prow-${pid}`);
+  if(row)row.classList.toggle('has-value',v>0);
   actualizarTotal();
 }
-
 function actualizarTotal(){
   const tot=Object.values(pedidoValues).reduce((s,v)=>s+(v||0),0);
   document.getElementById('total-display').textContent=tot.toLocaleString('es-AR',{maximumFractionDigits:1});
   document.getElementById('btn-enviar').disabled=tot===0;
 }
-
 function limpiarPedido(){
   if(!confirm('¿Limpiar todos los valores?'))return;
   pedidoValues={};
   productos.forEach(p=>{
-    const inp=document.getElementById(`inp-${p.id}`);
-    if(inp)inp.value='';
-    const card=document.getElementById(`card-${p.id}`);
-    if(card)card.classList.remove('has-value');
+    const inp=document.getElementById(`inp-${p.id}`);if(inp)inp.value='';
+    const row=document.getElementById(`prow-${p.id}`);if(row)row.classList.remove('has-value');
   });
   actualizarTotal();
 }
 
+async function guardarStockIdeal(){
+  if(!sucActual)return;
+  ss('saving','Guardando...');
+  try{
+    for(const p of productos){
+      const idealInp=document.getElementById(`ideal-${p.id}`);
+      const actualInp=document.getElementById(`actual-${p.id}`);
+      const cantidad=parseFloat(idealInp?.value)||0;
+      const actualVal=parseFloat(actualInp?.value)||0;
+      stockIdeal[p.id]=cantidad;
+      stockActualValues[p.id]=actualVal;
+      await upsert('sucursal_stock_ideal',{
+        sucursal_id:sucActual.id,
+        producto_id:p.id,
+        producto:p.nombre,
+        cantidad
+      });
+    }
+    ss('ok','Stock ideal guardado');
+    // Volver al tab pedido y actualizar sugeridos
+    showTab('pedido');
+  }catch(e){ss('error','Error: '+e.message)}
+}
+
 async function enviarPedido(){
   const btn=document.getElementById('btn-enviar');
-  btn.innerHTML='<span class="spinner"></span> Enviando...';
-  btn.disabled=true;
+  btn.innerHTML='<span class="spinner"></span> Enviando...';btn.disabled=true;
   ss('saving','Enviando...');
-
+  const unidad=sucActual.tipo==='refrigerado'?'bandejas':'cajas';
   const items=productos
     .filter(p=>pedidoValues[p.id]>0)
-    .map(p=>({
-      producto_id:p.id,
-      producto:p.nombre,
-      cantidad:pedidoValues[p.id],
-      unidad:sucActual.tipo==='refrigerado'?'bandejas':'cajas'
-    }));
-
+    .map(p=>({producto_id:p.id,producto:p.nombre,cantidad:pedidoValues[p.id],unidad,
+      stock_actual:stockActualValues[p.id]||0,stock_ideal:getIdeal(p)}));
   const obs=document.getElementById('obs-input').value.trim();
-
   try{
-    // Verificar si ya existe pedido hoy
     const existing=await get('pedidos_sucursal',`sucursal_id=eq.${sucActual.id}&fecha=eq.${hoy}&select=id`);
     if(existing.length){
-      await pat('pedidos_sucursal',`id=eq.${existing[0].id}`,{
-        items,observaciones:obs,estado:'pendiente',
-        updated_at:new Date().toISOString()
-      });
+      await pat(`${SB}/rest/v1/pedidos_sucursal?id=eq.${existing[0].id}`,
+        {items,observaciones:obs,estado:'pendiente',updated_at:new Date().toISOString()});
     } else {
-      await ins('pedidos_sucursal',{
-        sucursal_id:sucActual.id,
-        empresa_id:sucActual.empresa_id,
-        fecha:hoy,items,observaciones:obs,estado:'pendiente'
-      });
+      await ins('pedidos_sucursal',{sucursal_id:sucActual.id,empresa_id:sucActual.empresa_id,fecha:hoy,items,observaciones:obs,estado:'pendiente'});
     }
     ss('ok','Enviado');
     mostrarSuccess(items);
   }catch(e){
-    ss('','Error');
+    ss('error','Error');
     document.getElementById('msg-errtxt').textContent=e.message;
     document.getElementById('msg-err').style.display='flex';
-    btn.innerHTML='<i class="ti ti-send"></i> Enviar pedido';
-    btn.disabled=false;
+    btn.innerHTML='<i class="ti ti-send"></i> Enviar pedido';btn.disabled=false;
   }
 }
 
 function mostrarSuccess(items){
   document.getElementById('screen-main').style.display='none';
-  document.getElementById('bottom-bar').style.display='none';
+  document.getElementById('bottom-pedido').style.display='none';
+  document.getElementById('bottom-stock').style.display='none';
   document.getElementById('screen-success').style.display='flex';
-
   const unidad=sucActual.tipo==='refrigerado'?'bandejas':'cajas';
   const total=items.reduce((s,it)=>s+it.cantidad,0);
-
-  document.getElementById('success-sub').textContent=
-    `${sucActual.nombre} — ${hoyLabel}`;
-
-  let h=`<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">Resumen del pedido</div>`;
+  document.getElementById('success-sub').textContent=`${sucActual.nombre} — ${hoyLabel}`;
+  let h='';
   items.forEach(it=>{
     h+=`<div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0;border-bottom:.5px solid var(--border)">
       <span>${it.producto}</span>
-      <span style="font-weight:700;color:var(--gold2)">${it.cantidad} ${unidad}</span>
+      <span style="font-weight:700;color:var(--gold2)">${it.cantidad} <span style="font-weight:400;color:var(--text2)">${unidad}</span></span>
     </div>`;
   });
   h+=`<div style="display:flex;justify-content:space-between;font-size:14px;font-weight:700;padding-top:10px;color:var(--gold)">
     <span>TOTAL</span><span>${total.toLocaleString('es-AR')} ${unidad}</span>
   </div>`;
-  document.getElementById('success-resumen').innerHTML=h;
+  document.getElementById('success-res').innerHTML=h;
 }
 
 function nuevoPedido(){
   pedidoValues={};
   document.getElementById('screen-success').style.display='none';
   document.getElementById('screen-main').style.display='block';
-  document.getElementById('bottom-bar').style.display='flex';
   document.getElementById('obs-input').value='';
   document.getElementById('msg-ok').style.display='none';
   document.getElementById('msg-err').style.display='none';
-  renderPedido();
+  showTab('pedido');
 }
 
-// Cargar áreas para mostrar nombres
-async function cargarAreas(){
-  try{
-    const areas=await get('areas','order=nombre.asc');
-    productos=productos.map(p=>{
-      const a=areas.find(x=>x.id===p.area_id);
-      return{...p,area_nombre:a?a.nombre:'General'};
-    });
-  }catch{}
+function cerrarSesion(){
+  sucActual=null;pedidoValues={};stockIdeal={};stockActualValues={};productos=[];
+  document.getElementById('screen-main').style.display='none';
+  document.getElementById('bottom-pedido').style.display='none';
+  document.getElementById('bottom-stock').style.display='none';
+  document.getElementById('screen-success').style.display='none';
+  document.getElementById('screen-login').style.display='flex';
 }
-
-// Override ingresar para cargar áreas también
-const _ingresar=ingresar;
-ingresar=async function(){
-  const sid=document.getElementById('sel-sucursal').value;
-  if(!sid)return;
-  sucActual=sucursales.find(s=>s.id===sid);
-  if(!sucActual)return;
-  document.getElementById('btn-ingresar').innerHTML='<span class="spinner"></span> Cargando...';
-  document.getElementById('btn-ingresar').disabled=true;
-  try{
-    productos=await get('productos',`empresa_id=eq.${sucActual.empresa_id}&order=orden.asc,nombre.asc`);
-    await cargarAreas();
-  }catch{productos=[]}
-
-  document.getElementById('screen-login').style.display='none';
-  document.getElementById('screen-main').style.display='block';
-  document.getElementById('bottom-bar').style.display='flex';
-
-  document.getElementById('suc-nombre').textContent=sucActual.nombre;
-  document.getElementById('hdr-fecha').textContent=hoyLabel;
-
-  const chip=document.getElementById('suc-tipo-chip');
-  if(sucActual.tipo==='refrigerado'){
-    chip.textContent='❄️ Refrigerado';chip.className='suc-tipo ref';
-    document.getElementById('total-unidad-label').textContent='bandejas';
-  } else {
-    chip.textContent='🧊 Congelado';chip.className='suc-tipo con';
-    document.getElementById('total-unidad-label').textContent='cajas';
-  }
-
-  // Verificar pedido existente hoy
-  try{
-    const existing=await get('pedidos_sucursal',`sucursal_id=eq.${sucActual.id}&fecha=eq.${hoy}&select=id,items,observaciones`);
-    if(existing.length){
-      pedidoValues={};
-      (existing[0].items||[]).forEach(it=>{pedidoValues[it.producto_id]=it.cantidad;});
-      document.getElementById('obs-input').value=existing[0].observaciones||'';
-    }
-  }catch{}
-
-  document.getElementById('btn-ingresar').innerHTML='Ingresar →';
-  document.getElementById('btn-ingresar').disabled=false;
-  renderPedido();
-};
-
-document.getElementById('sel-sucursal').addEventListener('change',function(){
-  document.getElementById('login-err').style.display='none';
-});
 
 init();
 </script>
