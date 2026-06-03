@@ -228,7 +228,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.23</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.24</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -265,7 +265,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <button class="btn btn-primary" id="btnsave" onclick="savePlan()"><i class="ti ti-device-floppy"></i> Guardar plan</button>
     </div>
   </div>
-  <div id="epills" class="emp-pills"></div>
+  <div id="epills" class="emp-pills" style="display:none"></div>
   <div class="add-bar">
     <span style="font-size:13px;color:var(--text2);white-space:nowrap">Agregar:</span>
     <select id="semp" onchange="onEmp()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Empresa</option></select>
@@ -940,59 +940,124 @@ function onArea(){
 function changeWeek(n){st.w=addW(st.w,n);document.getElementById('gload').style.display='flex';lp(st.w).then(()=>{document.getElementById('gload').style.display='none';rG()})}
 function gE(){if(!st.Ed[st.w])st.Ed[st.w]=st.P[st.w]?JSON.parse(JSON.stringify(st.P[st.w])):[];return st.Ed[st.w]}
 
+let planActiveEmp=null;
+let planActiveArea={};
+
 function rG(){
   document.getElementById('wlabel').textContent=wlb(st.w);
-  const all=gE();const rows=st.ef==='all'?all:all.filter(r=>r.empresa_id===st.ef);
+  const all=gE();
   const wrap=document.getElementById('grid');
   if(!all.length){wrap.innerHTML='<div class="empty"><i class="ti ti-table-off"></i>Agrega productos desde el maestro.</div>';return}
-  if(!rows.length){wrap.innerHTML='<div class="empty"><i class="ti ti-filter-off"></i>No hay productos de esta empresa en el plan.</div>';return}
-  const t=tc(st.w);const as=gas(rows);
-  const byE={};rows.forEach(r=>{const eid=r.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push({...r,_i:all.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area)})});
-  let h=`<table class="plan-grid"><thead><tr><th class="left" style="width:100px">Empresa</th><th class="left" style="width:75px">Area</th><th class="left" style="width:200px">Producto</th><th class="left" style="width:80px">Unidad</th>`;
-  DAYS.forEach((d,i)=>{h+=`<th class="${i===t?'today-head':''}" style="width:70px">${d.slice(0,3)}<br><span style="font-size:10px;font-weight:400">${ddate(st.w,i)}</span></th>`});
-  h+=`<th style="width:64px">Total</th><th style="width:32px"></th></tr></thead><tbody>`;
-  let dt=Array(7).fill(0),gd=0;
-  Object.entries(byE).forEach(([eid,items],gi)=>{
-    const clr=ec(eid);const nm=en(eid)||'Sin empresa';const bg=rgba(clr,.12);
-    const bA={};items.forEach(r=>{const a=r.area||'SA';if(!bA[a])bA[a]=[];bA[a].push(r)});
-    let ef=true;
-    Object.entries(bA).forEach(([area,aIt],ai)=>{
-      aIt.forEach((r,ri)=>{
-        const rt=(r.days||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
-        gd+=rt;(r.days||Array(7).fill(0)).forEach((v,di)=>{dt[di]+=(v||0)});
-        const cls=gi>0&&ef&&ri===0&&ai===0?'emp-sep':(!ef&&ri===0&&ai>0)?'area-sep':'';
-        h+=`<tr class="${cls}">`;
-        if(ef&&ri===0&&ai===0)h+=`<td rowspan="${items.length}" style="vertical-align:top;padding-top:10px"><span class="emp-tag" style="background:${bg};color:${clr}"><span class="color-dot" style="background:${clr}"></span>${nm}</span></td>`;
-        if(ri===0)h+=`<td rowspan="${aIt.length}" style="vertical-align:top;padding-top:8px"><span class="area-tag" style="background:${ab(area,as)};color:${ac(area,as)}">${area}</span></td>`;
-        h+=`<td class="prod-name"><input class="prod-input" value="${r.producto}" onchange="uf(${r._i},'producto',this.value)"/></td>`;
-        h+=`<td><input value="${r.unidad||''}" list="udl" onchange="uf(${r._i},'unidad',this.value)" style="width:100%;padding:3px 5px;font-size:12px;border:.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`;
-        for(let di=0;di<7;di++){
-          const v=(r.days&&r.days[di])||0;
-          const prodObj=st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id);
-          const tanda=prodObj&&prodObj.unidades_tanda?parseInt(prodObj.unidades_tanda):0;
-          if(tanda>0){
-            const maxT=6;let opts='';
-            for(let t2=0;t2<=maxT;t2++){
-              const val=t2*tanda;
-              opts+=`<option value="${val}"${val===v?' selected':''}>${t2===0?'--':`${t2}T · ${val.toLocaleString('es-AR')}`}</option>`;
-            }
-            if(v>0&&v%tanda!==0)opts=`<option value="${v}" selected>${v} ✎</option>`+opts;
-            h+=`<td class="day-cell${di===t?' today-col':''}"><select class="day-input${v>0?' has-val':''}" style="width:100%;font-size:11px;padding:2px" onchange="ud(${r._i},${di},this.value);this.classList.toggle('has-val',this.value!='0'&&this.value!='');">${opts}</select></td>`;
-          } else {
-            h+=`<td class="day-cell${di===t?' today-col':''}"><input class="day-input${v>0?' has-val':''}" type="number" min="0" value="${v||''}" placeholder="--" onchange="ud(${r._i},${di},this.value);this.classList.toggle('has-val',this.value!='')"/></td>`;
-          }
-        }
-        h+=`<td class="total-cell">${fmt(rt)}</td><td style="text-align:center"><button class="btn btn-xs btn-danger" onclick="delRow(${r._i})"><i class="ti ti-trash"></i></button></td></tr>`;
-        ef=false;
-      });
-    });
+
+  // Agrupar por empresa
+  const byE={};
+  all.forEach(r=>{const eid=r.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(r)});
+  const eids=Object.keys(byE);
+  if(!planActiveEmp||!byE[planActiveEmp])planActiveEmp=eids[0];
+
+  // Tabs empresa
+  let tabsH=`<div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:0;flex-wrap:wrap;margin-bottom:1rem">`;
+  eids.forEach(eid=>{
+    const clr=ec(eid);const nm=en(eid)||'SE';
+    const active=eid===planActiveEmp;
+    tabsH+=`<button class="proy-tab${active?' active':''}" onclick="planSetEmp('${eid}')" style="${active?'border-bottom:2px solid '+clr+';color:'+clr:''}">
+      <span class="color-dot" style="background:${clr};display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>${nm}
+    </button>`;
   });
-  h+=`<tr class="totals-row"><td></td><td></td><td style="padding-left:8px;font-size:12px">Total diario</td><td></td>`;
-  dt.forEach((v,i)=>{h+=`<td class="day-cell${i===t?' today-col':''}" style="text-align:center">${fmt(v)}</td>`});
-  h+=`<td class="day-cell grand">${fmt(gd)}</td><td></td></tr></tbody></table>`;
-  h+=`<datalist id="udl">${UNITS.map(u=>`<option>${u}</option>`).join('')}</datalist>`;
-  wrap.innerHTML=h;
+  tabsH+=`</div>`;
+
+  wrap.innerHTML=tabsH+`<div id="plan-emp-content"></div>`;
+  renderPlanEmpresa(planActiveEmp, byE[planActiveEmp]||[]);
 }
+
+function planSetEmp(eid){
+  planActiveEmp=eid;
+  const all=gE();
+  const byE={};all.forEach(r=>{const e=r.empresa_id||'_';if(!byE[e])byE[e]=[];byE[e].push(r)});
+  document.querySelectorAll('#grid .proy-tab').forEach(btn=>{
+    const isActive=btn.getAttribute('onclick')===`planSetEmp('${eid}')`;
+    btn.classList.toggle('active',isActive);
+    const clr=ec(eid);
+    btn.style.borderBottom=isActive?'2px solid '+clr:'';
+    btn.style.color=isActive?clr:'';
+  });
+  renderPlanEmpresa(eid, byE[eid]||[]);
+}
+
+function renderPlanEmpresa(eid, items){
+  const el=document.getElementById('plan-emp-content');
+  if(!el)return;
+  const all=gE();
+  const t=tc(st.w);
+  const as=gas(all);
+
+  // Agrupar por área
+  const bA={};
+  items.forEach(r=>{const a=r.area||'SA';if(!bA[a])bA[a]=[];bA[a].push(r)});
+  const areas=Object.keys(bA);
+  if(!planActiveArea[eid]||!bA[planActiveArea[eid]])planActiveArea[eid]=areas[0];
+  const activeArea=planActiveArea[eid];
+
+  // Tabs área
+  let h=`<div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1rem;flex-wrap:wrap">`;
+  areas.forEach(area=>{
+    const bg2=ab(area,as);const ac2=ac(area,as);
+    const isActive=area===activeArea;
+    h+=`<button class="proy-tab${isActive?' active':''}" onclick="planSetArea('${eid}','${area.replace(/'/g,"\\'")}')">
+      <span style="background:${bg2};color:${ac2};border-radius:4px;padding:1px 6px;font-size:11px">${area}</span>
+    </button>`;
+  });
+  h+=`</div>`;
+
+  const aItems=bA[activeArea]||[];
+  h+=`<div style="overflow-x:auto"><table class="plan-grid"><thead><tr>
+    <th class="left" style="min-width:160px">Producto</th>
+    <th class="left" style="width:80px">Unidad</th>`;
+  DAYS.forEach((d,i)=>{h+=`<th class="${i===t?'today-head':''}" style="width:70px">${d.slice(0,3)}<br><span style="font-size:10px;font-weight:400">${ddate(st.w,i)}</span></th>`;});
+  h+=`<th style="width:64px">Total</th><th style="width:32px"></th></tr></thead><tbody>`;
+
+  let dt=Array(7).fill(0),gd=0;
+  aItems.forEach(r=>{
+    const _i=all.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
+    const rt=(r.days||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
+    gd+=rt;(r.days||Array(7).fill(0)).forEach((v,di)=>{dt[di]+=(v||0)});
+    h+=`<tr>`;
+    h+=`<td class="prod-name"><input class="prod-input" value="${r.producto}" onchange="uf(${_i},'producto',this.value)"/></td>`;
+    h+=`<td><input value="${r.unidad||''}" list="udl" onchange="uf(${_i},'unidad',this.value)" style="width:100%;padding:3px 5px;font-size:12px;border:.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`;
+    for(let di=0;di<7;di++){
+      const v=(r.days&&r.days[di])||0;
+      const prodObj=st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id);
+      const tanda=prodObj&&prodObj.unidades_tanda?parseInt(prodObj.unidades_tanda):0;
+      if(tanda>0){
+        const maxT=6;let opts='';
+        for(let t2=0;t2<=maxT;t2++){
+          const val=t2*tanda;
+          opts+=`<option value="${val}"${val===v?' selected':''}>${t2===0?'--':`${t2}T · ${val.toLocaleString('es-AR')}`}</option>`;
+        }
+        if(v>0&&v%tanda!==0)opts=`<option value="${v}" selected>${v} ✎</option>`+opts;
+        h+=`<td class="day-cell${di===t?' today-col':''}"><select class="day-input${v>0?' has-val':''}" style="width:100%;font-size:11px;padding:2px" onchange="ud(${_i},${di},this.value);this.classList.toggle('has-val',this.value!='0'&&this.value!='');">${opts}</select></td>`;
+      } else {
+        h+=`<td class="day-cell${di===t?' today-col':''}"><input class="day-input${v>0?' has-val':''}" type="number" min="0" value="${v||''}" placeholder="--" onchange="ud(${_i},${di},this.value);this.classList.toggle('has-val',this.value!='')"/></td>`;
+      }
+    }
+    h+=`<td class="total-cell">${fmt(rt)}</td><td style="text-align:center"><button class="btn btn-xs btn-danger" onclick="delRow(${_i})"><i class="ti ti-trash"></i></button></td></tr>`;
+  });
+
+  // Fila totales
+  const totPlan=aItems.reduce((s,r)=>(r.days||[]).reduce((a,b)=>a+(b||0),s),0);
+  h+=`<tr class="totals-row"><td style="padding-left:8px;font-size:12px">Total ${activeArea}</td><td></td>`;
+  dt.forEach((v,i)=>{h+=`<td class="day-cell${i===t?' today-col':''}" style="text-align:center">${fmt(v)}</td>`;});
+  h+=`<td class="day-cell grand">${fmt(gd)}</td><td></td></tr>`;
+  h+=`</tbody></table></div>`;
+  h+=`<datalist id="udl">${UNITS.map(u=>`<option>${u}</option>`).join('')}</datalist>`;
+  el.innerHTML=h;
+}
+
+function planSetArea(eid,area){
+  planActiveArea[eid]=area;
+  renderPlanEmpresa(eid, gE().filter(r=>r.empresa_id===eid));
+}
+
 function uf(i,f,v){const r=gE()[i];if(r)r[f]=v}
 function ud(i,di,v){
   const r=gE();
@@ -1002,12 +1067,11 @@ function ud(i,di,v){
   udt();
 }
 function udt(){
-  const r=gE();const dt=Array(7).fill(0);let gd=0;
-  r.forEach(x=>{(x.days||[]).forEach((v,k)=>{dt[k]+=(v||0);gd+=(v||0)})});
-  const tr=document.querySelector('.totals-row');if(!tr)return;
-  const cl=tr.querySelectorAll('td');
-  dt.forEach((v,i)=>{if(cl[4+i])cl[4+i].textContent=fmt(v)});
-  if(cl[11])cl[11].textContent=fmt(gd);
+  // Con el nuevo diseño de tabs, re-renderizamos solo el área activa
+  if(planActiveEmp){
+    const all=gE();
+    renderPlanEmpresa(planActiveEmp, all.filter(r=>r.empresa_id===planActiveEmp));
+  }
 }
 function delRow(i){const r=gE();r.splice(i,1);st.Ed[st.w]=r;rG()}
 function addFromMaestro(){
