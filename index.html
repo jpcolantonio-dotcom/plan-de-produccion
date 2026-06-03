@@ -1,5 +1,6 @@
 
 
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -227,7 +228,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.18</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.19</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -812,27 +813,30 @@ document.getElementById('hdate').textContent=new Date().toLocaleDateString('es-A
 
 async function init(){
   ss('saving','Conectando...');
+async function init(){
+  ss('saving','Conectando...');
   try{
     const[pl,re,rr,mp,em,ar,pr,planActual]=await Promise.all([
-      get('planes','select=semana&order=semana.desc'),
-      get('produccion_real','select=semana&order=semana.desc'),
+      get('planes','select=semana&order=semana.desc').catch(()=>[]),
+      get('produccion_real','select=semana&order=semana.desc').catch(()=>[]),
       get('recetas','select=datos,tandas').catch(()=>[]),
       get('materias_primas','order=nombre.asc').catch(()=>[]),
-      get('empresas','order=nombre.asc'),
-      get('areas','order=nombre.asc'),
-      get('productos','order=orden.asc,nombre.asc'),
-      get('planes',`semana=eq.${W0}&select=filas`)
+      get('empresas','order=nombre.asc').catch(()=>[]),
+      get('areas','order=nombre.asc').catch(()=>[]),
+      get('productos','order=orden.asc,nombre.asc').catch(()=>[]),
+      get('planes',`semana=eq.${W0}&select=filas`).catch(()=>[])
     ]);
     const ss2=new Set([...pl.map(p=>p.semana),...re.map(r=>r.semana),W0]);
     st.Sem=[...ss2].sort();
     if(rr.length){st.Rec=rr[0].datos||{};st.RecTanda=rr[0].tandas||{};}
     mpData=mp||[];
-    st.E=em;st.A=ar||[];st.Pr=pr;
-    // Plan actual ya cargado
+    st.E=em||[];st.A=ar||[];st.Pr=pr||[];
     st.P[W0]=planActual.length?planActual[0].filas:[];
     ss('online','Conectado');
     uES();
   }catch(e){ss('error','Sin conexion');console.error(e)}
+  rG();rP();
+}
   rG();rP();
 }
 
@@ -881,7 +885,7 @@ function T(t){
   if(t==='stock')initStock();
   if(t==='proy')initProy();
   if(t==='hor')initHorarios();
-  if(t==='rec')rRec();
+  if(t==='rec'){if(!st.Pr.length||!Object.keys(st.Rec).length){init().then(()=>rRec());}else{rRec();}}
   if(t==='con'){pSC();renderCon()}
   if(t==='mae')rMae();
   if(t==='rend')initRend();
