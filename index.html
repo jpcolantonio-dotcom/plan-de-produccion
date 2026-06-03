@@ -5604,7 +5604,8 @@ function renderSucursalesList(){
       <th style="text-align:left">Nombre</th>
       <th style="text-align:left">Empresa</th>
       <th style="text-align:center">Estado</th>
-      <th style="width:60px"></th>
+      <th style="text-align:center">Productos</th>
+      <th style="width:40px"></th>
     </tr></thead><tbody>`;
     items.forEach(s=>{
       const emp=st.E.find(e=>e.id===s.empresa_id);
@@ -5618,6 +5619,11 @@ function renderSucursalesList(){
           </label>
         </td>
         <td style="text-align:center">
+          <button class="btn btn-xs" onclick="abrirConfigProductos('${s.id}','${s.nombre.replace(/'/g,"\\'")}','${s.empresa_id}')">
+            <i class="ti ti-settings"></i> Configurar
+          </button>
+        </td>
+        <td style="text-align:center">
           <button class="btn btn-xs btn-danger" onclick="delSucursal('${s.id}','${s.nombre}')"><i class="ti ti-trash"></i></button>
         </td>
       </tr>`;
@@ -5626,6 +5632,92 @@ function renderSucursalesList(){
   });
   el.innerHTML=h;
 }
+
+async function abrirConfigProductos(sucId,sucNombre,empId){
+  // Cargar productos de la empresa y los asignados a esta sucursal
+  ss('saving','Cargando...');
+  try{
+    const[prods,areas,asignados]=await Promise.all([
+      get('productos',`empresa_id=eq.${empId}&order=orden.asc,nombre.asc`),
+      get('areas','order=nombre.asc'),
+      get('sucursal_productos',`sucursal_id=eq.${sucId}`)
+    ]);
+    ss('online','Listo');
+    const prodsConArea=prods.map(p=>{const a=areas.find(x=>x.id===p.area_id);return{...p,area_nombre:a?a.nombre:'General'};});
+    const asigIds=new Set(asignados.map(a=>a.producto_id||a.producto));
+    const todosActivos=asignados.length===0; // si no hay config, todos activos
+
+    // Agrupar por área
+    const byArea={};
+    prodsConArea.forEach(p=>{const a=p.area_nombre;if(!byArea[a])byArea[a]=[];byArea[a].push(p);});
+
+    const overlay=document.createElement('div');
+    overlay.className='modal-overlay';overlay.id='modal-config-prod';
+    let rows='';
+    Object.entries(byArea).forEach(([area,aProds])=>{
+      rows+=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:8px 0 4px;border-top:.5px solid var(--border);margin-top:8px">${area}</div>`;
+      aProds.forEach(p=>{
+        const activo=todosActivos||asigIds.has(p.id)||asigIds.has(p.nombre);
+        const asig=asignados.find(a=>a.producto_id===p.id||a.producto===p.nombre);
+        const pausado=asig?!asig.activo:false;
+        rows+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:.5px solid var(--border)">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1">
+            <input type="checkbox" id="cp-${p.id}" ${activo&&!pausado?'checked':''} style="width:15px;height:15px;cursor:pointer"/>
+            <span style="font-size:13px;font-weight:500">${p.nombre}</span>
+          </label>
+          ${activo&&!pausado?`<span style="font-size:10px;color:var(--green)">activo</span>`:`<span style="font-size:10px;color:var(--text3)">${pausado?'pausado':'inactivo'}</span>`}
+        </div>`;
+      });
+    });
+
+    overlay.innerHTML=`<div class="modal" style="width:480px;max-height:80vh;overflow-y:auto">
+      <div class="modal-title"><i class="ti ti-settings"></i> Productos — ${sucNombre}</div>
+      <div class="modal-sub">Marcá los productos que recibe esta sucursal. Desmarcá para pausar temporalmente.</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button class="btn btn-sm" onclick="selectAllCP(true)">Marcar todos</button>
+        <button class="btn btn-sm" onclick="selectAllCP(false)">Desmarcar todos</button>
+      </div>
+      <div id="cp-lista">${rows}</div>
+      <div class="modal-btns" style="margin-top:16px">
+        <button class="btn" onclick="document.getElementById('modal-config-prod').remove()">Cancelar</button>
+        <button class="btn btn-primary" onclick="guardarConfigProductos('${sucId}','${empId}')"><i class="ti ti-device-floppy"></i> Guardar</button>
+      </div>
+    </div>`;
+    overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove();});
+    // Guardar referencia a productos para el guardado
+    overlay._prods=prodsConArea;
+    document.body.appendChild(overlay);
+  }catch(e){ss('error','Error: '+e.message)}
+}
+
+function selectAllCP(val){
+  document.querySelectorAll('[id^="cp-"]').forEach(cb=>cb.checked=val);
+}
+
+async function guardarConfigProductos(sucId,empId){
+  const overlay=document.getElementById('modal-config-prod');
+  const prods=overlay?overlay._prods:[];
+  if(!prods.length)return;
+  ss('saving','Guardando...');
+  try{
+    // Borrar asignaciones anteriores
+    await fetch(`${SB}/rest/v1/sucursal_productos?sucursal_id=eq.${sucId}`,{method:'DELETE',headers:H});
+    // Insertar las marcadas como activas
+    const activos=prods.filter(p=>document.getElementById(`cp-${p.id}`)?.checked);
+    if(activos.length){
+      await fetch(`${SB}/rest/v1/sucursal_productos`,{
+        method:'POST',headers:{...H,'Prefer':'return=minimal'},
+        body:JSON.stringify(activos.map(p=>({sucursal_id:sucId,empresa_id:empId,producto_id:p.id,producto:p.nombre,activo:true})))
+      });
+    }
+    overlay?.remove();
+    ss('online','Configuración guardada');
+    const msg=document.getElementById('suc-msg');msg.style.display='flex';
+    setTimeout(()=>msg.style.display='none',3000);
+  }catch(e){ss('error','Error: '+e.message)}
+}
+
+
 
 async function addSucursal(){
   const nombre=document.getElementById('nsuc-nombre').value.trim();
