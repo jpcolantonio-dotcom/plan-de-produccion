@@ -814,8 +814,8 @@ async function init(){
   ss('saving','Conectando...');
   try{
     const[pl,re,rr,mp,em,ar,pr,planActual]=await Promise.all([
-      get('planes','select=semana&order=semana.desc&limit=20'),
-      get('produccion_real','select=semana&order=semana.desc&limit=20'),
+      get('planes','select=semana&order=semana.desc'),
+      get('produccion_real','select=semana&order=semana.desc'),
       get('recetas','select=datos,tandas').catch(()=>[]),
       get('materias_primas','order=nombre.asc').catch(()=>[]),
       get('empresas','order=nombre.asc'),
