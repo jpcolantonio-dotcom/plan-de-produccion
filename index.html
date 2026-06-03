@@ -228,7 +228,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.24</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.27</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -255,10 +255,10 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <!-- PLAN -->
 <div id="tab-plan" class="section active">
   <div class="toolbar">
-    <div class="week-nav">
-      <button class="btn btn-sm" onclick="changeWeek(-1)"><i class="ti ti-chevron-left"></i></button>
-      <span class="week-label" id="wlabel"></span>
-      <button class="btn btn-sm" onclick="changeWeek(1)"><i class="ti ti-chevron-right"></i></button>
+    <div class="real-sel">
+      <label>Semana:</label>
+      <select id="plan-wsel" onchange="onPlanSemana()"></select>
+      <button class="btn btn-sm" onclick="onPlanSemana()" title="Recargar"><i class="ti ti-refresh"></i></button>
     </div>
     <div class="btns">
       <button class="btn btn-pdf" id="btnpdf" onclick="genPDF()"><i class="ti ti-file-type-pdf"></i> PDF</button>
@@ -840,6 +840,15 @@ async function init(){
     st.P[W0]=planActual.length?planActual[0].filas:[];
     ss('online','Conectado');
     uES();
+    // Popular selector de semana de planificación
+    const psel=document.getElementById('plan-wsel');
+    if(psel){
+      psel.innerHTML='';
+      [...new Set([...st.Sem,st.w])].sort().reverse().forEach(w=>{
+        const o=document.createElement('option');o.value=w;o.textContent=wlb(w);psel.appendChild(o);
+      });
+      psel.value=st.w;
+    }
   }catch(e){ss('error','Sin conexion');console.error(e)}
   rG();rP();
 }
@@ -937,17 +946,40 @@ function onArea(){
   st.Pr.filter(p=>p.area_id===aid).forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.nombre;ps.appendChild(o)});
 }
 
-function changeWeek(n){st.w=addW(st.w,n);document.getElementById('gload').style.display='flex';lp(st.w).then(()=>{document.getElementById('gload').style.display='none';rG()})}
+function onPlanSemana(){
+  const k=document.getElementById('plan-wsel').value;
+  if(!k)return;
+  st.w=k;
+  document.getElementById('gload').style.display='flex';
+  lp(k).then(()=>{document.getElementById('gload').style.display='none';planActiveEmp=null;rG()});
+}
+function changeWeek(n){st.w=addW(st.w,n);document.getElementById('gload').style.display='flex';lp(st.w).then(()=>{document.getElementById('gload').style.display='none';planActiveEmp=null;rG()})}
 function gE(){if(!st.Ed[st.w])st.Ed[st.w]=st.P[st.w]?JSON.parse(JSON.stringify(st.P[st.w])):[];return st.Ed[st.w]}
 
 let planActiveEmp=null;
 let planActiveArea={};
 
 function rG(){
-  document.getElementById('wlabel').textContent=wlb(st.w);
+  // Popular selector de semana si está vacío
+  const sel=document.getElementById('plan-wsel');
+  if(sel){
+    if(!sel.options.length||sel.options.length<st.Sem.length){
+      sel.innerHTML='';
+      [...new Set([...st.Sem,st.w])].sort().reverse().forEach(w=>{
+        const o=document.createElement('option');o.value=w;o.textContent=wlb(w);sel.appendChild(o);
+      });
+    }
+    sel.value=st.w;
+  }
   const all=gE();
   const wrap=document.getElementById('grid');
   if(!all.length){wrap.innerHTML='<div class="empty"><i class="ti ti-table-off"></i>Agrega productos desde el maestro.</div>';return}
+  // Si no hay empresas cargadas todavía, esperar
+  if(!st.E.length){
+    wrap.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando...</div>';
+    init().then(()=>rG());
+    return;
+  }
 
   // Agrupar por empresa
   const byE={};
@@ -1147,6 +1179,13 @@ function renderReal(){
   const empContent=document.getElementById('real-emp-content');
   if(!ap.length){np.style.display='flex';empTabsEl.innerHTML='';empContent.innerHTML='';return}
   np.style.display='none';
+  // Si no hay empresas cargadas, recargar primero
+  if(!st.E.length){
+    empTabsEl.innerHTML='';
+    empContent.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando...</div>';
+    init().then(()=>renderReal());
+    return;
+  }
   const bE={};
   ap.forEach(r=>{const eid=r.empresa_id||'_';if(!bE[eid])bE[eid]=[];bE[eid].push(r)});
   const eids=Object.keys(bE);
