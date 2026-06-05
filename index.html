@@ -1009,8 +1009,12 @@ function onPlanSemana(){
   const k=document.getElementById('plan-wsel').value;
   if(!k)return;
   st.w=k;
+  planActiveEmp=null;
   document.getElementById('gload').style.display='flex';
-  lp(k).then(()=>{document.getElementById('gload').style.display='none';planActiveEmp=null;rG()});
+  // Forzar recarga borrando cache
+  delete st.P[k];
+  delete st.Ed[k];
+  lp(k).then(()=>{document.getElementById('gload').style.display='none';rG()});
 }
 function changeWeek(n){st.w=addW(st.w,n);document.getElementById('gload').style.display='flex';lp(st.w).then(()=>{document.getElementById('gload').style.display='none';planActiveEmp=null;rG()})}
 function gE(){if(!st.Ed[st.w])st.Ed[st.w]=st.P[st.w]?JSON.parse(JSON.stringify(st.P[st.w])):[];return st.Ed[st.w]}
