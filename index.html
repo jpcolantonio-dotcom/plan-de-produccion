@@ -601,6 +601,13 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <!-- STOCK DE SEGURIDAD -->
   <div id="stock-sub-seg" style="display:none">
     <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Define el stock minimo que debe haber en camara para cada producto. Se compara con el conteo del dia.</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem;padding:10px 14px;background:var(--blue-bg);border:.5px solid rgba(55,138,221,.3);border-radius:var(--radius)">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;color:var(--blue)">
+        <input type="checkbox" id="seg-usar-deposito" onchange="toggleSegDeposito()" style="width:16px;height:16px;cursor:pointer"/>
+        <i class="ti ti-temperature-snow"></i> Usar capacidad de depósito como stock de seguridad
+      </label>
+      <span style="font-size:12px;color:var(--text2)">(pre-carga las cajas reales calculadas en Depósitos)</span>
+    </div>
     <div id="stock-seg-content"></div>
     <div style="display:flex;justify-content:flex-end;margin-top:1rem">
       <button class="btn btn-primary" onclick="guardarSeguridad()"><i class="ti ti-device-floppy"></i> Guardar stock de seguridad</button>
@@ -2571,6 +2578,14 @@ async function saveRecetas(){
 async function renderCon(){
   const modo=document.getElementById('cmodo').value;const ef=document.getElementById('ceesel').value;
   const el=document.getElementById('ccon2');const flt=document.getElementById('cfilt').value.trim().toLowerCase();
+  // Recargar recetas si no están en memoria
+  if(!Object.keys(st.Rec).length){
+    el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando recetas...</div>';
+    try{
+      const rr=await get('recetas','select=datos,tandas');
+      if(rr.length){st.Rec=rr[0].datos||{};st.RecTanda=rr[0].tandas||{};}
+    }catch{}
+  }
   let sems=[];
   if(modo==='semana'){const k=document.getElementById('cswsel').value;if(k)sems=[k]}
   else{
@@ -3900,6 +3915,98 @@ function showStockSubTab(t){
   if(t==='mix')renderMix();
   if(t==='cajas')renderCajas();
   if(t==='dep')initDepositos();
+}
+
+function calcCajasDeposito(){
+  // Calcula cajas reales por producto desde los depósitos configurados
+  // Retorna un mapa {empresa_id+'||'+area+'||'+producto: cajas}
+  const result={};
+  depositosData.forEach(dep=>{
+    const torres=depTorresData.filter(t=>t.deposito_id===dep.id);
+    const prods=depProdData.filter(p=>p.deposito_id===dep.id);
+    const famsDep=depFamiliasData.filter(f=>f.deposito_id===dep.id);
+    const capTotal=torres.reduce((s,t)=>s+t.cantidad*t.altura_cajas*(t.estantes||1)*(t.doble?2:1),0);
+    if(!capTotal||!prods.length)return;
+    const prodsPorFam={};
+    prods.forEach(p=>{const k=p.familia_torre||'_SIN_';if(!prodsPorFam[k])prodsPorFam[k]=[];prodsPorFam[k].push(p);});
+    Object.entries(prodsPorFam).forEach(([famCod,fProds])=>{
+      const famObj=famsDep.find(f=>f.codigo===famCod);
+      const torresFam=famObj?torres.filter(t=>t.familia===famCod):torres;
+      const capFam=famObj?(()=>{const tF=torres.filter(t=>t.familia===famCod);return tF.reduce((s,t)=>s+t.cantidad*t.altura_cajas*(t.estantes||1)*(t.doble?2:1),0);})():capTotal;
+      const alturaRef=torresFam.length?torresFam[0].altura_cajas:(torres[0]?.altura_cajas||8);
+      const torreDobleFam=torresFam.find(t=>t.doble);
+      const cajasXtorreUnit=alturaRef*(torreDobleFam?2:1);
+      const torresReales=torresFam.reduce((s,t)=>s+t.cantidad*(t.estantes||1),0);
+      const mixFam=fProds.map(p=>{
+        const mix=mixData.find(m=>m.empresa_id===p.empresa_id&&m.area===p.area&&m.producto===p.producto);
+        return{p,pct:mix?mix.porcentaje:0};
+      }).filter(x=>x.pct>0);
+      if(!mixFam.length)return;
+      const sumPct=mixFam.reduce((s,x)=>s+x.pct,0);
+      const nProds=mixFam.length;
+      const torresMinimas=Math.min(nProds,torresReales);
+      const torresParaDistribuir=Math.max(0,torresReales-torresMinimas);
+      const torresExactas=mixFam.map(({p,pct})=>{
+        const pctNorm=sumPct>0?(pct/sumPct)*100:100/nProds;
+        const torresRaw=1+torresParaDistribuir*(pctNorm/100);
+        return{p,torresBase:Math.floor(torresRaw),fraccion:torresRaw-Math.floor(torresRaw),torresExtra:0};
+      });
+      const asig=torresExactas.reduce((s,x)=>s+x.torresBase,0);
+      let sob=torresReales-asig;
+      [...torresExactas].sort((a,b)=>b.fraccion-a.fraccion).forEach(x=>{if(sob>0){x.torresExtra=1;sob--;}});
+      torresExactas.forEach(({p,torresBase,torresExtra})=>{
+        const cajasReales=(torresBase+torresExtra)*cajasXtorreUnit;
+        const key=`${p.empresa_id}||${p.area}||${p.producto}`;
+        result[key]=(result[key]||0)+cajasReales;
+      });
+    });
+  });
+  return result;
+}
+
+async function toggleSegDeposito(){
+  const cb=document.getElementById('seg-usar-deposito');
+  if(!cb.checked)return;
+  // Asegurar que los datos de depósito estén cargados
+  if(!depositosData.length){
+    const eid=document.getElementById('stock-hist-esel').value;
+    const eidFinal=eid!=='all'?eid:(st.E[0]?.id||'');
+    if(eidFinal)await loadDepositos_eid(eidFinal);
+  }
+  if(!mixData.length){
+    try{mixData=await get('mix_ventas','order=area.asc,producto.asc');}catch{}
+  }
+  const cajasMap=calcCajasDeposito();
+  if(!Object.keys(cajasMap).length){
+    alert('No hay depósitos configurados con productos y mix de ventas. Configuralos primero en Stock → Depósitos.');
+    cb.checked=false;return;
+  }
+  // Pre-cargar los inputs del stock de seguridad con los valores calculados
+  st.Pr.forEach(p=>{
+    const a=st.A.find(x=>x.id===p.area_id);const area=a?a.nombre:'SA';
+    const key=`${p.empresa_id}||${area}||${p.nombre}`;
+    const cajas=cajasMap[key];
+    if(cajas){
+      const pid=`seg-${p.empresa_id}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+      const inp=document.getElementById(pid);
+      if(inp)inp.value=cajas;
+    }
+  });
+  ss('online','Stock de seguridad pre-cargado desde depósitos ✓');
+}
+
+async function loadDepositos_eid(eid){
+  try{
+    depositosData=await get('depositos',`empresa_id=eq.${eid}&order=nombre.asc`);
+    if(depositosData.length){
+      const ids=depositosData.map(d=>d.id);
+      [depTorresData,depProdData,depFamiliasData]=await Promise.all([
+        get('deposito_torres',`deposito_id=in.(${ids.join(',')})&order=created_at.asc`),
+        get('deposito_productos',`deposito_id=in.(${ids.join(',')})&order=area.asc,producto.asc`),
+        get('deposito_familias',`deposito_id=in.(${ids.join(',')})&order=nombre.asc`)
+      ]);
+    }
+  }catch(e){console.error(e)}
 }
 
 async function renderSeguridad(){
