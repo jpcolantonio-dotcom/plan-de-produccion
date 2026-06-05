@@ -603,6 +603,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Define el stock minimo que debe haber en camara para cada producto. Se compara con el conteo del dia.</div>
     <div id="stock-seg-content"></div>
     <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+      <button class="btn btn-pdf" onclick="pdfStockSeg()"><i class="ti ti-file-type-pdf"></i> PDF</button>
       <button class="btn btn-primary" onclick="guardarSeguridad()"><i class="ti ti-device-floppy"></i> Guardar stock de seguridad</button>
     </div>
     <div id="stock-seg-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Stock de seguridad guardado.</div>
@@ -4132,6 +4133,117 @@ function recalcFaltante(segId,actId,faltId){
   else if(faltante<0){el.textContent='+'+Math.abs(faltante).toLocaleString('es-AR');el.style.color='var(--green)';}
   else{el.textContent='✓';el.style.color='var(--green)';}
 }
+function pdfStockSeg(){
+  const ef=document.getElementById('stock-hist-esel').value;
+  const fecha=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  const nm=ef==='all'?'Todas las empresas':en(ef);
+
+  // Recolectar datos actuales de la tabla
+  let prods=st.Pr;
+  if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
+  if(!prods.length){alert('Sin datos para imprimir.');return}
+
+  const byE={};
+  prods.forEach(p=>{const eid=p.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(p)});
+
+  let tablas='';
+  Object.entries(byE).forEach(([eid,items])=>{
+    const clr=ec(eid)||'#1B3A6B';const empNm=en(eid)||'Sin empresa';
+    const byArea={};
+    items.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id);const an=a?a.nombre:'SA';if(!byArea[an])byArea[an]=[];byArea[an].push(p)});
+
+    tablas+=`<div style="margin-bottom:14px;border-left:4px solid ${clr};padding-left:10px">
+      <div style="font-size:12pt;font-weight:700;color:${clr};margin-bottom:6px">${empNm}</div>`;
+
+    Object.entries(byArea).forEach(([area,aItems])=>{
+      tablas+=`<div style="font-size:9pt;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#555;margin:8px 0 4px">${area}</div>
+      <table><thead><tr>
+        <th class="left">Producto</th>
+        <th class="r">Stock seg.</th>
+        <th class="r">Stock actual</th>
+        <th class="r">Faltante</th>
+        <th class="c">Estado</th>
+      </tr></thead><tbody>`;
+
+      let totSeg=0,totAct=0;
+      aItems.forEach(p=>{
+        const seg=stockSeg.find(x=>x.empresa_id===eid&&x.area===area&&x.producto===p.nombre);
+        const segVal=seg?seg.cantidad:0;
+        const pid=`seg-${eid}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+        const acidp=`act-${eid}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+        // Leer valores actuales del DOM (pueden haber sido modificados)
+        const segInput=document.getElementById(pid);
+        const actInput=document.getElementById(acidp);
+        const segV=segInput?parseFloat(segInput.value)||0:segVal;
+        const actV=actInput?parseFloat(actInput.value)||0:0;
+        const faltante=segV>0?(segV-actV):0;
+        totSeg+=segV;totAct+=actV;
+        const clrF=faltante>0?'#A32D2D':faltante<0?'#0F6E56':'#555';
+        const faltTxt=segV>0?(faltante>0?'-'+faltante.toLocaleString('es-AR'):faltante<0?'+'+Math.abs(faltante).toLocaleString('es-AR'):'✓'):'--';
+        let estadoTxt='--';
+        if(segV>0){
+          if(actV===0)estadoTxt='Sin conteo';
+          else if(actV>=segV)estadoTxt='OK';
+          else estadoTxt='Faltan '+Math.abs(faltante).toLocaleString('es-AR');
+        }
+        const estadoClr=actV>=segV&&segV>0?'#0F6E56':actV===0&&segV>0?'#8B6914':'#A32D2D';
+        tablas+=`<tr>
+          <td class="left name">${p.nombre}</td>
+          <td class="r">${segV>0?segV.toLocaleString('es-AR'):'--'}</td>
+          <td class="r" style="color:#8B4513;font-weight:600">${actV>0?actV.toLocaleString('es-AR'):'--'}</td>
+          <td class="r" style="color:${clrF};font-weight:700">${faltTxt}</td>
+          <td class="c" style="color:${estadoClr};font-weight:600;font-size:7.5pt">${estadoTxt}</td>
+        </tr>`;
+      });
+      // Subtotal área
+      const totFalt=totSeg-totAct;
+      tablas+=`<tr class="subtot">
+        <td class="left">Total ${area}</td>
+        <td class="r">${totSeg.toLocaleString('es-AR')}</td>
+        <td class="r">${totAct.toLocaleString('es-AR')}</td>
+        <td class="r" style="color:${totFalt>0?'#A32D2D':'#0F6E56'}">${totFalt>0?'-'+totFalt.toLocaleString('es-AR'):totFalt<0?'+'+Math.abs(totFalt).toLocaleString('es-AR'):'✓'}</td>
+        <td></td>
+      </tr>`;
+      tablas+=`</tbody></table>`;
+    });
+    tablas+=`</div>`;
+  });
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Stock de Seguridad — ${nm}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:8.5pt;color:#1a1a1a;padding:8mm 10mm}
+    .hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #1B3A6B}
+    .hdr-title{font-size:14pt;font-weight:700;color:#1B3A6B}
+    .hdr-sub{font-size:9pt;color:#555;margin-top:3px}
+    .hdr-fecha{font-size:8pt;color:#888;text-align:right}
+    table{width:100%;border-collapse:collapse;font-size:8pt;margin-bottom:6px}
+    th{background:#1B3A6B;color:#fff;padding:5px 7px;border:1px solid #1B3A6B}
+    th.left{text-align:left}th.r{text-align:right}th.c{text-align:center}
+    td{padding:4px 7px;border:1px solid #d0d0d0}
+    td.left{text-align:left}td.r{text-align:right}td.c{text-align:center}
+    td.name{font-weight:600}
+    tr:nth-child(even) td{background:#f8f8f8}
+    tr.subtot td{background:#e8f0fa!important;font-weight:700;border-top:2px solid #1B3A6B;color:#1B3A6B}
+    @media print{@page{size:A4;margin:8mm 10mm}body{padding:0}}
+  </style></head><body>
+  <div class="hdr">
+    <div>
+      <div class="hdr-title">🛡️ Stock de Seguridad</div>
+      <div class="hdr-sub">${nm}</div>
+    </div>
+    <div class="hdr-fecha">Generado: ${fecha}</div>
+  </div>
+  ${tablas}
+  <script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script>
+  </body></html>`;
+
+  const w=window.open('','_blank','width=900,height=700');
+  if(w){w.document.write(html);w.document.close();}
+  else alert('Permitir ventanas emergentes para generar el PDF.');
+}
+
 async function guardarSeguridad(){
   const ef=document.getElementById('stock-hist-esel').value;
   let prods=st.Pr;if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
