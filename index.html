@@ -3373,42 +3373,41 @@ async function deleteDepFamilia(id){
 async function copiarDepAStockSeg(){
   const eid=document.getElementById('dep-calc-esel').value;
   if(!eid){alert('Seleccioná una empresa primero.');return}
-  if(!Object.keys(calcCajasDeposito()).length){
+  const cajasMap=calcCajasDeposito();
+  if(!Object.keys(cajasMap).length){
     alert('Primero calculá el stock de depósito con el botón Actualizar.');return;
   }
   const nm=en(eid);
-  if(!confirm(`¿Copiar el cálculo de depósito como stock de seguridad para ${nm}?\n\nEsto va a reemplazar los valores actuales de stock de seguridad de esta empresa.`))return;
-
+  if(!confirm(`¿Copiar el cálculo de depósito como stock de seguridad para ${nm}?\n\nEsto va a reemplazar los valores actuales.`))return;
   ss('saving','Guardando stock de seguridad...');
-  const cajasMap=calcCajasDeposito();
   let guardados=0;
   try{
-    for(const p of st.Pr.filter(x=>x.empresa_id===eid)){
+    const rows=[];
+    st.Pr.filter(x=>x.empresa_id===eid).forEach(p=>{
       const area=st.A.find(a=>a.id===p.area_id)?.nombre||'SA';
       const key=`${p.empresa_id}||${area}||${p.nombre}`;
       const cajas=cajasMap[key];
-      if(!cajas)continue;
-      // Upsert en stock_seguridad
-      const existing=stockSeg.find(x=>x.empresa_id===p.empresa_id&&x.area===area&&x.producto===p.nombre);
-      if(existing){
-        await fetch(`${SB}/rest/v1/stock_seguridad?id=eq.${existing.id}`,{
-          method:'PATCH',headers:{...H,'Prefer':'return=minimal'},
-          body:JSON.stringify({cantidad:cajas,updated_at:new Date().toISOString()})
-        });
-        existing.cantidad=cajas;
-      } else {
-        const res=await ins('stock_seguridad',{empresa_id:p.empresa_id,area,producto:p.nombre,unidad:p.unidad,cantidad:cajas});
-        if(res&&res[0])stockSeg.push(res[0]);
-      }
+      if(!cajas)return;
+      rows.push({empresa_id:p.empresa_id,area,producto:p.nombre,unidad:p.unidad,cantidad:cajas,updated_at:new Date().toISOString()});
       guardados++;
-    }
+    });
+    if(!rows.length){alert('Sin productos con depósito asignado.');return;}
+    // Borrar los existentes y reinsertar
+    await fetch(`${SB}/rest/v1/stock_seguridad?empresa_id=eq.${eid}`,{method:'DELETE',headers:H});
+    await fetch(`${SB}/rest/v1/stock_seguridad`,{
+      method:'POST',
+      headers:{...H,'Prefer':'return=minimal'},
+      body:JSON.stringify(rows)
+    });
+    // Actualizar cache local
+    stockSeg=stockSeg.filter(x=>x.empresa_id!==eid);
+    stockSeg.push(...rows);
     ss('online',`✓ ${guardados} productos copiados a stock de seguridad`);
-    // Mostrar mensaje en el tab
     const msg=document.getElementById('dep-msg');
     msg.innerHTML=`<i class="ti ti-check"></i> ${guardados} productos copiados a stock de seguridad de ${nm}.`;
     msg.style.display='flex';
     setTimeout(()=>msg.style.display='none',5000);
-  }catch(e){ss('error','Error: '+e.message)}
+  }catch(e){ss('error','Error: '+e.message);console.error(e)}
 }
 
 function pdfDepCalc(){
