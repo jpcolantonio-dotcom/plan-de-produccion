@@ -601,13 +601,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <!-- STOCK DE SEGURIDAD -->
   <div id="stock-sub-seg" style="display:none">
     <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Define el stock minimo que debe haber en camara para cada producto. Se compara con el conteo del dia.</div>
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:1rem;padding:10px 14px;background:var(--blue-bg);border:.5px solid rgba(55,138,221,.3);border-radius:var(--radius)">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:500;color:var(--blue)">
-        <input type="checkbox" id="seg-usar-deposito" onchange="toggleSegDeposito()" style="width:16px;height:16px;cursor:pointer"/>
-        <i class="ti ti-temperature-snow"></i> Usar capacidad de depósito como stock de seguridad
-      </label>
-      <span style="font-size:12px;color:var(--text2)">(pre-carga las cajas reales calculadas en Depósitos)</span>
-    </div>
     <div id="stock-seg-content"></div>
     <div style="display:flex;justify-content:flex-end;margin-top:1rem">
       <button class="btn btn-primary" onclick="guardarSeguridad()"><i class="ti ti-device-floppy"></i> Guardar stock de seguridad</button>
@@ -4066,13 +4059,11 @@ async function renderSeguridad(){
   if(!st.Pr.length){
     try{const[ar,pr]=await Promise.all([get('areas','order=nombre.asc'),get('productos','order=nombre.asc')]);st.A=ar||[];st.Pr=pr||[];}catch{}
   }
-  // Cargar stock de seguridad guardado
   try{
     let f='order=area.asc,producto.asc';
     if(ef!=='all')f+=`&empresa_id=eq.${ef}`;
     stockSeg=await get('stock_seguridad',f);
   }catch{stockSeg=[]}
-  // Cargar conteo de hoy para comparar
   const hoy=new Date().toISOString().slice(0,10);
   let conteoHoy=[];
   try{
@@ -4087,15 +4078,16 @@ async function renderSeguridad(){
   let h=`<div class="stock-card"><table class="stock-tbl"><thead><tr>
     <th style="text-align:left">Empresa / Area / Producto</th>
     <th style="text-align:left;width:65px">Unidad</th>
-    <th style="text-align:right;width:110px">Stock seg.</th>
-    <th style="text-align:right;width:110px">Stock hoy</th>
+    <th style="text-align:right;width:100px">Stock seg.</th>
+    <th style="text-align:right;width:100px">Stock actual</th>
+    <th style="text-align:right;width:100px">Faltante</th>
     <th style="text-align:center;width:90px">Estado</th>
   </tr></thead><tbody>`;
   Object.entries(byE).forEach(([eid,items])=>{
     const clr=ec(eid);const nm=en(eid)||'SE';
     const byArea={};items.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id);const an=a?a.nombre:'SA';if(!byArea[an])byArea[an]=[];byArea[an].push({...p,anom:an})});
     Object.entries(byArea).forEach(([area,aItems])=>{
-      h+=`<tr><td colspan="5" style="background:var(--bg2);padding:5px 10px;font-size:11px;font-weight:700;color:${clr};border-top:2px solid var(--border2)">
+      h+=`<tr><td colspan="6" style="background:var(--bg2);padding:5px 10px;font-size:11px;font-weight:700;color:${clr};border-top:2px solid var(--border2)">
         <span class="color-dot" style="background:${clr}"></span> ${nm} — ${area}
       </td></tr>`;
       aItems.forEach(p=>{
@@ -4104,19 +4096,22 @@ async function renderSeguridad(){
         const segVal=seg?seg.cantidad:0;
         const stockVal=conteo?conteo.stock:null;
         const pid=`seg-${eid}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
-        // Estado: verde si stock >= seguridad, rojo si no
+        const acidp=`act-${eid}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+        const actualVal=stockVal!==null?stockVal:0;
+        const faltante=segVal>0?(segVal-actualVal):0;
+        const clrFalt=faltante>0?'var(--red)':faltante<0?'var(--green)':'var(--text2)';
         let estado='';
-        if(stockVal!==null&&segVal>0){
-          if(stockVal>=segVal) estado='<span class="badge badge-ok">OK</span>';
-          else estado=`<span class="badge badge-bad">Faltan ${(segVal-stockVal).toLocaleString('es-AR')}</span>`;
-        } else if(segVal>0&&stockVal===null){
-          estado='<span class="badge badge-warn">Sin conteo</span>';
+        if(segVal>0){
+          if(stockVal===null)estado='<span class="badge badge-warn">Sin conteo</span>';
+          else if(actualVal>=segVal)estado='<span class="badge badge-ok">OK</span>';
+          else estado=`<span class="badge badge-bad">Faltan ${Math.abs(faltante).toLocaleString('es-AR')}</span>`;
         }
         h+=`<tr>
           <td style="font-weight:500;padding-left:16px">${p.nombre}</td>
           <td style="font-size:12px;color:var(--text2)">${p.unidad}</td>
-          <td style="text-align:right"><input class="proy-input" type="number" min="0" id="${pid}" value="${segVal||''}" placeholder="0" style="width:90px"/></td>
-          <td style="text-align:right;font-weight:700;color:${stockVal>0?'var(--green)':'var(--text3)'}">${stockVal!==null&&stockVal>0?stockVal.toLocaleString('es-AR'):'--'}</td>
+          <td style="text-align:right"><input class="proy-input" type="number" min="0" id="${pid}" value="${segVal||''}" placeholder="0" style="width:80px" oninput="recalcFaltante('${pid}','${acidp}','falt-${pid}')"/></td>
+          <td style="text-align:right"><input class="proy-input" type="number" min="0" id="${acidp}" value="${actualVal>0?actualVal:''}" placeholder="0" style="width:80px;color:var(--warm)" oninput="recalcFaltante('${pid}','${acidp}','falt-${pid}')"/></td>
+          <td style="text-align:right;font-weight:700;color:${clrFalt}" id="falt-${pid}">${segVal>0?(faltante>0?'-'+faltante.toLocaleString('es-AR'):faltante<0?'+'+Math.abs(faltante).toLocaleString('es-AR'):'✓'):'--'}</td>
           <td style="text-align:center">${estado}</td>
         </tr>`;
       });
@@ -4126,6 +4121,17 @@ async function renderSeguridad(){
   el.innerHTML=h;
 }
 
+function recalcFaltante(segId,actId,faltId){
+  const segVal=parseFloat(document.getElementById(segId)?.value)||0;
+  const actVal=parseFloat(document.getElementById(actId)?.value)||0;
+  const faltante=segVal-actVal;
+  const el=document.getElementById(faltId);
+  if(!el)return;
+  if(segVal===0){el.textContent='--';el.style.color='var(--text2)';return;}
+  if(faltante>0){el.textContent='-'+faltante.toLocaleString('es-AR');el.style.color='var(--red)';}
+  else if(faltante<0){el.textContent='+'+Math.abs(faltante).toLocaleString('es-AR');el.style.color='var(--green)';}
+  else{el.textContent='✓';el.style.color='var(--green)';}
+}
 async function guardarSeguridad(){
   const ef=document.getElementById('stock-hist-esel').value;
   let prods=st.Pr;if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
