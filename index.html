@@ -1,6 +1,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -259,6 +260,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <label>Semana:</label>
       <select id="plan-wsel" onchange="onPlanSemana()"></select>
       <button class="btn btn-sm" onclick="onPlanSemana()" title="Recargar"><i class="ti ti-refresh"></i></button>
+      <button class="btn btn-sm" onclick="crearNuevaSemana()" title="Crear plan para la semana siguiente" style="gap:5px"><i class="ti ti-calendar-plus"></i> Nueva semana</button>
     </div>
     <div class="btns">
       <button class="btn btn-pdf" id="btnpdf" onclick="genPDF()"><i class="ti ti-file-type-pdf"></i> PDF</button>
@@ -840,17 +842,72 @@ async function init(){
     st.P[W0]=planActual.length?planActual[0].filas:[];
     ss('online','Conectado');
     uES();
-    // Popular selector de semana de planificación
-    const psel=document.getElementById('plan-wsel');
-    if(psel){
-      psel.innerHTML='';
-      [...new Set([...st.Sem,st.w])].sort().reverse().forEach(w=>{
-        const o=document.createElement('option');o.value=w;o.textContent=wlb(w);psel.appendChild(o);
-      });
-      psel.value=st.w;
-    }
   }catch(e){ss('error','Sin conexion');console.error(e)}
+  // Popular selector SIEMPRE después del try/catch
+  poblarPlanWsel();
   rG();rP();
+}
+
+async function crearNuevaSemana(){
+  // Encontrar la semana más reciente en st.Sem y crear la siguiente
+  const sems=[...new Set([...st.Sem,st.w])].sort();
+  const ultima=sems[sems.length-1];
+  const siguiente=addW(ultima,1);
+  // Verificar si ya existe
+  if(st.Sem.includes(siguiente)||st.P[siguiente]!==undefined){
+    // Ya existe — solo navegar a ella
+    st.w=siguiente;
+    poblarPlanWsel();
+    await lp(siguiente);
+    planActiveEmp=null;
+    rG();
+    return;
+  }
+  // Preguntar si quiere copiar el plan de la semana actual
+  const copiar=confirm(`¿Crear plan para ${wlb(siguiente)}?\n\nOK = copiar el plan de ${wlb(ultima)}\nCancelar = crear plan en blanco`);
+  if(copiar){
+    await lp(ultima);
+    const planBase=st.P[ultima]||[];
+    // Copiar limpiando los valores diarios
+    const nuevoPlan=JSON.parse(JSON.stringify(planBase)).map(r=>({...r,days:Array(7).fill(0)}));
+    st.P[siguiente]=nuevoPlan;
+    st.Ed[siguiente]=JSON.parse(JSON.stringify(nuevoPlan));
+  } else {
+    st.P[siguiente]=[];
+    st.Ed[siguiente]=[];
+  }
+  if(!st.Sem.includes(siguiente)){st.Sem.push(siguiente);st.Sem.sort();}
+  st.w=siguiente;
+  poblarPlanWsel();
+  planActiveEmp=null;
+  rG();
+  // Guardar automáticamente el nuevo plan
+  ss('saving','Guardando nueva semana...');
+  try{
+    await fetch(`${SB}/rest/v1/planes`,{
+      method:'POST',headers:{...H,'Prefer':'return=minimal'},
+      body:JSON.stringify({semana:siguiente,filas:st.P[siguiente],updated_at:new Date().toISOString()})
+    });
+    ss('online','Semana creada ✓');
+    // Actualizar selectores de semana en otras pestañas
+    ['rwsel','cwsel','cswsel','desv-wsel','dash-wsel'].forEach(id=>{
+      const s=document.getElementById(id);if(!s)return;
+      const c=s.value;s.innerHTML='';
+      [...new Set([...st.Sem,st.w])].sort().reverse().forEach(w=>{const o=document.createElement('option');o.value=w;o.textContent=wlb(w);s.appendChild(o)});
+      if(c)s.value=c;
+    });
+  }catch(e){ss('error','Error al guardar: '+e.message)}
+}
+
+function poblarPlanWsel(){
+  const sel=document.getElementById('plan-wsel');
+  if(!sel)return;
+  const cur=sel.value||st.w;
+  sel.innerHTML='';
+  [...new Set([...st.Sem,st.w])].sort().reverse().forEach(w=>{
+    const o=document.createElement('option');o.value=w;o.textContent=wlb(w);sel.appendChild(o);
+  });
+  sel.value=cur||st.w;
 }
 
 async function lp(k){if(st.P[k]!==undefined)return;try{const d=await get('planes',`semana=eq.${k}&select=filas`);st.P[k]=d.length?d[0].filas:[];}catch{st.P[k]=[]}}
@@ -891,7 +948,7 @@ function T(t){
   });
   document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));
   document.getElementById('tab-'+t).classList.add('active');
-  if(t==='real'){pS('rwsel');loadReal2()}
+  if(t==='real'){poblarPlanWsel();pS('rwsel');loadReal2()}
   if(t==='cmp'){pS('cwsel');loadCmp()}
   if(t==='desv'){pS('desv-wsel');loadDesv()}
   if(t==='dash'){pS('dash-wsel');initDash()}
