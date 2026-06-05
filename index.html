@@ -3981,18 +3981,27 @@ async function toggleSegDeposito(){
     alert('No hay depósitos configurados con productos y mix de ventas. Configuralos primero en Stock → Depósitos.');
     cb.checked=false;return;
   }
-  // Pre-cargar los inputs del stock de seguridad con los valores calculados
+  // Pre-cargar inputs buscando por nombre de producto en la tabla
+  let cargados=0;
   st.Pr.forEach(p=>{
     const a=st.A.find(x=>x.id===p.area_id);const area=a?a.nombre:'SA';
     const key=`${p.empresa_id}||${area}||${p.nombre}`;
     const cajas=cajasMap[key];
-    if(cajas){
-      const pid=`seg-${p.empresa_id}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
-      const inp=document.getElementById(pid);
-      if(inp)inp.value=cajas;
+    if(!cajas)return;
+    const pid=`seg-${p.empresa_id}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+    let inp=document.getElementById(pid);
+    if(!inp){
+      // Buscar por contenido de la fila
+      document.querySelectorAll('#stock-seg-content tr').forEach(tr=>{
+        const td=tr.querySelector('td');
+        if(td&&td.textContent.trim()===p.nombre){
+          inp=tr.querySelector('input[type="number"]');
+        }
+      });
     }
+    if(inp){inp.value=cajas;cargados++;}
   });
-  ss('online','Stock de seguridad pre-cargado desde depósitos ✓');
+  ss('online',`Pre-cargado: ${cargados} productos desde depósitos ✓`);
 }
 
 async function loadDepositos_eid(eid){
