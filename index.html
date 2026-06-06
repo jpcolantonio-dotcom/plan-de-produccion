@@ -886,10 +886,19 @@ async function crearNuevaSemana(){
   // Guardar automáticamente el nuevo plan
   ss('saving','Guardando nueva semana...');
   try{
-    await fetch(`${SB}/rest/v1/planes`,{
-      method:'POST',headers:{...H,'Prefer':'return=minimal'},
-      body:JSON.stringify({semana:siguiente,filas:st.P[siguiente],updated_at:new Date().toISOString()})
-    });
+    const existing=await get('planes',`semana=eq.${siguiente}&select=id`);
+    if(existing.length){
+      // Ya existe — solo actualizar
+      await fetch(`${SB}/rest/v1/planes?semana=eq.${siguiente}`,{
+        method:'PATCH',headers:{...H,'Prefer':'return=minimal'},
+        body:JSON.stringify({filas:st.P[siguiente],updated_at:new Date().toISOString()})
+      });
+    } else {
+      await fetch(`${SB}/rest/v1/planes`,{
+        method:'POST',headers:{...H,'Prefer':'return=minimal'},
+        body:JSON.stringify({semana:siguiente,filas:st.P[siguiente],updated_at:new Date().toISOString()})
+      });
+    }
     ss('online','Semana creada ✓');
     // Actualizar selectores de semana en otras pestañas
     ['rwsel','cwsel','cswsel','desv-wsel','dash-wsel'].forEach(id=>{
@@ -2064,8 +2073,8 @@ function rProdDetail(aid){
     <span style="font-size:12px;color:var(--text2)">${prods.length} producto${prods.length!==1?'s':''}</span>
   </div>`;
   if(prods.length){
-    h+=`<div class="grid-card" style="margin-bottom:1rem"><table class="ptbl">
-      <thead><tr><th style="width:56px">Orden</th><th>Producto</th><th style="width:120px">Unidad</th><th style="width:100px;text-align:center" title="Habilita campos de hora inicio, hora fin, desperdicio y cantidad al cargar producción">Detalle proceso</th>
+    h+=`<div class="grid-card" style="margin-bottom:1rem;overflow-x:auto"><table class="ptbl" style="min-width:900px">
+      <thead><tr><th style="width:56px">Orden</th><th style="min-width:180px">Producto</th><th style="width:120px">Unidad</th><th style="width:100px;text-align:center" title="Habilita campos de hora inicio, hora fin, desperdicio y cantidad al cargar producción">Detalle proceso</th>
       <th style="width:110px;text-align:center" title="Si se define, la planificación usa múltiplos de este valor">Uds. x tanda</th>
       <th style="width:100px;text-align:center" title="Unidades por bandeja para ingreso en producción (ej: 24 o 36)">Uds. x bandeja</th>
       <th style="width:80px;text-align:center" title="¿Este producto lleva relleno?">Relleno</th>
