@@ -2,6 +2,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -229,7 +230,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.27</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.42</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1103,7 +1104,8 @@ function renderPlanEmpresa(eid, items){
   const activeArea=planActiveArea[eid];
 
   // Tabs área
-  let h=`<div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1rem;flex-wrap:wrap">`;
+  let h=`<div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1rem;flex-wrap:wrap;align-items:center;justify-content:space-between">`;
+  h+=`<div style="display:flex;gap:0;flex-wrap:wrap">`;
   areas.forEach(area=>{
     const bg2=ab(area,as);const ac2=ac(area,as);
     const isActive=area===activeArea;
@@ -1111,6 +1113,8 @@ function renderPlanEmpresa(eid, items){
       <span style="background:${bg2};color:${ac2};border-radius:4px;padding:1px 6px;font-size:11px">${area}</span>
     </button>`;
   });
+  h+=`</div>`;
+  h+=`<button class="btn btn-sm" onclick="copiarAreaSemanaAnterior('${eid}','${activeArea.replace(/'/g,"\\'")}') " style="margin-right:4px;font-size:12px;gap:5px"><i class="ti ti-copy"></i> Copiar sem. anterior</button>`;
   h+=`</div>`;
 
   const aItems=bA[activeArea]||[];
@@ -1155,6 +1159,46 @@ function renderPlanEmpresa(eid, items){
   h+=`</tbody></table></div>`;
   h+=`<datalist id="udl">${UNITS.map(u=>`<option>${u}</option>`).join('')}</datalist>`;
   el.innerHTML=h;
+}
+
+async function copiarAreaSemanaAnterior(eid, area){
+  const semAnterior=addW(st.w,-1);
+  const confirmar=confirm(`¿Copiar el área "${area}" de ${wlb(semAnterior)} a esta semana?\n\nOK = copiar con cantidades\nCancelar = solo estructura (cantidades en 0)`);
+  // Cargar plan de la semana anterior
+  ss('saving','Cargando semana anterior...');
+  await lp(semAnterior);
+  const planAnterior=st.P[semAnterior]||[];
+  const itemsArea=planAnterior.filter(r=>r.empresa_id===eid&&r.area===area);
+  if(!itemsArea.length){
+    ss('online','Sin datos');
+    alert(`No hay plan para "${area}" en la semana anterior.`);
+    return;
+  }
+  const rows=gE();
+  let copiados=0;
+  itemsArea.forEach(r=>{
+    const existe=rows.find(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
+    if(existe){
+      // Actualizar cantidades
+      existe.days=confirmar?[...(r.days||Array(7).fill(0))]:Array(7).fill(0);
+      copiados++;
+    } else {
+      // Agregar producto nuevo
+      rows.push({
+        empresa_id:r.empresa_id,
+        area:r.area,
+        producto:r.producto,
+        unidad:r.unidad,
+        days:confirmar?[...(r.days||Array(7).fill(0))]:Array(7).fill(0)
+      });
+      copiados++;
+    }
+  });
+  st.Ed[st.w]=rows;
+  ss('online',`${copiados} productos copiados ✓`);
+  planActiveEmp=eid;
+  planActiveArea[eid]=area;
+  rG();
 }
 
 function planSetArea(eid,area){
