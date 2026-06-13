@@ -230,7 +230,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.44</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.45</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1670,10 +1670,15 @@ function updRealTot(trId,rk,k){
   if(el)el.textContent=tot>0?tot.toLocaleString('es-AR'):'--';
 }
 function rKey(r){return`${r.empresa_id}||${r.area}||${r.producto}`}
+if(!st.RDirty)st.RDirty={};
 function uR(k,rkey,di,v){
   if(!st.R[k])st.R[k]={};
   if(!st.R[k][rkey])st.R[k][rkey]=Array(7).fill(0);
   st.R[k][rkey][di]=parseFloat(v)||0;
+  // Marcar esta celda específica como editada por el usuario
+  if(!st.RDirty[k])st.RDirty[k]={};
+  if(!st.RDirty[k][rkey])st.RDirty[k][rkey]=new Set();
+  st.RDirty[k][rkey].add(di);
 }
 async function saveReal(){
   const k=document.getElementById('rwsel').value;
@@ -1683,14 +1688,18 @@ async function saveReal(){
     const freshData=await get('produccion_real',`semana=eq.${k}&select=datos,id`);
     const datosRemoto=freshData.length?freshData[0].datos:{};
     
-    // 2. Mergear: los datos remotos son la base, los locales tienen prioridad solo para los productos que este usuario tocó
+    // 2. Mergear celda por celda: solo sobreescribir los días que el usuario editó localmente,
+    //    preservando el resto del array remoto (evita pisar cambios de otros usuarios)
     const datosLocal=st.R[k]||{};
+    const dirty=st.RDirty[k]||{};
     const datosMerge={...datosRemoto};
-    // Solo sobreescribir las claves que el usuario local modificó (las que tienen valores > 0)
-    Object.entries(datosLocal).forEach(([rk,days])=>{
-      if(days&&days.some(v=>v>0)){
-        datosMerge[rk]=days;
-      }
+    Object.entries(dirty).forEach(([rk,diasSet])=>{
+      const localArr=datosLocal[rk]||Array(7).fill(0);
+      const remoteArr=datosMerge[rk]?[...datosMerge[rk]]:Array(7).fill(0);
+      // Asegurar longitud 7
+      while(remoteArr.length<7)remoteArr.push(0);
+      diasSet.forEach(di=>{remoteArr[di]=localArr[di]||0;});
+      datosMerge[rk]=remoteArr;
     });
     
     // 3. Guardar el merge
@@ -1708,6 +1717,7 @@ async function saveReal(){
     
     // 4. Actualizar cache local con el merge final
     st.R[k]=datosMerge;
+    st.RDirty[k]={}; // limpiar marcas de edición después de guardar exitosamente
     
     if(!st.Sem.includes(k))st.Sem.push(k);
     ss('online','Guardado');fl('rmsg');
