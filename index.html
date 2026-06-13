@@ -230,7 +230,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.43</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.44</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2643,7 +2643,18 @@ async function renderCon(){
   else{
     const fr=document.getElementById('cfrom').value;const to=document.getElementById('cto').value;
     if(!fr||!to){el.innerHTML='<div class="alert alert-info"><i class="ti ti-info-circle"></i> Selecciona el rango.</div>';return}
-    sems=st.Sem.filter(w=>{const we=addW(w,1);return w<=to&&we>fr});
+    // Generar todas las semanas del rango directamente por fecha (no depende de st.Sem)
+    sems=[];
+    let w=wk(new Date(fr+'T00:00:00'));
+    const toDate=new Date(to+'T00:00:00');
+    let guard=0;
+    while(true){
+      const wStart=new Date(w+'T00:00:00');
+      if(wStart>toDate||guard>200)break;
+      sems.push(w);
+      w=addW(w,1);
+      guard++;
+    }
     if(!sems.length)sems=[wk(new Date(fr+'T00:00:00'))];
   }
   el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Calculando...</div>';
