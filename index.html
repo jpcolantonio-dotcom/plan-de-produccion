@@ -230,7 +230,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.42</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.43</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2653,8 +2653,10 @@ async function renderCon(){
     let plan=st.P[k]||[];if(ef!=='all')plan=plan.filter(r=>r.empresa_id===ef);
     plan.forEach(r=>{
       const tot=(r.days||[]).reduce((a,b)=>a+(b||0),0);if(!tot)return;
+      const tanda=(st.RecTanda&&st.RecTanda[r.producto])||1;
       (st.Rec[r.producto]||[]).forEach(ing=>{
-        const c=fn(ing.cantidad*tot);const key=ing.ingrediente+'|'+ing.unidad;
+        const cantXUnidad=tanda>0?ing.cantidad/tanda:ing.cantidad;
+        const c=fn(cantXUnidad*tot);const key=ing.ingrediente+'|'+ing.unidad;
         if(!cm[key])cm[key]={ingrediente:ing.ingrediente,unidad:ing.unidad,total:0,det:[]};
         cm[key].total=fn(cm[key].total+c);cm[key].det.push({producto:r.producto,c});
       });
