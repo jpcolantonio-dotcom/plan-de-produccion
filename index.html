@@ -3,6 +3,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -230,7 +231,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.45</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.46</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -246,7 +247,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('stock')"><i class="ti ti-building-warehouse"></i> Stock</button>
   <button class="tab" onclick="T('proy')"><i class="ti ti-chart-dots"></i> Proyeccion</button>
   <button class="tab" onclick="T('rec')"><i class="ti ti-notebook"></i> Recetas</button>
-  <button class="tab" onclick="T('con')"><i class="ti ti-package"></i> Consumo MP</button>
   <button class="tab" onclick="T('rend')"><i class="ti ti-speedometer"></i> Rendimiento</button>
   <button class="tab" onclick="T('hor')"><i class="ti ti-clock"></i> Horarios</button>
   <button class="tab" onclick="T('ped')"><i class="ti ti-shopping-cart"></i> Pedidos</button>
@@ -422,7 +422,11 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <div><label>Hasta</label><input type="date" id="cto" onchange="renderCon()"/></div>
     </div>
     <div><label>Empresa</label><select id="ceesel" onchange="renderCon()"><option value="all">Todas</option></select></div>
-    <div><label>Buscar</label><input type="text" id="cfilt" placeholder="Ingrediente..." oninput="renderCon()" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:150px"/></div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <label>Buscar MP</label>
+      <input type="text" id="cfilt" placeholder="Ingrediente..." oninput="renderCon()" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:200px"/>
+      <button onclick="document.getElementById('cfilt').value='';renderCon()" style="padding:6px 10px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:transparent;color:var(--text2);cursor:pointer" title="Limpiar"><i class="ti ti-x"></i></button>
+    </div>
   </div>
   <div id="ccon2"></div>
 </div>
@@ -952,7 +956,7 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['plan','real','cmp','desv','dash','stock','proy','rec','con','rend','hor','ped','mae'];
+const TABS=['plan','real','cmp','desv','dash','stock','proy','rec','rend','hor','ped','mae'];
 function T(t){
   document.querySelectorAll('.tab').forEach(el=>{
     const m=el.getAttribute('onclick')||'';
