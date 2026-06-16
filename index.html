@@ -231,7 +231,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.48</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.49</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -637,7 +637,8 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <div id="stock-sub-cajas" style="display:none">
     <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Ingresá cuántas unidades entran en cada caja por producto.</div>
     <div id="stock-cajas-content"></div>
-    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:1rem">
+      <button class="btn btn-pdf" onclick="pdfCajas()"><i class="ti ti-file-type-pdf"></i> PDF</button>
       <button class="btn btn-primary" onclick="guardarCajas()"><i class="ti ti-device-floppy"></i> Guardar cajas</button>
     </div>
     <div id="stock-cajas-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Cajas guardado.</div>
@@ -3965,6 +3966,81 @@ async function guardarMix(){
 
 // ── CAJAS POR PRODUCTO ────────────────────────────────────────────
 let cajasData=[];
+
+function pdfCajas(){
+  const ef=document.getElementById('stock-hist-esel').value;
+  const fecha=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  const nm=ef==='all'?'Todas las empresas':en(ef);
+
+  let prods=st.Pr;
+  if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
+  if(!prods.length){alert('Sin datos para imprimir.');return}
+
+  const byE={};prods.forEach(p=>{const eid=p.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(p)});
+
+  let tablas='';
+  Object.entries(byE).forEach(([eid,items])=>{
+    const clr=ec(eid)||'#1B3A6B';const empNm=en(eid)||'Sin empresa';
+    const byArea={};items.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';if(!byArea[a])byArea[a]=[];byArea[a].push(p)});
+
+    tablas+=`<div style="margin-bottom:14px;border-left:4px solid ${clr};padding-left:10px">
+      <div style="font-size:12pt;font-weight:700;color:${clr};margin-bottom:6px">${empNm}</div>`;
+
+    Object.entries(byArea).forEach(([area,aItems])=>{
+      tablas+=`<div style="font-size:9pt;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#555;margin:8px 0 4px">${area}</div>
+      <table><thead><tr>
+        <th class="left">Producto</th>
+        <th class="left" style="width:80px">Unidad</th>
+        <th class="r" style="width:130px">Unidades por caja</th>
+      </tr></thead><tbody>`;
+
+      aItems.forEach(p=>{
+        const c=cajasData.find(x=>x.empresa_id===eid&&x.area===area&&x.producto===p.nombre);
+        const val=c?c.unidades_por_caja:null;
+        tablas+=`<tr>
+          <td class="left name">${p.nombre}</td>
+          <td class="left" style="color:#777;font-size:7.5pt">${p.unidad}</td>
+          <td class="r" style="font-weight:700;color:${val?'#1B3A6B':'#bbb'}">${val?val.toLocaleString('es-AR')+' '+p.unidad+'/caja':'--'}</td>
+        </tr>`;
+      });
+      tablas+=`</tbody></table>`;
+    });
+    tablas+=`</div>`;
+  });
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Unidades por Caja — ${nm}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:8.5pt;color:#1a1a1a;padding:8mm 10mm}
+    .hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #1B3A6B}
+    .hdr-title{font-size:14pt;font-weight:700;color:#1B3A6B}
+    .hdr-sub{font-size:9pt;color:#555;margin-top:3px}
+    .hdr-fecha{font-size:8pt;color:#888;text-align:right}
+    table{width:100%;border-collapse:collapse;font-size:8pt;margin-bottom:6px}
+    th{background:#1B3A6B;color:#fff;padding:5px 7px;border:1px solid #1B3A6B}
+    th.left{text-align:left}th.r{text-align:right}
+    td{padding:4px 7px;border:1px solid #d0d0d0}
+    td.left{text-align:left}td.r{text-align:right}
+    td.name{font-weight:600}
+    tr:nth-child(even) td{background:#f8f8f8}
+    @media print{@page{size:A4;margin:8mm 10mm}body{padding:0}}
+  </style></head><body>
+  <div class="hdr">
+    <div>
+      <div class="hdr-title">📦 Unidades por Caja</div>
+      <div class="hdr-sub">${nm}</div>
+    </div>
+    <div class="hdr-fecha">Generado: ${fecha}</div>
+  </div>
+  ${tablas}
+  <script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script>
+  </body></html>`;
+
+  const w=window.open('','_blank','width=900,height=700');
+  if(w){w.document.write(html);w.document.close();}
+  else alert('Permitir ventanas emergentes para generar el PDF.');
+}
 
 async function renderCajas(){
   const ef=document.getElementById('stock-hist-esel').value;
