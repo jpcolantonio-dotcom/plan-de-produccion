@@ -4,6 +4,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -2286,14 +2287,17 @@ function rRecDet(p){
       <div style="font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px">
         <i class="ti ti-notebook" style="color:var(--purple)"></i>${p}
       </div>
-      <div style="display:flex;align-items:center;gap:8px;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);padding:6px 12px">
-        <i class="ti ti-stack-2" style="color:var(--blue)"></i>
-        <label style="font-size:12px;color:var(--text2)">Unidades por tanda:</label>
-        <input type="number" min="1" step="1" value="${tanda}" 
-          style="width:70px;padding:4px 8px;font-size:13px;font-weight:700;text-align:center;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg)"
-          onchange="setTanda('${p.replace(/'/g,"\'")}',this.value)"
-          title="Cuántas unidades del producto produce una tanda completa"/>
-        <span style="font-size:11px;color:var(--text2)">uds/tanda</span>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:8px;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);padding:6px 12px">
+          <i class="ti ti-stack-2" style="color:var(--blue)"></i>
+          <label style="font-size:12px;color:var(--text2)">Unidades por tanda:</label>
+          <input type="number" min="1" step="1" value="${tanda}" 
+            style="width:70px;padding:4px 8px;font-size:13px;font-weight:700;text-align:center;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg)"
+            onchange="setTanda('${p.replace(/'/g,"\'")}',this.value)"
+            title="Cuántas unidades del producto produce una tanda completa"/>
+          <span style="font-size:11px;color:var(--text2)">uds/tanda</span>
+        </div>
+        <button class="btn btn-sm" onclick="imprimirReceta('${p.replace(/'/g,"\'")}')"><i class="ti ti-printer"></i> Imprimir receta</button>
       </div>
     </div>
     <table class="itbl"><thead><tr>
@@ -2305,13 +2309,16 @@ function rRecDet(p){
     </tr></thead><tbody>`;
   ings.forEach((ing,i)=>{
     const unOpts=['Kg','Gr','Litros','CC','Unidad'].map(u=>`<option${u===ing.unidad?' selected':''}>${u}</option>`).join('');
-    const xUnd=tanda>0?fn(ing.cantidad/tanda):0;
+    const xUndRaw=tanda>0?(ing.cantidad/tanda):0;
+    // No redondeamos a 2 decimales antes de mostrar: si no, cantidades chicas (ej 0,0000087) se muestran como 0.
+    // Mostramos hasta 6 decimales pero recortando ceros finales innecesarios.
+    const xUndTxt=xUndRaw===0?'0':xUndRaw.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:6});
     h+=`<tr>
       <td><input value="${ing.ingrediente}" onchange="uIng('${p.replace(/'/g,"\'")}',${i},'ingrediente',this.value)" 
         oninput="mpAC(this)" onfocus="mpAC(this)" onblur="setTimeout(()=>mpHide(this),200)"
         autocomplete="off" style="position:relative"/></td>
       <td><input type="number" min="0" step="0.001" value="${ing.cantidad}" onchange="uIng('${p.replace(/'/g,"\'")}',${i},'cantidad',this.value);rRecDet('${p.replace(/'/g,"\'")}');" style="width:110px;text-align:right"/></td>
-      <td style="text-align:right;font-weight:600;color:var(--green);font-size:13px">${xUnd.toLocaleString('es-AR',{maximumFractionDigits:4})} <span style="font-size:10px;font-weight:400;color:var(--text3)">${ing.unidad}</span></td>
+      <td style="text-align:right;font-weight:600;color:var(--green);font-size:13px">${xUndTxt} <span style="font-size:10px;font-weight:400;color:var(--text3)">${ing.unidad}</span></td>
       <td><select onchange="uIng('${p.replace(/'/g,"\'")}',${i},'unidad',this.value);rRecDet('${p.replace(/'/g,"\'")}');" style="width:100%">${unOpts}</select></td>
       <td><button class="btn btn-xs btn-danger" onclick="delIng('${p.replace(/'/g,"\'")}',${i})"><i class="ti ti-trash"></i></button></td>
     </tr>`;
@@ -2334,6 +2341,52 @@ function setTanda(p,v){
   if(!st.RecTanda)st.RecTanda={};
   st.RecTanda[p]=parseInt(v)||1;
   rRecDet(p);
+}
+function imprimirReceta(p){
+  const ings=st.Rec[p]||[];
+  const tanda=st.RecTanda&&st.RecTanda[p]?st.RecTanda[p]:1;
+  if(!ings.length){alert('Esta receta no tiene ingredientes cargados.');return}
+  const fmtNum=(n)=>{
+    if(n===0)return '0';
+    // Hasta 6 decimales para no perder valores muy chicos (ej. 0,0000087), sin ceros finales de más.
+    return n.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:6});
+  };
+  let filas='';
+  ings.forEach(ing=>{
+    const xUnd=tanda>0?(ing.cantidad/tanda):0;
+    filas+=`<tr>
+      <td class="left">${ing.ingrediente}</td>
+      <td>${fmtNum(ing.cantidad)}</td>
+      <td>${fmtNum(xUnd)}</td>
+      <td>${ing.unidad}</td>
+    </tr>`;
+  });
+  const fechaHoy=new Date().toLocaleDateString('es-AR');
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Receta - ${p}</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10pt;padding:12mm;color:#1a1a1a}
+  h1{font-size:15pt;margin-bottom:2px}
+  .sub{font-size:9pt;color:#555;margin-bottom:14px}
+  table{width:100%;border-collapse:collapse;font-size:9.5pt}
+  th{background:#1B3A6B;color:#fff;padding:7px 10px;text-align:right;border:1px solid #1B3A6B}
+  th.left{text-align:left}
+  td{padding:6px 10px;border:1px solid #d0d0d0;text-align:right;vertical-align:middle}
+  td.left{text-align:left}
+  tr:nth-child(even){background:#f7f7f7}
+  .foot{margin-top:14px;font-size:8.5pt;color:#777}
+  @media print{@page{size:A4;margin:10mm}}</style></head>
+  <body>
+    <h1>${p}</h1>
+    <div class="sub">Unidades por tanda: <b>${tanda}</b> &nbsp;|&nbsp; Impreso: ${fechaHoy}</div>
+    <table><thead><tr>
+      <th class="left">Ingrediente / MP</th>
+      <th>Cant. x tanda</th>
+      <th>Cant. x unidad</th>
+      <th>Unidad</th>
+    </tr></thead><tbody>${filas}</tbody></table>
+    <div class="foot">Planeta Empanada / Joselito - PAPO</div>
+  <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`;
+  const w=window.open('','_blank');
+  if(w){w.document.write(html);w.document.close();}
 }
 
 function uIng(p,i,f,v){if(!st.Rec[p])st.Rec[p]=[];st.Rec[p][i][f]=f==='cantidad'?parseFloat(v)||0:v}
