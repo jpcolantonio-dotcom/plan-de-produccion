@@ -1153,7 +1153,7 @@ function renderPlanEmpresa(eid, items){
   h+=`<div style="overflow-x:auto"><table class="plan-grid"><thead><tr>
     <th class="left" style="min-width:160px">Producto</th>
     <th class="left" style="width:80px">Unidad</th>`;
-  DAYS.forEach((d,i)=>{h+=`<th class="${i===t?'today-head':''}" style="width:70px">${d.slice(0,3)}<br><span style="font-size:10px;font-weight:400">${ddate(st.w,i)}</span></th>`;});
+  DAYS.forEach((d,i)=>{h+=`<th class="${i===t?'today-head':''}" style="width:92px">${d.slice(0,3)}<br><span style="font-size:10px;font-weight:400">${ddate(st.w,i)}</span></th>`;});
   h+=`<th style="width:64px">Total</th><th style="width:32px"></th></tr></thead><tbody>`;
 
   let dt=Array(7).fill(0),gd=0;
@@ -1179,10 +1179,19 @@ function renderPlanEmpresa(eid, items){
         const maxT=6;let opts='';
         for(let t2=0;t2<=maxT;t2++){
           const val=Math.round(t2*xTanda*100)/100;
-          opts+=`<option value="${val}"${val===v?' selected':''}>${t2===0?'--':`${t2}T · ${val.toLocaleString('es-AR')}`}</option>`;
+          let label;
+          if(t2===0){
+            label='--';
+          } else if(cajasTanda>0&&xCaja>0){
+            const cTotal=t2*cajasTanda;
+            label=`${t2}T - ${cTotal.toLocaleString('es-AR')}C - ${val.toLocaleString('es-AR')}U`;
+          } else {
+            label=`${t2}T · ${val.toLocaleString('es-AR')}`;
+          }
+          opts+=`<option value="${val}"${val===v?' selected':''}>${label}</option>`;
         }
         if(v>0&&!opts.includes(`value="${v}"`))opts=`<option value="${v}" selected>${v.toLocaleString('es-AR')} ✎</option>`+opts;
-        h+=`<td class="day-cell${di===t?' today-col':''}"><select class="day-input${v>0?' has-val':''}" style="width:100%;font-size:11px;padding:2px" onchange="ud(${_i},${di},this.value);this.classList.toggle('has-val',this.value!='0'&&this.value!='');">${opts}</select></td>`;
+        h+=`<td class="day-cell${di===t?' today-col':''}"><select class="day-input${v>0?' has-val':''}" style="width:100%;font-size:10px;padding:2px" onchange="ud(${_i},${di},this.value);this.classList.toggle('has-val',this.value!='0'&&this.value!='');">${opts}</select></td>`;
       } else {
         h+=`<td class="day-cell${di===t?' today-col':''}"><input class="day-input${v>0?' has-val':''}" type="number" min="0" value="${v||''}" placeholder="--" onchange="ud(${_i},${di},this.value);this.classList.toggle('has-val',this.value!='')"/></td>`;
       }
