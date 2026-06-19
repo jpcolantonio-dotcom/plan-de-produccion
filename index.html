@@ -1053,6 +1053,18 @@ let planActiveEmp=null;
 let planActiveArea={};
 
 function rG(){
+  // Asegurar que cajasData (unidades por caja, definidas en Stock > Cajas) esté cargado,
+  // porque la planificación ahora calcula unidades reales = cajas x unidades_por_caja.
+  if(!cajasData.length){
+    get('cajas_producto','order=area.asc,producto.asc').then(d=>{
+      cajasData=d||[];
+      rG();
+    }).catch(()=>{cajasData=[];rGInner()});
+    return;
+  }
+  rGInner();
+}
+function rGInner(){
   // Popular selector de semana si está vacío
   const sel=document.getElementById('plan-wsel');
   if(sel){
@@ -1154,15 +1166,15 @@ function renderPlanEmpresa(eid, items){
     h+=`<td><input value="${r.unidad||''}" list="udl" onchange="uf(${_i},'unidad',this.value)" style="width:100%;padding:3px 5px;font-size:12px;border:.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`;
     for(let di=0;di<7;di++){
       const v=(r.days&&r.days[di])||0;
-      const prodObj=st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id);
-      const tanda=prodObj&&prodObj.unidades_tanda?parseInt(prodObj.unidades_tanda):0;
-      if(tanda>0){
-        const maxT=6;let opts='';
-        for(let t2=0;t2<=maxT;t2++){
-          const val=t2*tanda;
-          opts+=`<option value="${val}"${val===v?' selected':''}>${t2===0?'--':`${t2}T · ${val.toLocaleString('es-AR')}`}</option>`;
+      const cajaObj=cajasData.find(c=>c.empresa_id===r.empresa_id&&c.area===r.area&&c.producto===r.producto);
+      const xCaja=cajaObj&&cajaObj.unidades_por_caja?parseFloat(cajaObj.unidades_por_caja):0;
+      if(xCaja>0){
+        const maxC=12;let opts='';
+        for(let c2=0;c2<=maxC;c2++){
+          const val=Math.round(c2*xCaja*100)/100;
+          opts+=`<option value="${val}"${val===v?' selected':''}>${c2===0?'--':`${c2}C · ${val.toLocaleString('es-AR')}`}</option>`;
         }
-        if(v>0&&v%tanda!==0)opts=`<option value="${v}" selected>${v} ✎</option>`+opts;
+        if(v>0&&!opts.includes(`value="${v}"`))opts=`<option value="${v}" selected>${v.toLocaleString('es-AR')} ✎</option>`+opts;
         h+=`<td class="day-cell${di===t?' today-col':''}"><select class="day-input${v>0?' has-val':''}" style="width:100%;font-size:11px;padding:2px" onchange="ud(${_i},${di},this.value);this.classList.toggle('has-val',this.value!='0'&&this.value!='');">${opts}</select></td>`;
       } else {
         h+=`<td class="day-cell${di===t?' today-col':''}"><input class="day-input${v>0?' has-val':''}" type="number" min="0" value="${v||''}" placeholder="--" onchange="ud(${_i},${di},this.value);this.classList.toggle('has-val',this.value!='')"/></td>`;
