@@ -233,7 +233,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.49</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.51</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1170,24 +1170,16 @@ function renderPlanEmpresa(eid, items){
       const cajaObj=cajasData.find(c=>c.empresa_id===r.empresa_id&&c.area===r.area&&c.producto===r.producto);
       const xCaja=cajaObj&&cajaObj.unidades_por_caja?parseFloat(cajaObj.unidades_por_caja):0;
       const cajasTanda=prodObj&&prodObj.cajas_tanda?parseFloat(prodObj.cajas_tanda):0;
-      // 1 tanda = cajas_tanda (maestro de producto) x unidades por caja (Stock > Cajas)
-      const xTandaNueva=cajasTanda>0&&xCaja>0?cajasTanda*xCaja:0;
-      // Compatibilidad con productos viejos que solo tienen unidades_tanda cargado y no cajas_tanda
-      const xTandaVieja=prodObj&&prodObj.unidades_tanda?parseFloat(prodObj.unidades_tanda):0;
-      const xTanda=xTandaNueva>0?xTandaNueva:xTandaVieja;
+      // 1 tanda = cajas_tanda (maestro de producto) x unidades por caja (Stock > Cajas).
+      // Si falta cualquiera de los dos datos, la celda queda como campo libre (sin desplegable)
+      // hasta que se completen ambos en Maestro > Productos y Stock > Cajas.
+      const xTanda=cajasTanda>0&&xCaja>0?cajasTanda*xCaja:0;
       if(xTanda>0){
         const maxT=6;let opts='';
         for(let t2=0;t2<=maxT;t2++){
           const val=Math.round(t2*xTanda*100)/100;
-          let label;
-          if(t2===0){
-            label='--';
-          } else if(cajasTanda>0&&xCaja>0){
-            const cTotal=t2*cajasTanda;
-            label=`${t2}T - ${cTotal.toLocaleString('es-AR')}C - ${val.toLocaleString('es-AR')}U`;
-          } else {
-            label=`${t2}T · ${val.toLocaleString('es-AR')}`;
-          }
+          const cTotal=t2*cajasTanda;
+          const label=t2===0?'--':`${t2}T - ${cTotal.toLocaleString('es-AR')}C - ${val.toLocaleString('es-AR')}U`;
           opts+=`<option value="${val}"${val===v?' selected':''}>${label}</option>`;
         }
         if(v>0&&!opts.includes(`value="${v}"`))opts=`<option value="${v}" selected>${v.toLocaleString('es-AR')} ✎</option>`+opts;
