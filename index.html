@@ -233,7 +233,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.52</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.54</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -253,6 +253,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('hor')"><i class="ti ti-clock"></i> Horarios</button>
   <button class="tab" onclick="T('ped')"><i class="ti ti-shopping-cart"></i> Pedidos</button>
   <button class="tab" onclick="T('mae')"><i class="ti ti-building"></i> Maestro</button>
+  <button class="tab" onclick="T('etq')"><i class="ti ti-qrcode"></i> Etiquetas</button>
 </div>
 <div class="pad">
 
@@ -791,8 +792,84 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <div id="maeerr" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="maeErrtxt"></span></div>
 </div>
 
+<!-- ETIQUETAS / CAJAS CONGELADAS -->
+<div id="tab-etq" class="section">
+  <div class="toolbar">
+    <div>
+      <div style="font-size:16px;font-weight:600">Etiquetas de cajas</div>
+      <div style="font-size:13px;color:var(--text2)">Registrá una caja al cerrarla y generá su etiqueta con QR</div>
+    </div>
+  </div>
+
+  <div class="proy-subtabs">
+    <button class="proy-tab active" id="etab-nueva" onclick="showEtqSubTab('nueva')"><i class="ti ti-plus"></i> Nueva caja</button>
+    <button class="proy-tab" id="etab-pend" onclick="showEtqSubTab('pend')"><i class="ti ti-printer"></i> Pendientes de imprimir <span id="etq-pend-count" class="badge" style="display:none"></span></button>
+    <button class="proy-tab" id="etab-stock" onclick="showEtqSubTab('stock')"><i class="ti ti-building-warehouse"></i> Stock congelado</button>
+  </div>
+
+  <!-- NUEVA CAJA -->
+  <div id="etq-sub-nueva">
+    <div class="grid-card" style="max-width:520px">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Empresa</label>
+          <select id="etq-empresa" onchange="etqCargarVariedades()" style="width:100%;padding:8px 10px;font-size:14px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Seleccionar...</option></select>
+        </div>
+        <div>
+          <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Variedad</label>
+          <select id="etq-variedad" style="width:100%;padding:8px 10px;font-size:14px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Seleccionar empresa primero...</option></select>
+        </div>
+        <div style="display:flex;gap:10px">
+          <div style="flex:1">
+            <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Fecha de relleno</label>
+            <input type="date" id="etq-frelleno" style="width:100%;padding:8px 10px;font-size:14px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+          </div>
+          <div style="flex:1">
+            <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Fecha de cierre</label>
+            <input type="date" id="etq-fcierre" style="width:100%;padding:8px 10px;font-size:14px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px">
+          <div style="flex:1">
+            <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Cantidad (unidades)</label>
+            <input type="number" min="0" step="1" id="etq-cantidad" placeholder="Ej: 24" style="width:100%;padding:8px 10px;font-size:14px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+          </div>
+          <div style="flex:1">
+            <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Depósito destino</label>
+            <select id="etq-deposito" style="width:100%;padding:8px 10px;font-size:14px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Seleccionar empresa primero...</option></select>
+          </div>
+        </div>
+        <button class="btn btn-primary" style="padding:12px;font-size:15px" onclick="etqRegistrarCaja()"><i class="ti ti-device-floppy"></i> Registrar caja y generar etiqueta</button>
+      </div>
+      <div id="etq-nueva-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> <span id="etq-nueva-msg-txt"></span></div>
+      <div id="etq-nueva-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="etq-nueva-err-txt"></span></div>
+    </div>
+  </div>
+
+  <!-- PENDIENTES DE IMPRIMIR -->
+  <div id="etq-sub-pend" style="display:none">
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Cajas registradas que todavía no se imprimieron. Juntá varias y mandalas a imprimir juntas en la hoja A4.</div>
+    <div id="etq-pend-content"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:1rem">
+      <button class="btn btn-sm" onclick="etqCalibrar()"><i class="ti ti-ruler-2"></i> Hoja de calibración</button>
+      <button class="btn btn-primary" id="etq-btn-imprimir" onclick="etqImprimirSeleccion()"><i class="ti ti-printer"></i> Imprimir seleccionadas</button>
+    </div>
+  </div>
+
+  <!-- STOCK CONGELADO -->
+  <div id="etq-sub-stock" style="display:none">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+      <select id="etq-stock-esel" onchange="renderEtqStock()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Todas las empresas</option></select>
+      <select id="etq-stock-depsel" onchange="renderEtqStock()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Todos los depositos</option></select>
+      <button class="btn btn-sm" onclick="renderEtqStock()"><i class="ti ti-refresh"></i> Actualizar</button>
+    </div>
+    <div id="etq-stock-content"></div>
+  </div>
+</div>
+
 </div></div></div>
 <script>
+
 const SB='https://ugmjfvgjumpnvbfskcgl.supabase.co';
 const SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnbWpmdmdqdW1wbnZiZnNrY2dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MjU4OTIsImV4cCI6MjA5NDEwMTg5Mn0.fmf7Isp5rDi10mq0VjahWRCgl6J4mD8-ib89DKWtPLs';
 const H={'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK};
@@ -972,7 +1049,7 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['plan','real','cmp','desv','dash','stock','proy','rec','rend','hor','ped','mae'];
+const TABS=['plan','real','cmp','desv','dash','stock','proy','rec','rend','hor','ped','mae','etq'];
 function T(t){
   document.querySelectorAll('.tab').forEach(el=>{
     const m=el.getAttribute('onclick')||'';
@@ -992,6 +1069,7 @@ function T(t){
   if(t==='mae')rMae();
   if(t==='rend')initRend();
   if(t==='ped')initPedidos();
+  if(t==='etq')initEtiquetas();
 }
 function pS(id){
   const s=document.getElementById(id);const c=s.value||st.w;
@@ -6790,6 +6868,338 @@ if('serviceWorker' in navigator){
       .then(()=>console.log('SW registrado'))
       .catch(e=>console.log('SW error:',e));
   });
+}
+
+
+// ===== ETIQUETAS / CAJAS CONGELADAS =====
+const QR_LIB_URL='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+let qrLibLoaded=false;
+async function ensureQrLib(){
+  if(qrLibLoaded||window.QRCode)return qrLibLoaded=true;
+  await new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src=QR_LIB_URL;s.onload=res;s.onerror=rej;
+    document.head.appendChild(s);
+  });
+  qrLibLoaded=true;
+}
+
+let etqCajasData=[]; // cajas_congeladas
+let etqDepData=[];   // depositos (reusa tabla existente)
+
+async function initEtiquetas(){
+  await ensureQrLib();
+  // Si se entra directo a esta pestaña sin pasar antes por otra, st.E/st.Pr pueden estar vacíos
+  if(!st.E.length||!st.Pr.length){
+    await init();
+  }
+  // Poblar select de empresas si no está poblado
+  const selE=document.getElementById('etq-empresa');
+  if(selE.options.length<=1){
+    (st.E||[]).forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;selE.appendChild(o);});
+  }
+  // Default fecha de hoy en ambos campos de fecha
+  const hoy=hoyLocal();
+  if(!document.getElementById('etq-frelleno').value)document.getElementById('etq-frelleno').value=hoy;
+  if(!document.getElementById('etq-fcierre').value)document.getElementById('etq-fcierre').value=hoy;
+  await etqRefreshPendientes();
+  showEtqSubTab('nueva');
+}
+
+function showEtqSubTab(t){
+  ['nueva','pend','stock'].forEach(x=>{
+    document.getElementById('etq-sub-'+x).style.display=x===t?'':'none';
+    document.getElementById('etab-'+x).classList.toggle('active',x===t);
+  });
+  if(t==='pend')renderEtqPendientes();
+  if(t==='stock')renderEtqStockInit();
+}
+
+async function etqCargarVariedades(){
+  const eid=document.getElementById('etq-empresa').value;
+  const selV=document.getElementById('etq-variedad');
+  const selD=document.getElementById('etq-deposito');
+  selV.innerHTML='<option value="">Cargando...</option>';
+  selD.innerHTML='<option value="">Cargando...</option>';
+  if(!eid){
+    selV.innerHTML='<option value="">Seleccionar empresa primero...</option>';
+    selD.innerHTML='<option value="">Seleccionar empresa primero...</option>';
+    return;
+  }
+  // Productos del maestro para esa empresa (todas las areas)
+  if(!st.Pr.length)await init();
+  const prods=st.Pr.filter(p=>p.empresa_id===eid).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  selV.innerHTML='<option value="">Seleccionar...</option>'+prods.map(p=>`<option value="${p.nombre}">${p.nombre}</option>`).join('');
+  // Depositos de esa empresa (tabla "depositos" ya existente, configurable en Stock > Depositos)
+  try{
+    etqDepData=await get('depositos',`empresa_id=eq.${eid}&order=nombre.asc`);
+  }catch{etqDepData=[]}
+  if(!etqDepData.length){
+    selD.innerHTML='<option value="">Sin depositos. Cargalos en Stock > Depositos</option>';
+  } else {
+    selD.innerHTML='<option value="">Seleccionar...</option>'+etqDepData.map(d=>`<option value="${d.id}">${d.nombre}</option>`).join('');
+  }
+}
+
+function etqGenerarCodigo(eid){
+  const fecha=hoyLocal().replace(/-/g,'');
+  const rnd=Math.floor(Math.random()*9000+1000);
+  return `${eid}-${fecha}-${rnd}`;
+}
+
+async function etqRegistrarCaja(){
+  const errEl=document.getElementById('etq-nueva-err');
+  const errTxt=document.getElementById('etq-nueva-err-txt');
+  const okEl=document.getElementById('etq-nueva-msg');
+  const okTxt=document.getElementById('etq-nueva-msg-txt');
+  errEl.style.display='none';okEl.style.display='none';
+
+  const empresa_id=document.getElementById('etq-empresa').value;
+  const variedad=document.getElementById('etq-variedad').value;
+  const fecha_relleno=document.getElementById('etq-frelleno').value;
+  const fecha_cierre=document.getElementById('etq-fcierre').value;
+  const cantidad=parseFloat(document.getElementById('etq-cantidad').value);
+  const deposito_id=document.getElementById('etq-deposito').value;
+
+  if(!empresa_id||!variedad||!fecha_relleno||!fecha_cierre||!cantidad||cantidad<=0||!deposito_id){
+    errTxt.textContent='Completá todos los campos antes de registrar la caja.';
+    errEl.style.display='';
+    return;
+  }
+
+  const codigo_qr=etqGenerarCodigo(empresa_id);
+  try{
+    const res=await ins('cajas_congeladas',{
+      codigo_qr,empresa_id,variedad,fecha_relleno,fecha_cierre,cantidad,
+      deposito_id,estado:'en_stock'
+    });
+    etqCajasData.push(res[0]);
+    okTxt.textContent=`Caja registrada (${codigo_qr}). Quedó en "Pendientes de imprimir".`;
+    okEl.style.display='';
+    // Limpiar cantidad para cargar la siguiente caja más rápido; mantener variedad/fechas/depósito
+    document.getElementById('etq-cantidad').value='';
+    document.getElementById('etq-cantidad').focus();
+    await etqRefreshPendientes();
+  }catch(e){
+    errTxt.textContent='Error al guardar: '+e.message;
+    errEl.style.display='';
+  }
+}
+
+async function etqRefreshPendientes(){
+  try{
+    etqCajasData=await get('cajas_congeladas','estado=eq.en_stock&imprimida=eq.false&order=created_at.desc');
+  }catch{
+    // Fallback por si la columna "imprimida" todavia no existe en la tabla
+    try{etqCajasData=await get('cajas_congeladas','estado=eq.en_stock&order=created_at.desc');}catch{etqCajasData=[]}
+  }
+  const count=etqCajasData.length;
+  const badge=document.getElementById('etq-pend-count');
+  if(count>0){badge.textContent=count;badge.style.display='';}else{badge.style.display='none';}
+}
+
+function renderEtqPendientes(){
+  const el=document.getElementById('etq-pend-content');
+  if(!etqCajasData.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-printer-off"></i>No hay cajas pendientes de imprimir.</div>';
+    document.getElementById('etq-btn-imprimir').disabled=true;
+    return;
+  }
+  document.getElementById('etq-btn-imprimir').disabled=false;
+  let h=`<div class="grid-card" style="overflow-x:auto"><table class="ptbl">
+    <thead><tr>
+      <th style="width:34px"><input type="checkbox" id="etq-check-all" checked onchange="document.querySelectorAll('.etq-check').forEach(c=>c.checked=this.checked)"/></th>
+      <th>Variedad</th><th>Relleno</th><th>Cierre</th><th>Cant.</th><th>Deposito</th><th>Codigo</th><th></th>
+    </tr></thead><tbody>`;
+  etqCajasData.forEach(c=>{
+    const dep=etqDepData.find(d=>d.id===c.deposito_id);
+    h+=`<tr>
+      <td><input type="checkbox" class="etq-check" data-id="${c.id}" checked/></td>
+      <td>${c.variedad}</td>
+      <td>${fechaCorta(c.fecha_relleno)}</td>
+      <td>${fechaCorta(c.fecha_cierre)}</td>
+      <td>${c.cantidad}</td>
+      <td>${dep?dep.nombre:(c.deposito_id||'-')}</td>
+      <td style="font-size:11px;color:var(--text3)">${c.codigo_qr}</td>
+      <td><button class="btn btn-xs btn-danger" onclick="etqEliminarPendiente(${c.id})"><i class="ti ti-trash"></i></button></td>
+    </tr>`;
+  });
+  h+='</tbody></table></div>';
+  el.innerHTML=h;
+}
+
+function fechaCorta(d){
+  if(!d)return '-';
+  const [y,m,dd]=d.split('-');
+  return `${dd}/${m}`;
+}
+
+async function etqEliminarPendiente(id){
+  if(!confirm('¿Eliminar esta caja registrada? Esta accion no se puede deshacer.'))return;
+  try{
+    await del('cajas_congeladas',id);
+    await etqRefreshPendientes();
+    renderEtqPendientes();
+  }catch(e){alert('Error al eliminar: '+e.message)}
+}
+
+// ===== IMPRESION DE ETIQUETAS (hoja A4, grilla 2x5, etiquetas Ori-Tec 50x28mm) =====
+// Valores de calibracion: ajustables si la impresora corre el contenido respecto
+// a las etiquetas fisicas. Medidos como estandar tipico para hojas 50x28mm 2x5.
+const ETQ_CAL={
+  margenSupMM:13.5,   // distancia del borde superior de la hoja a la primera etiqueta
+  margenIzqMM:5,      // distancia del borde izquierdo de la hoja a la primera etiqueta
+  anchoMM:50,         // ancho de cada etiqueta
+  altoMM:28,          // alto de cada etiqueta
+  gapColMM:2.5,       // separacion horizontal entre las 2 columnas
+  gapFilaMM:0         // separacion vertical entre filas (suelen venir pegadas en altura)
+};
+
+function etqArmarHojaHTML(cajas, soloCalibracion){
+  const c=ETQ_CAL;
+  let celdas='';
+  const datosQR=[]; // [{codigo, idx}] para generar después, dentro de la propia hoja
+  for(let i=0;i<10;i++){
+    const col=i%2, fila=Math.floor(i/2);
+    const top=c.margenSupMM+fila*(c.altoMM+c.gapFilaMM);
+    const left=c.margenIzqMM+col*(c.anchoMM+c.gapColMM);
+    const caja=cajas[i];
+    let contenido;
+    if(soloCalibracion){
+      contenido=`<div style="width:100%;height:100%;border:0.5px dashed #999;display:flex;align-items:center;justify-content:center;font-size:7pt;color:#999">${i+1}</div>`;
+    } else if(caja){
+      datosQR.push({idx:i,codigo:caja.codigo_qr});
+      contenido=`
+        <div style="display:flex;width:100%;height:100%;align-items:center;padding:1mm;box-sizing:border-box">
+          <div class="etq-qr" id="etq-qr-${i}" style="width:20mm;height:20mm;flex-shrink:0"></div>
+          <div style="margin-left:2mm;font-size:7.5pt;line-height:1.25;overflow:hidden">
+            <div style="font-weight:700;font-size:8pt">${caja.empresa_id} - ${caja.variedad}</div>
+            <div>Relleno: ${fechaCorta(caja.fecha_relleno)}</div>
+            <div>Cierre: ${fechaCorta(caja.fecha_cierre)}</div>
+            <div>Cant: ${caja.cantidad} u.</div>
+          </div>
+        </div>`;
+    } else {
+      contenido='';
+    }
+    celdas+=`<div style="position:absolute;top:${top}mm;left:${left}mm;width:${c.anchoMM}mm;height:${c.altoMM}mm;overflow:hidden">${contenido}</div>`;
+  }
+  // La hoja carga su propia copia de la libreria QR y genera los codigos ella misma,
+  // sin depender de la ventana que la abrió. Esto evita problemas de DOM cruzado entre ventanas.
+  const scriptQR=datosQR.length?`
+  <script src="${QR_LIB_URL}"><\/script>
+  <script>
+    window.onload=function(){
+      var datos=${JSON.stringify(datosQR)};
+      datos.forEach(function(d){
+        var el=document.getElementById('etq-qr-'+d.idx);
+        if(el)new QRCode(el,{text:d.codigo,width:75,height:75,correctLevel:QRCode.CorrectLevel.M});
+      });
+      setTimeout(function(){window.print()},400);
+    };
+  <\/script>`:`
+  <script>window.onload=function(){setTimeout(function(){window.print()},300)};<\/script>`;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Etiquetas</title>
+  <style>*{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Arial,sans-serif}
+  .hoja{position:relative;width:210mm;height:297mm}
+  @media print{@page{size:A4;margin:0}body{margin:0}}
+  </style></head>
+  <body><div class="hoja">${celdas}</div>${scriptQR}</body></html>`;
+}
+
+function etqCalibrar(){
+  const html=etqArmarHojaHTML([],true);
+  const w=window.open('','_blank');
+  if(w){w.document.write(html);w.document.close();
+    w.onload=()=>setTimeout(()=>w.print(),300);
+  }
+}
+
+async function etqImprimirSeleccion(){
+  const checks=[...document.querySelectorAll('.etq-check:checked')];
+  if(!checks.length){alert('Seleccioná al menos una caja para imprimir.');return}
+  const ids=checks.map(c=>parseInt(c.dataset.id));
+  const seleccionadas=etqCajasData.filter(c=>ids.includes(c.id));
+  if(seleccionadas.length>10){
+    alert('Solo entran 10 etiquetas por hoja. Imprimí de a 10 o menos por vez.');
+    return;
+  }
+  const html=etqArmarHojaHTML(seleccionadas,false);
+  const w=window.open('','_blank');
+  if(!w){alert('El navegador bloqueó la ventana de impresión. Habilitá popups para este sitio.');return}
+  w.document.write(html);
+  w.document.close();
+  // La propia hoja se encarga de generar los QR y disparar window.print() al cargar (ver etqArmarHojaHTML).
+  // Marcar como impresas y sacarlas de pendientes (no de stock: el estado de stock sigue en_stock)
+  try{
+    for(const c of seleccionadas){
+      await pat('cajas_congeladas',c.id,{imprimida:true});
+    }
+  }catch{
+    // Si la columna "imprimida" no existe todavia, no rompe el flujo: solo no se ocultaran de pendientes.
+  }
+  await etqRefreshPendientes();
+  renderEtqPendientes();
+}
+
+// ===== STOCK CONGELADO (consulta) =====
+function renderEtqStockInit(){
+  const selE=document.getElementById('etq-stock-esel');
+  if(selE.options.length<=1){
+    (st.E||[]).forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;selE.appendChild(o);});
+  }
+  renderEtqStock();
+}
+
+async function renderEtqStock(){
+  const eid=document.getElementById('etq-stock-esel').value;
+  const depFiltro=document.getElementById('etq-stock-depsel').value;
+  const el=document.getElementById('etq-stock-content');
+  el.innerHTML='<div style="padding:2rem;text-align:center;color:var(--text2)"><i class="ti ti-loader-2"></i> Cargando...</div>';
+  let filtro='estado=eq.en_stock&order=fecha_cierre.asc';
+  if(eid)filtro+=`&empresa_id=eq.${eid}`;
+  let data=[];
+  try{data=await get('cajas_congeladas',filtro);}catch{data=[]}
+
+  // Poblar select de depositos segun empresa
+  const selD=document.getElementById('etq-stock-depsel');
+  if(eid&&(!etqDepData.length||etqDepData[0]?.empresa_id!==eid)){
+    try{etqDepData=await get('depositos',`empresa_id=eq.${eid}&order=nombre.asc`);}catch{etqDepData=[]}
+    selD.innerHTML='<option value="">Todos los depositos</option>'+etqDepData.map(d=>`<option value="${d.id}">${d.nombre}</option>`).join('');
+  }
+  if(depFiltro)data=data.filter(c=>String(c.deposito_id)===String(depFiltro));
+
+  if(!data.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-snowflake-off"></i>Sin cajas en stock para este filtro.</div>';
+    return;
+  }
+  let h=`<div class="grid-card" style="overflow-x:auto"><table class="ptbl">
+    <thead><tr><th>Variedad</th><th>Relleno</th><th>Cierre</th><th>Cant.</th><th>Deposito</th><th>Codigo</th><th></th></tr></thead><tbody>`;
+  let totalU=0;
+  data.forEach(c=>{
+    const dep=etqDepData.find(d=>d.id===c.deposito_id);
+    totalU+=parseFloat(c.cantidad)||0;
+    h+=`<tr>
+      <td>${c.variedad}</td>
+      <td>${fechaCorta(c.fecha_relleno)}</td>
+      <td>${fechaCorta(c.fecha_cierre)}</td>
+      <td>${c.cantidad}</td>
+      <td>${dep?dep.nombre:(c.deposito_id||'-')}</td>
+      <td style="font-size:11px;color:var(--text3)">${c.codigo_qr}</td>
+      <td><button class="btn btn-xs btn-danger" title="Dar salida manual" onclick="etqSalidaManual(${c.id})"><i class="ti ti-logout"></i></button></td>
+    </tr>`;
+  });
+  h+=`</tbody><tfoot><tr style="font-weight:700"><td colspan="3">Total</td><td>${totalU}</td><td colspan="3"></td></tr></tfoot></table></div>`;
+  el.innerHTML=h;
+}
+
+async function etqSalidaManual(id){
+  if(!confirm('¿Dar salida a esta caja? Se va a sacar del stock congelado.'))return;
+  try{
+    await pat('cajas_congeladas',id,{estado:'salida',fecha_salida:new Date().toISOString()});
+    renderEtqStock();
+  }catch(e){alert('Error: '+e.message)}
 }
 </script>
 </body>
