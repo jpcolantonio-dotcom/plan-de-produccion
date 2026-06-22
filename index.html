@@ -233,7 +233,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.58</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.60</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -6955,6 +6955,7 @@ async function etqRegistrarCaja(){
   errEl.style.display='none';okEl.style.display='none';
 
   const empresa_id=document.getElementById('etq-empresa').value;
+  const empresa_nombre=document.getElementById('etq-empresa').selectedOptions[0]?.text||empresa_id;
   const variedad=document.getElementById('etq-variedad').value;
   const fecha_relleno=document.getElementById('etq-frelleno').value;
   const fecha_cierre=document.getElementById('etq-fcierre').value;
@@ -6970,7 +6971,7 @@ async function etqRegistrarCaja(){
   const codigo_qr=etqGenerarCodigo(empresa_id);
   try{
     const res=await ins('cajas_congeladas',{
-      codigo_qr,empresa_id,variedad,fecha_relleno,fecha_cierre,cantidad,
+      codigo_qr,empresa_id,empresa_nombre,variedad,fecha_relleno,fecha_cierre,cantidad,
       deposito_id,estado:'en_stock'
     });
     etqCajasData.push(res[0]);
@@ -7055,12 +7056,12 @@ async function etqEliminarPendiente(id){
 // Valores de calibracion: ajustables si la impresora corre el contenido respecto
 // a las etiquetas fisicas. Medidos como estandar tipico para hojas 50x28mm 2x5.
 const ETQ_CAL={
-  margenSupMM:5,      // (150 - 5*28) / 2 = 5mm
-  margenIzqMM:2.5,    // (105 - 2*50) / 2 = 2.5mm
+  margenSupMM:-56,    // la impresora agrega ~56mm de margen propio; compensamos con negativo
+  margenIzqMM:0,
   anchoMM:50,
   altoMM:28,
-  gapColMM:0,         // ajustar con hoja de calibracion si hay espacio entre columnas
-  gapFilaMM:0         // ajustar con hoja de calibracion si hay espacio entre filas
+  gapColMM:0,
+  gapFilaMM:0
 };
 
 function etqArmarHojaHTML(cajas, soloCalibracion){
@@ -7081,7 +7082,8 @@ function etqArmarHojaHTML(cajas, soloCalibracion){
         <div style="display:flex;width:100%;height:100%;align-items:center;padding:1.5mm;box-sizing:border-box;gap:2mm">
           <div class="etq-qr" id="etq-qr-${i}" style="width:20mm;height:20mm;flex-shrink:0"></div>
           <div style="display:flex;flex-direction:column;justify-content:center;gap:1mm;min-width:0;flex:1">
-            <div style="font-weight:700;font-size:7pt;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${caja.empresa_id} - ${caja.variedad}</div>
+            <div style="font-weight:700;font-size:8pt;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${caja.variedad}</div>
+            <div style="font-size:7pt;color:#444">${(caja.empresa_nombre||'').split(' ')[0]}</div>
             <div style="font-size:7pt">Cant: ${caja.cantidad} u.</div>
           </div>
           <div style="font-size:20pt;font-weight:900;letter-spacing:-0.5px;color:#000;flex-shrink:0;line-height:1">${fechaCodigo(caja.fecha_cierre)}</div>
