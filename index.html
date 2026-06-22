@@ -233,7 +233,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </head>
 <body>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.54</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.58</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -7033,6 +7033,14 @@ function fechaCorta(d){
   const [y,m,dd]=d.split('-');
   return `${dd}/${m}`;
 }
+// Convierte una fecha a código visual corto: día + letra del mes (A=enero ... L=diciembre)
+// Ej: "2026-06-21" → "21F"
+function fechaCodigo(d){
+  if(!d)return '-';
+  const [y,m,dd]=d.split('-');
+  const letra='ABCDEFGHIJKL'[parseInt(m,10)-1];
+  return `${parseInt(dd,10)}${letra}`;
+}
 
 async function etqEliminarPendiente(id){
   if(!confirm('¿Eliminar esta caja registrada? Esta accion no se puede deshacer.'))return;
@@ -7047,12 +7055,12 @@ async function etqEliminarPendiente(id){
 // Valores de calibracion: ajustables si la impresora corre el contenido respecto
 // a las etiquetas fisicas. Medidos como estandar tipico para hojas 50x28mm 2x5.
 const ETQ_CAL={
-  margenSupMM:13.5,   // distancia del borde superior de la hoja a la primera etiqueta
-  margenIzqMM:5,      // distancia del borde izquierdo de la hoja a la primera etiqueta
-  anchoMM:50,         // ancho de cada etiqueta
-  altoMM:28,          // alto de cada etiqueta
-  gapColMM:2.5,       // separacion horizontal entre las 2 columnas
-  gapFilaMM:0         // separacion vertical entre filas (suelen venir pegadas en altura)
+  margenSupMM:5,      // (150 - 5*28) / 2 = 5mm
+  margenIzqMM:2.5,    // (105 - 2*50) / 2 = 2.5mm
+  anchoMM:50,
+  altoMM:28,
+  gapColMM:0,         // ajustar con hoja de calibracion si hay espacio entre columnas
+  gapFilaMM:0         // ajustar con hoja de calibracion si hay espacio entre filas
 };
 
 function etqArmarHojaHTML(cajas, soloCalibracion){
@@ -7070,14 +7078,13 @@ function etqArmarHojaHTML(cajas, soloCalibracion){
     } else if(caja){
       datosQR.push({idx:i,codigo:caja.codigo_qr});
       contenido=`
-        <div style="display:flex;width:100%;height:100%;align-items:center;padding:1mm;box-sizing:border-box">
+        <div style="display:flex;width:100%;height:100%;align-items:center;padding:1.5mm;box-sizing:border-box;gap:2mm">
           <div class="etq-qr" id="etq-qr-${i}" style="width:20mm;height:20mm;flex-shrink:0"></div>
-          <div style="margin-left:2mm;font-size:7.5pt;line-height:1.25;overflow:hidden">
-            <div style="font-weight:700;font-size:8pt">${caja.empresa_id} - ${caja.variedad}</div>
-            <div>Relleno: ${fechaCorta(caja.fecha_relleno)}</div>
-            <div>Cierre: ${fechaCorta(caja.fecha_cierre)}</div>
-            <div>Cant: ${caja.cantidad} u.</div>
+          <div style="display:flex;flex-direction:column;justify-content:center;gap:1mm;min-width:0;flex:1">
+            <div style="font-weight:700;font-size:7pt;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${caja.empresa_id} - ${caja.variedad}</div>
+            <div style="font-size:7pt">Cant: ${caja.cantidad} u.</div>
           </div>
+          <div style="font-size:20pt;font-weight:900;letter-spacing:-0.5px;color:#000;flex-shrink:0;line-height:1">${fechaCodigo(caja.fecha_cierre)}</div>
         </div>`;
     } else {
       contenido='';
@@ -7102,8 +7109,8 @@ function etqArmarHojaHTML(cajas, soloCalibracion){
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Etiquetas</title>
   <style>*{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Arial,sans-serif}
-  .hoja{position:relative;width:210mm;height:297mm}
-  @media print{@page{size:A4;margin:0}body{margin:0}}
+  .hoja{position:relative;width:105mm;height:150mm}
+  @media print{@page{size:105mm 150mm;margin:0}body{margin:0}}
   </style></head>
   <body><div class="hoja">${celdas}</div>${scriptQR}</body></html>`;
 }
