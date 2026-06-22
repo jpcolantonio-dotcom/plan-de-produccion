@@ -229,11 +229,19 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 .saldo-pos{color:var(--green);font-weight:700}
 .saldo-neg{color:var(--red);font-weight:700}
 .saldo-zero{color:var(--text2);font-weight:500}
+/* IMPRESION DIRECTA DE ETIQUETAS */
+#etq-print-area{display:none}
+@media print{
+  body > *:not(#etq-print-area){display:none!important}
+  #etq-print-area{display:block!important;margin:0;padding:0}
+  @page{size:105mm 150mm;margin:0}
+}
 </style>
 </head>
 <body>
+<div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.60</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.65</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -7064,10 +7072,33 @@ const ETQ_CAL={
   gapFilaMM:0
 };
 
-function etqArmarHojaHTML(cajas, soloCalibracion){
+// Genera un QR como imagen base64 usando un canvas temporal en la ventana principal
+function etqQRtoBase64(texto){
+  return new Promise((resolve)=>{
+    const div=document.createElement('div');
+    div.style.cssText='position:fixed;left:-9999px;top:-9999px';
+    document.body.appendChild(div);
+    try{
+      const qr=new window.QRCode(div,{text:texto,width:80,height:80,correctLevel:window.QRCode.CorrectLevel.M});
+      setTimeout(()=>{
+        const canvas=div.querySelector('canvas');
+        const img=div.querySelector('img');
+        let base64='';
+        if(canvas){base64=canvas.toDataURL('image/png');}
+        else if(img){base64=img.src;}
+        document.body.removeChild(div);
+        resolve(base64);
+      },100);
+    }catch(e){
+      document.body.removeChild(div);
+      resolve('');
+    }
+  });
+}
+
+async function etqArmarHojaHTML(cajas, soloCalibracion){
   const c=ETQ_CAL;
   let celdas='';
-  const datosQR=[]; // [{codigo, idx}] para generar después, dentro de la propia hoja
   for(let i=0;i<10;i++){
     const col=i%2, fila=Math.floor(i/2);
     const top=c.margenSupMM+fila*(c.altoMM+c.gapFilaMM);
@@ -7077,10 +7108,12 @@ function etqArmarHojaHTML(cajas, soloCalibracion){
     if(soloCalibracion){
       contenido=`<div style="width:100%;height:100%;border:0.5px dashed #999;display:flex;align-items:center;justify-content:center;font-size:7pt;color:#999">${i+1}</div>`;
     } else if(caja){
-      datosQR.push({idx:i,codigo:caja.codigo_qr});
+      // Generar QR como base64 en esta ventana, para embeber directamente en el HTML
+      const qrBase64=await etqQRtoBase64(caja.codigo_qr);
+      const qrImg=qrBase64?`<img src="${qrBase64}" style="width:20mm;height:20mm;display:block"/>`:`<div style="width:20mm;height:20mm;background:#eee;display:flex;align-items:center;justify-content:center;font-size:6pt">QR</div>`;
       contenido=`
         <div style="display:flex;width:100%;height:100%;align-items:center;padding:1.5mm;box-sizing:border-box;gap:2mm">
-          <div class="etq-qr" id="etq-qr-${i}" style="width:20mm;height:20mm;flex-shrink:0"></div>
+          <div style="flex-shrink:0">${qrImg}</div>
           <div style="display:flex;flex-direction:column;justify-content:center;gap:1mm;min-width:0;flex:1">
             <div style="font-weight:700;font-size:8pt;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${caja.variedad}</div>
             <div style="font-size:7pt;color:#444">${(caja.empresa_nombre||'').split(' ')[0]}</div>
@@ -7093,36 +7126,32 @@ function etqArmarHojaHTML(cajas, soloCalibracion){
     }
     celdas+=`<div style="position:absolute;top:${top}mm;left:${left}mm;width:${c.anchoMM}mm;height:${c.altoMM}mm;overflow:hidden">${contenido}</div>`;
   }
-  // La hoja carga su propia copia de la libreria QR y genera los codigos ella misma,
-  // sin depender de la ventana que la abrió. Esto evita problemas de DOM cruzado entre ventanas.
-  const scriptQR=datosQR.length?`
-  <script src="${QR_LIB_URL}"><\/script>
-  <script>
-    window.onload=function(){
-      var datos=${JSON.stringify(datosQR)};
-      datos.forEach(function(d){
-        var el=document.getElementById('etq-qr-'+d.idx);
-        if(el)new QRCode(el,{text:d.codigo,width:75,height:75,correctLevel:QRCode.CorrectLevel.M});
-      });
-      setTimeout(function(){window.print()},400);
-    };
-  <\/script>`:`
-  <script>window.onload=function(){setTimeout(function(){window.print()},300)};<\/script>`;
+  // El HTML ya tiene todo embebido (QR como base64), no necesita cargar nada externo
   return `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Etiquetas</title>
   <style>*{box-sizing:border-box;margin:0;padding:0}
   body{font-family:Arial,sans-serif}
   .hoja{position:relative;width:105mm;height:150mm}
   @media print{@page{size:105mm 150mm;margin:0}body{margin:0}}
   </style></head>
-  <body><div class="hoja">${celdas}</div>${scriptQR}</body></html>`;
+  <body><div class="hoja">${celdas}</div></body></html>`;
 }
 
-function etqCalibrar(){
-  const html=etqArmarHojaHTML([],true);
-  const w=window.open('','_blank');
-  if(w){w.document.write(html);w.document.close();
-    w.onload=()=>setTimeout(()=>w.print(),300);
-  }
+function etqAbrirHoja(html){
+  // Inyectar el contenido en el div de impresion de la pagina principal y llamar window.print().
+  // Esto evita todos los problemas de blob:null, iframes, popups bloqueados, etc.
+  // El CSS @media print ya oculta todo excepto #etq-print-area durante la impresion.
+  const area=document.getElementById('etq-print-area');
+  // Extraer solo el contenido del <body> del html generado
+  const match=html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  area.innerHTML=match?match[1]:html;
+  window.print();
+  // Limpiar después de imprimir
+  setTimeout(()=>{area.innerHTML=''},2000);
+}
+
+async function etqCalibrar(){
+  const html=await etqArmarHojaHTML([],true);
+  etqAbrirHoja(html);
 }
 
 async function etqImprimirSeleccion(){
@@ -7134,20 +7163,14 @@ async function etqImprimirSeleccion(){
     alert('Solo entran 10 etiquetas por hoja. Imprimí de a 10 o menos por vez.');
     return;
   }
-  const html=etqArmarHojaHTML(seleccionadas,false);
-  const w=window.open('','_blank');
-  if(!w){alert('El navegador bloqueó la ventana de impresión. Habilitá popups para este sitio.');return}
-  w.document.write(html);
-  w.document.close();
-  // La propia hoja se encarga de generar los QR y disparar window.print() al cargar (ver etqArmarHojaHTML).
-  // Marcar como impresas y sacarlas de pendientes (no de stock: el estado de stock sigue en_stock)
+  const html=await etqArmarHojaHTML(seleccionadas,false);
+  etqAbrirHoja(html);
+  // Marcar como impresas
   try{
     for(const c of seleccionadas){
       await pat('cajas_congeladas',c.id,{imprimida:true});
     }
-  }catch{
-    // Si la columna "imprimida" no existe todavia, no rompe el flujo: solo no se ocultaran de pendientes.
-  }
+  }catch{}
   await etqRefreshPendientes();
   renderEtqPendientes();
 }
@@ -7196,7 +7219,10 @@ async function renderEtqStock(){
       <td>${c.cantidad}</td>
       <td>${dep?dep.nombre:(c.deposito_id||'-')}</td>
       <td style="font-size:11px;color:var(--text3)">${c.codigo_qr}</td>
-      <td><button class="btn btn-xs btn-danger" title="Dar salida manual" onclick="etqSalidaManual(${c.id})"><i class="ti ti-logout"></i></button></td>
+      <td style="display:flex;gap:4px">
+        <button class="btn btn-xs" title="Ver QR" onclick='etqVerQR(${JSON.stringify(c).replace(/'/g,"&#39;")})'><i class="ti ti-qrcode"></i></button>
+        <button class="btn btn-xs btn-danger" title="Dar salida manual" onclick="etqSalidaManual(${c.id})"><i class="ti ti-logout"></i></button>
+      </td>
     </tr>`;
   });
   h+=`</tbody><tfoot><tr style="font-weight:700"><td colspan="3">Total</td><td>${totalU}</td><td colspan="3"></td></tr></tfoot></table></div>`;
@@ -7209,6 +7235,49 @@ async function etqSalidaManual(id){
     await pat('cajas_congeladas',id,{estado:'salida',fecha_salida:new Date().toISOString()});
     renderEtqStock();
   }catch(e){alert('Error: '+e.message)}
+}
+
+async function etqVerQR(caja){
+  await ensureQrLib();
+  // Crear modal
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  overlay.onclick=(e)=>{if(e.target===overlay)overlay.remove()};
+
+  const card=document.createElement('div');
+  card.style.cssText='background:var(--bg);border:1px solid var(--border);border-radius:16px;padding:24px;max-width:320px;width:100%;text-align:center';
+
+  const titulo=document.createElement('div');
+  titulo.style.cssText='font-size:16px;font-weight:700;margin-bottom:4px';
+  titulo.textContent=caja.variedad;
+
+  const sub=document.createElement('div');
+  sub.style.cssText='font-size:12px;color:var(--text2);margin-bottom:16px';
+  sub.textContent=`Cierre: ${fechaCorta(caja.fecha_cierre)} · Cant: ${caja.cantidad} u. · ${fechaCodigo(caja.fecha_cierre)}`;
+
+  const qrDiv=document.createElement('div');
+  qrDiv.style.cssText='display:flex;justify-content:center;margin-bottom:16px;background:#fff;padding:12px;border-radius:10px';
+
+  const codigo=document.createElement('div');
+  codigo.style.cssText='font-size:28px;font-weight:900;letter-spacing:1px;color:var(--text);margin-bottom:16px';
+  codigo.textContent=fechaCodigo(caja.fecha_cierre);
+
+  const btnCerrar=document.createElement('button');
+  btnCerrar.className='btn';
+  btnCerrar.style.cssText='width:100%';
+  btnCerrar.textContent='Cerrar';
+  btnCerrar.onclick=()=>overlay.remove();
+
+  card.appendChild(titulo);
+  card.appendChild(sub);
+  card.appendChild(qrDiv);
+  card.appendChild(codigo);
+  card.appendChild(btnCerrar);
+  overlay.appendChild(card);
+  document.body.appendChild(overlay);
+
+  // Generar QR
+  new window.QRCode(qrDiv,{text:caja.codigo_qr,width:180,height:180,correctLevel:window.QRCode.CorrectLevel.M});
 }
 </script>
 </body>
