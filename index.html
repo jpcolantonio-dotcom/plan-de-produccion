@@ -241,7 +241,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.68</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.69</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2254,13 +2254,13 @@ function rProdDetail(aid){
     <span style="font-size:12px;color:var(--text2)">${prods.length} producto${prods.length!==1?'s':''}</span>
   </div>`;
   if(prods.length){
-    h+=`<div class="grid-card" style="margin-bottom:1rem;overflow-x:auto"><table class="ptbl" style="min-width:900px">
-      <thead><tr><th style="width:56px">Orden</th><th style="min-width:180px">Producto</th><th style="width:120px">Unidad</th><th style="width:100px;text-align:center" title="Habilita campos de hora inicio, hora fin, desperdicio y cantidad al cargar producción">Detalle proceso</th>
-      <th style="width:110px;text-align:center" title="Cajas que salen de una tanda completa. Junto con 'Unidades por caja' (Stock > Cajas) define el total de unidades por tanda.">Cajas x tanda</th>
-      <th style="width:100px;text-align:center" title="Unidades por bandeja para ingreso en producción (ej: 24 o 36)">Uds. x bandeja</th>
-      <th style="width:80px;text-align:center" title="¿Este producto lleva relleno?">Relleno</th>
-      <th style="width:130px;text-align:center" title="Nombre del relleno (ej: Carne, Jamón, Pollo)">Tipo relleno</th>
-      <th style="width:100px;text-align:center" title="Caliente = se elabora un día antes del pedido. Frío = mismo día.">Elaboración</th>
+    h+=`<div class="grid-card" style="margin-bottom:1rem;overflow-x:auto"><table class="ptbl" style="min-width:800px">
+      <thead><tr><th style="width:44px">Orden</th><th style="min-width:150px">Producto</th><th style="width:100px">Unidad</th><th style="width:80px;text-align:center" title="Habilita campos de hora inicio, hora fin, desperdicio y cantidad al cargar producción">Det. proc.</th>
+      <th style="width:80px;text-align:center" title="Cajas que salen de una tanda completa.">Caj/tanda</th>
+      <th style="width:80px;text-align:center" title="Unidades por bandeja">Uds/band.</th>
+      <th style="width:70px;text-align:center" title="¿Este producto lleva relleno?">Relleno</th>
+      <th style="width:110px;text-align:center" title="Nombre del relleno (ej: Carne, Jamón, Pollo)">Tipo relleno</th>
+      <th style="width:90px;text-align:center" title="Caliente = se elabora un día antes del pedido. Frío = mismo día.">Elaboración</th>
       <th style="width:34px"></th></tr></thead><tbody>`;
     prods.forEach((p,idx)=>{
       h+=`<tr>
