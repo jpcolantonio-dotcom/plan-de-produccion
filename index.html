@@ -241,7 +241,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.67</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.68</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2260,6 +2260,7 @@ function rProdDetail(aid){
       <th style="width:100px;text-align:center" title="Unidades por bandeja para ingreso en producción (ej: 24 o 36)">Uds. x bandeja</th>
       <th style="width:80px;text-align:center" title="¿Este producto lleva relleno?">Relleno</th>
       <th style="width:130px;text-align:center" title="Nombre del relleno (ej: Carne, Jamón, Pollo)">Tipo relleno</th>
+      <th style="width:100px;text-align:center" title="Caliente = se elabora un día antes del pedido. Frío = mismo día.">Elaboración</th>
       <th style="width:34px"></th></tr></thead><tbody>`;
     prods.forEach((p,idx)=>{
       h+=`<tr>
@@ -2299,6 +2300,14 @@ function rProdDetail(aid){
             style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>`
             :`<span style="font-size:11px;color:var(--text3)">--</span>`}
         </td>
+        <td style="width:100px;text-align:center">
+          <select onchange="updP('${p.id}','elaboracion',this.value)"
+            style="width:100%;padding:4px 5px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+            <option value=""${!p.elaboracion?' selected':''}>—</option>
+            <option value="caliente"${p.elaboracion==='caliente'?' selected':''}>🔥 Caliente</option>
+            <option value="frio"${p.elaboracion==='frio'?' selected':''}>❄️ Frío</option>
+          </select>
+        </td>
         <td><button class="btn btn-xs btn-danger" onclick="delProd('${p.id}')"><i class="ti ti-trash"></i></button></td>
       </tr>`;
     });
@@ -2312,8 +2321,115 @@ function rProdDetail(aid){
     <datalist id="npudl">${UNITS.map(u=>`<option>${u}</option>`).join('')}</datalist>
     <button class="btn btn-primary" onclick="addProd('${aid}','${area.empresa_id}')"><i class="ti ti-plus"></i> Agregar producto</button>
   </div>`;
+
+  // Si el área es "Cocina", mostrar sección de vínculos relleno → productos
+  if(area.nombre&&area.nombre.toLowerCase().includes('cocina')){
+    h+=rRellenoVinculos(area.empresa_id, prods);
+  }
+
   wrap.innerHTML=h;
 }
+function rRellenoVinculos(eid, rellenosProds){
+  // Todos los productos de esta empresa que NO son de Cocina (candidatos a ser vinculados)
+  const todosProds=st.Pr.filter(p=>p.empresa_id===eid);
+  const areasEmp=st.A.filter(a=>a.empresa_id===eid);
+
+  let h=`<div class="grid-card" style="margin-top:1.5rem">
+    <div style="font-size:14px;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:8px">
+      <i class="ti ti-link" style="color:var(--purple)"></i> Vínculos relleno → productos
+      <span style="font-size:12px;font-weight:400;color:var(--text2)">Indicá qué productos usan cada relleno y cuántos gramos por unidad</span>
+    </div>`;
+
+  if(!rellenosProds.length){
+    h+=`<div style="padding:1rem;color:var(--text2);font-size:13px">Agregá rellenos arriba para configurar los vínculos.</div>`;
+  } else {
+    rellenosProds.forEach(relleno=>{
+      const vinculos=relleno.vinculo_productos?JSON.parse(relleno.vinculo_productos):[];
+      h+=`<div style="border:.5px solid var(--border);border-radius:var(--radius);padding:14px;margin-bottom:12px">
+        <div style="font-size:14px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+          <i class="ti ti-bowl-chopsticks" style="color:var(--amber)"></i> ${relleno.nombre}
+        </div>
+        <table class="ptbl" style="margin-bottom:10px">
+          <thead><tr>
+            <th>Producto</th>
+            <th style="width:120px;text-align:right">Gramos / unidad</th>
+            <th style="width:34px"></th>
+          </tr></thead>
+          <tbody id="vinc-tbody-${relleno.id}">`;
+
+      if(!vinculos.length){
+        h+=`<tr><td colspan="3" style="color:var(--text2);font-size:12px;text-align:center;padding:8px">Sin vínculos aún</td></tr>`;
+      } else {
+        vinculos.forEach((v,vi)=>{
+          const prod=todosProds.find(p=>p.id===v.producto_id);
+          h+=`<tr>
+            <td>${prod?prod.nombre:v.producto_nombre||v.producto_id}</td>
+            <td style="text-align:right">
+              <input type="number" min="0" step="0.1" value="${v.gramos_por_unidad||''}"
+                onchange="updVinculo('${relleno.id}',${vi},'gramos_por_unidad',parseFloat(this.value)||0)"
+                style="width:90px;text-align:right;padding:3px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)"/> g
+            </td>
+            <td><button class="btn btn-xs btn-danger" onclick="delVinculo('${relleno.id}',${vi})"><i class="ti ti-trash"></i></button></td>
+          </tr>`;
+        });
+      }
+
+      h+=`</tbody></table>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="vsel-${relleno.id}" style="flex:1;min-width:150px;padding:5px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+            <option value="">Elegir producto...</option>
+            ${todosProds.filter(p=>{
+              const vv=relleno.vinculo_productos?JSON.parse(relleno.vinculo_productos):[];
+              return !vv.find(v=>v.producto_id===p.id);
+            }).map(p=>{
+              const area=areasEmp.find(a=>a.id===p.area_id);
+              return `<option value="${p.id}" data-nombre="${p.nombre}">${area?area.nombre+' · ':''}${p.nombre}</option>`;
+            }).join('')}
+          </select>
+          <input type="number" min="0" step="0.1" id="vgr-${relleno.id}" placeholder="g / unidad"
+            style="width:110px;padding:5px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+          <button class="btn btn-primary btn-sm" onclick="addVinculo('${relleno.id}')">
+            <i class="ti ti-plus"></i> Vincular
+          </button>
+        </div>
+      </div>`;
+    });
+  }
+
+  h+=`</div>`;
+  return h;
+}
+
+async function addVinculo(rellenoId){
+  const selEl=document.getElementById(`vsel-${rellenoId}`);
+  const grEl=document.getElementById(`vgr-${rellenoId}`);
+  const producto_id=selEl.value;
+  const producto_nombre=selEl.selectedOptions[0]?.dataset.nombre||'';
+  const gramos=parseFloat(grEl.value)||0;
+  if(!producto_id){alert('Elegí un producto.');return}
+  const relleno=st.Pr.find(p=>p.id===rellenoId);if(!relleno)return;
+  const vinculos=relleno.vinculo_productos?JSON.parse(relleno.vinculo_productos):[];
+  vinculos.push({producto_id,producto_nombre,gramos_por_unidad:gramos});
+  await updP(rellenoId,'vinculo_productos',JSON.stringify(vinculos));
+  rProdDetail(st.aaid);
+}
+
+async function updVinculo(rellenoId,vi,campo,valor){
+  const relleno=st.Pr.find(p=>p.id===rellenoId);if(!relleno)return;
+  const vinculos=relleno.vinculo_productos?JSON.parse(relleno.vinculo_productos):[];
+  if(!vinculos[vi])return;
+  vinculos[vi][campo]=valor;
+  await updP(rellenoId,'vinculo_productos',JSON.stringify(vinculos));
+}
+
+async function delVinculo(rellenoId,vi){
+  const relleno=st.Pr.find(p=>p.id===rellenoId);if(!relleno)return;
+  const vinculos=relleno.vinculo_productos?JSON.parse(relleno.vinculo_productos):[];
+  vinculos.splice(vi,1);
+  await updP(rellenoId,'vinculo_productos',JSON.stringify(vinculos));
+  rProdDetail(st.aaid);
+}
+
 async function moveProd(id,aid,dir){
   const prods=st.Pr.filter(p=>p.area_id===aid).sort((a,b)=>(a.orden||0)-(b.orden||0));
   const idx=prods.findIndex(p=>p.id===id);if(idx<0)return;
