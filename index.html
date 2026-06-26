@@ -241,7 +241,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.66</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.67</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2417,14 +2417,19 @@ function rRecDet(p){
       <th style="width:130px">Cant. x tanda</th>
       <th style="width:130px;color:var(--green)">Cant. x unidad</th>
       <th style="width:100px">Unidad</th>
+      <th style="width:90px;text-align:center">Temp.</th>
       <th style="width:34px"></th>
     </tr></thead><tbody>`;
   ings.forEach((ing,i)=>{
     const unOpts=['Kg','Gr','Litros','CC','Unidad'].map(u=>`<option${u===ing.unidad?' selected':''}>${u}</option>`).join('');
     const xUndRaw=tanda>0?(ing.cantidad/tanda):0;
-    // No redondeamos a 2 decimales antes de mostrar: si no, cantidades chicas (ej 0,0000087) se muestran como 0.
-    // Mostramos hasta 6 decimales pero recortando ceros finales innecesarios.
     const xUndTxt=xUndRaw===0?'0':xUndRaw.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:6});
+    const tempVal=ing.temp||'';
+    const tempOpts=[
+      `<option value=""${tempVal===''?' selected':''}>—</option>`,
+      `<option value="frio"${tempVal==='frio'?' selected':''}>❄️ Frío</option>`,
+      `<option value="caliente"${tempVal==='caliente'?' selected':''}>🔥 Caliente</option>`,
+    ].join('');
     h+=`<tr>
       <td><input value="${ing.ingrediente}" onchange="uIng('${p.replace(/'/g,"\'")}',${i},'ingrediente',this.value)" 
         oninput="mpAC(this)" onfocus="mpAC(this)" onblur="setTimeout(()=>mpHide(this),200)"
@@ -2432,6 +2437,7 @@ function rRecDet(p){
       <td><input type="number" min="0" step="0.001" value="${ing.cantidad}" onchange="uIng('${p.replace(/'/g,"\'")}',${i},'cantidad',this.value);rRecDet('${p.replace(/'/g,"\'")}');" style="width:110px;text-align:right"/></td>
       <td style="text-align:right;font-weight:600;color:var(--green);font-size:13px">${xUndTxt} <span style="font-size:10px;font-weight:400;color:var(--text3)">${ing.unidad}</span></td>
       <td><select onchange="uIng('${p.replace(/'/g,"\'")}',${i},'unidad',this.value);rRecDet('${p.replace(/'/g,"\'")}');" style="width:100%">${unOpts}</select></td>
+      <td style="text-align:center"><select onchange="uIng('${p.replace(/'/g,"\'")}',${i},'temp',this.value)" style="width:100%;font-size:12px;padding:3px 4px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)">${tempOpts}</select></td>
       <td><button class="btn btn-xs btn-danger" onclick="delIng('${p.replace(/'/g,"\'")}',${i})"><i class="ti ti-trash"></i></button></td>
     </tr>`;
   });
@@ -2466,11 +2472,13 @@ function imprimirReceta(p){
   let filas='';
   ings.forEach(ing=>{
     const xUnd=tanda>0?(ing.cantidad/tanda):0;
+    const tempLabel=ing.temp==='frio'?'❄️ Frío':ing.temp==='caliente'?'🔥 Caliente':'—';
     filas+=`<tr>
       <td class="left">${ing.ingrediente}</td>
       <td>${fmtNum(ing.cantidad)}</td>
       <td>${fmtNum(xUnd)}</td>
       <td>${ing.unidad}</td>
+      <td style="text-align:center">${tempLabel}</td>
     </tr>`;
   });
   const fechaHoy=new Date().toLocaleDateString('es-AR');
@@ -2494,6 +2502,7 @@ function imprimirReceta(p){
       <th>Cant. x tanda</th>
       <th>Cant. x unidad</th>
       <th>Unidad</th>
+      <th>Temp.</th>
     </tr></thead><tbody>${filas}</tbody></table>
     <div class="foot">Planeta Empanada / Joselito - PAPO</div>
   <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`;
