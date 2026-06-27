@@ -241,7 +241,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.69</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.70</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -613,6 +613,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab" id="stab-mix" onclick="showStockSubTab('mix')"><i class="ti ti-chart-pie"></i> Mix ventas</button>
     <button class="proy-tab" id="stab-cajas" onclick="showStockSubTab('cajas')"><i class="ti ti-box"></i> Cajas</button>
     <button class="proy-tab" id="stab-dep" onclick="showStockSubTab('dep')"><i class="ti ti-temperature-snow"></i> Depositos</button>
+    <button class="proy-tab" id="stab-ventas" onclick="showStockSubTab('ventas')"><i class="ti ti-chart-bar"></i> Ventas mensuales</button>
   </div>
   <!-- HISTORIAL -->
   <div id="stock-sub-hist">
@@ -680,6 +681,23 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     </div>
     <div id="dep-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
   </div>
+
+  <!-- VENTAS MENSUALES -->
+  <div id="stock-sub-ventas" style="display:none">
+    <div class="alert alert-info" style="margin-bottom:1rem">
+      <i class="ti ti-info-circle"></i> Ingresá las ventas mensuales promedio por producto. PAPO las divide por <b>4,2</b> para calcular la venta semanal equivalente.
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+      <select id="ventas-esel" onchange="renderVentasMensuales()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
+      <button class="btn btn-sm" onclick="renderVentasMensuales()"><i class="ti ti-refresh"></i> Actualizar</button>
+    </div>
+    <div id="stock-ventas-content"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:1rem">
+      <button class="btn btn-primary" onclick="guardarVentasMensuales()"><i class="ti ti-device-floppy"></i> Guardar ventas</button>
+    </div>
+    <div id="stock-ventas-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Ventas mensuales guardadas.</div>
+  </div>
+
 </div>
 
 <!-- HORARIOS -->
@@ -4254,6 +4272,131 @@ async function guardarMix(){
   }catch(e){ss('error','Error: '+e.message)}
 }
 
+// ── VENTAS MENSUALES ─────────────────────────────────────────────
+let ventasMensualesData=[];
+
+async function initVentasMensuales(){
+  // Poblar selector de empresa si no está poblado
+  const sel=document.getElementById('ventas-esel');
+  if(sel.options.length<=1){
+    st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;sel.appendChild(o);});
+  }
+  await renderVentasMensuales();
+}
+
+async function renderVentasMensuales(){
+  const ef=document.getElementById('ventas-esel').value;
+  const el=document.getElementById('stock-ventas-content');
+  el.innerHTML='<div style="padding:2rem;text-align:center;color:var(--text2)"><span class="spinner spinner-dark"></span></div>';
+  try{
+    const f=ef&&ef!=='all'?`empresa_id=eq.${ef}&order=area.asc,producto.asc`:'order=area.asc,producto.asc';
+    ventasMensualesData=await get('ventas_mensuales',f);
+  }catch{ventasMensualesData=[]}
+
+  let prods=st.Pr;
+  if(ef&&ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
+  if(!prods.length){el.innerHTML='<div class="empty">Sin productos.</div>';return}
+
+  // Agrupar por empresa → área
+  const grupos={};
+  prods.forEach(p=>{
+    const emp=st.E.find(e=>e.id===p.empresa_id);
+    const area=st.A.find(a=>a.id===p.area_id);
+    const eNom=emp?.nombre||p.empresa_id;
+    const aNom=area?.nombre||'Sin área';
+    if(!grupos[eNom])grupos[eNom]={color:emp?.color||'#888',areas:{}};
+    if(!grupos[eNom].areas[aNom])grupos[eNom].areas[aNom]=[];
+    grupos[eNom].areas[aNom].push(p);
+  });
+
+  let h='';
+  Object.entries(grupos).forEach(([eNom,g])=>{
+    h+=`<div class="grid-card" style="margin-bottom:1.5rem">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:1rem">
+        <span style="width:12px;height:12px;border-radius:50%;background:${g.color};display:inline-block"></span>
+        <span style="font-size:14px;font-weight:700">${eNom}</span>
+      </div>`;
+
+    Object.entries(g.areas).forEach(([aNom,aProds])=>{
+      h+=`<div style="margin-bottom:1rem">
+        <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">${aNom}</div>
+        <table class="stock-tbl">
+          <thead><tr>
+            <th>Producto</th>
+            <th style="width:150px;text-align:right">Venta mensual</th>
+            <th style="width:60px;text-align:center">Unidad</th>
+            <th style="width:160px;text-align:right;color:var(--blue)">Venta semanal (÷4,2)</th>
+          </tr></thead>
+          <tbody>`;
+
+      aProds.forEach(p=>{
+        const area=st.A.find(a=>a.id===p.area_id)?.nombre||'SA';
+        const pid=`vm-${p.empresa_id}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+        const existing=ventasMensualesData.find(x=>x.empresa_id===p.empresa_id&&x.area===area&&x.producto===p.nombre);
+        const val=existing?.venta_mensual||'';
+        const semanal=val?`<span style="color:var(--blue);font-weight:700">${(parseFloat(val)/4.2).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:1})}</span>`:'<span style="color:var(--text3)">—</span>';
+        h+=`<tr>
+          <td>${p.nombre}</td>
+          <td style="text-align:right">
+            <input type="number" min="0" step="1" id="${pid}" value="${val}" placeholder="0"
+              oninput="actualizarSemanales()"
+              style="width:120px;text-align:right;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)"/>
+          </td>
+          <td style="text-align:center;font-size:12px;color:var(--text2)">${p.unidad||'u.'}</td>
+          <td style="text-align:right;font-size:13px" id="sem-${pid}">${semanal}</td>
+        </tr>`;
+      });
+
+      h+=`</tbody></table></div>`;
+    });
+    h+=`</div>`;
+  });
+
+  el.innerHTML=h;
+}
+
+function actualizarSemanales(){
+  // Actualizar columna semanal en tiempo real al tipear
+  document.querySelectorAll('[id^="vm-"]').forEach(inp=>{
+    const semEl=document.getElementById('sem-'+inp.id);
+    if(!semEl)return;
+    const v=parseFloat(inp.value);
+    if(!isNaN(v)&&v>0){
+      semEl.innerHTML=`<span style="color:var(--blue);font-weight:700">${(v/4.2).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:1})}</span>`;
+    } else {
+      semEl.innerHTML='<span style="color:var(--text3)">—</span>';
+    }
+  });
+}
+
+async function guardarVentasMensuales(){
+  const ef=document.getElementById('ventas-esel').value;
+  let prods=st.Pr;
+  if(ef&&ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
+  ss('saving','Guardando...');
+  try{
+    for(const p of prods){
+      const area=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';
+      const pid=`vm-${p.empresa_id}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+      const inp=document.getElementById(pid);
+      if(!inp||inp.value==='')continue;
+      const venta_mensual=parseFloat(inp.value)||0;
+      const existing=ventasMensualesData.find(x=>x.empresa_id===p.empresa_id&&x.area===area&&x.producto===p.nombre);
+      if(existing){
+        await fetch(`${SB}/rest/v1/ventas_mensuales?id=eq.${existing.id}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({venta_mensual,updated_at:new Date().toISOString()})});
+        existing.venta_mensual=venta_mensual;
+      } else {
+        const res=await ins('ventas_mensuales',{empresa_id:p.empresa_id,area,producto:p.nombre,venta_mensual});
+        if(res&&res[0])ventasMensualesData.push(res[0]);
+      }
+    }
+    ss('online','Guardado');
+    const msg=document.getElementById('stock-ventas-msg');msg.style.display='flex';
+    setTimeout(()=>msg.style.display='none',3000);
+    renderVentasMensuales();
+  }catch(e){ss('error','Error: '+e.message)}
+}
+
 // ── CAJAS POR PRODUCTO ────────────────────────────────────────────
 let cajasData=[];
 
@@ -4411,7 +4554,7 @@ async function guardarCajas(){
 let stockSeg=[];
 
 function showStockSubTab(t){
-  ['hist','seg','mix','cajas','dep'].forEach(id=>{
+  ['hist','seg','mix','cajas','dep','ventas'].forEach(id=>{
     document.getElementById('stock-sub-'+id).style.display=id===t?'block':'none';
     document.getElementById('stab-'+id).classList.toggle('active',id===t);
   });
@@ -4419,6 +4562,7 @@ function showStockSubTab(t){
   if(t==='mix')renderMix();
   if(t==='cajas')renderCajas();
   if(t==='dep')initDepositos();
+  if(t==='ventas')initVentasMensuales();
 }
 
 function calcCajasDeposito(){
