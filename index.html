@@ -241,7 +241,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.72</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.73</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2374,9 +2374,12 @@ function rRellenoVinculos(eid, rellenosProds){
   const areasEmp=st.A.filter(a=>a.empresa_id===eid);
 
   let h=`<div class="grid-card" style="margin-top:1.5rem">
-    <div style="font-size:14px;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:8px">
+    <div style="font-size:14px;font-weight:700;margin-bottom:1rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
       <i class="ti ti-link" style="color:var(--purple)"></i> Vínculos relleno → productos
       <span style="font-size:12px;font-weight:400;color:var(--text2)">Indicá qué productos usan cada relleno y cuántos gramos por unidad</span>
+      <button class="btn btn-sm" style="margin-left:auto" onclick="cargarTodosPromedios(${JSON.stringify(rellenosProds.map(r=>({id:r.id,vinculo_productos:r.vinculo_productos,empresa_id:r.empresa_id})))}, '${eid}')">
+        <i class="ti ti-arrow-down-to-arc"></i> Cargar todos desde Rendimiento
+      </button>
     </div>`;
 
   if(!rellenosProds.length){
@@ -2393,22 +2396,41 @@ function rRellenoVinculos(eid, rellenosProds){
             <th>Producto</th>
             <th style="width:120px;text-align:right">Gramos / unidad</th>
             <th style="width:34px"></th>
+          <thead><tr>
+            <th>Producto</th>
+            <th style="width:130px;text-align:right">g / unidad</th>
+            <th style="width:110px;text-align:right;color:var(--amber)">Prom. real</th>
+            <th style="width:34px"></th>
           </tr></thead>
           <tbody id="vinc-tbody-${relleno.id}">`;
 
       if(!vinculos.length){
-        h+=`<tr><td colspan="3" style="color:var(--text2);font-size:12px;text-align:center;padding:8px">Sin vínculos aún</td></tr>`;
+        h+=`<tr><td colspan="4" style="color:var(--text2);font-size:12px;text-align:center;padding:8px">Sin vínculos aún</td></tr>`;
       } else {
         vinculos.forEach((v,vi)=>{
           const prod=todosProds.find(p=>p.id===v.producto_id);
+          const prodNombre=prod?prod.nombre:v.producto_nombre||v.producto_id;
+          const prodArea=prod?areasEmp.find(a=>a.id===prod.area_id)?.nombre||'':'';
           h+=`<tr>
-            <td>${prod?prod.nombre:v.producto_nombre||v.producto_id}</td>
+            <td>${prodNombre}</td>
             <td style="text-align:right">
               <input type="number" min="0" step="0.1" value="${v.gramos_por_unidad||''}"
+                id="vinc-inp-${relleno.id}-${vi}"
                 onchange="updVinculo('${relleno.id}',${vi},'gramos_por_unidad',parseFloat(this.value)||0)"
-                style="width:90px;text-align:right;padding:3px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)"/> g
+                style="width:85px;text-align:right;padding:3px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)"/> g
             </td>
-            <td><button class="btn btn-xs btn-danger" onclick="delVinculo('${relleno.id}',${vi})"><i class="ti ti-trash"></i></button></td>
+            <td style="text-align:right">
+              <span id="vinc-prom-${relleno.id}-${vi}" style="font-size:12px;color:var(--amber)">
+                <span class="spinner" style="width:10px;height:10px;border-width:1.5px"></span>
+              </span>
+            </td>
+            <td style="display:flex;gap:3px;align-items:center">
+              <button class="btn btn-xs" title="Cargar promedio real desde Rendimiento" 
+                onclick="cargarPromRend('${relleno.id}',${vi},'${prodNombre}','${prodArea}','${eid}')">
+                <i class="ti ti-arrow-down-to-arc"></i>
+              </button>
+              <button class="btn btn-xs btn-danger" onclick="delVinculo('${relleno.id}',${vi})"><i class="ti ti-trash"></i></button>
+            </td>
           </tr>`;
         });
       }
@@ -2422,7 +2444,7 @@ function rRellenoVinculos(eid, rellenosProds){
               return !vv.find(v=>v.producto_id===p.id);
             }).map(p=>{
               const area=areasEmp.find(a=>a.id===p.area_id);
-              return `<option value="${p.id}" data-nombre="${p.nombre}">${area?area.nombre+' · ':''}${p.nombre}</option>`;
+              return `<option value="${p.id}" data-nombre="${p.nombre}" data-area="${area?.nombre||''}">${area?area.nombre+' · ':''}${p.nombre}</option>`;
             }).join('')}
           </select>
           <input type="number" min="0" step="0.1" id="vgr-${relleno.id}" placeholder="g / unidad"
@@ -2436,6 +2458,8 @@ function rRellenoVinculos(eid, rellenosProds){
   }
 
   h+=`</div>`;
+  // Cargar promedios de rendimiento en segundo plano después de renderizar
+  setTimeout(()=>cargarTodosPromedios(rellenosProds,eid),100);
   return h;
 }
 
@@ -2443,7 +2467,8 @@ async function addVinculo(rellenoId){
   const selEl=document.getElementById(`vsel-${rellenoId}`);
   const grEl=document.getElementById(`vgr-${rellenoId}`);
   const producto_id=selEl.value;
-  const producto_nombre=selEl.selectedOptions[0]?.dataset.nombre||'';
+  const opt=selEl.selectedOptions[0];
+  const producto_nombre=opt?.dataset.nombre||'';
   const gramos=parseFloat(grEl.value)||0;
   if(!producto_id){alert('Elegí un producto.');return}
   const relleno=st.Pr.find(p=>p.id===rellenoId);if(!relleno)return;
@@ -2451,6 +2476,46 @@ async function addVinculo(rellenoId){
   vinculos.push({producto_id,producto_nombre,gramos_por_unidad:gramos});
   await updP(rellenoId,'vinculo_productos',JSON.stringify(vinculos));
   rProdDetail(st.aaid);
+  // Cargar promedio de rendimiento automáticamente para el nuevo vínculo
+  const prodArea=opt?.dataset.area||'';
+  const eid=relleno.empresa_id;
+  const newVi=vinculos.length-1;
+  setTimeout(()=>cargarPromRend(rellenoId,newVi,producto_nombre,prodArea,eid),500);
+}
+
+// Carga el promedio real de g/ud desde rendimiento_proceso para un vínculo
+async function cargarPromRend(rellenoId,vi,prodNombre,prodArea,eid){
+  const spanEl=document.getElementById(`vinc-prom-${rellenoId}-${vi}`);
+  if(spanEl)spanEl.innerHTML='<span class="spinner" style="width:10px;height:10px;border-width:1.5px"></span>';
+  try{
+    const f=`empresa_id=eq.${eid}&producto=eq.${encodeURIComponent(prodNombre)}&select=cantidad,relleno_kg`;
+    const data=await get('rendimiento_proceso',f);
+    const conRelleno=data.filter(r=>r.relleno_kg>0&&r.cantidad>0);
+    if(!conRelleno.length){
+      if(spanEl)spanEl.innerHTML='<span style="color:var(--text3)">Sin datos</span>';
+      return;
+    }
+    const totalKg=conRelleno.reduce((s,r)=>s+(r.relleno_kg||0),0);
+    const totalUnd=conRelleno.reduce((s,r)=>s+(r.cantidad||0),0);
+    const promG=totalUnd>0?(totalKg/totalUnd*1000):0;
+    const promFmt=promG.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1});
+    if(spanEl)spanEl.innerHTML=`<span style="color:var(--amber);font-weight:600">${promFmt}g</span>`;
+  }catch{
+    if(spanEl)spanEl.innerHTML='<span style="color:var(--text3)">Error</span>';
+  }
+}
+
+// Al mostrar los vínculos, cargar promedios en segundo plano para todos
+function cargarTodosPromedios(rellenosProds,eid){
+  rellenosProds.forEach(relleno=>{
+    let vinculos=[];
+    try{vinculos=JSON.parse(relleno.vinculo_productos||'[]');}catch{}
+    vinculos.forEach((v,vi)=>{
+      const prod=st.Pr.find(p=>p.id===v.producto_id);
+      const prodArea=prod?st.A.find(a=>a.id===prod.area_id)?.nombre||'':'';
+      cargarPromRend(relleno.id,vi,v.producto_nombre||prod?.nombre||'',prodArea,eid);
+    });
+  });
 }
 
 async function updVinculo(rellenoId,vi,campo,valor){
