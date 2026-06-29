@@ -241,7 +241,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.76</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.77</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -805,6 +805,34 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <div id="tab-mae" class="section">
   <div class="toolbar">
     <div><div style="font-size:16px;font-weight:600">Maestro</div><div style="font-size:13px;color:var(--text2)">Empresas &rarr; Areas &rarr; Productos</div></div>
+    <button class="btn btn-sm" onclick="toggleMapeoJoselito()"><i class="ti ti-link"></i> Mapeo Joselito</button>
+  </div>
+
+  <!-- PANEL MAPEO JOSELITO -->
+  <div id="mapeo-joselito-panel" style="display:none;margin-bottom:1.5rem">
+    <div class="grid-card">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap">
+        <div style="font-size:14px;font-weight:700"><i class="ti ti-link" style="color:var(--blue)"></i> Mapeo de códigos Joselito</div>
+        <span style="font-size:12px;color:var(--text2)">Asociá cada artículo del sistema externo con el producto correspondiente en PAPO</span>
+        <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="guardarMapeoJoselito()"><i class="ti ti-device-floppy"></i> Guardar todos</button>
+      </div>
+      <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
+        <input type="text" id="mapeo-buscar" placeholder="Buscar en el listado..." oninput="filtrarMapeo()" style="padding:6px 10px;font-size:13px;width:250px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        <span id="mapeo-progress" style="font-size:12px;color:var(--text2)"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="ptbl" id="mapeo-table">
+          <thead><tr>
+            <th style="width:100px">Código</th>
+            <th>Descripción (sistema externo)</th>
+            <th style="width:100px">Rubro</th>
+            <th style="min-width:220px">Producto en PAPO</th>
+            <th style="width:70px;text-align:center">Estado</th>
+          </tr></thead>
+          <tbody id="mapeo-tbody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
   <div class="maestro-cols">
     <div>
@@ -7442,6 +7470,125 @@ function renderRellenosTabla(el, rellenos, DIAS, fechasDia, sortCol, sortDir){
   h+=`</tbody></table></div>
   <div style="font-size:12px;color:var(--text2);margin-top:8px">Todos los valores en <b>kg</b>. El día de elaboración ya está ajustado según Frío/Caliente.</div>`;
   el.innerHTML=h;
+}
+
+// ===== MAPEO JOSELITO =====
+const JOSELITO_CSV=[{"codigo":"30200502","desc":"FUCCILES PAQUETE 500 GRS.","rubro":"FIDEOS ESPECIALES"},{"codigo":"30200501","desc":"FUCCILES POR KILOS","rubro":"FIDEOS ESPECIALES"},{"codigo":"30200504","desc":"MOSTACHOLES PAQUETE 500 GRS.","rubro":"FIDEOS ESPECIALES"},{"codigo":"30200503","desc":"MOSTACHOLES POR KILOS","rubro":"FIDEOS ESPECIALES"},{"codigo":"30200601","desc":"CANELONES POR KILOS","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200602","desc":"FIAMBRE ALEMAN POR UNIDAD (APROX. 1KG.)","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200603","desc":"LASAGNA POR KILOS","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200604","desc":"MASA DE LASAGNA 50X60 INDUSTRIAL POR KILOS","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200605","desc":"MASA DE TALLARINES/LASAGNA POR KILOS","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200606","desc":"MASA HOJALDRE POR KILOS","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200607","desc":"PANQUEQUES POR 12 UNIDADES","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200610","desc":"PASTELES DE MEMBRILLO CAJA POR 6 UNIDADES","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200611","desc":"PASTELES DE MEMBRILLO MASA CRUDA CAJA POR 60 UNIDADES","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200612","desc":"PASTELES DE MEMBRILLO POR UNIDAD","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200613","desc":"PIZZA DE MOZZA UNIDAD","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200614","desc":"PIZZA DE MOZZA, JAMON Y ACEITUNAS UNIDAD","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200615","desc":"PIZZA DE MOZZA, JAMON, MORRON Y HUEVO UNIDAD","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200616","desc":"PRE-PIZZAS UNIDAD","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200617","desc":"QUESO SARDO RALLADO BOLSA 100 GRS.","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200618","desc":"QUESO SARDO RALLADO POR KILOS","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200619","desc":"SALSA BOLOGNESA 220 GRS.","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200620","desc":"SALSA BOLOGNESA 390 GRS.","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200621","desc":"SALSA FILETO 220 GRS.","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200622","desc":"SALSA FILETO 390 GRS.","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200623","desc":"TORTA FRITAS POR KILOS","rubro":"PASTELES Y ROTISERIA"},{"codigo":"30200104","desc":"TALLARINES ANCHOS AL HUEVO PAQUETE 500 GRS.","rubro":"TALLARINES"},{"codigo":"30200101","desc":"TALLARINES ANCHOS AL HUEVO POR KILOS","rubro":"TALLARINES"},{"codigo":"30200110","desc":"TALLARINES DE AJO PAQUETE 500 GRS.","rubro":"TALLARINES"},{"codigo":"30200107","desc":"TALLARINES DE AJO POR KILOS","rubro":"TALLARINES"},{"codigo":"30200111","desc":"TALLARINES DE ESPINACA PAQUETE 500 GRS.","rubro":"TALLARINES"},{"codigo":"30200108","desc":"TALLARINES DE ESPINACA POR KILOS","rubro":"TALLARINES"},{"codigo":"30200112","desc":"TALLARINES DE MORRON PAQUETE 500 GRS.","rubro":"TALLARINES"},{"codigo":"30200109","desc":"TALLARINES DE MORRON POR KILOS","rubro":"TALLARINES"},{"codigo":"30200105","desc":"TALLARINES FINOS AL HUEVO PAQUETE 500 GRS.","rubro":"TALLARINES"},{"codigo":"30200102","desc":"TALLARINES FINOS AL HUEVO POR KILOS","rubro":"TALLARINES"},{"codigo":"30200106","desc":"TALLARINES MEDIANOS AL HUEVO PAQUETE 500 GRS.","rubro":"TALLARINES"},{"codigo":"30200103","desc":"TALLARINES MEDIANOS AL HUEVO POR KILOS","rubro":"TALLARINES"},{"codigo":"30200401","desc":"TAPAS DE COPETIN PAQUETE POR 3 DOCENAS","rubro":"TAPAS PARA COPETIN Y PASTELES"},{"codigo":"30200402","desc":"TAPAS PARA PASTELES CHICOS POR 6 DOCENAS","rubro":"TAPAS PARA COPETIN Y PASTELES"},{"codigo":"30200403","desc":"TAPAS PARA PASTELES GRANDES POR 2 DOCENAS","rubro":"TAPAS PARA COPETIN Y PASTELES"},{"codigo":"30200312","desc":"TAPA CRIOLLA PARA PASCUALINA 50X60 INDUSTRIAL POR KILOS","rubro":"TAPAS PARA EMPANADAS Y PASCUALINAS"},{"codigo":"30200311","desc":"TAPA HOJALDRE PARA CALZONES 100 GRS. INDUSTRIAL POR UNIDADES","rubro":"TAPAS PARA EMPANADAS Y PASCUALINAS"},{"codigo":"30200303","desc":"TAPAS DE EMPANADAS CRIOLLO 13 PAQUETE POR 12 UNIDADES","rubro":"TAPAS PARA EMPANADAS Y PASCUALINAS"},{"codigo":"30200304","desc":"TAPAS DE EMPANADAS CRIOLLO 15 PAQUETE POR 12 UNIDADES","rubro":"TAPAS PARA EMPANADAS Y PASCUALINAS"},{"codigo":"30200305","desc":"TAPAS DE EMPANADAS FREIR 13 PAQUETE POR 12 UNIDADES","rubro":"TAPAS PARA EMPANADAS Y PASCUALINAS"},{"codigo":"30200306","desc":"TAPAS DE EMPANADAS FREIR 15 PAQUETE POR 12 UNIDADES","rubro":"TAPAS PARA EMPANADAS Y PASCUALINAS"},{"codigo":"30200307","desc":"TAPAS DE EMPANADAS HORNO 13 PAQUETE POR 12 UNIDADES","rubro":"TAPAS PARA EMPANADAS Y PASCUALINAS"},{"codigo":"30200308","desc":"TAPAS DE EMPANADAS HORNO 15 PAQUETE POR 12 UNIDADES","rubro":"TAPAS PARA EMPANADAS Y PASCUALINAS"},{"codigo":"30200309","desc":"TAPAS DE EMPANADAS HORNO/FREIR 13 PAQUETE POR 12 UNIDADES","rubro":"TAPAS PARA EMPANADAS Y PASCUALINAS"},{"codigo":"30200310","desc":"TAPAS DE EMPANADAS HORNO/FREIR 15 PAQUETE POR 12 UNIDADES","rubro":"TAPAS PARA EMPANADAS Y PASCUALINAS"},{"codigo":"30200301","desc":"TAPAS PARA PASCUALINA CRIOLLA 30 PAQUETE POR 2 UNIDADES","rubro":"TAPAS PARA EMPANADAS Y PASCUALINAS"},{"codigo":"30200302","desc":"TAPAS PARA PASCUALINA HOJALDRE 33 PAQUETE POR 2 UNIDADES","rubro":"TAPAS PARA EMPANADAS Y PASCUALINAS"},{"codigo":"30200201","desc":"AGNOLOTTIS POR KILOS","rubro":"ÑOQUIS Y PASTAS RELLENAS"},{"codigo":"30200202","desc":"RAVIOLES DE CUATRO QUESOS CAJA POR 96 UNIDADES","rubro":"ÑOQUIS Y PASTAS RELLENAS"},{"codigo":"30200203","desc":"RAVIOLES DE JAMON Y QUESO CAJA POR 96 UNIDADES","rubro":"ÑOQUIS Y PASTAS RELLENAS"},{"codigo":"30200204","desc":"RAVIOLES DE POLLO Y VERDURA CAJA POR 96 UNIDADES","rubro":"ÑOQUIS Y PASTAS RELLENAS"},{"codigo":"30200205","desc":"RAVIOLES DE RICOTA CAJA POR 96 UNIDADES","rubro":"ÑOQUIS Y PASTAS RELLENAS"},{"codigo":"30200206","desc":"RAVIOLES DE RICOTA CON JAMON CAJA POR 96 UNIDADES","rubro":"ÑOQUIS Y PASTAS RELLENAS"},{"codigo":"30200207","desc":"RAVIOLES DE VERDURA CAJA POR 96 UNIDADES","rubro":"ÑOQUIS Y PASTAS RELLENAS"},{"codigo":"30200208","desc":"SORRENTINOS DE JAMON Y QUESO CAJA POR 15 UNIDADES","rubro":"ÑOQUIS Y PASTAS RELLENAS"},{"codigo":"30200211","desc":"TORTELETTIS PAQUETE 500 GRS.","rubro":"ÑOQUIS Y PASTAS RELLENAS"},{"codigo":"30200210","desc":"TORTELETTIS POR KILOS","rubro":"ÑOQUIS Y PASTAS RELLENAS"},{"codigo":"30200213","desc":"ÑOQUIS DE PAPAS PAQUETE 500 GRS.","rubro":"ÑOQUIS Y PASTAS RELLENAS"},{"codigo":"30200212","desc":"ÑOQUIS DE PAPAS POR KILOS","rubro":"ÑOQUIS Y PASTAS RELLENAS"}];
+
+let mapeoVisible=false;
+
+function toggleMapeoJoselito(){
+  mapeoVisible=!mapeoVisible;
+  const panel=document.getElementById('mapeo-joselito-panel');
+  panel.style.display=mapeoVisible?'block':'none';
+  if(mapeoVisible)renderMapeoJoselito();
+}
+
+function renderMapeoJoselito(){
+  // Obtener empresa Joselito
+  const joselito=st.E.find(e=>e.nombre.toLowerCase().includes('joselito'));
+  const prodsJos=joselito?st.Pr.filter(p=>p.empresa_id===joselito.id).sort((a,b)=>a.nombre.localeCompare(b.nombre)):[];
+  const optsProds='<option value="">— Sin vincular —</option>'+prodsJos.map(p=>{
+    const area=st.A.find(a=>a.id===p.area_id);
+    return `<option value="${p.id}" data-codigo="${p.codigo_articulo||''}">${area?area.nombre+' · ':''}${p.nombre}${p.codigo_articulo?' ✓':''}</option>`;
+  }).join('');
+
+  const tbody=document.getElementById('mapeo-tbody');
+  let h='';
+  JOSELITO_CSV.forEach(item=>{
+    // Buscar si ya hay un producto vinculado a este código
+    const yaVinculado=prodsJos.find(p=>p.codigo_articulo===item.codigo);
+    const estadoIcon=yaVinculado
+      ?`<span style="color:var(--green);font-size:16px" title="${yaVinculado.nombre}">✓</span>`
+      :`<span style="color:var(--text3);font-size:16px">—</span>`;
+    h+=`<tr data-codigo="${item.codigo}" data-rubro="${item.rubro}" data-desc="${item.desc.toLowerCase()}">
+      <td style="font-family:monospace;font-size:12px;color:var(--blue)">${item.codigo}</td>
+      <td style="font-size:13px">${item.desc}</td>
+      <td style="font-size:11px;color:var(--text2)">${item.rubro}</td>
+      <td>
+        <select id="msel-${item.codigo}" onchange="onMapeoChange('${item.codigo}')"
+          style="width:100%;padding:4px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+          ${optsProds}
+        </select>
+      </td>
+      <td style="text-align:center" id="mest-${item.codigo}">${estadoIcon}</td>
+    </tr>`;
+  });
+  tbody.innerHTML=h;
+
+  // Pre-seleccionar los que ya están vinculados
+  prodsJos.forEach(p=>{
+    if(p.codigo_articulo){
+      const sel=document.getElementById(`msel-${p.codigo_articulo}`);
+      if(sel)sel.value=p.id;
+    }
+  });
+
+  actualizarProgressMapeo();
+}
+
+function onMapeoChange(codigo){
+  const sel=document.getElementById(`msel-${codigo}`);
+  const estEl=document.getElementById(`mest-${codigo}`);
+  if(sel.value){
+    estEl.innerHTML='<span style="color:var(--amber);font-size:16px">●</span>';
+  } else {
+    estEl.innerHTML='<span style="color:var(--text3);font-size:16px">—</span>';
+  }
+  actualizarProgressMapeo();
+}
+
+function actualizarProgressMapeo(){
+  const total=JOSELITO_CSV.length;
+  const vinculados=JOSELITO_CSV.filter(item=>{
+    const sel=document.getElementById(`msel-${item.codigo}`);
+    return sel&&sel.value;
+  }).length;
+  const el=document.getElementById('mapeo-progress');
+  if(el)el.textContent=`${vinculados} de ${total} vinculados`;
+}
+
+function filtrarMapeo(){
+  const q=document.getElementById('mapeo-buscar').value.toLowerCase();
+  document.querySelectorAll('#mapeo-tbody tr').forEach(tr=>{
+    const desc=tr.dataset.desc||'';
+    const codigo=tr.dataset.codigo||'';
+    const rubro=tr.dataset.rubro?.toLowerCase()||'';
+    tr.style.display=(desc.includes(q)||codigo.includes(q)||rubro.includes(q))?'':'none';
+  });
+}
+
+async function guardarMapeoJoselito(){
+  const btn=document.querySelector('[onclick="guardarMapeoJoselito()"]');
+  const orig=btn.innerHTML;
+  btn.innerHTML='<span class="spinner" style="width:12px;height:12px;border-width:2px"></span> Guardando...';
+  btn.disabled=true;
+  let guardados=0,errores=0;
+  try{
+    for(const item of JOSELITO_CSV){
+      const sel=document.getElementById(`msel-${item.codigo}`);
+      if(!sel||!sel.value)continue;
+      const prodId=sel.value;
+      const prod=st.Pr.find(p=>p.id===prodId);
+      if(!prod)continue;
+      // Solo guardar si cambió
+      if(prod.codigo_articulo===item.codigo)continue;
+      await updP(prodId,'codigo_articulo',item.codigo);
+      prod.codigo_articulo=item.codigo;
+      // Actualizar icono de estado
+      const estEl=document.getElementById(`mest-${item.codigo}`);
+      if(estEl)estEl.innerHTML=`<span style="color:var(--green);font-size:16px" title="${prod.nombre}">✓</span>`;
+      guardados++;
+    }
+    btn.innerHTML='<i class="ti ti-check"></i> '+guardados+' guardados';
+    btn.style.background='var(--green)';
+    setTimeout(()=>{btn.innerHTML=orig;btn.style.background='';btn.disabled=false;},2500);
+    // Refrescar el Maestro si está visible
+    if(st.aaid)rProdDetail(st.aaid);
+  }catch(e){
+    btn.innerHTML=orig;btn.disabled=false;
+    alert('Error al guardar: '+e.message);
+  }
 }
 
 // ===== ETIQUETAS / CAJAS CONGELADAS =====
