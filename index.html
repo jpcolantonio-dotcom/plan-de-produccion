@@ -241,7 +241,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.73</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.74</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2425,9 +2425,10 @@ function rRellenoVinculos(eid, rellenosProds){
               </span>
             </td>
             <td style="display:flex;gap:3px;align-items:center">
-              <button class="btn btn-xs" title="Cargar promedio real desde Rendimiento" 
-                onclick="cargarPromRend('${relleno.id}',${vi},'${prodNombre}','${prodArea}','${eid}')">
-                <i class="ti ti-arrow-down-to-arc"></i>
+              <button class="btn btn-sm" title="Usar promedio real" 
+                style="background:var(--amber);color:#000;font-size:11px;padding:3px 8px;white-space:nowrap"
+                onclick="usarPromRend('${relleno.id}',${vi},'${prodNombre}','${prodArea}','${eid}')">
+                <i class="ti ti-arrow-down-to-arc"></i> Usar prom.
               </button>
               <button class="btn btn-xs btn-danger" onclick="delVinculo('${relleno.id}',${vi})"><i class="ti ti-trash"></i></button>
             </td>
@@ -2493,16 +2494,46 @@ async function cargarPromRend(rellenoId,vi,prodNombre,prodArea,eid){
     const conRelleno=data.filter(r=>r.relleno_kg>0&&r.cantidad>0);
     if(!conRelleno.length){
       if(spanEl)spanEl.innerHTML='<span style="color:var(--text3)">Sin datos</span>';
-      return;
+      return null;
     }
     const totalKg=conRelleno.reduce((s,r)=>s+(r.relleno_kg||0),0);
     const totalUnd=conRelleno.reduce((s,r)=>s+(r.cantidad||0),0);
     const promG=totalUnd>0?(totalKg/totalUnd*1000):0;
     const promFmt=promG.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1});
     if(spanEl)spanEl.innerHTML=`<span style="color:var(--amber);font-weight:600">${promFmt}g</span>`;
+    return Math.round(promG*10)/10;
   }catch{
     if(spanEl)spanEl.innerHTML='<span style="color:var(--text3)">Error</span>';
+    return null;
   }
+}
+
+// Usa el promedio real: lo pone en el input y guarda el vínculo
+async function usarPromRend(rellenoId,vi,prodNombre,prodArea,eid){
+  const btn=event.currentTarget;
+  const originalHTML=btn.innerHTML;
+  btn.innerHTML='<span class="spinner" style="width:10px;height:10px;border-width:1.5px"></span>';
+  btn.disabled=true;
+  const promG=await cargarPromRend(rellenoId,vi,prodNombre,prodArea,eid);
+  if(promG===null){
+    btn.innerHTML=originalHTML;btn.disabled=false;
+    alert('No hay registros de rendimiento con relleno para este producto.');
+    return;
+  }
+  // Poner el valor en el input
+  const inp=document.getElementById(`vinc-inp-${rellenoId}-${vi}`);
+  if(inp){
+    inp.value=promG.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1}).replace(',','.');
+    // Flash visual
+    inp.style.background='rgba(245,158,11,0.15)';
+    inp.style.borderColor='var(--amber)';
+    setTimeout(()=>{inp.style.background='';inp.style.borderColor='';},1500);
+  }
+  // Guardar automáticamente
+  await updVinculo(rellenoId,vi,'gramos_por_unidad',promG);
+  btn.innerHTML='<i class="ti ti-check"></i> Aplicado';
+  btn.style.background='var(--green)';
+  setTimeout(()=>{btn.innerHTML=originalHTML;btn.style.background='';btn.disabled=false;},2000);
 }
 
 // Al mostrar los vínculos, cargar promedios en segundo plano para todos
