@@ -241,7 +241,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.70</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.72</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -250,6 +250,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <div class="main"><div class="app-card">
 <div class="tabs">
   <button class="tab active" onclick="T('plan')"><i class="ti ti-calendar"></i> Planificacion</button>
+  <button class="tab" onclick="T('rell')"><i class="ti ti-bowl-chopsticks"></i> Rellenos</button>
   <button class="tab" onclick="T('real')"><i class="ti ti-clipboard-list"></i> Produccion real</button>
   <button class="tab" onclick="T('cmp')"><i class="ti ti-chart-bar"></i> Comparacion</button>
   <button class="tab" onclick="T('desv')"><i class="ti ti-alert-triangle"></i> Desvios</button>
@@ -264,6 +265,25 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('etq')"><i class="ti ti-qrcode"></i> Etiquetas</button>
 </div>
 <div class="pad">
+
+<!-- RELLENOS -->
+<div id="tab-rell" class="section">
+  <div class="toolbar">
+    <div>
+      <div style="font-size:16px;font-weight:600">Planificación de Rellenos</div>
+      <div style="font-size:13px;color:var(--text2)">Kg a elaborar por día según el plan semanal</div>
+    </div>
+    <div class="btns">
+      <select id="rell-wsel" onchange="renderRellenos()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
+      <button class="btn btn-sm" onclick="renderRellenos()"><i class="ti ti-refresh"></i> Actualizar</button>
+    </div>
+  </div>
+  <div class="alert alert-info" style="margin-bottom:1rem">
+    <i class="ti ti-info-circle"></i>
+    <span>🔥 <b>Caliente</b>: se elabora el día anterior al cierre (si cae domingo → sábado). &nbsp; ❄️ <b>Frío</b>: se elabora el mismo día del cierre.</span>
+  </div>
+  <div id="rell-content"></div>
+</div>
 
 <!-- PLAN -->
 <div id="tab-plan" class="section active">
@@ -1075,7 +1095,7 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['plan','real','cmp','desv','dash','stock','proy','rec','rend','hor','ped','mae','etq'];
+const TABS=['plan','rell','real','cmp','desv','dash','stock','proy','rec','rend','hor','ped','mae','etq'];
 function T(t){
   document.querySelectorAll('.tab').forEach(el=>{
     const m=el.getAttribute('onclick')||'';
@@ -1096,6 +1116,7 @@ function T(t){
   if(t==='rend')initRend();
   if(t==='ped')initPedidos();
   if(t==='etq')initEtiquetas();
+  if(t==='rell')initRellenos();
 }
 function pS(id){
   const s=document.getElementById(id);const c=s.value||st.w;
@@ -4331,14 +4352,14 @@ async function renderVentasMensuales(){
 
       aProds.forEach(p=>{
         const area=st.A.find(a=>a.id===p.area_id)?.nombre||'SA';
-        const pid=`vm-${p.empresa_id}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+        const pid=`vm-${p.empresa_id}-${area.replace(/[\s'\/]/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
         const existing=ventasMensualesData.find(x=>x.empresa_id===p.empresa_id&&x.area===area&&x.producto===p.nombre);
         const val=existing?.venta_mensual||'';
         const semanal=val?`<span style="color:var(--blue);font-weight:700">${(parseFloat(val)/4.2).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:1})}</span>`:'<span style="color:var(--text3)">—</span>';
         h+=`<tr>
-          <td>${p.nombre}</td>
+          <td style="font-weight:500">${p.nombre}</td>
           <td style="text-align:right">
-            <input type="number" min="0" step="1" id="${pid}" value="${val}" placeholder="0"
+            <input type="number" min="0" step="1" id="${pid}" value="${val}" placeholder="—"
               oninput="actualizarSemanales()"
               style="width:120px;text-align:right;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)"/>
           </td>
@@ -4377,10 +4398,11 @@ async function guardarVentasMensuales(){
   try{
     for(const p of prods){
       const area=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';
-      const pid=`vm-${p.empresa_id}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+      const pid=`vm-${p.empresa_id}-${area.replace(/[\s'\/]/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
       const inp=document.getElementById(pid);
-      if(!inp||inp.value==='')continue;
+      if(!inp||inp.value===''||inp.value==='0')continue;
       const venta_mensual=parseFloat(inp.value)||0;
+      if(venta_mensual<=0)continue;
       const existing=ventasMensualesData.find(x=>x.empresa_id===p.empresa_id&&x.area===area&&x.producto===p.nombre);
       if(existing){
         await fetch(`${SB}/rest/v1/ventas_mensuales?id=eq.${existing.id}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({venta_mensual,updated_at:new Date().toISOString()})});
@@ -7147,6 +7169,134 @@ if('serviceWorker' in navigator){
   });
 }
 
+
+// ===== RELLENOS =====
+async function initRellenos(){
+  // Poblar selector de semanas igual que en Planificación
+  const sel=document.getElementById('rell-wsel');
+  if(sel.options.length===0){
+    const sems=[...new Set([...st.Sem,st.w])].sort().reverse();
+    sems.forEach(s=>{
+      const o=document.createElement('option');
+      o.value=s;o.textContent=wlb(s);
+      if(s===st.w)o.selected=true;
+      sel.appendChild(o);
+    });
+  }
+  if(!st.E.length||!st.Pr.length)await init();
+  await renderRellenos();
+}
+
+async function renderRellenos(){
+  const el=document.getElementById('rell-content');
+  el.innerHTML='<div style="padding:2rem;text-align:center;color:var(--text2)"><span class="spinner spinner-dark"></span> Calculando...</div>';
+
+  const sem=document.getElementById('rell-wsel').value||st.w;
+  // Cargar plan si no está en memoria
+  await lp(sem);
+  const plan=st.P[sem]||[];
+  if(!plan.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-bowl-chopsticks-off"></i> Sin plan cargado para esta semana.</div>';
+    return;
+  }
+
+  const DIAS=['Lun','Mar','Mie','Jue','Vie','Sab','Dom'];
+  // Calcular fecha real de cada día de la semana
+  const fechasDia=DIAS.map((_,di)=>{
+    const d=new Date(sem+'T00:00:00');
+    d.setDate(d.getDate()+di);
+    return d;
+  });
+
+  // Construir mapa: relleno → { elaboracion, dias: [kg × 7] }
+  // Para cada producto en el plan, buscar su vínculo con rellenos
+  const rellenoMap={}; // key = nombre relleno
+
+  plan.forEach(row=>{
+    const prod=st.Pr.find(p=>p.nombre===row.producto&&p.empresa_id===row.empresa_id);
+    if(!prod)return;
+    const elaboracion=prod.elaboracion||'frio'; // default frio si no está seteado
+
+    // Buscar todos los rellenos de Cocina que vinculan este producto
+    const rellenosDeEsteProducto=st.Pr.filter(r=>{
+      if(!r.vinculo_productos)return false;
+      try{
+        const v=JSON.parse(r.vinculo_productos);
+        return v.some(x=>x.producto_id===prod.id);
+      }catch{return false}
+    });
+
+    rellenosDeEsteProducto.forEach(relleno=>{
+      let vinculos=[];
+      try{vinculos=JSON.parse(relleno.vinculo_productos);}catch{}
+      const vinc=vinculos.find(x=>x.producto_id===prod.id);
+      if(!vinc)return;
+      const gramosPorUnidad=parseFloat(vinc.gramos_por_unidad)||0;
+      if(!gramosPorUnidad)return;
+
+      const key=relleno.nombre;
+      if(!rellenoMap[key]){
+        rellenoMap[key]={elaboracion,kgPorDia:Array(7).fill(0),empresa:relleno.empresa_id};
+      }
+
+      // Asignar kg al día de elaboración según frío/caliente
+      (row.days||[]).forEach((unidades,di)=>{
+        if(!unidades)return;
+        const kg=(unidades*gramosPorUnidad)/1000;
+        let diaElab=di;
+        if(elaboracion==='caliente'){
+          diaElab=di-1;
+          // Si cae domingo (índice 6) → sábado (índice 5)
+          if(diaElab<0)diaElab=0; // si el lunes necesita elaboración previa, queda el lunes mismo
+          if(di===0)diaElab=0;    // lunes caliente → elaborar el lunes (no hay domingo anterior en la semana)
+        }
+        // Si el día calculado es domingo (di===6) para caliente, ya viene di-1=5 (sábado), ok
+        rellenoMap[key].kgPorDia[diaElab]+=kg;
+      });
+    });
+  });
+
+  const rellenos=Object.entries(rellenoMap);
+  if(!rellenos.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-info-circle"></i> No hay vínculos relleno→producto configurados. Andá a Maestro → Cocina para vincularlos.</div>';
+    return;
+  }
+
+  // Renderizar tabla
+  let h=`<div class="grid-card" style="overflow-x:auto">
+    <table class="ptbl">
+      <thead><tr>
+        <th style="min-width:180px">Relleno</th>
+        <th style="width:80px;text-align:center">Tipo</th>`;
+  DIAS.forEach((d,di)=>{
+    const fecha=fechasDia[di];
+    const dd=fecha.getDate().toString().padStart(2,'0');
+    const mm=(fecha.getMonth()+1).toString().padStart(2,'0');
+    h+=`<th style="text-align:right;width:90px">${d}<br><span style="font-size:10px;font-weight:400">${dd}/${mm}</span></th>`;
+  });
+  h+=`<th style="text-align:right;width:90px">Total</th></tr></thead><tbody>`;
+
+  rellenos.sort((a,b)=>a[0].localeCompare(b[0])).forEach(([nombre,data])=>{
+    const esCaliente=data.elaboracion==='caliente';
+    const tipoLabel=esCaliente?'🔥 Caliente':'❄️ Frío';
+    const tipoColor=esCaliente?'var(--red)':'var(--blue)';
+    const total=data.kgPorDia.reduce((s,v)=>s+v,0);
+    h+=`<tr>
+      <td style="font-weight:600">${nombre}</td>
+      <td style="text-align:center;font-size:12px;color:${tipoColor}">${tipoLabel}</td>`;
+    data.kgPorDia.forEach(kg=>{
+      const val=kg>0?kg.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:2}):'—';
+      const color=kg>0?'var(--text)':'var(--text3)';
+      h+=`<td style="text-align:right;color:${color};font-weight:${kg>0?'600':'400'}">${val}</td>`;
+    });
+    const totalFmt=total>0?total.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:2}):'—';
+    h+=`<td style="text-align:right;font-weight:700;color:var(--green)">${totalFmt}</td></tr>`;
+  });
+
+  h+=`</tbody></table></div>
+  <div style="font-size:12px;color:var(--text2);margin-top:8px">Todos los valores en <b>kg</b>. El día de elaboración ya está ajustado según Frío/Caliente.</div>`;
+  el.innerHTML=h;
+}
 
 // ===== ETIQUETAS / CAJAS CONGELADAS =====
 const QR_LIB_URL='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
