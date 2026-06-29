@@ -241,7 +241,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.74</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.75</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -7358,21 +7358,64 @@ async function renderRellenos(){
     return;
   }
 
-  // Renderizar tabla
+  // Guardar datos para re-ordenar sin recargar todo
+  el._rellenosData={rellenos,DIAS,fechasDia};
+  renderRellenosTabla(el, rellenos, DIAS, fechasDia, 'nombre', 'asc');
+}
+
+// Ordenamiento: col = 'nombre' | 'tipo' | 'total' | 0..6 (día)
+let rellenoSortCol='nombre', rellenoSortDir='asc';
+
+function sortRellenos(col){
+  if(rellenoSortCol===col){
+    rellenoSortDir=rellenoSortDir==='asc'?'desc':'asc';
+  } else {
+    rellenoSortCol=col;
+    rellenoSortDir=col==='nombre'||col==='tipo'?'asc':'desc';
+  }
+  const el=document.getElementById('rell-content');
+  if(!el._rellenosData)return;
+  const {rellenos,DIAS,fechasDia}=el._rellenosData;
+  renderRellenosTabla(el,rellenos,DIAS,fechasDia,rellenoSortCol,rellenoSortDir);
+}
+
+function renderRellenosTabla(el, rellenos, DIAS, fechasDia, sortCol, sortDir){
+  // Ordenar
+  const sorted=[...rellenos].sort((a,b)=>{
+    let va,vb;
+    if(sortCol==='nombre'){va=a[0];vb=b[0];return sortDir==='asc'?va.localeCompare(vb):vb.localeCompare(va);}
+    if(sortCol==='tipo'){va=a[1].elaboracion;vb=b[1].elaboracion;return sortDir==='asc'?va.localeCompare(vb):vb.localeCompare(va);}
+    if(sortCol==='total'){va=a[1].kgPorDia.reduce((s,v)=>s+v,0);vb=b[1].kgPorDia.reduce((s,v)=>s+v,0);}
+    else{va=a[1].kgPorDia[sortCol]||0;vb=b[1].kgPorDia[sortCol]||0;}
+    return sortDir==='asc'?va-vb:vb-va;
+  });
+
+  const arrow=dir=>dir==='asc'?'↑':'↓';
+  const thStyle=(col)=>`cursor:pointer;user-select:none;${sortCol===col?'color:var(--blue)':''}`;
+
   let h=`<div class="grid-card" style="overflow-x:auto">
     <table class="ptbl">
       <thead><tr>
-        <th style="min-width:180px">Relleno</th>
-        <th style="width:80px;text-align:center">Tipo</th>`;
+        <th style="${thStyle('nombre')};min-width:180px" onclick="sortRellenos('nombre')">
+          Relleno ${sortCol==='nombre'?arrow(sortDir):'↕'}
+        </th>
+        <th style="${thStyle('tipo')};width:80px;text-align:center" onclick="sortRellenos('tipo')">
+          Tipo ${sortCol==='tipo'?arrow(sortDir):'↕'}
+        </th>`;
   DIAS.forEach((d,di)=>{
     const fecha=fechasDia[di];
     const dd=fecha.getDate().toString().padStart(2,'0');
     const mm=(fecha.getMonth()+1).toString().padStart(2,'0');
-    h+=`<th style="text-align:right;width:90px">${d}<br><span style="font-size:10px;font-weight:400">${dd}/${mm}</span></th>`;
+    h+=`<th style="${thStyle(di)};text-align:right;width:90px" onclick="sortRellenos(${di})">
+      ${d} ${sortCol===di?arrow(sortDir):'↕'}<br>
+      <span style="font-size:10px;font-weight:400">${dd}/${mm}</span>
+    </th>`;
   });
-  h+=`<th style="text-align:right;width:90px">Total</th></tr></thead><tbody>`;
+  h+=`<th style="${thStyle('total')};text-align:right;width:90px" onclick="sortRellenos('total')">
+    Total ${sortCol==='total'?arrow(sortDir):'↕'}
+  </th></tr></thead><tbody>`;
 
-  rellenos.sort((a,b)=>a[0].localeCompare(b[0])).forEach(([nombre,data])=>{
+  sorted.forEach(([nombre,data])=>{
     const esCaliente=data.elaboracion==='caliente';
     const tipoLabel=esCaliente?'🔥 Caliente':'❄️ Frío';
     const tipoColor=esCaliente?'var(--red)':'var(--blue)';
