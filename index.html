@@ -241,7 +241,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.80</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.81</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -7581,7 +7581,7 @@ async function guardarStockManualJoselito(){
       const inp=document.getElementById(`jman-${p.codigo_articulo}`);
       if(!inp||inp.value==='')continue;
       const stock=parseFloat(inp.value)||0;
-      await fetch(`${SB}/rest/v1/stock_joselito`,{
+      await fetch(`${SB}/rest/v1/stock_joselito?on_conflict=fecha,codigo_articulo`,{
         method:'POST',
         headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},
         body:JSON.stringify({fecha,codigo_articulo:p.codigo_articulo,stock})
@@ -7707,7 +7707,7 @@ async function importarStockJoselito(){
   try{
     for(const d of stockImportData){
       // Upsert por fecha + codigo_articulo (UNIQUE constraint)
-      const res=await fetch(`${SB}/rest/v1/stock_joselito`,{
+      const res=await fetch(`${SB}/rest/v1/stock_joselito?on_conflict=fecha,codigo_articulo`,{
         method:'POST',
         headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},
         body:JSON.stringify({fecha,codigo_articulo:d.codigo,stock:d.stock})
