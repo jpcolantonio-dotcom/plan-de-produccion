@@ -241,7 +241,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.78</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.80</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -550,6 +550,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab" id="ptab-ventas" onclick="showProyTab('ventas')"><i class="ti ti-shopping-cart"></i> 2. Ventas del dia</button>
     <button class="proy-tab" id="ptab-resumen" onclick="showProyTab('resumen')"><i class="ti ti-table"></i> 3. Resumen</button>
     <button class="proy-tab" id="ptab-stats" onclick="showProyTab('stats')"><i class="ti ti-chart-bar"></i> 4. Estadisticas</button>
+    <button class="proy-tab" id="ptab-joselito" onclick="showProyTab('joselito')"><i class="ti ti-file-spreadsheet"></i> Stock Joselito</button>
   </div>
   <!-- CONTEO -->
   <div id="proy-conteo">
@@ -614,6 +615,55 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     </div>
   </div>
   <div id="proy-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
+
+  <!-- STOCK JOSELITO -->
+  <div id="proy-joselito" style="display:none">
+    <div class="proy-subtabs" style="margin-bottom:1rem">
+      <button class="proy-tab active" id="jstab-import" onclick="showJoselTab('import')"><i class="ti ti-upload"></i> Importar desde xlsx</button>
+      <button class="proy-tab" id="jstab-manual" onclick="showJoselTab('manual')"><i class="ti ti-pencil"></i> Carga manual</button>
+      <button class="proy-tab" id="jstab-historial" onclick="showJoselTab('historial')"><i class="ti ti-history"></i> Historial</button>
+    </div>
+
+    <!-- IMPORTAR -->
+    <div id="josel-sub-import">
+      <div class="alert alert-info" style="margin-bottom:1rem">
+        <i class="ti ti-info-circle"></i> Subí el xlsx del sistema Joselito. Lee columna A (código) y columna H (stock) automáticamente.
+      </div>
+      <div class="grid-card" style="max-width:600px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+          <input type="file" id="stock-xlsx-input" accept=".xlsx,.xls" onchange="previewStockJoselito(this)"
+            style="flex:1;min-width:200px;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+          <button class="btn btn-primary" id="btn-importar-stock" disabled onclick="importarStockJoselito()">
+            <i class="ti ti-upload"></i> Importar
+          </button>
+        </div>
+        <div id="stock-import-preview"></div>
+        <div id="stock-import-msg" style="display:none;margin-top:8px" class="alert alert-ok"><i class="ti ti-check"></i> <span id="stock-import-msg-txt"></span></div>
+        <div id="stock-import-err" style="display:none;margin-top:8px" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="stock-import-err-txt"></span></div>
+      </div>
+    </div>
+
+    <!-- MANUAL -->
+    <div id="josel-sub-manual" style="display:none">
+      <div class="alert alert-info" style="margin-bottom:1rem">
+        <i class="ti ti-info-circle"></i> Cargá el stock de cada producto Joselito manualmente para la fecha seleccionada.
+      </div>
+      <div id="josel-manual-content"></div>
+      <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+        <button class="btn btn-primary" onclick="guardarStockManualJoselito()"><i class="ti ti-device-floppy"></i> Guardar stock</button>
+      </div>
+      <div id="josel-manual-msg" style="display:none;margin-top:8px" class="alert alert-ok"><i class="ti ti-check"></i> Stock guardado.</div>
+    </div>
+
+    <!-- HISTORIAL -->
+    <div id="josel-sub-historial" style="display:none">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+        <input type="date" id="josel-hist-fecha" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        <button class="btn btn-sm" onclick="renderHistorialJoselito()"><i class="ti ti-search"></i> Buscar</button>
+      </div>
+      <div id="josel-hist-content"></div>
+    </div>
+  </div>
   <div id="proy-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="proy-errtxt"></span></div>
 </div>
 
@@ -5601,18 +5651,18 @@ async function confirmarImport(){
 let proyData = []; // cache proyeccion del dia
 
 function showProyTab(t){
-  ['conteo','ventas','resumen','stats'].forEach(id=>{
+  ['conteo','ventas','resumen','stats','joselito'].forEach(id=>{
     document.getElementById('proy-'+id).style.display=id===t?'block':'none';
     document.getElementById('ptab-'+id).classList.toggle('active',id===t);
   });
   if(t==='resumen'){
     const fecha=document.getElementById('proy-fecha').value;
     const semKey=wk(new Date(fecha+'T00:00:00'));
-    // Forzar recarga fresca
     delete st.P[semKey]; delete st.R[semKey];
     Promise.all([lp(semKey),lr(semKey)]).then(()=>renderResumen());
   }
   if(t==='stats')initStats();
+  if(t==='joselito')initStockJoselito();
 }
 
 async function initProy(){
@@ -7470,6 +7520,216 @@ function renderRellenosTabla(el, rellenos, DIAS, fechasDia, sortCol, sortDir){
   h+=`</tbody></table></div>
   <div style="font-size:12px;color:var(--text2);margin-top:8px">Todos los valores en <b>kg</b>. El día de elaboración ya está ajustado según Frío/Caliente.</div>`;
   el.innerHTML=h;
+}
+
+// ===== STOCK JOSELITO (Proyección) =====
+function initStockJoselito(){
+  // Fecha default = hoy
+  const fechaEl=document.getElementById('josel-hist-fecha');
+  if(fechaEl&&!fechaEl.value)fechaEl.value=hoyLocal();
+  showJoselTab('import');
+}
+
+function showJoselTab(t){
+  ['import','manual','historial'].forEach(id=>{
+    document.getElementById('josel-sub-'+id).style.display=id===t?'block':'none';
+    document.getElementById('jstab-'+id).classList.toggle('active',id===t);
+  });
+  if(t==='manual')renderManualJoselito();
+  if(t==='historial')renderHistorialJoselito();
+}
+
+async function renderManualJoselito(){
+  const el=document.getElementById('josel-manual-content');
+  el.innerHTML='<div style="padding:1rem;text-align:center;color:var(--text2)"><span class="spinner spinner-dark"></span></div>';
+  const fecha=document.getElementById('proy-fecha').value||hoyLocal();
+  // Cargar stock ya guardado para hoy
+  let stockActual=[];
+  try{stockActual=await get('stock_joselito',`fecha=eq.${fecha}`);}catch{}
+  const joselito=st.E.find(e=>e.nombre.toLowerCase().includes('joselito'));
+  const prods=joselito?st.Pr.filter(p=>p.empresa_id===joselito.id&&p.codigo_articulo).sort((a,b)=>a.nombre.localeCompare(b.nombre)):[];
+  if(!prods.length){
+    el.innerHTML='<div class="empty">No hay productos Joselito con código de artículo mapeado. Completá el Mapeo Joselito en el Maestro.</div>';
+    return;
+  }
+  let h=`<div class="grid-card" style="overflow-x:auto"><table class="ptbl">
+    <thead><tr><th>Código</th><th>Producto</th><th style="width:150px;text-align:right">Stock</th></tr></thead><tbody>`;
+  prods.forEach(p=>{
+    const reg=stockActual.find(s=>s.codigo_articulo===p.codigo_articulo);
+    const val=reg?reg.stock:'';
+    h+=`<tr>
+      <td style="font-family:monospace;font-size:12px;color:var(--blue)">${p.codigo_articulo}</td>
+      <td>${p.nombre}</td>
+      <td style="text-align:right">
+        <input type="number" id="jman-${p.codigo_articulo}" value="${val}" placeholder="0" min="0" step="0.001"
+          style="width:120px;text-align:right;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)"/>
+      </td>
+    </tr>`;
+  });
+  h+=`</tbody></table></div>`;
+  el.innerHTML=h;
+}
+
+async function guardarStockManualJoselito(){
+  const fecha=document.getElementById('proy-fecha').value||hoyLocal();
+  const joselito=st.E.find(e=>e.nombre.toLowerCase().includes('joselito'));
+  const prods=joselito?st.Pr.filter(p=>p.empresa_id===joselito.id&&p.codigo_articulo):[];
+  ss('saving','Guardando...');
+  let guardados=0;
+  try{
+    for(const p of prods){
+      const inp=document.getElementById(`jman-${p.codigo_articulo}`);
+      if(!inp||inp.value==='')continue;
+      const stock=parseFloat(inp.value)||0;
+      await fetch(`${SB}/rest/v1/stock_joselito`,{
+        method:'POST',
+        headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},
+        body:JSON.stringify({fecha,codigo_articulo:p.codigo_articulo,stock})
+      });
+      guardados++;
+    }
+    ss('online','Guardado');
+    const msgEl=document.getElementById('josel-manual-msg');
+    msgEl.style.display='';
+    setTimeout(()=>msgEl.style.display='none',3000);
+  }catch(e){ss('error',e.message)}
+}
+
+async function renderHistorialJoselito(){
+  const el=document.getElementById('josel-hist-content');
+  const fecha=document.getElementById('josel-hist-fecha').value||hoyLocal();
+  el.innerHTML='<div style="padding:1rem;text-align:center;color:var(--text2)"><span class="spinner spinner-dark"></span></div>';
+  let data=[];
+  try{data=await get('stock_joselito',`fecha=eq.${fecha}&order=codigo_articulo.asc`);}catch{}
+  if(!data.length){
+    el.innerHTML=`<div class="empty">Sin stock registrado para el ${fecha}.</div>`;
+    return;
+  }
+  const joselito=st.E.find(e=>e.nombre.toLowerCase().includes('joselito'));
+  const prods=joselito?st.Pr.filter(p=>p.empresa_id===joselito.id):[];
+  let h=`<div class="grid-card" style="overflow-x:auto"><table class="ptbl">
+    <thead><tr><th>Código</th><th>Producto en PAPO</th><th style="text-align:right;width:120px">Stock</th></tr></thead><tbody>`;
+  let total=0;
+  data.forEach(d=>{
+    const prod=prods.find(p=>p.codigo_articulo===d.codigo_articulo);
+    total+=parseFloat(d.stock)||0;
+    h+=`<tr>
+      <td style="font-family:monospace;font-size:12px;color:var(--blue)">${d.codigo_articulo}</td>
+      <td>${prod?prod.nombre:`<span style="color:var(--text3)">${d.codigo_articulo}</span>`}</td>
+      <td style="text-align:right;font-weight:${d.stock>0?'600':'400'};color:${d.stock>0?'var(--text)':'var(--text3)'}">${parseFloat(d.stock).toLocaleString('es-AR')}</td>
+    </tr>`;
+  });
+  h+=`</tbody><tfoot><tr><td colspan="2" style="font-weight:700">Total registros</td><td style="text-align:right;font-weight:700;color:var(--green)">${data.length}</td></tr></tfoot></table></div>`;
+  el.innerHTML=h;
+}
+
+// ===== IMPORTAR STOCK JOSELITO =====
+let stockImportData=[]; // [{codigo, stock}] del xlsx leído
+
+async function previewStockJoselito(input){
+  const file=input.files[0];
+  if(!file)return;
+  const previewEl=document.getElementById('stock-import-preview');
+  const btnImport=document.getElementById('btn-importar-stock');
+  const errEl=document.getElementById('stock-import-err');
+  const msgEl=document.getElementById('stock-import-msg');
+  errEl.style.display='none';msgEl.style.display='none';
+  previewEl.innerHTML='<div style="color:var(--text2);font-size:13px"><span class="spinner spinner-dark"></span> Leyendo archivo...</div>';
+  btnImport.disabled=true;
+  stockImportData=[];
+  try{
+    // Cargar SheetJS si no está disponible
+    if(!window.XLSX){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload=res;s.onerror=rej;document.head.appendChild(s);
+      });
+    }
+    const buf=await file.arrayBuffer();
+    const wb=window.XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=window.XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+    // Buscar fila de datos: empieza donde col A es un código que comienza con 302
+    const datos=[];
+    for(const row of rows){
+      const codigo=row[0]!=null?String(row[0]).trim():'';
+      if(!codigo.startsWith('302'))continue;
+      const stock=parseFloat(row[7])||0;
+      datos.push({codigo,stock});
+    }
+    if(!datos.length){
+      throw new Error('No se encontraron filas con códigos 302xxx en la columna A.');
+    }
+    stockImportData=datos;
+    // Preview: mostrar resumen y primeros 8 registros con stock > 0
+    const conStock=datos.filter(d=>d.stock>0).length;
+    const fecha=new Date().toLocaleDateString('es-AR');
+    let h=`<div style="font-size:13px;margin-bottom:8px">
+      <b>${datos.length}</b> artículos leídos · <b>${conStock}</b> con stock > 0 · Fecha: <b>${fecha}</b>
+    </div>
+    <table class="ptbl" style="font-size:12px">
+      <thead><tr><th>Código</th><th style="text-align:right">Stock</th><th>Producto en PAPO</th></tr></thead>
+      <tbody>`;
+    const joselito=st.E.find(e=>e.nombre.toLowerCase().includes('joselito'));
+    const prodsJos=joselito?st.Pr.filter(p=>p.empresa_id===joselito.id):[];
+    const muestra=datos.filter(d=>d.stock>0).slice(0,8);
+    muestra.forEach(d=>{
+      const prod=prodsJos.find(p=>p.codigo_articulo===d.codigo);
+      h+=`<tr>
+        <td style="font-family:monospace;color:var(--blue)">${d.codigo}</td>
+        <td style="text-align:right;font-weight:600">${d.stock.toLocaleString('es-AR')}</td>
+        <td style="color:${prod?'var(--text)':'var(--red)'}">${prod?prod.nombre:'⚠ Sin mapeo en PAPO'}</td>
+      </tr>`;
+    });
+    if(datos.filter(d=>d.stock>0).length>8)h+=`<tr><td colspan="3" style="color:var(--text2);text-align:center">... y ${datos.filter(d=>d.stock>0).length-8} más con stock</td></tr>`;
+    h+=`</tbody></table>`;
+    previewEl.innerHTML=h;
+    btnImport.disabled=false;
+  }catch(e){
+    previewEl.innerHTML='';
+    document.getElementById('stock-import-err-txt').textContent=e.message;
+    errEl.style.display='';
+  }
+}
+
+async function importarStockJoselito(){
+  if(!stockImportData.length)return;
+  const btn=document.getElementById('btn-importar-stock');
+  const msgEl=document.getElementById('stock-import-msg');
+  const errEl=document.getElementById('stock-import-err');
+  const origHTML=btn.innerHTML;
+  btn.disabled=true;
+  btn.innerHTML='<span class="spinner" style="width:12px;height:12px;border-width:2px"></span> Importando...';
+  msgEl.style.display='none';errEl.style.display='none';
+  const fecha=hoyLocal();
+  let guardados=0,sinMapeo=0;
+  try{
+    for(const d of stockImportData){
+      // Upsert por fecha + codigo_articulo (UNIQUE constraint)
+      const res=await fetch(`${SB}/rest/v1/stock_joselito`,{
+        method:'POST',
+        headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},
+        body:JSON.stringify({fecha,codigo_articulo:d.codigo,stock:d.stock})
+      });
+      if(!res.ok){
+        const txt=await res.text();
+        throw new Error(`Error en ${d.codigo}: ${txt}`);
+      }
+      guardados++;
+    }
+    btn.innerHTML=origHTML;btn.disabled=false;
+    document.getElementById('stock-import-msg-txt').textContent=`${guardados} registros importados para ${fecha}. Los productos sin mapeo igualmente se guardaron por código.`;
+    msgEl.style.display='';
+    // Limpiar input
+    document.getElementById('stock-xlsx-input').value='';
+    document.getElementById('stock-import-preview').innerHTML='';
+    stockImportData=[];
+  }catch(e){
+    btn.innerHTML=origHTML;btn.disabled=false;
+    document.getElementById('stock-import-err-txt').textContent=e.message;
+    errEl.style.display='';
+  }
 }
 
 // ===== MAPEO JOSELITO =====
