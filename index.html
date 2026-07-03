@@ -241,7 +241,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.81</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.82</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -5649,6 +5649,7 @@ async function confirmarImport(){
 
 // ── PROYECCION DIARIA ─────────────────────────────────────────────
 let proyData = []; // cache proyeccion del dia
+let stockJoselitoHoy = []; // cache stock joselito del dia (importado desde xlsx)
 
 function showProyTab(t){
   ['conteo','ventas','resumen','stats','joselito'].forEach(id=>{
@@ -5703,12 +5704,25 @@ async function loadProy(){
     if(ef!=='all')f+=`&empresa_id=eq.${ef}`;
     proyData=await get('proyeccion_diaria',f+'&order=area.asc,producto.asc');
   }catch{proyData=[]}
+  // Cargar stock de Joselito para la fecha seleccionada
+  try{
+    stockJoselitoHoy=await get('stock_joselito',`fecha=eq.${fecha}`);
+  }catch{stockJoselitoHoy=[]}
   renderConteo();
   renderVentas();
   if(document.getElementById('proy-resumen').style.display!=='none')renderResumen();
 }
 
 function getProyItem(eid,area,prod){
+  // Para productos con codigo_articulo (Joselito), usar stock importado si existe
+  const prodObj=st.Pr.find(p=>p.nombre===prod&&p.empresa_id===eid);
+  if(prodObj&&prodObj.codigo_articulo&&stockJoselitoHoy.length){
+    const sj=stockJoselitoHoy.find(s=>s.codigo_articulo===prodObj.codigo_articulo);
+    if(sj){
+      const proy=proyData.find(x=>x.empresa_id===eid&&x.area===area&&x.producto===prod)||{};
+      return Object.assign({},proy,{stock:parseFloat(sj.stock)||0});
+    }
+  }
   return proyData.find(x=>x.empresa_id===eid&&x.area===area&&x.producto===prod)||null;
 }
 
