@@ -241,7 +241,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.87</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.88</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -566,7 +566,17 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   </div>
   <!-- VENTAS -->
   <div id="proy-ventas" style="display:none">
-    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Ingresa las ventas proyectadas para el dia por canal.</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap">
+      <div class="alert alert-info" style="flex:1;margin:0"><i class="ti ti-info-circle"></i> Ingresa las ventas proyectadas para el dia por canal.</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+        <label style="font-size:13px;color:var(--text2);white-space:nowrap">Ventas agentes:</label>
+        <input type="file" id="ventas-agentes-input" accept=".xls,.xlsx" onchange="importarVentasAgentes(this)"
+          style="font-size:12px;padding:5px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);max-width:220px"/>
+        <button class="btn btn-sm" onclick="imprimirMatrizAgentes()" id="btn-matriz-pdf" style="display:none"><i class="ti ti-file-type-pdf"></i> PDF matriz</button>
+      </div>
+    </div>
+    <div id="ventas-agentes-msg" style="display:none;margin-bottom:8px" class="alert alert-ok"><i class="ti ti-check"></i> <span id="ventas-agentes-msg-txt"></span></div>
+    <div id="ventas-agentes-err" style="display:none;margin-bottom:8px" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="ventas-agentes-err-txt"></span></div>
     <div id="proy-ventas-content"></div>
     <div style="display:flex;justify-content:flex-end;margin-top:1rem">
       <button class="btn btn-primary" onclick="guardarVentas()"><i class="ti ti-device-floppy"></i> Guardar ventas</button>
@@ -5842,6 +5852,224 @@ async function guardarConteo(){
     fl('proy-msg');
     // NO avanzar al paso 2 automaticamente - dejar que el usuario corrija si quiere
   }catch(e){ss('error','Error');document.getElementById('proy-errtxt').textContent=e.message;fl('proy-err')}
+}
+
+// ===== VENTAS AGENTES =====
+let ventasAgentesData=null; // {agentes:[], productos:[{codigo,nombre,porAgente:{agente:cant}}], totales:{codigo:total}}
+
+async function importarVentasAgentes(input){
+  const file=input.files[0];
+  if(!file)return;
+  const msgEl=document.getElementById('ventas-agentes-msg');
+  const errEl=document.getElementById('ventas-agentes-err');
+  const btnPDF=document.getElementById('btn-matriz-pdf');
+  msgEl.style.display='none';errEl.style.display='none';
+
+  try{
+    if(!window.XLSX){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload=res;s.onerror=rej;document.head.appendChild(s);
+      });
+    }
+    const buf=await file.arrayBuffer();
+    const wb=window.XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=window.XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+
+    // Fila 0 = headers, datos desde fila 1
+    // Col 7=codigo, Col 12=cantidad, Col 14=agente
+    const agentesSet=new Set();
+    const porCodigo={}; // {codigo: {agente: total}}
+
+    for(let i=1;i<rows.length;i++){
+      const row=rows[i];
+      const codigo=row[7]!=null?String(row[7]).trim():'';
+      if(!codigo||!codigo.startsWith('302'))continue;
+      const cantidad=parseFloat(row[12])||0;
+      const agente=(row[14]||'SIN AGENTE').toString().trim();
+      agentesSet.add(agente);
+      if(!porCodigo[codigo])porCodigo[codigo]={};
+      porCodigo[codigo][agente]=(porCodigo[codigo][agente]||0)+cantidad;
+    }
+
+    const agentes=[...agentesSet].sort();
+    // Cruzar con productos de PAPO por codigo_articulo
+    const todosProds=st.Pr;
+    const productos=Object.keys(porCodigo).sort().map(codigo=>{
+      const prod=todosProds.find(p=>p.codigo_articulo===codigo);
+      return {
+        codigo,
+        nombre:prod?prod.nombre:codigo,
+        prodId:prod?prod.id:null,
+        empresaId:prod?prod.empresa_id:null,
+        area:prod?st.A.find(a=>a.id===prod.area_id)?.nombre||'':'',
+        porAgente:porCodigo[codigo],
+        total:Object.values(porCodigo[codigo]).reduce((s,v)=>s+v,0)
+      };
+    });
+
+    ventasAgentesData={agentes,productos};
+    btnPDF.style.display='';
+
+    // Mostrar preview de la matriz
+    mostrarMatrizPreview();
+
+    // Volcar totales al campo Vendedores de proyeccion_diaria
+    const fecha=document.getElementById('proy-fecha').value||hoyLocal();
+    let volcados=0;
+    for(const p of productos){
+      if(!p.prodId)continue;
+      // Actualizar el input de vendedores en la UI si está visible
+      const inp=document.querySelector(`input[data-pid="${p.prodId}"][data-campo="vendedores"]`);
+      if(inp){inp.value=p.total;inp.dispatchEvent(new Event('input'));}
+      // Guardar en proyData en memoria para el resumen
+      const existing=proyData.find(x=>x.empresa_id===p.empresaId&&x.area===p.area&&x.producto===p.nombre);
+      if(existing){existing.vendedores=p.total;}
+      else{proyData.push({fecha,empresa_id:p.empresaId,area:p.area,producto:p.nombre,vendedores:p.total});}
+      volcados++;
+    }
+
+    document.getElementById('ventas-agentes-msg-txt').textContent=
+      `${productos.length} productos leídos, ${volcados} vinculados a PAPO. Revisá los valores y guardá las ventas.`;
+    msgEl.style.display='';
+  }catch(e){
+    document.getElementById('ventas-agentes-err-txt').textContent='Error: '+e.message;
+    errEl.style.display='';
+  }
+}
+
+function mostrarMatrizPreview(){
+  if(!ventasAgentesData)return;
+  const {agentes,productos}=ventasAgentesData;
+  // Insertar preview debajo del mensaje, antes de la tabla de ventas
+  const existing=document.getElementById('ventas-agentes-preview');
+  const container=existing||document.createElement('div');
+  container.id='ventas-agentes-preview';
+  container.style.cssText='margin-bottom:1rem;overflow-x:auto';
+
+  let h=`<div style="font-size:13px;font-weight:600;margin-bottom:6px;color:var(--text2)">
+    <i class="ti ti-table"></i> Matriz de pedidos por agente
+  </div>
+  <div style="overflow-x:auto"><table class="ptbl" style="font-size:12px;min-width:600px">
+    <thead><tr>
+      <th style="min-width:160px;text-align:left">Producto (PAPO)</th>`;
+  agentes.forEach(a=>{
+    const nombre=a.split(' ')[0]; // solo apellido para ahorrar espacio
+    h+=`<th style="text-align:right;min-width:80px" title="${a}">${nombre}</th>`;
+  });
+  h+=`<th style="text-align:right;min-width:70px;color:var(--green)">Total</th></tr></thead><tbody>`;
+
+  productos.forEach(p=>{
+    const sinMapeo=!p.prodId;
+    h+=`<tr${sinMapeo?' style="opacity:0.5"':''}>
+      <td style="font-weight:${sinMapeo?'400':'600'}">${p.nombre}${sinMapeo?` <span style="color:var(--red);font-size:10px">⚠ sin mapeo</span>`:''}</td>`;
+    agentes.forEach(a=>{
+      const v=p.porAgente[a]||0;
+      h+=`<td style="text-align:right;color:${v>0?'var(--text)':'var(--text3)'}">${v>0?v.toLocaleString('es-AR'):'—'}</td>`;
+    });
+    h+=`<td style="text-align:right;font-weight:700;color:var(--green)">${p.total.toLocaleString('es-AR')}</td></tr>`;
+  });
+
+  // Fila totales
+  h+=`<tr style="font-weight:700;border-top:2px solid var(--border)"><td>TOTAL</td>`;
+  agentes.forEach(a=>{
+    const tot=productos.reduce((s,p)=>s+(p.porAgente[a]||0),0);
+    h+=`<td style="text-align:right;color:var(--blue)">${tot>0?tot.toLocaleString('es-AR'):'—'}</td>`;
+  });
+  const gtot=productos.reduce((s,p)=>s+p.total,0);
+  h+=`<td style="text-align:right;color:var(--green)">${gtot.toLocaleString('es-AR')}</td></tr>`;
+  h+=`</tbody></table></div>`;
+  container.innerHTML=h;
+
+  if(!existing){
+    const msgEl=document.getElementById('ventas-agentes-msg');
+    msgEl.parentNode.insertBefore(container,msgEl.nextSibling);
+  }
+}
+
+async function imprimirMatrizAgentes(){
+  if(!ventasAgentesData){alert('Cargá primero el archivo de pedidos.');return}
+  const {agentes,productos}=ventasAgentesData;
+  const fecha=document.getElementById('proy-fecha').value||hoyLocal();
+  const [y,m,d]=fecha.split('-');
+  const fechaFmt=`${d}/${m}/${y}`;
+
+  // Colores por agente para identificarlos fácil
+  const colores=['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#84cc16','#ec4899'];
+
+  let filas='';
+  productos.forEach(p=>{
+    filas+=`<tr>
+      <td class="prod">${p.nombre}${!p.prodId?'<span class="nomap"> ⚠</span>':''}</td>`;
+    agentes.forEach(a=>{
+      const v=p.porAgente[a]||0;
+      filas+=`<td class="num">${v>0?v.toLocaleString('es-AR'):''}</td>`;
+    });
+    filas+=`<td class="num tot">${p.total.toLocaleString('es-AR')}</td></tr>`;
+  });
+
+  // Fila totales
+  filas+=`<tr class="tot-row"><td class="prod">TOTAL</td>`;
+  agentes.forEach(a=>{
+    const tot=productos.reduce((s,p)=>s+(p.porAgente[a]||0),0);
+    filas+=`<td class="num tot">${tot>0?tot.toLocaleString('es-AR'):''}</td>`;
+  });
+  const gtot=productos.reduce((s,p)=>s+p.total,0);
+  filas+=`<td class="num tot">${gtot.toLocaleString('es-AR')}</td></tr>`;
+
+  const thAgentes=agentes.map((a,i)=>`<th style="background:${colores[i%colores.length]}">${a.replace(' ',' ')}</th>`).join('');
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Pedidos Agentes ${fechaFmt}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:9pt;padding:8mm}
+    h1{font-size:13pt;margin-bottom:2px}
+    .sub{font-size:9pt;color:#555;margin-bottom:10px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#1B3A6B;color:#fff;padding:5px 6px;font-size:8pt;text-align:right;border:1px solid #ddd;white-space:nowrap}
+    th:first-child{text-align:left;background:#1B3A6B}
+    td{padding:4px 6px;border:1px solid #ddd;font-size:8.5pt}
+    td.prod{text-align:left;font-weight:600;max-width:180px}
+    td.num{text-align:right}
+    td.tot{font-weight:700;color:#1B3A6B}
+    tr:nth-child(even){background:#f7f7f7}
+    tr.tot-row{background:#e8f0fe;font-weight:700}
+    .nomap{color:#ef4444;font-size:7pt}
+    @media print{@page{size:A4 landscape;margin:8mm}body{padding:0}}
+  </style></head>
+  <body>
+    <h1>Pedidos de Agentes — ${fechaFmt}</h1>
+    <div class="sub">Generado desde PAPO · ${productos.length} productos · ${agentes.length} agentes</div>
+    <table>
+      <thead><tr>
+        <th>Producto</th>${thAgentes}
+        <th style="background:#16a34a">TOTAL</th>
+      </tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+  <script>window.onload=function(){setTimeout(function(){window.print()},300)};<\/script>
+  </body></html>`;
+
+  // Usar el mismo método de impresión directa que las etiquetas
+  const area=document.getElementById('etq-print-area');
+  const match=html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  if(area){
+    area.innerHTML=match?match[1]:html;
+    // Agregar estilos de impresión temporales para A4 landscape
+    const styleEl=document.createElement('style');
+    styleEl.id='tmp-print-style';
+    styleEl.textContent='@media print{@page{size:A4 landscape;margin:8mm}}';
+    document.head.appendChild(styleEl);
+    window.print();
+    setTimeout(()=>{
+      area.innerHTML='';
+      const tmp=document.getElementById('tmp-print-style');
+      if(tmp)tmp.remove();
+    },2000);
+  }
 }
 
 async function guardarVentas(){
