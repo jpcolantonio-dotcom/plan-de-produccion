@@ -241,7 +241,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.85</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.86</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -699,6 +699,11 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <!-- STOCK DE SEGURIDAD -->
   <div id="stock-sub-seg" style="display:none">
     <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Define el stock minimo que debe haber en camara para cada producto. Se compara con el conteo del dia.</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--text2)">Fecha de stock actual:</label>
+      <input type="date" id="stock-seg-fecha" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)" onchange="renderSeguridad()"/>
+      <button class="btn btn-sm" onclick="renderSeguridad()"><i class="ti ti-refresh"></i> Actualizar</button>
+    </div>
     <div id="stock-seg-content"></div>
     <div style="display:flex;justify-content:flex-end;margin-top:1rem">
       <button class="btn btn-pdf" onclick="pdfStockSeg()"><i class="ti ti-file-type-pdf"></i> PDF</button>
@@ -4883,7 +4888,11 @@ async function renderSeguridad(){
     if(ef!=='all')f+=`&empresa_id=eq.${ef}`;
     stockSeg=await get('stock_seguridad',f);
   }catch{stockSeg=[]}
-  const hoy=hoyLocal();
+  const hoy=(()=>{
+    const el=document.getElementById('stock-seg-fecha');
+    if(!el.value)el.value=hoyLocal();
+    return el.value;
+  })();
   let conteoHoy=[];
   try{
     let f2=`fecha=eq.${hoy}&order=area.asc,producto.asc`;
