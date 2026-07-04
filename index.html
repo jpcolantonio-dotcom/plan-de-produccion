@@ -241,7 +241,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.86</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.87</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2535,6 +2535,10 @@ function rRellenoVinculos(eid, rellenosProds){
             ${todosProds.filter(p=>{
               const vv=relleno.vinculo_productos?JSON.parse(relleno.vinculo_productos):[];
               return !vv.find(v=>v.producto_id===p.id);
+            }).sort((a,b)=>{
+              const areaN=n=>areasEmp.find(x=>x.id===n.area_id)?.nombre||'';
+              const cmp=areaN(a).localeCompare(areaN(b));
+              return cmp!==0?cmp:a.nombre.localeCompare(b.nombre);
             }).map(p=>{
               const area=areasEmp.find(a=>a.id===p.area_id);
               return `<option value="${p.id}" data-nombre="${p.nombre}" data-area="${area?.nombre||''}">${area?area.nombre+' · ':''}${p.nombre}</option>`;
