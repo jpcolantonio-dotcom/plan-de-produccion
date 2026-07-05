@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.93</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.95</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -279,6 +279,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div class="btns">
       <select id="rell-wsel" onchange="renderRellenos()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
       <button class="btn btn-sm" onclick="renderRellenos()"><i class="ti ti-refresh"></i> Actualizar</button>
+      <button class="btn btn-sm" onclick="imprimirRellenos()"><i class="ti ti-file-type-pdf"></i> PDF</button>
     </div>
   </div>
   <div class="alert alert-info" style="margin-bottom:1rem">
@@ -7660,7 +7661,8 @@ async function renderRellenos(){
 
       const key=relleno.nombre;
       if(!rellenoMap[key]){
-        rellenoMap[key]={elaboracion,kgPorDia:Array(7).fill(0),empresa:relleno.empresa_id};
+        const area=st.A.find(a=>a.id===prod.area_id);
+        rellenoMap[key]={elaboracion,kgPorDia:Array(7).fill(0),empresa:relleno.empresa_id,area:area?.nombre||'Sin área'};
       }
 
       // Asignar kg al día de elaboración según frío/caliente
@@ -7708,8 +7710,14 @@ function sortRellenos(col){
 }
 
 function renderRellenosTabla(el, rellenos, DIAS, fechasDia, sortCol, sortDir){
-  // Ordenar
+  // Ordenar: siempre primero por área, luego por el criterio elegido
   const sorted=[...rellenos].sort((a,b)=>{
+    // Primero agrupar por área
+    const areaA=a[1].area||'';
+    const areaB=b[1].area||'';
+    const areaCmp=areaA.localeCompare(areaB);
+    if(areaCmp!==0)return areaCmp;
+    // Dentro del área, ordenar por el criterio elegido
     let va,vb;
     if(sortCol==='nombre'){va=a[0];vb=b[0];return sortDir==='asc'?va.localeCompare(vb):vb.localeCompare(va);}
     if(sortCol==='tipo'){va=a[1].elaboracion;vb=b[1].elaboracion;return sortDir==='asc'?va.localeCompare(vb):vb.localeCompare(va);}
@@ -7720,6 +7728,7 @@ function renderRellenosTabla(el, rellenos, DIAS, fechasDia, sortCol, sortDir){
 
   const arrow=dir=>dir==='asc'?'↑':'↓';
   const thStyle=(col)=>`cursor:pointer;user-select:none;${sortCol===col?'color:var(--blue)':''}`;
+  const nCols=2+DIAS.length+1; // relleno + tipo + 7 días + total
 
   let h=`<div class="grid-card" style="overflow-x:auto">
     <table class="ptbl">
@@ -7743,13 +7752,23 @@ function renderRellenosTabla(el, rellenos, DIAS, fechasDia, sortCol, sortDir){
     Total ${sortCol==='total'?arrow(sortDir):'↕'}
   </th></tr></thead><tbody>`;
 
+  let areaActual='';
   sorted.forEach(([nombre,data])=>{
+    // Separador de área
+    if(data.area!==areaActual){
+      areaActual=data.area;
+      h+=`<tr>
+        <td colspan="${nCols}" style="background:var(--surface2);padding:6px 12px;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;border-top:2px solid var(--border2)">
+          <i class="ti ti-tag" style="font-size:12px"></i> ${areaActual}
+        </td>
+      </tr>`;
+    }
     const esCaliente=data.elaboracion==='caliente';
     const tipoLabel=esCaliente?'🔥 Caliente':'❄️ Frío';
     const tipoColor=esCaliente?'var(--red)':'var(--blue)';
     const total=data.kgPorDia.reduce((s,v)=>s+v,0);
     h+=`<tr>
-      <td style="font-weight:600">${nombre}</td>
+      <td style="font-weight:600;padding-left:20px">${nombre}</td>
       <td style="text-align:center;font-size:12px;color:${tipoColor}">${tipoLabel}</td>`;
     data.kgPorDia.forEach(kg=>{
       const val=kg>0?kg.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:2}):'—';
@@ -7763,6 +7782,114 @@ function renderRellenosTabla(el, rellenos, DIAS, fechasDia, sortCol, sortDir){
   h+=`</tbody></table></div>
   <div style="font-size:12px;color:var(--text2);margin-top:8px">Todos los valores en <b>kg</b>. El día de elaboración ya está ajustado según Frío/Caliente.</div>`;
   el.innerHTML=h;
+}
+
+function imprimirRellenos(){
+  const el=document.getElementById('rell-content');
+  if(!el._rellenosData){alert('Cargá primero los rellenos.');return}
+  const {rellenos,DIAS,fechasDia}=el._rellenosData;
+  const sem=document.getElementById('rell-wsel').value||'';
+
+  // Ordenar por área y luego por nombre
+  const sorted=[...rellenos].sort((a,b)=>{
+    const ca=(a[1].area||'').localeCompare(b[1].area||'');
+    return ca!==0?ca:a[0].localeCompare(b[0]);
+  });
+
+  // Agrupar por área
+  const grupos={};
+  sorted.forEach(([nombre,data])=>{
+    const area=data.area||'Sin área';
+    if(!grupos[area])grupos[area]=[];
+    grupos[area].push([nombre,data]);
+  });
+
+  const DIAS_HDR=DIAS.map((d,di)=>{
+    const f=fechasDia[di];
+    return `${d}<br><span style="font-size:7pt;font-weight:400">${f.getDate().toString().padStart(2,'0')}/${(f.getMonth()+1).toString().padStart(2,'0')}</span>`;
+  });
+
+  let tablas='';
+  Object.entries(grupos).forEach(([area,items])=>{
+    let filas='';
+    items.forEach(([nombre,data])=>{
+      const esC=data.elaboracion==='caliente';
+      const total=data.kgPorDia.reduce((s,v)=>s+v,0);
+      filas+=`<tr>
+        <td class="prod">${nombre}</td>
+        <td class="tipo ${esC?'cal':'fri'}">${esC?'🔥 Cal.':'❄️ Frío'}</td>`;
+      data.kgPorDia.forEach(kg=>{
+        filas+=`<td class="num ${kg>0?'hasval':''}">${kg>0?kg.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:2}):''}</td>`;
+      });
+      filas+=`<td class="num tot">${total>0?total.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:2}):''}</td>
+      </tr>`;
+    });
+
+    // Fila de totales del área
+    let totFila='<tr class="tot-row"><td class="prod">TOTAL</td><td></td>';
+    DIAS.forEach((_,di)=>{
+      const tot=items.reduce((s,[,d])=>s+(d.kgPorDia[di]||0),0);
+      totFila+=`<td class="num tot">${tot>0?tot.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:2}):''}</td>`;
+    });
+    const gtot=items.reduce((s,[,d])=>s+d.kgPorDia.reduce((a,v)=>a+v,0),0);
+    totFila+=`<td class="num tot">${gtot>0?gtot.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:2}):''}</td></tr>`;
+
+    tablas+=`
+      <div class="area-titulo">${area}</div>
+      <table>
+        <thead><tr>
+          <th class="h-prod">Relleno</th>
+          <th class="h-tipo">Tipo</th>
+          ${DIAS_HDR.map(d=>`<th class="h-num">${d}</th>`).join('')}
+          <th class="h-tot">Total</th>
+        </tr></thead>
+        <tbody>${filas}${totFila}</tbody>
+      </table>`;
+  });
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Planificación Rellenos ${sem}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:9pt;padding:8mm}
+    h1{font-size:12pt;margin-bottom:1px}
+    .sub{font-size:8pt;color:#555;margin-bottom:8px}
+    .leyenda{font-size:7.5pt;color:#555;margin-bottom:10px;padding:4px 8px;background:#f0f4ff;border-radius:4px;display:inline-block}
+    .area-titulo{font-size:10pt;font-weight:700;color:#1B3A6B;margin:12px 0 4px;padding:4px 8px;background:#e8f0fe;border-left:3px solid #1B3A6B;border-radius:2px}
+    table{width:100%;border-collapse:collapse;margin-bottom:4px}
+    th{background:#1B3A6B;color:#fff;padding:4px 5px;font-size:7.5pt;text-align:right;border:1px solid #0f2a52}
+    th.h-prod{text-align:left;min-width:160px}
+    th.h-tipo{text-align:center;width:60px}
+    th.h-num{width:70px}
+    th.h-tot{background:#16a34a;width:70px}
+    td{padding:3px 5px;font-size:8pt;border-top:.5px solid #ddd;border-bottom:.5px solid #ddd;border-left:1.5px solid #c8d5e8;border-right:none}
+    td:last-child{border-right:1.5px solid #c8d5e8}
+    td.prod{text-align:left;font-weight:600}
+    td.tipo{text-align:center;font-size:7.5pt}
+    td.cal{color:#dc2626}
+    td.fri{color:#2563eb}
+    td.num{text-align:right;color:#aaa}
+    td.hasval{color:#111;font-weight:600}
+    td.tot{font-weight:700;color:#16a34a;background:#f0fdf4}
+    tr:nth-child(even) td{background:#f8fafc}
+    tr:nth-child(even) td.tot{background:#dcfce7}
+    tr.tot-row td{background:#dde8ff!important;font-weight:700;border-top:1.5px solid #9ab0d8;color:#1B3A6B}
+    tr.tot-row td.tot{background:#c8d9f8!important;color:#16a34a}
+    @media print{@page{size:A4 landscape;margin:7mm}body{padding:0}.area-titulo{page-break-before:auto}}
+  </style></head>
+  <body>
+    <h1>Planificación de Rellenos — ${sem}</h1>
+    <div class="sub">PAPO · Generado ${new Date().toLocaleDateString('es-AR')}</div>
+    <div class="leyenda">🔥 <b>Caliente</b>: elaborar día anterior al cierre &nbsp;|&nbsp; ❄️ <b>Frío</b>: elaborar el mismo día</div>
+    ${tablas}
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
+  </body></html>`;
+
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para imprimir.');
 }
 
 // ===== STOCK JOSELITO (Proyección) =====
