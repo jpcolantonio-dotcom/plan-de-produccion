@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.97</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.98</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -8790,7 +8790,7 @@ function showTrenTab(t){
 }
 
 function getCap(empId,puestoId){
-  return trenCapacitaciones.find(c=>c.empleado_id===empId&&c.puesto_id===puestoId)||null;
+  return trenCapacitaciones.find(c=>Number(c.empleado_id)===Number(empId)&&Number(c.puesto_id)===Number(puestoId))||null;
 }
 
 // ── MATRIZ DE CAPACITACIÓN ──────────────────────────────────────
@@ -8853,10 +8853,10 @@ function renderMatrizCapacitacion(){
 }
 
 async function toggleCapacitacion(empId,puestoId,tdEl){
+  empId=parseInt(empId);puestoId=parseInt(puestoId);
   const cap=getCap(empId,puestoId);
   const nuevoEstado=!(cap?.capacitado||false);
   const span=tdEl.querySelector('span');
-  // Feedback inmediato
   span.textContent=nuevoEstado?'●':'○';
   span.style.color=nuevoEstado?'var(--green)':'var(--border2)';
   try{
@@ -8867,11 +8867,16 @@ async function toggleCapacitacion(empId,puestoId,tdEl){
       cap.capacitado=nuevoEstado;
       if(nuevoEstado){cap.fecha_inicio=null;cap.fecha_fin=null;}
     } else {
-      const res=await ins('capacitacion_empleados',{empleado_id:empId,puesto_id:puestoId,capacitado:nuevoEstado});
-      if(res&&res[0])trenCapacitaciones.push(res[0]);
+      const res=await fetch(`${SB}/rest/v1/capacitacion_empleados?on_conflict=empleado_id,puesto_id`,{
+        method:'POST',
+        headers:{...H,'Prefer':'resolution=merge-duplicates,return=representation'},
+        body:JSON.stringify({empleado_id:empId,puesto_id:puestoId,capacitado:nuevoEstado})
+      });
+      if(!res.ok)throw new Error(await res.text());
+      const data=await res.json();
+      if(data&&data[0])trenCapacitaciones.push(data[0]);
     }
   }catch(e){
-    // Revertir si falla
     span.textContent=nuevoEstado?'○':'●';
     span.style.color=nuevoEstado?'var(--border2)':'var(--green)';
     alert('Error: '+e.message);
