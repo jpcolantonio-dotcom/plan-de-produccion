@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.99</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.101</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -8838,10 +8838,11 @@ function renderMatrizCapacitacion(){
       puestosDeEsta.forEach(p=>{
         const cap=getCap(emp.id,p.id);
         const capacitado=cap?.capacitado||false;
-        html+=`<td style="text-align:center;padding:6px;border:.5px solid var(--border);background:${bg};cursor:pointer"
-          onclick="toggleCapacitacion(${emp.id},${p.id},this)"
-          title="${capacitado?'Capacitado — click para quitar':'Sin capacitación — click para marcar'}">
-          <span style="font-size:18px;color:${capacitado?'var(--green)':'var(--border2)'}">${capacitado?'●':'○'}</span>
+        html+=`<td style="text-align:center;padding:6px;border:.5px solid var(--border);background:${bg}">
+          <input type="checkbox" ${capacitado?'checked':''}
+            style="width:18px;height:18px;cursor:pointer;accent-color:var(--green)"
+            onchange="toggleCapacitacion(${emp.id},${p.id},this.checked)"
+            title="${emp.nombre} — ${p.nombre}"/>
         </td>`;
       });
       html+=`</tr>`;
@@ -8852,20 +8853,16 @@ function renderMatrizCapacitacion(){
   el.innerHTML=html||'<div class="empty">Seleccioná una empresa con puestos configurados.</div>';
 }
 
-async function toggleCapacitacion(empId,puestoId,tdEl){
+async function toggleCapacitacion(empId,puestoId,nuevoEstado){
   empId=parseInt(empId);puestoId=parseInt(puestoId);
-  console.log('toggle',empId,puestoId,'caps en memoria:',trenCapacitaciones.length);
   const cap=getCap(empId,puestoId);
-  console.log('cap encontrado:',cap);
-  const nuevoEstado=!(cap?.capacitado||false);
-  const span=tdEl.querySelector('span');
-  span.textContent=nuevoEstado?'●':'○';
-  span.style.color=nuevoEstado?'var(--green)':'var(--border2)';
   try{
     if(cap){
-      await pat('capacitacion_empleados',cap.id,{capacitado:nuevoEstado,
+      await pat('capacitacion_empleados',cap.id,{
+        capacitado:nuevoEstado,
         fecha_inicio:nuevoEstado?null:cap.fecha_inicio,
-        fecha_fin:nuevoEstado?null:cap.fecha_fin});
+        fecha_fin:nuevoEstado?null:cap.fecha_fin
+      });
       cap.capacitado=nuevoEstado;
       if(nuevoEstado){cap.fecha_inicio=null;cap.fecha_fin=null;}
     } else {
@@ -8874,18 +8871,15 @@ async function toggleCapacitacion(empId,puestoId,tdEl){
         headers:{...H,'Prefer':'resolution=merge-duplicates,return=representation'},
         body:JSON.stringify({empleado_id:empId,puesto_id:puestoId,capacitado:nuevoEstado})
       });
-      const txt=await res.text();
-      console.log('respuesta insert:',res.status,txt);
-      if(!res.ok)throw new Error(txt);
-      const data=JSON.parse(txt);
+      if(!res.ok)throw new Error(await res.text());
+      const data=await res.json();
       if(data&&data[0])trenCapacitaciones.push(data[0]);
     }
-    console.log('OK - nuevo estado:',nuevoEstado);
   }catch(e){
-    console.error('ERROR toggle:',e);
-    span.textContent=nuevoEstado?'○':'●';
-    span.style.color=nuevoEstado?'var(--border2)':'var(--green)';
-    alert('Error: '+e.message);
+    // Revertir el checkbox si falla
+    const chk=document.querySelector(`input[onchange*="toggleCapacitacion(${empId},${puestoId}"]`);
+    if(chk)chk.checked=!nuevoEstado;
+    alert('Error al guardar: '+e.message);
   }
 }
 
