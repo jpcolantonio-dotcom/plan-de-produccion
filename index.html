@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.102</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.103</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2772,8 +2772,72 @@ async function addProd(aid,eid){
   catch(e){ss('error','Error');document.getElementById('maeErrtxt').textContent=e.message;fl('maeerr')}
 }
 async function updP(id,f,v){
-  try{await pat('productos',id,{[f]:v});const p=st.Pr.find(x=>x.id===id);if(p)p[f]=v;}
+  try{
+    // Si cambia el nombre, propagar a todas las tablas que lo usan como texto
+    if(f==='nombre'){
+      const prod=st.Pr.find(x=>x.id===id);
+      if(prod&&prod.nombre&&prod.nombre!==v){
+        await propagarCambioNombreProducto(prod.empresa_id, prod.nombre, v, prod.area_id);
+      }
+    }
+    await pat('productos',id,{[f]:v});
+    const p=st.Pr.find(x=>x.id===id);if(p)p[f]=v;
+  }
   catch(e){ss('error','Error al actualizar')}
+}
+
+async function propagarCambioNombreProducto(empresa_id, nombreViejo, nombreNuevo, area_id){
+  const area=st.A.find(a=>a.id===area_id)?.nombre||'';
+  ss('saving',`Actualizando nombre en tablas...`);
+  const tablas=[
+    'proyeccion_diaria',
+    'mix_ventas',
+    'stock_seguridad',
+    'ventas_mensuales',
+    'cajas_producto',
+  ];
+  let actualizadas=0;
+  for(const tabla of tablas){
+    try{
+      // Cada tabla tiene columna "producto" y opcionalmente "empresa_id" y "area"
+      let filtro=`producto=eq.${encodeURIComponent(nombreViejo)}&empresa_id=eq.${empresa_id}`;
+      const r=await fetch(`${SB}/rest/v1/${tabla}?${filtro}`,{
+        method:'PATCH',
+        headers:{...H,'Prefer':'return=minimal'},
+        body:JSON.stringify({producto:nombreNuevo})
+      });
+      if(r.ok)actualizadas++;
+    }catch{}
+  }
+  // Actualizar planes (JSON con filas)
+  try{
+    const planesData=await get('planes',`select=id,filas`);
+    for(const plan of planesData){
+      if(!plan.filas)continue;
+      let modificado=false;
+      const filas=plan.filas.map(f=>{
+        if(f.empresa_id===empresa_id&&f.producto===nombreViejo){
+          modificado=true;
+          return {...f,producto:nombreNuevo};
+        }
+        return f;
+      });
+      if(modificado){
+        await fetch(`${SB}/rest/v1/planes?id=eq.${plan.id}`,{
+          method:'PATCH',
+          headers:{...H,'Prefer':'return=minimal'},
+          body:JSON.stringify({filas})
+        });
+        actualizadas++;
+      }
+    }
+  }catch{}
+  // Actualizar recetas en memoria
+  if(st.Rec[nombreViejo]!==undefined){
+    st.Rec[nombreNuevo]=st.Rec[nombreViejo];
+    delete st.Rec[nombreViejo];
+  }
+  ss('online',`Nombre propagado a ${actualizadas} tablas ✓`);
 }
 async function delProd(id){
   if(!confirm('Eliminar producto?'))return;
