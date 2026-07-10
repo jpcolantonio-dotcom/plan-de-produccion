@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.101</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.102</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -8748,15 +8748,14 @@ let trenCapacitaciones=[];
 let trenEmpleadosData=[];
 
 async function initEntrenamiento(){
+  if(!st.E.length||!st.Pr.length)await init();
   // Poblar selector de empresas
   const selE=document.getElementById('tren-esel');
-  if(selE.options.length<=1){
-    st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;selE.appendChild(o);});
-  }
+  selE.innerHTML='<option value="all">Todas las empresas</option>';
+  st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;selE.appendChild(o);});
   const selPE=document.getElementById('tren-puesto-esel');
-  if(selPE.options.length<=1){
-    st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;selPE.appendChild(o);});
-  }
+  selPE.innerHTML='<option value="">Seleccionar empresa...</option>';
+  st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;selPE.appendChild(o);});
   await cargarDatosTren();
   showTrenTab('matriz');
 }
