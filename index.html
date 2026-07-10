@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.96</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.97</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -266,6 +266,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('ped')"><i class="ti ti-shopping-cart"></i>Pedidos</button>
   <button class="tab" onclick="T('mae')"><i class="ti ti-building-factory-2"></i>Maestro</button>
   <button class="tab" onclick="T('etq')"><i class="ti ti-qrcode"></i>Etiquetas</button>
+  <button class="tab" onclick="T('tren')"><i class="ti ti-school"></i>Entrenamiento</button>
 </div>
 <div class="pad">
 
@@ -1012,6 +1013,57 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   </div>
 </div>
 
+<!-- ENTRENAMIENTO -->
+<div id="tab-tren" class="section">
+  <div class="toolbar">
+    <div>
+      <div style="font-size:16px;font-weight:600">Entrenamiento</div>
+      <div style="font-size:13px;color:var(--text2)">Matriz de capacitación y plan de entrenamiento por empresa</div>
+    </div>
+    <div class="btns">
+      <select id="tren-esel" onchange="initEntrenamiento()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
+    </div>
+  </div>
+
+  <div class="proy-subtabs">
+    <button class="proy-tab active" id="ttab-matriz" onclick="showTrenTab('matriz')"><i class="ti ti-table"></i> Matriz de capacitación</button>
+    <button class="proy-tab" id="ttab-plan" onclick="showTrenTab('plan')"><i class="ti ti-calendar-event"></i> Plan de entrenamiento</button>
+    <button class="proy-tab" id="ttab-puestos" onclick="showTrenTab('puestos')"><i class="ti ti-settings"></i> Gestionar puestos</button>
+  </div>
+
+  <!-- MATRIZ -->
+  <div id="tren-sub-matriz">
+    <div class="alert alert-info" style="margin-bottom:1rem">
+      <i class="ti ti-info-circle"></i> Hacé click en una celda para marcar/desmarcar la capacitación. <span style="color:var(--green);font-weight:700">●</span> = capacitado.
+    </div>
+    <div id="tren-matriz-content"></div>
+  </div>
+
+  <!-- PLAN -->
+  <div id="tren-sub-plan" style="display:none">
+    <div class="alert alert-info" style="margin-bottom:1rem">
+      <i class="ti ti-info-circle"></i> Si el empleado no está capacitado en un puesto, podés programar las fechas de entrenamiento. Los capacitados se muestran en verde automáticamente.
+    </div>
+    <div id="tren-plan-content"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+      <button class="btn btn-primary" onclick="guardarPlanEntrenamiento()"><i class="ti ti-device-floppy"></i> Guardar plan</button>
+    </div>
+  </div>
+
+  <!-- PUESTOS -->
+  <div id="tren-sub-puestos" style="display:none">
+    <div class="grid-card" style="max-width:500px">
+      <div style="font-size:14px;font-weight:600;margin-bottom:1rem">Puestos por empresa</div>
+      <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+        <select id="tren-puesto-esel" style="flex:1;padding:8px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Seleccionar empresa...</option></select>
+        <input type="text" id="tren-puesto-nombre" placeholder="Nombre del puesto" style="flex:2;padding:8px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        <button class="btn btn-primary" onclick="agregarPuesto()"><i class="ti ti-plus"></i> Agregar</button>
+      </div>
+      <div id="tren-puestos-lista"></div>
+    </div>
+  </div>
+</div>
+
 </div></div></div>
 <script>
 
@@ -1194,7 +1246,7 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['plan','rell','real','cmp','desv','dash','stock','proy','rec','rend','hor','ped','mae','etq'];
+const TABS=['plan','rell','real','cmp','desv','dash','stock','proy','rec','rend','hor','ped','mae','etq','tren'];
 function T(t){
   document.querySelectorAll('.tab').forEach(el=>{
     const m=el.getAttribute('onclick')||'';
@@ -1216,6 +1268,7 @@ function T(t){
   if(t==='ped')initPedidos();
   if(t==='etq')initEtiquetas();
   if(t==='rell')initRellenos();
+  if(t==='tren')initEntrenamiento();
 }
 function pS(id){
   const s=document.getElementById(id);const c=s.value||st.w;
@@ -8687,6 +8740,288 @@ async function etqVerQR(caja){
 
   // Generar QR
   new window.QRCode(qrDiv,{text:caja.codigo_qr,width:180,height:180,correctLevel:window.QRCode.CorrectLevel.M});
+}
+
+// ===== ENTRENAMIENTO =====
+let trenPuestos=[];
+let trenCapacitaciones=[];
+let trenEmpleadosData=[];
+
+async function initEntrenamiento(){
+  // Poblar selector de empresas
+  const selE=document.getElementById('tren-esel');
+  if(selE.options.length<=1){
+    st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;selE.appendChild(o);});
+  }
+  const selPE=document.getElementById('tren-puesto-esel');
+  if(selPE.options.length<=1){
+    st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;selPE.appendChild(o);});
+  }
+  await cargarDatosTren();
+  showTrenTab('matriz');
+}
+
+async function cargarDatosTren(){
+  const ef=document.getElementById('tren-esel').value;
+  try{
+    const fP=ef&&ef!=='all'?`empresa_id=eq.${ef}&order=orden.asc,nombre.asc`:'order=empresa_id.asc,orden.asc,nombre.asc';
+    trenPuestos=await get('puestos_capacitacion',fP);
+  }catch{trenPuestos=[]}
+  try{
+    if(!empleados.length)await loadEmpleados();
+    trenEmpleadosData=ef&&ef!=='all'?empleados.filter(e=>e.empresa_id===ef):empleados;
+  }catch{trenEmpleadosData=[]}
+  if(trenPuestos.length&&trenEmpleadosData.length){
+    try{
+      const ids=trenEmpleadosData.map(e=>e.id).join(',');
+      trenCapacitaciones=await get('capacitacion_empleados',`empleado_id=in.(${ids})`);
+    }catch{trenCapacitaciones=[]}
+  }
+}
+
+function showTrenTab(t){
+  ['matriz','plan','puestos'].forEach(id=>{
+    document.getElementById('tren-sub-'+id).style.display=id===t?'block':'none';
+    document.getElementById('ttab-'+id).classList.toggle('active',id===t);
+  });
+  if(t==='matriz')renderMatrizCapacitacion();
+  if(t==='plan')renderPlanEntrenamiento();
+  if(t==='puestos')renderPuestosLista();
+}
+
+function getCap(empId,puestoId){
+  return trenCapacitaciones.find(c=>c.empleado_id===empId&&c.puesto_id===puestoId)||null;
+}
+
+// ── MATRIZ DE CAPACITACIÓN ──────────────────────────────────────
+function renderMatrizCapacitacion(){
+  const el=document.getElementById('tren-matriz-content');
+  if(!trenPuestos.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-armchair"></i> Primero agregá puestos en la pestaña "Gestionar puestos".</div>';
+    return;
+  }
+  if(!trenEmpleadosData.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-users"></i> No hay empleados cargados.</div>';
+    return;
+  }
+
+  // Agrupar por empresa
+  const empresas=[...new Set(trenEmpleadosData.map(e=>e.empresa_id))];
+  let html='';
+
+  empresas.forEach(eid=>{
+    const emp=st.E.find(e=>e.id===eid);
+    const empNom=emp?.nombre||eid;
+    const empColor=emp?.color||'#888';
+    const empsDeEsta=trenEmpleadosData.filter(e=>e.empresa_id===eid);
+    const puestosDeEsta=trenPuestos.filter(p=>p.empresa_id===eid);
+    if(!puestosDeEsta.length)return;
+
+    html+=`<div class="grid-card" style="margin-bottom:1.5rem;overflow-x:auto">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <span style="width:12px;height:12px;border-radius:50%;background:${empColor};display:inline-block"></span>
+        <span style="font-size:14px;font-weight:700">${empNom}</span>
+        <span style="font-size:12px;color:var(--text2)">${empsDeEsta.length} empleados · ${puestosDeEsta.length} puestos</span>
+      </div>
+      <table style="border-collapse:collapse;min-width:100%">
+        <thead><tr>
+          <th style="text-align:left;padding:8px 12px;background:var(--surface2);font-size:12px;border:.5px solid var(--border);min-width:160px;position:sticky;left:0;z-index:1">Empleado</th>`;
+    puestosDeEsta.forEach(p=>{
+      html+=`<th style="text-align:center;padding:6px 8px;background:var(--surface2);font-size:11px;border:.5px solid var(--border);min-width:80px;max-width:100px;word-break:break-word;line-height:1.2">${p.nombre}</th>`;
+    });
+    html+=`</tr></thead><tbody>`;
+
+    empsDeEsta.forEach((emp,ei)=>{
+      const bg=ei%2===0?'var(--bg)':'var(--surface)';
+      html+=`<tr>
+        <td style="padding:7px 12px;font-size:13px;font-weight:500;border:.5px solid var(--border);background:${bg};position:sticky;left:0;z-index:1">${emp.nombre}</td>`;
+      puestosDeEsta.forEach(p=>{
+        const cap=getCap(emp.id,p.id);
+        const capacitado=cap?.capacitado||false;
+        html+=`<td style="text-align:center;padding:6px;border:.5px solid var(--border);background:${bg};cursor:pointer"
+          onclick="toggleCapacitacion(${emp.id},${p.id},this)"
+          title="${capacitado?'Capacitado — click para quitar':'Sin capacitación — click para marcar'}">
+          <span style="font-size:18px;color:${capacitado?'var(--green)':'var(--border2)'}">${capacitado?'●':'○'}</span>
+        </td>`;
+      });
+      html+=`</tr>`;
+    });
+    html+=`</tbody></table></div>`;
+  });
+
+  el.innerHTML=html||'<div class="empty">Seleccioná una empresa con puestos configurados.</div>';
+}
+
+async function toggleCapacitacion(empId,puestoId,tdEl){
+  const cap=getCap(empId,puestoId);
+  const nuevoEstado=!(cap?.capacitado||false);
+  const span=tdEl.querySelector('span');
+  // Feedback inmediato
+  span.textContent=nuevoEstado?'●':'○';
+  span.style.color=nuevoEstado?'var(--green)':'var(--border2)';
+  try{
+    if(cap){
+      await pat('capacitacion_empleados',cap.id,{capacitado:nuevoEstado,
+        fecha_inicio:nuevoEstado?null:cap.fecha_inicio,
+        fecha_fin:nuevoEstado?null:cap.fecha_fin});
+      cap.capacitado=nuevoEstado;
+      if(nuevoEstado){cap.fecha_inicio=null;cap.fecha_fin=null;}
+    } else {
+      const res=await ins('capacitacion_empleados',{empleado_id:empId,puesto_id:puestoId,capacitado:nuevoEstado});
+      if(res&&res[0])trenCapacitaciones.push(res[0]);
+    }
+  }catch(e){
+    // Revertir si falla
+    span.textContent=nuevoEstado?'○':'●';
+    span.style.color=nuevoEstado?'var(--border2)':'var(--green)';
+    alert('Error: '+e.message);
+  }
+}
+
+// ── PLAN DE ENTRENAMIENTO ───────────────────────────────────────
+function renderPlanEntrenamiento(){
+  const el=document.getElementById('tren-plan-content');
+  if(!trenPuestos.length||!trenEmpleadosData.length){
+    el.innerHTML='<div class="empty">Configurá puestos y empleados primero.</div>';
+    return;
+  }
+
+  const empresas=[...new Set(trenEmpleadosData.map(e=>e.empresa_id))];
+  let html='';
+
+  empresas.forEach(eid=>{
+    const emp=st.E.find(e=>e.id===eid);
+    const empNom=emp?.nombre||eid;
+    const empColor=emp?.color||'#888';
+    const empsDeEsta=trenEmpleadosData.filter(e=>e.empresa_id===eid);
+    const puestosDeEsta=trenPuestos.filter(p=>p.empresa_id===eid);
+    if(!puestosDeEsta.length)return;
+
+    // Solo mostrar empleados que tienen al menos un puesto sin capacitación
+    const empsFiltrados=empsDeEsta.filter(e=>
+      puestosDeEsta.some(p=>!getCap(e.id,p.id)?.capacitado)
+    );
+    if(!empsFiltrados.length)return;
+
+    html+=`<div class="grid-card" style="margin-bottom:1.5rem;overflow-x:auto">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <span style="width:12px;height:12px;border-radius:50%;background:${empColor};display:inline-block"></span>
+        <span style="font-size:14px;font-weight:700">${empNom}</span>
+        <span style="font-size:12px;color:var(--text2)">Solo muestra empleados con puestos pendientes</span>
+      </div>
+      <table style="border-collapse:collapse;min-width:100%">
+        <thead><tr>
+          <th style="text-align:left;padding:8px 12px;background:var(--surface2);font-size:12px;border:.5px solid var(--border);min-width:160px;position:sticky;left:0">Empleado</th>`;
+    puestosDeEsta.forEach(p=>{
+      html+=`<th style="text-align:center;padding:6px 8px;background:var(--surface2);font-size:11px;border:.5px solid var(--border);min-width:130px;word-break:break-word">${p.nombre}</th>`;
+    });
+    html+=`</tr></thead><tbody>`;
+
+    empsFiltrados.forEach((e,ei)=>{
+      const bg=ei%2===0?'var(--bg)':'var(--surface)';
+      html+=`<tr><td style="padding:7px 12px;font-size:13px;font-weight:500;border:.5px solid var(--border);background:${bg};position:sticky;left:0">${e.nombre}</td>`;
+      puestosDeEsta.forEach(p=>{
+        const cap=getCap(e.id,p.id);
+        if(cap?.capacitado){
+          html+=`<td style="text-align:center;border:.5px solid var(--border);background:rgba(34,197,94,.08)">
+            <span style="color:var(--green);font-size:16px">✓</span>
+            <div style="font-size:10px;color:var(--green)">Capacitado</div>
+          </td>`;
+        } else {
+          const fi=cap?.fecha_inicio||'';
+          const ff=cap?.fecha_fin||'';
+          html+=`<td style="padding:4px 6px;border:.5px solid var(--border);background:${bg}">
+            <div style="display:flex;flex-direction:column;gap:3px">
+              <input type="date" data-empid="${e.id}" data-puestoid="${p.id}" data-campo="inicio"
+                value="${fi}" placeholder="Inicio"
+                style="width:100%;padding:3px 5px;font-size:11px;border:.5px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--text)"/>
+              <input type="date" data-empid="${e.id}" data-puestoid="${p.id}" data-campo="fin"
+                value="${ff}" placeholder="Fin"
+                style="width:100%;padding:3px 5px;font-size:11px;border:.5px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--text)"/>
+            </div>
+          </td>`;
+        }
+      });
+      html+=`</tr>`;
+    });
+    html+=`</tbody></table></div>`;
+  });
+
+  el.innerHTML=html||'<div class="empty" style="color:var(--green)"><i class="ti ti-circle-check"></i> ¡Todos los empleados están capacitados en todos los puestos!</div>';
+}
+
+async function guardarPlanEntrenamiento(){
+  const inputs=document.querySelectorAll('#tren-plan-content input[data-empid]');
+  let guardados=0;
+  try{
+    for(const inp of inputs){
+      const empId=parseInt(inp.dataset.empid);
+      const puestoId=parseInt(inp.dataset.puestoid);
+      const campo=inp.dataset.campo;
+      const valor=inp.value||null;
+      let cap=getCap(empId,puestoId);
+      if(!cap){
+        const res=await ins('capacitacion_empleados',{empleado_id:empId,puesto_id:puestoId,capacitado:false});
+        if(res&&res[0]){trenCapacitaciones.push(res[0]);cap=res[0];}
+      }
+      if(cap){
+        const upd=campo==='inicio'?{fecha_inicio:valor}:{fecha_fin:valor};
+        await pat('capacitacion_empleados',cap.id,upd);
+        Object.assign(cap,upd);
+        guardados++;
+      }
+    }
+    ss('online',`${guardados} fechas guardadas`);
+  }catch(e){ss('error',e.message)}
+}
+
+// ── GESTIONAR PUESTOS ───────────────────────────────────────────
+function renderPuestosLista(){
+  const el=document.getElementById('tren-puestos-lista');
+  if(!trenPuestos.length){
+    el.innerHTML='<div style="color:var(--text2);font-size:13px;padding:8px">No hay puestos configurados aún.</div>';
+    return;
+  }
+  const byEmp={};
+  trenPuestos.forEach(p=>{if(!byEmp[p.empresa_id])byEmp[p.empresa_id]=[];byEmp[p.empresa_id].push(p);});
+  let h='';
+  Object.entries(byEmp).forEach(([eid,puestos])=>{
+    const empNom=st.E.find(e=>e.id===eid)?.nombre||eid;
+    h+=`<div style="margin-bottom:12px"><div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px">${empNom}</div>`;
+    puestos.forEach(p=>{
+      h+=`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface);border:.5px solid var(--border);border-radius:8px;margin-bottom:4px">
+        <span style="flex:1;font-size:13px">${p.nombre}</span>
+        <button class="btn btn-xs btn-danger" onclick="eliminarPuesto(${p.id})"><i class="ti ti-trash"></i></button>
+      </div>`;
+    });
+    h+='</div>';
+  });
+  el.innerHTML=h;
+}
+
+async function agregarPuesto(){
+  const eid=document.getElementById('tren-puesto-esel').value;
+  const nom=document.getElementById('tren-puesto-nombre').value.trim();
+  if(!eid){alert('Seleccioná una empresa.');return}
+  if(!nom){alert('Escribí el nombre del puesto.');return}
+  try{
+    const res=await ins('puestos_capacitacion',{empresa_id:eid,nombre:nom,orden:trenPuestos.length});
+    if(res&&res[0])trenPuestos.push(res[0]);
+    document.getElementById('tren-puesto-nombre').value='';
+    renderPuestosLista();
+    ss('online','Puesto agregado');
+  }catch(e){alert('Error: '+e.message)}
+}
+
+async function eliminarPuesto(id){
+  if(!confirm('¿Eliminar este puesto? También se eliminarán todas las capacitaciones asociadas.'))return;
+  try{
+    await del('puestos_capacitacion',id);
+    trenPuestos=trenPuestos.filter(p=>p.id!==id);
+    trenCapacitaciones=trenCapacitaciones.filter(c=>c.puesto_id!==id);
+    renderPuestosLista();
+    ss('online','Eliminado');
+  }catch(e){alert('Error: '+e.message)}
 }
 </script>
 </body>
