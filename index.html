@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.103</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.104</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -556,6 +556,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab" id="ptab-resumen" onclick="showProyTab('resumen')"><i class="ti ti-table"></i> 3. Resumen</button>
     <button class="proy-tab" id="ptab-stats" onclick="showProyTab('stats')"><i class="ti ti-chart-bar"></i> 4. Estadisticas</button>
     <button class="proy-tab" id="ptab-joselito" onclick="showProyTab('joselito')"><i class="ti ti-file-spreadsheet"></i> Stock Joselito</button>
+    <button class="proy-tab" id="ptab-pedidos-fut" onclick="showProyTab('pedidos-fut')"><i class="ti ti-calendar-plus"></i> Pedidos futuros</button>
   </div>
   <!-- CONTEO -->
   <div id="proy-conteo">
@@ -630,6 +631,67 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     </div>
   </div>
   <div id="proy-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
+
+  <!-- PEDIDOS FUTUROS -->
+  <div id="proy-pedidos-fut" style="display:none">
+    <div class="proy-subtabs" style="margin-bottom:1rem">
+      <button class="proy-tab active" id="pftab-carga" onclick="showPedFutTab('carga')"><i class="ti ti-plus"></i> Cargar pedido</button>
+      <button class="proy-tab" id="pftab-resumen" onclick="showPedFutTab('resumen')"><i class="ti ti-calendar-week"></i> Resumen por día</button>
+    </div>
+
+    <!-- CARGA -->
+    <div id="pf-sub-carga">
+      <div class="grid-card" style="max-width:600px;margin-bottom:1.5rem">
+        <div style="font-size:14px;font-weight:600;margin-bottom:1rem">Nuevo pedido futuro</div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div>
+            <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Producto</label>
+            <select id="pf-producto" style="width:100%;padding:8px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+              <option value="">Seleccionar producto...</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:10px">
+            <div style="flex:1">
+              <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Cantidad</label>
+              <input type="number" id="pf-cantidad" min="0" step="1" placeholder="0"
+                style="width:100%;padding:8px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+            </div>
+            <div style="flex:1">
+              <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Unidad</label>
+              <input type="text" id="pf-unidad" placeholder="docenas" readonly
+                style="width:100%;padding:8px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg2);color:var(--text2)"/>
+            </div>
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Fecha de entrega</label>
+            <input type="date" id="pf-fecha" style="width:100%;padding:8px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Observación (opcional)</label>
+            <input type="text" id="pf-obs" placeholder="Ej: Cliente XYZ, urgente..."
+              style="width:100%;padding:8px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+          </div>
+          <button class="btn btn-primary" onclick="agregarPedidoFuturo()"><i class="ti ti-plus"></i> Agregar pedido</button>
+        </div>
+        <div id="pf-msg" style="display:none;margin-top:8px" class="alert alert-ok"><i class="ti ti-check"></i> Pedido agregado.</div>
+        <div id="pf-err" style="display:none;margin-top:8px" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="pf-err-txt"></span></div>
+      </div>
+
+      <!-- LISTA DE PEDIDOS -->
+      <div id="pf-lista-content"></div>
+    </div>
+
+    <!-- RESUMEN POR DÍA -->
+    <div id="pf-sub-resumen" style="display:none">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+        <input type="date" id="pf-res-desde" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        <span style="color:var(--text2);font-size:13px">hasta</span>
+        <input type="date" id="pf-res-hasta" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        <button class="btn btn-sm" onclick="renderResumenPedidosFuturos()"><i class="ti ti-refresh"></i> Ver</button>
+      </div>
+      <div id="pf-resumen-content"></div>
+    </div>
+  </div>
 
   <!-- STOCK JOSELITO -->
   <div id="proy-joselito" style="display:none">
@@ -5798,7 +5860,7 @@ let proyData = []; // cache proyeccion del dia
 let stockJoselitoHoy = []; // cache stock joselito del dia (importado desde xlsx)
 
 function showProyTab(t){
-  ['conteo','ventas','resumen','stats','joselito'].forEach(id=>{
+  ['conteo','ventas','resumen','stats','joselito','pedidos-fut'].forEach(id=>{
     document.getElementById('proy-'+id).style.display=id===t?'block':'none';
     document.getElementById('ptab-'+id).classList.toggle('active',id===t);
   });
@@ -5810,6 +5872,7 @@ function showProyTab(t){
   }
   if(t==='stats')initStats();
   if(t==='joselito')initStockJoselito();
+  if(t==='pedidos-fut')initPedidosFuturos();
 }
 
 async function initProy(){
@@ -8011,6 +8074,213 @@ function imprimirRellenos(){
 }
 
 // ===== STOCK JOSELITO (Proyección) =====
+// ===== PEDIDOS FUTUROS =====
+let pedidosFuturosData=[];
+
+async function initPedidosFuturos(){
+  if(!st.Pr.length)await init();
+  // Poblar selector de productos ordenado alfabéticamente
+  const sel=document.getElementById('pf-producto');
+  const valorActual=sel.value;
+  sel.innerHTML='<option value="">Seleccionar producto...</option>';
+  const prods=[...st.Pr].sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  prods.forEach(p=>{
+    const area=st.A.find(a=>a.id===p.area_id);
+    const emp=st.E.find(e=>e.id===p.empresa_id);
+    const o=document.createElement('option');
+    o.value=p.id;
+    o.dataset.nombre=p.nombre;
+    o.dataset.unidad=p.unidad||'';
+    o.dataset.area=area?.nombre||'';
+    o.dataset.emp=emp?.nombre||'';
+    o.textContent=`${p.nombre}${area?' — '+area.nombre:''}`;
+    sel.appendChild(o);
+  });
+  if(valorActual)sel.value=valorActual;
+  sel.onchange=()=>{
+    const opt=sel.selectedOptions[0];
+    document.getElementById('pf-unidad').value=opt?.dataset.unidad||'';
+  };
+  // Fecha default = hoy
+  if(!document.getElementById('pf-fecha').value)
+    document.getElementById('pf-fecha').value=hoyLocal();
+  // Fechas resumen default = próximos 7 días
+  if(!document.getElementById('pf-res-desde').value){
+    document.getElementById('pf-res-desde').value=hoyLocal();
+    const d=new Date();d.setDate(d.getDate()+7);
+    document.getElementById('pf-res-hasta').value=d.toISOString().slice(0,10);
+  }
+  await cargarPedidosFuturos();
+  showPedFutTab('carga');
+}
+
+function showPedFutTab(t){
+  ['carga','resumen'].forEach(id=>{
+    document.getElementById('pf-sub-'+id).style.display=id===t?'block':'none';
+    document.getElementById('pftab-'+id).classList.toggle('active',id===t);
+  });
+  if(t==='resumen')renderResumenPedidosFuturos();
+}
+
+async function cargarPedidosFuturos(){
+  try{
+    pedidosFuturosData=await get('pedidos_futuros','order=fecha.asc,producto.asc');
+  }catch{pedidosFuturosData=[]}
+  renderListaPedidosFuturos();
+}
+
+function renderListaPedidosFuturos(){
+  const el=document.getElementById('pf-lista-content');
+  const hoy=hoyLocal();
+  // Solo pedidos futuros o de hoy
+  const data=pedidosFuturosData.filter(p=>p.fecha>=hoy);
+  if(!data.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-calendar-off"></i> No hay pedidos futuros cargados.</div>';
+    return;
+  }
+  let h=`<div class="grid-card" style="overflow-x:auto"><table class="ptbl">
+    <thead><tr>
+      <th style="text-align:left">Producto</th>
+      <th style="width:80px">Unidad</th>
+      <th style="text-align:right;width:90px">Cantidad</th>
+      <th style="width:110px;text-align:center">Fecha entrega</th>
+      <th>Observación</th>
+      <th style="width:34px"></th>
+    </tr></thead><tbody>`;
+  let fechaActual='';
+  data.forEach(p=>{
+    if(p.fecha!==fechaActual){
+      fechaActual=p.fecha;
+      const [y,m,d]=p.fecha.split('-');
+      const diasF=new Date(p.fecha+'T00:00:00');
+      const diasNom=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][diasF.getDay()];
+      const esHoy=p.fecha===hoy;
+      h+=`<tr><td colspan="6" style="background:var(--surface2);font-size:11px;font-weight:700;color:${esHoy?'var(--blue)':'var(--text2)'};padding:5px 10px;border-top:2px solid var(--border2)">
+        ${diasNom} ${d}/${m}/${y}${esHoy?' — HOY':''}
+      </td></tr>`;
+    }
+    h+=`<tr>
+      <td style="font-weight:600">${p.producto}</td>
+      <td style="font-size:12px;color:var(--text2)">${p.unidad||''}</td>
+      <td style="text-align:right;font-weight:700;color:var(--blue)">${parseFloat(p.cantidad).toLocaleString('es-AR')}</td>
+      <td style="text-align:center;font-size:12px">${p.fecha.split('-').reverse().join('/')}</td>
+      <td style="font-size:12px;color:var(--text2)">${p.observacion||'—'}</td>
+      <td><button class="btn btn-xs btn-danger" onclick="eliminarPedidoFuturo(${p.id})"><i class="ti ti-trash"></i></button></td>
+    </tr>`;
+  });
+  h+=`</tbody></table></div>`;
+  el.innerHTML=h;
+}
+
+async function agregarPedidoFuturo(){
+  const sel=document.getElementById('pf-producto');
+  const opt=sel.selectedOptions[0];
+  const prodId=sel.value;
+  const cantidad=parseFloat(document.getElementById('pf-cantidad').value)||0;
+  const fecha=document.getElementById('pf-fecha').value;
+  const obs=document.getElementById('pf-obs').value.trim();
+  const errEl=document.getElementById('pf-err');
+  const msgEl=document.getElementById('pf-msg');
+  errEl.style.display='none';msgEl.style.display='none';
+  if(!prodId){document.getElementById('pf-err-txt').textContent='Seleccioná un producto.';errEl.style.display='';return}
+  if(!cantidad||cantidad<=0){document.getElementById('pf-err-txt').textContent='Ingresá una cantidad mayor a 0.';errEl.style.display='';return}
+  if(!fecha){document.getElementById('pf-err-txt').textContent='Seleccioná una fecha.';errEl.style.display='';return}
+  try{
+    const prod=st.Pr.find(p=>p.id===prodId);
+    const area=st.A.find(a=>a.id===prod?.area_id);
+    const emp=st.E.find(e=>e.id===prod?.empresa_id);
+    const res=await ins('pedidos_futuros',{
+      producto:opt?.dataset.nombre||'',
+      empresa_id:prod?.empresa_id||'',
+      area:area?.nombre||'',
+      unidad:opt?.dataset.unidad||'',
+      cantidad,fecha,
+      observacion:obs||null
+    });
+    if(res&&res[0])pedidosFuturosData.push(res[0]);
+    pedidosFuturosData.sort((a,b)=>a.fecha.localeCompare(b.fecha)||a.producto.localeCompare(b.producto));
+    // Limpiar form
+    sel.value='';
+    document.getElementById('pf-cantidad').value='';
+    document.getElementById('pf-obs').value='';
+    document.getElementById('pf-unidad').value='';
+    msgEl.style.display='';
+    setTimeout(()=>msgEl.style.display='none',2000);
+    renderListaPedidosFuturos();
+  }catch(e){
+    document.getElementById('pf-err-txt').textContent='Error: '+e.message;
+    errEl.style.display='';
+  }
+}
+
+async function eliminarPedidoFuturo(id){
+  if(!confirm('¿Eliminar este pedido?'))return;
+  try{
+    await del('pedidos_futuros',id);
+    pedidosFuturosData=pedidosFuturosData.filter(p=>p.id!==id);
+    renderListaPedidosFuturos();
+  }catch(e){alert('Error: '+e.message)}
+}
+
+async function renderResumenPedidosFuturos(){
+  const desde=document.getElementById('pf-res-desde').value;
+  const hasta=document.getElementById('pf-res-hasta').value;
+  const el=document.getElementById('pf-resumen-content');
+  el.innerHTML='<div style="padding:1rem;text-align:center;color:var(--text2)"><span class="spinner spinner-dark"></span></div>';
+  try{
+    const data=await get('pedidos_futuros',`fecha=gte.${desde}&fecha=lte.${hasta}&order=fecha.asc,producto.asc`);
+    if(!data.length){el.innerHTML='<div class="empty">Sin pedidos en ese rango de fechas.</div>';return}
+    // Agrupar por fecha
+    const porFecha={};
+    data.forEach(p=>{
+      if(!porFecha[p.fecha])porFecha[p.fecha]=[];
+      porFecha[p.fecha].push(p);
+    });
+    let h='';
+    Object.entries(porFecha).forEach(([fecha,items])=>{
+      const [y,m,d]=fecha.split('-');
+      const diasF=new Date(fecha+'T00:00:00');
+      const diasNom=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][diasF.getDay()];
+      const esHoy=fecha===hoyLocal();
+      const total=items.reduce((s,i)=>s+parseFloat(i.cantidad),0);
+      h+=`<div class="grid-card" style="margin-bottom:1rem">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="font-size:15px;font-weight:700;color:${esHoy?'var(--blue)':'var(--text)'}">${diasNom} ${d}/${m}/${y}${esHoy?' — HOY':''}</div>
+          <div style="font-size:12px;color:var(--text2);margin-left:auto">${items.length} producto${items.length!==1?'s':''} · Total: <b>${total.toLocaleString('es-AR')}</b></div>
+        </div>
+        <table class="ptbl">
+          <thead><tr>
+            <th style="text-align:left">Producto</th>
+            <th style="width:80px">Unidad</th>
+            <th style="text-align:right;width:100px">Cantidad</th>
+            <th>Observación</th>
+          </tr></thead><tbody>`;
+      // Agrupar por empresa/área dentro del día
+      const porArea={};
+      items.forEach(i=>{const k=(i.empresa_id||'')+'||'+(i.area||'');if(!porArea[k])porArea[k]=[];porArea[k].push(i);});
+      Object.entries(porArea).forEach(([key,aItems])=>{
+        const [eid,area]=key.split('||');
+        const emp=st.E.find(e=>e.id===eid);
+        if(emp||area){
+          h+=`<tr><td colspan="4" style="background:var(--surface2);font-size:11px;color:var(--text2);padding:4px 8px">
+            ${emp?emp.nombre:''}${area?' — '+area:''}
+          </td></tr>`;
+        }
+        aItems.forEach(i=>{
+          h+=`<tr>
+            <td style="font-weight:600">${i.producto}</td>
+            <td style="font-size:12px;color:var(--text2)">${i.unidad||''}</td>
+            <td style="text-align:right;font-weight:700;color:var(--blue)">${parseFloat(i.cantidad).toLocaleString('es-AR')}</td>
+            <td style="font-size:12px;color:var(--text2)">${i.observacion||'—'}</td>
+          </tr>`;
+        });
+      });
+      h+=`</tbody></table></div>`;
+    });
+    el.innerHTML=h;
+  }catch(e){el.innerHTML=`<div class="alert alert-err">${e.message}</div>`}
+}
+
 function initStockJoselito(){
   // Fecha default = hoy
   const fechaEl=document.getElementById('josel-hist-fecha');
