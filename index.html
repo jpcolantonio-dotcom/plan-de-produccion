@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.104</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.105</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -684,10 +684,8 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <!-- RESUMEN POR DÍA -->
     <div id="pf-sub-resumen" style="display:none">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
-        <input type="date" id="pf-res-desde" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-        <span style="color:var(--text2);font-size:13px">hasta</span>
-        <input type="date" id="pf-res-hasta" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-        <button class="btn btn-sm" onclick="renderResumenPedidosFuturos()"><i class="ti ti-refresh"></i> Ver</button>
+        <select id="pf-res-sem" onchange="renderResumenPedidosFuturos()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
+        <button class="btn btn-sm" onclick="renderResumenPedidosFuturos()"><i class="ti ti-refresh"></i> Actualizar</button>
       </div>
       <div id="pf-resumen-content"></div>
     </div>
@@ -8079,6 +8077,18 @@ let pedidosFuturosData=[];
 
 async function initPedidosFuturos(){
   if(!st.Pr.length)await init();
+  // Poblar selector de semanas
+  const selSem=document.getElementById('pf-res-sem');
+  if(selSem.options.length===0){
+    const sems=[...new Set([...st.Sem,st.w])].sort().reverse();
+    sems.forEach(s=>{
+      const o=document.createElement('option');
+      o.value=s;o.textContent=wlb(s);
+      if(s===st.w)o.selected=true;
+      selSem.appendChild(o);
+    });
+    if(!selSem.value)selSem.value=st.w;
+  }
   // Poblar selector de productos ordenado alfabéticamente
   const sel=document.getElementById('pf-producto');
   const valorActual=sel.value;
@@ -8086,13 +8096,11 @@ async function initPedidosFuturos(){
   const prods=[...st.Pr].sort((a,b)=>a.nombre.localeCompare(b.nombre));
   prods.forEach(p=>{
     const area=st.A.find(a=>a.id===p.area_id);
-    const emp=st.E.find(e=>e.id===p.empresa_id);
     const o=document.createElement('option');
     o.value=p.id;
     o.dataset.nombre=p.nombre;
     o.dataset.unidad=p.unidad||'';
     o.dataset.area=area?.nombre||'';
-    o.dataset.emp=emp?.nombre||'';
     o.textContent=`${p.nombre}${area?' — '+area.nombre:''}`;
     sel.appendChild(o);
   });
@@ -8101,15 +8109,8 @@ async function initPedidosFuturos(){
     const opt=sel.selectedOptions[0];
     document.getElementById('pf-unidad').value=opt?.dataset.unidad||'';
   };
-  // Fecha default = hoy
   if(!document.getElementById('pf-fecha').value)
     document.getElementById('pf-fecha').value=hoyLocal();
-  // Fechas resumen default = próximos 7 días
-  if(!document.getElementById('pf-res-desde').value){
-    document.getElementById('pf-res-desde').value=hoyLocal();
-    const d=new Date();d.setDate(d.getDate()+7);
-    document.getElementById('pf-res-hasta').value=d.toISOString().slice(0,10);
-  }
   await cargarPedidosFuturos();
   showPedFutTab('carga');
 }
@@ -8223,62 +8224,100 @@ async function eliminarPedidoFuturo(id){
 }
 
 async function renderResumenPedidosFuturos(){
-  const desde=document.getElementById('pf-res-desde').value;
-  const hasta=document.getElementById('pf-res-hasta').value;
+  const sem=document.getElementById('pf-res-sem').value||st.w;
   const el=document.getElementById('pf-resumen-content');
   el.innerHTML='<div style="padding:1rem;text-align:center;color:var(--text2)"><span class="spinner spinner-dark"></span></div>';
+
+  // Calcular fechas Lun→Dom de la semana
+  const DIAS=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  const fechasDia=DIAS.map((_,di)=>{
+    const d=new Date(sem+'T00:00:00');
+    d.setDate(d.getDate()+di);
+    return d.toISOString().slice(0,10);
+  });
+  const desde=fechasDia[0];
+  const hasta=fechasDia[6];
+
   try{
-    const data=await get('pedidos_futuros',`fecha=gte.${desde}&fecha=lte.${hasta}&order=fecha.asc,producto.asc`);
-    if(!data.length){el.innerHTML='<div class="empty">Sin pedidos en ese rango de fechas.</div>';return}
-    // Agrupar por fecha
-    const porFecha={};
+    const data=await get('pedidos_futuros',`fecha=gte.${desde}&fecha=lte.${hasta}&order=producto.asc,fecha.asc`);
+    if(!data.length){
+      el.innerHTML='<div class="empty"><i class="ti ti-calendar-off"></i> No hay pedidos para esta semana.</div>';
+      return;
+    }
+
+    // Agrupar por empresa → área → producto → dia
+    const grupos={}; // {emp: {area: {producto: {unidad, dias:[0..6]}}}}
     data.forEach(p=>{
-      if(!porFecha[p.fecha])porFecha[p.fecha]=[];
-      porFecha[p.fecha].push(p);
+      const di=fechasDia.indexOf(p.fecha);
+      if(di<0)return;
+      const ek=p.empresa_id||'_';
+      const ak=p.area||'Sin área';
+      const pk=p.producto;
+      if(!grupos[ek])grupos[ek]={};
+      if(!grupos[ek][ak])grupos[ek][ak]={};
+      if(!grupos[ek][ak][pk])grupos[ek][ak][pk]={unidad:p.unidad||'',dias:Array(7).fill(0),obs:[]};
+      grupos[ek][ak][pk].dias[di]+=parseFloat(p.cantidad)||0;
+      if(p.observacion)grupos[ek][ak][pk].obs.push(p.observacion);
     });
+
+    const hoy=hoyLocal();
     let h='';
-    Object.entries(porFecha).forEach(([fecha,items])=>{
-      const [y,m,d]=fecha.split('-');
-      const diasF=new Date(fecha+'T00:00:00');
-      const diasNom=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'][diasF.getDay()];
-      const esHoy=fecha===hoyLocal();
-      const total=items.reduce((s,i)=>s+parseFloat(i.cantidad),0);
-      h+=`<div class="grid-card" style="margin-bottom:1rem">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-          <div style="font-size:15px;font-weight:700;color:${esHoy?'var(--blue)':'var(--text)'}">${diasNom} ${d}/${m}/${y}${esHoy?' — HOY':''}</div>
-          <div style="font-size:12px;color:var(--text2);margin-left:auto">${items.length} producto${items.length!==1?'s':''} · Total: <b>${total.toLocaleString('es-AR')}</b></div>
+    Object.entries(grupos).forEach(([eid,areas])=>{
+      const emp=st.E.find(e=>e.id===eid);
+      const empNom=emp?.nombre||eid;
+      const empColor=emp?.color||'#888';
+
+      h+=`<div class="grid-card" style="margin-bottom:1.5rem;overflow-x:auto">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="width:12px;height:12px;border-radius:50%;background:${empColor};display:inline-block"></span>
+          <span style="font-size:14px;font-weight:700">${empNom}</span>
         </div>
-        <table class="ptbl">
+        <table class="ptbl" style="min-width:700px">
           <thead><tr>
-            <th style="text-align:left">Producto</th>
-            <th style="width:80px">Unidad</th>
-            <th style="text-align:right;width:100px">Cantidad</th>
-            <th>Observación</th>
-          </tr></thead><tbody>`;
-      // Agrupar por empresa/área dentro del día
-      const porArea={};
-      items.forEach(i=>{const k=(i.empresa_id||'')+'||'+(i.area||'');if(!porArea[k])porArea[k]=[];porArea[k].push(i);});
-      Object.entries(porArea).forEach(([key,aItems])=>{
-        const [eid,area]=key.split('||');
-        const emp=st.E.find(e=>e.id===eid);
-        if(emp||area){
-          h+=`<tr><td colspan="4" style="background:var(--surface2);font-size:11px;color:var(--text2);padding:4px 8px">
-            ${emp?emp.nombre:''}${area?' — '+area:''}
-          </td></tr>`;
-        }
-        aItems.forEach(i=>{
+            <th style="text-align:left;min-width:160px">Producto</th>
+            <th style="width:70px">Unidad</th>`;
+
+      fechasDia.forEach((f,di)=>{
+        const [y,m,d]=f.split('-');
+        const esHoy=f===hoy;
+        h+=`<th style="text-align:right;width:80px;${esHoy?'color:var(--blue)':''}">${DIAS[di]}<br><span style="font-size:10px;font-weight:400">${d}/${m}</span></th>`;
+      });
+      h+=`<th style="text-align:right;width:80px;color:var(--green)">Total</th></tr></thead><tbody>`;
+
+      Object.entries(areas).forEach(([area,prods])=>{
+        h+=`<tr><td colspan="${9}" style="background:var(--surface2);font-size:11px;font-weight:700;color:var(--text2);padding:4px 10px;border-top:2px solid var(--border2)">${area}</td></tr>`;
+        Object.entries(prods).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([prod,data])=>{
+          const total=data.dias.reduce((s,v)=>s+v,0);
           h+=`<tr>
-            <td style="font-weight:600">${i.producto}</td>
-            <td style="font-size:12px;color:var(--text2)">${i.unidad||''}</td>
-            <td style="text-align:right;font-weight:700;color:var(--blue)">${parseFloat(i.cantidad).toLocaleString('es-AR')}</td>
-            <td style="font-size:12px;color:var(--text2)">${i.observacion||'—'}</td>
-          </tr>`;
+            <td style="font-weight:600">${prod}${data.obs.length?`<span style="font-size:10px;color:var(--text2);margin-left:6px">${data.obs.join(', ')}</span>`:''}
+            </td>
+            <td style="font-size:12px;color:var(--text2)">${data.unidad}</td>`;
+          data.dias.forEach((v,di)=>{
+            const esHoy=fechasDia[di]===hoy;
+            h+=`<td style="text-align:right;font-weight:${v>0?'700':'400'};color:${v>0?(esHoy?'var(--blue)':'var(--text)'):'var(--text3)'}">
+              ${v>0?v.toLocaleString('es-AR'):'—'}
+            </td>`;
+          });
+          h+=`<td style="text-align:right;font-weight:700;color:var(--green)">${total.toLocaleString('es-AR')}</td></tr>`;
         });
       });
+
+      // Fila de totales
+      h+=`<tr style="font-weight:700;border-top:2px solid var(--border2)"><td colspan="2" style="color:var(--text2)">Total</td>`;
+      fechasDia.forEach((_,di)=>{
+        const tot=Object.values(areas).reduce((s,prods)=>
+          s+Object.values(prods).reduce((s2,d)=>s2+d.dias[di],0),0);
+        h+=`<td style="text-align:right;color:var(--blue)">${tot>0?tot.toLocaleString('es-AR'):'—'}</td>`;
+      });
+      const gtot=Object.values(areas).reduce((s,prods)=>
+        s+Object.values(prods).reduce((s2,d)=>s2+d.dias.reduce((a,v)=>a+v,0),0),0);
+      h+=`<td style="text-align:right;color:var(--green)">${gtot.toLocaleString('es-AR')}</td></tr>`;
       h+=`</tbody></table></div>`;
     });
     el.innerHTML=h;
-  }catch(e){el.innerHTML=`<div class="alert alert-err">${e.message}</div>`}
+  }catch(e){
+    el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> ${e.message}</div>`;
+  }
 }
 
 function initStockJoselito(){
