@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.108</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.109</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2513,11 +2513,24 @@ function generarInformeCmp(){
   }
   <\/script></body></html>`;
 
-  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const w=window.open(url,'_blank');
-  setTimeout(()=>URL.revokeObjectURL(url),30000);
-  if(!w)alert('Habilitá popups para ver el informe.');
+  // Inyectar en la página y usar window.print() igual que etiquetas
+  const area=document.getElementById('etq-print-area');
+  const styleEl=document.createElement('style');
+  styleEl.id='tmp-informe-style';
+  styleEl.textContent=`@media print{@page{size:A4;margin:10mm}#etq-print-area{display:block!important}body>*:not(#etq-print-area){display:none!important}}`;
+  document.head.appendChild(styleEl);
+
+  // Extraer solo el body del HTML generado
+  const match=html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+  // Limpiar el script interno del informe (no lo necesitamos acá)
+  const bodyContent=(match?match[1]:html).replace(/<script[\s\S]*?<\/script>/gi,'');
+  area.innerHTML=bodyContent;
+  window.print();
+  setTimeout(()=>{
+    area.innerHTML='';
+    const tmp=document.getElementById('tmp-informe-style');
+    if(tmp)tmp.remove();
+  },3000);
 }
 
 function renderCmp(){
