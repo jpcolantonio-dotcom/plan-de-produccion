@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.105</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.107</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -350,6 +350,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div class="real-sel">
       <label>Semana:</label><select id="cwsel" onchange="loadCmp()"></select>
       <label>Empresa:</label><select id="cesel" onchange="renderCmp()"><option value="all">Todas</option></select>
+      <button class="btn btn-sm" onclick="generarInformeCmp()" style="margin-left:auto"><i class="ti ti-mail"></i> Enviar informe</button>
     </div>
     <div id="ccon"></div>
   </div>
@@ -2353,6 +2354,169 @@ async function renderCmpMensual(){
     h+=`<div style="font-size:12px;color:var(--text2);margin-top:8px;text-align:center"><i class="ti ti-info-circle"></i> El mes tiene más de 14 días con datos — se muestra solo el total. Usá el filtro por día para ver el detalle diario.</div>`;
   }
   el.innerHTML=h;
+}
+
+function generarInformeCmp(){
+  const k=document.getElementById('cwsel').value;
+  const ef=document.getElementById('cesel').value;
+  if(!k){alert('Seleccioná una semana primero.');return}
+  const ap=st.P[k]||[];
+  if(!ap.length){alert('No hay plan para esta semana.');return}
+  let plan=ef==='all'?ap:ap.filter(r=>r.empresa_id===ef);
+  const re=st.R[k]||{};
+  const semLabel=document.getElementById('cwsel').selectedOptions[0]?.textContent||k;
+  const fechaHoy=new Date().toLocaleDateString('es-AR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+  // Totales globales
+  let tp=0,tr=0,cu=0,totalItems=0;
+  plan.forEach(r=>{
+    const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
+    const rk=rKey(r);const rdReal=re[rk]||re[oi]||Array(7).fill(0);
+    const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);
+    const rv=rdReal.reduce((a,b)=>a+(b||0),0);
+    tp+=pv;tr+=rv;if(rv>=pv&&pv>0)cu++;if(pv>0)totalItems++;
+  });
+  const pctGlobal=tp>0?Math.round(tr/tp*100):0;
+  const colorGlobal=pctGlobal>=90?'#16a34a':pctGlobal>=70?'#d97706':'#dc2626';
+  const bgGlobal=pctGlobal>=90?'#f0fdf4':pctGlobal>=70?'#fffbeb':'#fef2f2';
+
+  // Detalle por empresa → área
+  const bE={};plan.forEach(r=>{const eid=r.empresa_id||'_';if(!bE[eid])bE[eid]=[];bE[eid].push(r)});
+
+  let seccionesHTML='';
+  Object.entries(bE).forEach(([eid,items])=>{
+    const nm=en(eid)||'Sin empresa';
+    const empColor=ec(eid)||'#1B3A6B';
+    const bA={};items.forEach(r=>{const a=r.area||'SA';if(!bA[a])bA[a]=[];bA[a].push(r)});
+
+    let areasHTML='';
+    Object.entries(bA).forEach(([area,aItems])=>{
+      let aap=0,aar=0;
+      let filasHTML='';
+      aItems.forEach(r=>{
+        const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
+        const rk=rKey(r);const rdReal=re[rk]||re[oi]||Array(7).fill(0);
+        const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);
+        const rv=rdReal.reduce((a,b)=>a+(b||0),0);
+        if(!pv&&!rv)return;
+        const pct=pv>0?Math.round(rv/pv*100):null;
+        aap+=pv;aar+=rv;
+        const color=pct===null?'#6b7280':pct>=90?'#16a34a':pct>=70?'#d97706':'#dc2626';
+        const bg=pct===null?'':pct>=90?'#f0fdf4':pct>=70?'#fffbeb':'#fef2f2';
+        const icono=pct===null?'—':pct>=90?'✅':pct>=70?'⚠️':'❌';
+        const barra=pct!==null?`<div style="background:#e5e7eb;border-radius:4px;height:6px;width:80px;display:inline-block;vertical-align:middle;margin-left:6px">
+          <div style="background:${color};height:6px;border-radius:4px;width:${Math.min(pct,100)}%"></div></div>`:'';
+        filasHTML+=`<tr style="background:${bg}">
+          <td style="padding:7px 12px;font-size:13px;font-weight:500;border-bottom:.5px solid #e5e7eb">${r.producto}</td>
+          <td style="padding:7px 12px;text-align:right;font-size:13px;border-bottom:.5px solid #e5e7eb;color:#374151">${pv>0?pv.toLocaleString('es-AR'):'—'}</td>
+          <td style="padding:7px 12px;text-align:right;font-size:13px;font-weight:600;border-bottom:.5px solid #e5e7eb;color:${rv>0?color:'#9ca3af'}">${rv>0?rv.toLocaleString('es-AR'):'—'}</td>
+          <td style="padding:7px 12px;text-align:right;font-size:13px;font-weight:700;border-bottom:.5px solid #e5e7eb;color:${color}">
+            ${pct!==null?pct+'%':'—'}${barra}
+          </td>
+          <td style="padding:7px 12px;text-align:center;font-size:14px;border-bottom:.5px solid #e5e7eb">${icono}</td>
+        </tr>`;
+      });
+      if(!filasHTML)return;
+      const pctArea=aap>0?Math.round(aar/aap*100):0;
+      const colorArea=pctArea>=90?'#16a34a':pctArea>=70?'#d97706':'#dc2626';
+      areasHTML+=`<div style="margin-bottom:20px">
+        <div style="font-size:12px;font-weight:700;color:#6b7280;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px;padding:0 4px">${area}</div>
+        <table style="width:100%;border-collapse:collapse;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb">
+          <thead><tr style="background:#f9fafb">
+            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb">Producto</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb">Planificado</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb">Producido</th>
+            <th style="padding:8px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb">Cumplimiento</th>
+            <th style="padding:8px 12px;text-align:center;font-size:11px;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb">Estado</th>
+          </tr></thead>
+          <tbody>${filasHTML}</tbody>
+          <tfoot><tr style="background:#f3f4f6">
+            <td style="padding:8px 12px;font-size:13px;font-weight:700;border-top:2px solid #d1d5db">SUBTOTAL</td>
+            <td style="padding:8px 12px;text-align:right;font-size:13px;font-weight:700;border-top:2px solid #d1d5db">${aap.toLocaleString('es-AR')}</td>
+            <td style="padding:8px 12px;text-align:right;font-size:13px;font-weight:700;color:${colorArea};border-top:2px solid #d1d5db">${aar.toLocaleString('es-AR')}</td>
+            <td style="padding:8px 12px;text-align:right;font-size:13px;font-weight:700;color:${colorArea};border-top:2px solid #d1d5db">${aap>0?pctArea+'%':'—'}</td>
+            <td style="border-top:2px solid #d1d5db"></td>
+          </tr></tfoot>
+        </table>
+      </div>`;
+    });
+
+    seccionesHTML+=`<div style="margin-bottom:32px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:3px solid ${empColor}">
+        <span style="width:14px;height:14px;border-radius:50%;background:${empColor};display:inline-block"></span>
+        <span style="font-size:18px;font-weight:700;color:${empColor}">${nm}</span>
+      </div>
+      ${areasHTML}
+    </div>`;
+  });
+
+  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
+  <title>Informe de Producción — ${semLabel}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f8fafc;color:#111827;padding:0}
+    .page{max-width:800px;margin:0 auto;background:#fff;min-height:100vh}
+    .header{background:linear-gradient(135deg,#1B3A6B 0%,#2563eb 100%);padding:32px 40px;color:#fff}
+    .header h1{font-size:24px;font-weight:700;margin-bottom:4px}
+    .header p{font-size:14px;opacity:.8}
+    .content{padding:32px 40px}
+    .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:32px}
+    .kpi{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:16px;text-align:center}
+    .kpi-label{font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+    .kpi-val{font-size:26px;font-weight:800}
+    .kpi-main{background:${bgGlobal};border-color:${colorGlobal};border-width:2px}
+    .kpi-main .kpi-val{color:${colorGlobal}}
+    .leyenda{display:flex;gap:16px;margin-bottom:24px;font-size:12px;color:#6b7280}
+    .leyenda span{display:flex;align-items:center;gap:4px}
+    @media print{@page{margin:10mm}body{background:#fff}.page{box-shadow:none}}
+  </style></head>
+  <body><div class="page">
+    <div class="header">
+      <h1>📊 Informe de Producción Semanal</h1>
+      <p>${semLabel} &nbsp;·&nbsp; Emitido el ${fechaHoy}</p>
+    </div>
+    <div class="content">
+      <div class="kpi-grid">
+        <div class="kpi kpi-main">
+          <div class="kpi-label">Cumplimiento global</div>
+          <div class="kpi-val">${pctGlobal}%</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Total planificado</div>
+          <div class="kpi-val" style="color:#1B3A6B">${tp.toLocaleString('es-AR')}</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Total producido</div>
+          <div class="kpi-val" style="color:#16a34a">${tr.toLocaleString('es-AR')}</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Items cumplidos</div>
+          <div class="kpi-val" style="color:#374151">${cu}/${totalItems}</div>
+        </div>
+      </div>
+      <div class="leyenda">
+        <span>✅ Cumplido (≥90%)</span>
+        <span>⚠️ Parcial (70–89%)</span>
+        <span>❌ Bajo (&lt;70%)</span>
+      </div>
+      ${seccionesHTML}
+    </div>
+    <div style="padding:20px 40px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center">
+      Generado desde PAPO · Plan de Producción
+    </div>
+  </div>
+  <script>window.onload=function(){document.querySelector('.page').insertAdjacentHTML('afterend','<div style="text-align:center;padding:16px"><button onclick="window.print()" style="padding:10px 24px;background:#1B3A6B;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;margin-right:8px">🖨️ Imprimir / PDF</button><button onclick="copiarAlPortapapeles()" style="padding:10px 24px;background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:8px;font-size:14px;cursor:pointer">📋 Copiar para mail</button></div>')}
+  function copiarAlPortapapeles(){
+    const txt=document.querySelector('.page').innerText;
+    navigator.clipboard.writeText(txt).then(()=>alert('Copiado al portapapeles. Podés pegarlo en tu mail.'));
+  }
+  <\/script></body></html>`;
+
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),30000);
+  if(!w)alert('Habilitá popups para ver el informe.');
 }
 
 function renderCmp(){
