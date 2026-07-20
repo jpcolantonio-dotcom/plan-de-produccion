@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.111</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.112</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -350,7 +350,8 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div class="real-sel">
       <label>Semana:</label><select id="cwsel" onchange="loadCmp()"></select>
       <label>Empresa:</label><select id="cesel" onchange="renderCmp()"><option value="all">Todas</option></select>
-      <button class="btn btn-sm" onclick="generarInformeCmp()" style="margin-left:auto"><i class="ti ti-mail"></i> Enviar informe</button>
+      <button class="btn btn-sm" onclick="generarInformePDF()" style="margin-left:auto"><i class="ti ti-file-type-pdf"></i> Informe PDF</button>
+      <button class="btn btn-sm" style="opacity:.5;cursor:not-allowed" title="Próximamente"><i class="ti ti-world"></i> Informe Web</button>
     </div>
     <div id="ccon"></div>
   </div>
@@ -2356,7 +2357,7 @@ async function renderCmpMensual(){
   el.innerHTML=h;
 }
 
-function generarInformeCmp(){
+
   const k=document.getElementById('cwsel').value;
   const ef=document.getElementById('cesel').value;
   alert('Generando informe...\nSemana: '+k+'\nPlan: '+((st.P[k]||[]).length)+' items');
@@ -2579,6 +2580,243 @@ function generarInformeCmp(){
     const tmp=document.getElementById('tmp-informe-style');
     if(tmp)tmp.remove();
   },3000);
+
+function generarInformePDF(){
+  const k=document.getElementById('cwsel').value;
+  const ef=document.getElementById('cesel').value;
+  if(!k){alert('Seleccioná una semana primero.');return}
+  const ap=st.P[k]||[];
+  if(!ap.length){alert('No hay plan para esta semana.');return}
+  let plan=ef==='all'?ap:ap.filter(r=>r.empresa_id===ef);
+  const re=st.R[k]||{};
+  const semLabel=document.getElementById('cwsel').selectedOptions[0]?.textContent||k;
+  const fechaHoy=new Date().toLocaleDateString('es-AR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+  // Totales globales
+  let tp=0,tr=0,cu=0,totalItems=0;
+  plan.forEach(r=>{
+    const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
+    const rk=rKey(r);const rdReal=re[rk]||re[oi]||Array(7).fill(0);
+    const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);
+    const rv=rdReal.reduce((a,b)=>a+(b||0),0);
+    tp+=pv;tr+=rv;if(rv>=pv&&pv>0)cu++;if(pv>0)totalItems++;
+  });
+  const pctGlobal=tp>0?Math.round(tr/tp*100):0;
+  const colorGlobal=pctGlobal>=90?'#16a34a':pctGlobal>=70?'#d97706':'#dc2626';
+
+  // Generar tortas SVG por familia (área)
+  function svgTorta(pct, color, size=120){
+    const r=size/2-8; const cx=size/2; const cy=size/2;
+    const ang=(pct/100)*Math.PI*2;
+    const x1=cx+r*Math.sin(0); const y1=cy-r*Math.cos(0);
+    const x2=cx+r*Math.sin(ang); const y2=cy-r*Math.cos(ang);
+    const large=pct>50?1:0;
+    const bgColor=pct>=90?'#dcfce7':pct>=70?'#fef9c3':'#fee2e2';
+    if(pct>=100){
+      return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}"/>
+        <text x="${cx}" y="${cy+2}" text-anchor="middle" dominant-baseline="middle" font-size="22" font-weight="800" fill="white">100%</text>
+      </svg>`;
+    }
+    if(pct<=0){
+      return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="#e5e7eb"/>
+        <text x="${cx}" y="${cy+2}" text-anchor="middle" dominant-baseline="middle" font-size="22" font-weight="800" fill="#9ca3af">0%</text>
+      </svg>`;
+    }
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+      <circle cx="${cx}" cy="${cy}" r="${r}" fill="#e5e7eb"/>
+      <path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z" fill="${color}"/>
+      <circle cx="${cx}" cy="${cy}" r="${r*0.55}" fill="white"/>
+      <text x="${cx}" y="${cy+2}" text-anchor="middle" dominant-baseline="middle" font-size="18" font-weight="800" fill="${color}">${pct}%</text>
+    </svg>`;
+  }
+
+  // Agrupar por empresa → área
+  const bE={};plan.forEach(r=>{const eid=r.empresa_id||'_';if(!bE[eid])bE[eid]=[];bE[eid].push(r)});
+
+  let familiaCards='';
+  Object.entries(bE).forEach(([eid,items])=>{
+    const nm=en(eid)||'Sin empresa';
+    const empColor=ec(eid)||'#1B3A6B';
+    const bA={};items.forEach(r=>{const a=r.area||'SA';if(!bA[a])bA[a]=[];bA[a].push(r)});
+
+    // Una card por área (familia)
+    const PALETA=['#3b82f6','#16a34a','#d97706','#7c3aed','#dc2626','#0891b2','#be185d','#059669','#b45309'];
+    Object.entries(bA).forEach(([area,aItems],ai)=>{
+      let aap=0,aar=0;
+      const productos=[];
+      aItems.forEach((r,ri)=>{
+        const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
+        const rk=rKey(r);const rdReal=re[rk]||re[oi]||Array(7).fill(0);
+        const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);
+        const rv=rdReal.reduce((a,b)=>a+(b||0),0);
+        if(!pv&&!rv)return;
+        aap+=pv;aar+=rv;
+        const pct=pv>0?Math.round(rv/pv*100):null;
+        const col=PALETA[ri%PALETA.length];
+        productos.push({nombre:r.producto,pv,rv,pct,col});
+      });
+      if(!productos.length)return;
+      const pctArea=aap>0?Math.round(aar/aap*100):0;
+      const colorArea=pctArea>=90?'#16a34a':pctArea>=70?'#d97706':'#dc2626';
+
+      // Tabla de productos
+      let filasProd=productos.map(p=>`
+        <tr>
+          <td style="padding:4px 8px;font-size:11px;border-bottom:.5px solid #e5e7eb">
+            <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${p.col};margin-right:5px"></span>${p.nombre}
+          </td>
+          <td style="padding:4px 8px;font-size:11px;text-align:right;border-bottom:.5px solid #e5e7eb;color:#374151">${p.pv>0?p.pv.toLocaleString('es-AR'):'—'}</td>
+          <td style="padding:4px 8px;font-size:11px;text-align:right;border-bottom:.5px solid #e5e7eb;font-weight:600;color:${p.pct!==null?(p.pct>=90?'#16a34a':p.pct>=70?'#d97706':'#dc2626'):'#9ca3af'}">${p.rv>0?p.rv.toLocaleString('es-AR'):'—'}</td>
+          <td style="padding:4px 8px;font-size:11px;text-align:right;border-bottom:.5px solid #e5e7eb;font-weight:700;color:${p.pct!==null?(p.pct>=90?'#16a34a':p.pct>=70?'#d97706':'#dc2626'):'#9ca3af'}">${p.pct!==null?p.pct+'%':'—'}</td>
+        </tr>`).join('');
+
+      familiaCards+=`
+        <div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:20px;break-inside:avoid;page-break-inside:avoid">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:16px">
+            <span style="width:10px;height:10px;border-radius:50%;background:${empColor};display:inline-block"></span>
+            <span style="font-size:10px;color:#6b7280">${nm}</span>
+            <span style="font-size:15px;font-weight:700;color:#111827;margin-left:4px">${area}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:20px">
+            <div style="flex-shrink:0">${svgTorta(pctArea,colorArea,130)}</div>
+            <div style="flex:1;min-width:0">
+              <table style="width:100%;border-collapse:collapse">
+                <thead><tr style="background:#f9fafb">
+                  <th style="padding:4px 8px;font-size:10px;color:#6b7280;text-align:left;border-bottom:1px solid #e5e7eb">Producto</th>
+                  <th style="padding:4px 8px;font-size:10px;color:#6b7280;text-align:right;border-bottom:1px solid #e5e7eb">Plan</th>
+                  <th style="padding:4px 8px;font-size:10px;color:#6b7280;text-align:right;border-bottom:1px solid #e5e7eb">Real</th>
+                  <th style="padding:4px 8px;font-size:10px;color:#6b7280;text-align:right;border-bottom:1px solid #e5e7eb">%</th>
+                </tr></thead>
+                <tbody>${filasProd}</tbody>
+                <tfoot><tr style="background:#f3f4f6">
+                  <td style="padding:4px 8px;font-size:11px;font-weight:700;border-top:1.5px solid #d1d5db">Total</td>
+                  <td style="padding:4px 8px;font-size:11px;text-align:right;font-weight:700;border-top:1.5px solid #d1d5db">${aap.toLocaleString('es-AR')}</td>
+                  <td style="padding:4px 8px;font-size:11px;text-align:right;font-weight:700;color:${colorArea};border-top:1.5px solid #d1d5db">${aar.toLocaleString('es-AR')}</td>
+                  <td style="padding:4px 8px;font-size:11px;text-align:right;font-weight:700;color:${colorArea};border-top:1.5px solid #d1d5db">${pctArea}%</td>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        </div>`;
+    });
+  });
+
+  // Desvíos
+  const causasInforme=ef==='all'?st.causas.filter(c=>c.semana===k):st.causas.filter(c=>c.semana===k&&c.empresa_id===ef);
+  let desviosHTML='';
+  if(causasInforme.length){
+    const DIAS_NOM=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+    let filasCausas=causasInforme.map(c=>{
+      const emp=st.E.find(e=>e.id===c.empresa_id);
+      const empColor=ec(c.empresa_id)||'#1B3A6B';
+      const diaNom=DIAS_NOM[c.dia]||`Día ${c.dia+1}`;
+      const causaColor=c.causa==='Falta de MP'?'#dc2626':c.causa==='Problema mecánico'?'#d97706':c.causa==='Falta de personal'?'#7c3aed':'#374151';
+      const causaBg=c.causa==='Falta de MP'?'#fef2f2':c.causa==='Problema mecánico'?'#fffbeb':c.causa==='Falta de personal'?'#f5f3ff':'#f9fafb';
+      return `<tr>
+        <td style="padding:6px 10px;font-size:11px;border-bottom:.5px solid #fca5a5">
+          <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${empColor};margin-right:5px"></span>${emp?.nombre||''}
+        </td>
+        <td style="padding:6px 10px;font-size:11px;color:#6b7280;border-bottom:.5px solid #fca5a5">${c.area}</td>
+        <td style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:.5px solid #fca5a5">${c.producto}</td>
+        <td style="padding:6px 10px;font-size:11px;text-align:center;border-bottom:.5px solid #fca5a5">${diaNom}</td>
+        <td style="padding:6px 10px;border-bottom:.5px solid #fca5a5">
+          <span style="background:${causaBg};color:${causaColor};padding:1px 7px;border-radius:10px;font-size:10px;font-weight:600">${c.causa}</span>
+        </td>
+        <td style="padding:6px 10px;font-size:11px;color:#6b7280;border-bottom:.5px solid #fca5a5">${c.observacion||'—'}</td>
+      </tr>`;
+    }).join('');
+    desviosHTML=`<div style="margin-top:32px;break-inside:avoid">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #dc2626">
+        <span style="font-size:16px">⚠️</span>
+        <span style="font-size:15px;font-weight:700;color:#dc2626">Desvíos registrados</span>
+        <span style="font-size:11px;color:#6b7280;background:#fef2f2;padding:1px 7px;border-radius:10px;border:1px solid #fca5a5;margin-left:4px">${causasInforme.length} desvío${causasInforme.length!==1?'s':''}</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;border:1px solid #fca5a5;border-radius:8px;overflow:hidden">
+        <thead><tr style="background:#fef2f2">
+          <th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;font-weight:600;border-bottom:1px solid #fca5a5">Empresa</th>
+          <th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;font-weight:600;border-bottom:1px solid #fca5a5">Área</th>
+          <th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;font-weight:600;border-bottom:1px solid #fca5a5">Producto</th>
+          <th style="padding:6px 10px;text-align:center;font-size:10px;color:#6b7280;font-weight:600;border-bottom:1px solid #fca5a5">Día</th>
+          <th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;font-weight:600;border-bottom:1px solid #fca5a5">Causa</th>
+          <th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;font-weight:600;border-bottom:1px solid #fca5a5">Observación</th>
+        </tr></thead>
+        <tbody>${filasCausas}</tbody>
+      </table>
+    </div>`;
+  }
+
+  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
+  <title>Informe PDF — ${semLabel}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#111827}
+    .page{max-width:900px;margin:0 auto;background:#f1f5f9;padding:20px}
+    .header{background:linear-gradient(135deg,#1B3A6B 0%,#2563eb 100%);border-radius:16px;padding:28px 32px;color:#fff;margin-bottom:24px}
+    .header h1{font-size:22px;font-weight:800;margin-bottom:4px}
+    .header p{font-size:13px;opacity:.75}
+    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+    .kpi{background:white;border:1px solid #e5e7eb;border-radius:12px;padding:16px;text-align:center}
+    .kpi-label{font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+    .kpi-val{font-size:24px;font-weight:800}
+    .familias{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
+    @media print{
+      @page{size:A4;margin:10mm}
+      body{background:white}
+      .page{padding:0;max-width:100%}
+      .header{border-radius:8px}
+      .familias{grid-template-columns:repeat(2,1fr)}
+    }
+  </style></head>
+  <body><div class="page">
+    <div class="header">
+      <h1>📊 Informe de Producción Semanal</h1>
+      <p>${semLabel} &nbsp;·&nbsp; ${fechaHoy}</p>
+    </div>
+    <div class="kpis">
+      <div class="kpi" style="border-color:${colorGlobal};border-width:2px">
+        <div class="kpi-label">Cumplimiento global</div>
+        <div class="kpi-val" style="color:${colorGlobal}">${pctGlobal}%</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Total planificado</div>
+        <div class="kpi-val" style="color:#1B3A6B">${tp.toLocaleString('es-AR')}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Total producido</div>
+        <div class="kpi-val" style="color:#16a34a">${tr.toLocaleString('es-AR')}</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Items cumplidos</div>
+        <div class="kpi-val" style="color:#374151">${cu}/${totalItems}</div>
+      </div>
+    </div>
+    <div class="familias">${familiaCards}</div>
+    ${desviosHTML}
+    <div style="margin-top:20px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center">
+      Generado desde PAPO · Plan de Producción · ${fechaHoy}
+    </div>
+  </div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
+  </body></html>`;
+
+  // Abrir en ventana nueva con blob
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),30000);
+  if(!w){
+    // Fallback: inyectar en página
+    const area=document.getElementById('etq-print-area');
+    const match=html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    area.innerHTML=(match?match[1]:html).replace(/<script[\s\S]*?<\/script>/gi,'');
+    const styleEl=document.createElement('style');
+    styleEl.textContent='@media print{@page{size:A4;margin:10mm}}';
+    document.head.appendChild(styleEl);
+    window.print();
+    setTimeout(()=>{area.innerHTML='';styleEl.remove();},3000);
+  }
 }
 
 function renderCmp(){
