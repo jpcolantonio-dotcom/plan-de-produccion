@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.115</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.116</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2428,6 +2428,40 @@ function generarInformePDF(){
     });
   });
   const causasInforme=ef==='all'?st.causas.filter(c=>c.semana===k):st.causas.filter(c=>c.semana===k&&c.empresa_id===ef);
+  // Calcular Kg totales y por empresa para los KPIs
+  const kgPorEmp={};
+  let kgPlanTotal=0, kgRealTotal=0;
+  plan.forEach(r=>{
+    const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
+    const rk=rKey(r);const rdReal=re[rk]||re[oi]||Array(7).fill(0);
+    const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);
+    const rv=rdReal.reduce((a,b)=>a+(b||0),0);
+    const prodM=st.Pr.find(px=>px.nombre===r.producto&&px.empresa_id===r.empresa_id);
+    const pg=prodM?.peso_gramos?parseFloat(prodM.peso_gramos):null;
+    if(pg!==null){
+      const kgP=pv*pg/1000; const kgR=rv*pg/1000;
+      kgPlanTotal+=kgP; kgRealTotal+=kgR;
+      const eid=r.empresa_id||'_';
+      if(!kgPorEmp[eid])kgPorEmp[eid]={kgP:0,kgR:0};
+      kgPorEmp[eid].kgP+=kgP; kgPorEmp[eid].kgR+=kgR;
+    }
+  });
+  const hayKgGlobal=kgPlanTotal>0||kgRealTotal>0;
+  const fmtKgT=v=>v<1?v.toFixed(1):Math.round(v).toLocaleString('es-AR');
+
+  // KPIs de Kg por empresa
+  const kpiEmpresas=Object.entries(kgPorEmp).map(([eid,d])=>{
+    const nm=en(eid)||'Sin empresa'; const color=ec(eid)||'#1B3A6B';
+    return `<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:14px;text-align:center;border-top:3px solid ${color}">
+      <div style="font-size:9px;color:#6b7280;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${nm}</div>
+      <div style="display:flex;justify-content:space-around;gap:8px;margin-top:8px">
+        <div><div style="font-size:9px;color:#2563eb;font-weight:600">KG PLAN</div><div style="font-size:20px;font-weight:800;color:#2563eb">${fmtKgT(d.kgP)}</div></div>
+        <div style="width:1px;background:#e5e7eb"></div>
+        <div><div style="font-size:9px;color:#16a34a;font-weight:600">KG REAL</div><div style="font-size:20px;font-weight:800;color:#16a34a">${fmtKgT(d.kgR)}</div></div>
+      </div>
+    </div>`;
+  }).join('');
+
   let desviosHTML='';
   if(causasInforme.length){
     const DIAS_NOM=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
@@ -2440,7 +2474,7 @@ function generarInformePDF(){
     }).join('');
     desviosHTML=`<div style="margin-top:24px;break-inside:avoid"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #dc2626"><span style="font-size:16px">⚠️</span><span style="font-size:15px;font-weight:700;color:#dc2626">Desvíos registrados</span><span style="font-size:11px;background:#fef2f2;color:#6b7280;padding:1px 7px;border-radius:10px;border:1px solid #fca5a5;margin-left:4px">${causasInforme.length} desvío${causasInforme.length!==1?'s':''}</span></div><table style="width:100%;border-collapse:collapse;border:1px solid #fca5a5"><thead><tr style="background:#fef2f2"><th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;border-bottom:1px solid #fca5a5">Empresa</th><th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;border-bottom:1px solid #fca5a5">Área</th><th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;border-bottom:1px solid #fca5a5">Producto</th><th style="padding:6px 10px;text-align:center;font-size:10px;color:#6b7280;border-bottom:1px solid #fca5a5">Día</th><th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;border-bottom:1px solid #fca5a5">Causa</th><th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;border-bottom:1px solid #fca5a5">Observación</th></tr></thead><tbody>${filasCausas}</tbody></table></div>`;
   }
-  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Informe PDF — ${semLabel}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#111827}.page{max-width:900px;margin:0 auto;background:#f1f5f9;padding:20px}.header{background:linear-gradient(135deg,#1B3A6B 0%,#2563eb 100%);border-radius:16px;padding:28px 32px;color:#fff;margin-bottom:24px}.header h1{font-size:22px;font-weight:800;margin-bottom:4px}.header p{font-size:13px;opacity:.75}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}.kpi{background:white;border:1px solid #e5e7eb;border-radius:12px;padding:16px;text-align:center}.kpi-label{font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}.kpi-val{font-size:24px;font-weight:800}.familias{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}@media print{@page{size:A4;margin:10mm}body{background:white}.page{padding:0;max-width:100%}}</style></head><body><div class="page"><div class="header"><h1>📊 Informe de Producción Semanal</h1><p>${semLabel} &nbsp;·&nbsp; ${fechaHoy}</p></div><div class="kpis"><div class="kpi" style="border-color:${colorGlobal};border-width:2px"><div class="kpi-label">Cumplimiento global</div><div class="kpi-val" style="color:${colorGlobal}">${pctGlobal}%</div></div><div class="kpi"><div class="kpi-label">Total planificado</div><div class="kpi-val" style="color:#1B3A6B">${tp.toLocaleString('es-AR')}</div></div><div class="kpi"><div class="kpi-label">Total producido</div><div class="kpi-val" style="color:#16a34a">${tr.toLocaleString('es-AR')}</div></div><div class="kpi"><div class="kpi-label">Items cumplidos</div><div class="kpi-val">${cu}/${totalItems}</div></div></div><div class="familias">${familiaCards}</div>${desviosHTML}<div style="margin-top:20px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center">PAPO · Plan de Producción · ${fechaHoy}</div></div><script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script></body></html>`;
+  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Informe PDF — ${semLabel}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#111827}.page{max-width:900px;margin:0 auto;background:#f1f5f9;padding:20px}.header{background:linear-gradient(135deg,#1B3A6B 0%,#2563eb 100%);border-radius:16px;padding:28px 32px;color:#fff;margin-bottom:24px}.header h1{font-size:22px;font-weight:800;margin-bottom:4px}.header p{font-size:13px;opacity:.75}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}.kpi{background:white;border:1px solid #e5e7eb;border-radius:12px;padding:16px;text-align:center}.kpi-label{font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}.kpi-val{font-size:24px;font-weight:800}.familias{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}@media print{@page{size:A4;margin:10mm}body{background:white}.page{padding:0;max-width:100%}}</style></head><body><div class="page"><div class="header"><h1>📊 Informe de Producción Semanal</h1><p>${semLabel} &nbsp;·&nbsp; ${fechaHoy}</p></div><div class="kpis"><div class="kpi" style="border-color:${colorGlobal};border-width:2px"><div class="kpi-label">Cumplimiento global</div><div class="kpi-val" style="color:${colorGlobal}">${pctGlobal}%</div></div>${hayKgGlobal?`<div class=\"kpi\" style=\"border-color:#2563eb\"><div class=\"kpi-label\">Kg planificados</div><div class=\"kpi-val\" style=\"color:#2563eb\">${fmtKgT(kgPlanTotal)}</div></div><div class=\"kpi\" style=\"border-color:#16a34a\"><div class=\"kpi-label\">Kg producidos</div><div class=\"kpi-val\" style=\"color:#16a34a\">${fmtKgT(kgRealTotal)}</div></div>`:`<div class=\"kpi\"><div class=\"kpi-label\">Total planificado</div><div class=\"kpi-val\" style=\"color:#1B3A6B\">${tp.toLocaleString('es-AR')}</div></div><div class=\"kpi\"><div class=\"kpi-label\">Total producido</div><div class=\"kpi-val\" style=\"color:#16a34a\">${tr.toLocaleString('es-AR')}</div></div>`}<div class="kpi"><div class="kpi-label">Items cumplidos</div><div class="kpi-val">${cu}/${totalItems}</div></div></div>${hayKgGlobal?`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px">${kpiEmpresas}</div>`:''}<div class="familias">${familiaCards}</div>${desviosHTML}<div style="margin-top:20px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center">PAPO · Plan de Producción · ${fechaHoy}</div></div><script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script></body></html>`;
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const w=window.open(url,'_blank');
@@ -2642,10 +2676,10 @@ function rProdDetail(aid){
             onchange="updP('${p.id}','unidades_bandeja',this.value?parseInt(this.value):null)"
             style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
         </td>
-        <td style="width:80px">
-          <input type="number" min="0" step="0.1" value="${p.peso_gramos||''}" placeholder="g"
+        <td style="width:100px">
+          <input type="number" min="0" step="1" value="${p.peso_gramos||''}" placeholder="g"
             onchange="updP('${p.id}','peso_gramos',this.value?parseFloat(this.value):null)"
-            style="width:100%;padding:4px 6px;font-size:12px;text-align:right;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
+            style="width:100%;padding:4px 8px;font-size:13px;text-align:right;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
             title="Peso en gramos por unidad de planificación"/>
         </td>
         <td style="width:80px;text-align:center">
