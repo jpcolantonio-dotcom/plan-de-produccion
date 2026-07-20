@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.113</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.115</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2358,227 +2358,7 @@ async function renderCmpMensual(){
 }
 
 
-  const k=document.getElementById('cwsel').value;
-  const ef=document.getElementById('cesel').value;
-  if(!k){alert('Seleccioná una semana primero.');return}
-  const ap=st.P[k]||[];
-  if(!ap.length){alert('No hay plan para esta semana.');return}
-  let plan=ef==='all'?ap:ap.filter(r=>r.empresa_id===ef);
-  const re=st.R[k]||{};
-  const semLabel=document.getElementById('cwsel').selectedOptions[0]?.textContent||k;
-  const fechaHoy=new Date().toLocaleDateString('es-AR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 
-  // Totales globales
-  let tp=0,tr=0,cu=0,totalItems=0;
-  plan.forEach(r=>{
-    const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
-    const rk=rKey(r);const rdReal=re[rk]||re[oi]||Array(7).fill(0);
-    const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);
-    const rv=rdReal.reduce((a,b)=>a+(b||0),0);
-    tp+=pv;tr+=rv;if(rv>=pv&&pv>0)cu++;if(pv>0)totalItems++;
-  });
-  const pctGlobal=tp>0?Math.round(tr/tp*100):0;
-  const colorGlobal=pctGlobal>=90?'#16a34a':pctGlobal>=70?'#d97706':'#dc2626';
-  const bgGlobal=pctGlobal>=90?'#f0fdf4':pctGlobal>=70?'#fffbeb':'#fef2f2';
-
-  // Detalle por empresa → área
-  const bE={};plan.forEach(r=>{const eid=r.empresa_id||'_';if(!bE[eid])bE[eid]=[];bE[eid].push(r)});
-
-  let seccionesHTML='';
-  Object.entries(bE).forEach(([eid,items])=>{
-    const nm=en(eid)||'Sin empresa';
-    const empColor=ec(eid)||'#1B3A6B';
-    const bA={};items.forEach(r=>{const a=r.area||'SA';if(!bA[a])bA[a]=[];bA[a].push(r)});
-
-    let areasHTML='';
-    Object.entries(bA).forEach(([area,aItems])=>{
-      let aap=0,aar=0;
-      let filasHTML='';
-      aItems.forEach(r=>{
-        const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
-        const rk=rKey(r);const rdReal=re[rk]||re[oi]||Array(7).fill(0);
-        const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);
-        const rv=rdReal.reduce((a,b)=>a+(b||0),0);
-        if(!pv&&!rv)return;
-        const pct=pv>0?Math.round(rv/pv*100):null;
-        aap+=pv;aar+=rv;
-        const color=pct===null?'#6b7280':pct>=90?'#16a34a':pct>=70?'#d97706':'#dc2626';
-        const bg=pct===null?'':pct>=90?'#f0fdf4':pct>=70?'#fffbeb':'#fef2f2';
-        const icono=pct===null?'—':pct>=90?'✅':pct>=70?'⚠️':'❌';
-        const barra=pct!==null?`<div style="background:#e5e7eb;border-radius:4px;height:6px;width:80px;display:inline-block;vertical-align:middle;margin-left:6px">
-          <div style="background:${color};height:6px;border-radius:4px;width:${Math.min(pct,100)}%"></div></div>`:'';
-        filasHTML+=`<tr style="background:${bg}">
-          <td style="padding:7px 12px;font-size:13px;font-weight:500;border-bottom:.5px solid #e5e7eb">${r.producto}</td>
-          <td style="padding:7px 12px;text-align:right;font-size:13px;border-bottom:.5px solid #e5e7eb;color:#374151">${pv>0?pv.toLocaleString('es-AR'):'—'}</td>
-          <td style="padding:7px 12px;text-align:right;font-size:13px;font-weight:600;border-bottom:.5px solid #e5e7eb;color:${rv>0?color:'#9ca3af'}">${rv>0?rv.toLocaleString('es-AR'):'—'}</td>
-          <td style="padding:7px 12px;text-align:right;font-size:13px;font-weight:700;border-bottom:.5px solid #e5e7eb;color:${color}">
-            ${pct!==null?pct+'%':'—'}${barra}
-          </td>
-          <td style="padding:7px 12px;text-align:center;font-size:14px;border-bottom:.5px solid #e5e7eb">${icono}</td>
-        </tr>`;
-      });
-      if(!filasHTML)return;
-      const pctArea=aap>0?Math.round(aar/aap*100):0;
-      const colorArea=pctArea>=90?'#16a34a':pctArea>=70?'#d97706':'#dc2626';
-      areasHTML+=`<div style="margin-bottom:20px">
-        <div style="font-size:12px;font-weight:700;color:#6b7280;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:6px;padding:0 4px">${area}</div>
-        <table style="width:100%;border-collapse:collapse;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb">
-          <thead><tr style="background:#f9fafb">
-            <th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb">Producto</th>
-            <th style="padding:8px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb">Planificado</th>
-            <th style="padding:8px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb">Producido</th>
-            <th style="padding:8px 12px;text-align:right;font-size:11px;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb">Cumplimiento</th>
-            <th style="padding:8px 12px;text-align:center;font-size:11px;color:#6b7280;font-weight:600;border-bottom:1px solid #e5e7eb">Estado</th>
-          </tr></thead>
-          <tbody>${filasHTML}</tbody>
-          <tfoot><tr style="background:#f3f4f6">
-            <td style="padding:8px 12px;font-size:13px;font-weight:700;border-top:2px solid #d1d5db">SUBTOTAL</td>
-            <td style="padding:8px 12px;text-align:right;font-size:13px;font-weight:700;border-top:2px solid #d1d5db">${aap.toLocaleString('es-AR')}</td>
-            <td style="padding:8px 12px;text-align:right;font-size:13px;font-weight:700;color:${colorArea};border-top:2px solid #d1d5db">${aar.toLocaleString('es-AR')}</td>
-            <td style="padding:8px 12px;text-align:right;font-size:13px;font-weight:700;color:${colorArea};border-top:2px solid #d1d5db">${aap>0?pctArea+'%':'—'}</td>
-            <td style="border-top:2px solid #d1d5db"></td>
-          </tr></tfoot>
-        </table>
-      </div>`;
-    });
-
-    seccionesHTML+=`<div style="margin-bottom:32px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:3px solid ${empColor}">
-        <span style="width:14px;height:14px;border-radius:50%;background:${empColor};display:inline-block"></span>
-        <span style="font-size:18px;font-weight:700;color:${empColor}">${nm}</span>
-      </div>
-      ${areasHTML}
-    </div>`;
-  });
-
-  // Desvíos
-  const causasInforme=ef==='all'
-    ?st.causas.filter(c=>c.semana===k)
-    :st.causas.filter(c=>c.semana===k&&c.empresa_id===ef);
-  let desviosHTML='';
-  if(causasInforme.length){
-    const DIAS_NOM=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
-    let filasCausas='';
-    causasInforme.forEach(c=>{
-      const emp=st.E.find(e=>e.id===c.empresa_id);
-      const empColor=ec(c.empresa_id)||'#1B3A6B';
-      const diaNom=DIAS_NOM[c.dia]||`Día ${c.dia+1}`;
-      const causaColor=c.causa==='Falta de MP'?'#dc2626':c.causa==='Problema mecánico'?'#d97706':c.causa==='Falta de personal'?'#7c3aed':'#374151';
-      const causaBg=c.causa==='Falta de MP'?'#fef2f2':c.causa==='Problema mecánico'?'#fffbeb':c.causa==='Falta de personal'?'#f5f3ff':'#f9fafb';
-      filasCausas+=`<tr>
-        <td style="padding:7px 12px;font-size:13px;border-bottom:.5px solid #e5e7eb">
-          <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${empColor};margin-right:6px;vertical-align:middle"></span>${emp?.nombre||''}
-        </td>
-        <td style="padding:7px 12px;font-size:13px;color:#6b7280;border-bottom:.5px solid #e5e7eb">${c.area}</td>
-        <td style="padding:7px 12px;font-size:13px;font-weight:600;border-bottom:.5px solid #e5e7eb">${c.producto}</td>
-        <td style="padding:7px 12px;font-size:13px;text-align:center;border-bottom:.5px solid #e5e7eb">${diaNom}</td>
-        <td style="padding:7px 12px;border-bottom:.5px solid #e5e7eb">
-          <span style="background:${causaBg};color:${causaColor};padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600">${c.causa}</span>
-        </td>
-        <td style="padding:7px 12px;font-size:12px;color:#6b7280;border-bottom:.5px solid #e5e7eb">${c.observacion||'—'}</td>
-      </tr>`;
-    });
-    desviosHTML=`<div style="margin-top:32px;margin-bottom:32px">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:3px solid #dc2626">
-        <span style="font-size:20px">⚠️</span>
-        <span style="font-size:18px;font-weight:700;color:#dc2626">Desvíos registrados</span>
-        <span style="font-size:12px;color:#6b7280;background:#fef2f2;padding:2px 8px;border-radius:12px;border:1px solid #fca5a5">${causasInforme.length} desvío${causasInforme.length!==1?'s':''}</span>
-      </div>
-      <table style="width:100%;border-collapse:collapse;border:1px solid #fca5a5;border-radius:8px;overflow:hidden">
-        <thead><tr style="background:#fef2f2">
-          <th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;border-bottom:1px solid #fca5a5">Empresa</th>
-          <th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;border-bottom:1px solid #fca5a5">Área</th>
-          <th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;border-bottom:1px solid #fca5a5">Producto</th>
-          <th style="padding:8px 12px;text-align:center;font-size:11px;color:#6b7280;font-weight:600;border-bottom:1px solid #fca5a5">Día</th>
-          <th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;border-bottom:1px solid #fca5a5">Causa</th>
-          <th style="padding:8px 12px;text-align:left;font-size:11px;color:#6b7280;font-weight:600;border-bottom:1px solid #fca5a5">Observación</th>
-        </tr></thead>
-        <tbody>${filasCausas}</tbody>
-      </table>
-    </div>`;
-  }
-
-  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
-  <title>Informe de Producción — ${semLabel}</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f8fafc;color:#111827;padding:0}
-    .page{max-width:800px;margin:0 auto;background:#fff;min-height:100vh}
-    .header{background:linear-gradient(135deg,#1B3A6B 0%,#2563eb 100%);padding:32px 40px;color:#fff}
-    .header h1{font-size:24px;font-weight:700;margin-bottom:4px}
-    .header p{font-size:14px;opacity:.8}
-    .content{padding:32px 40px}
-    .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:32px}
-    .kpi{background:#f9fafb;border:1px solid #e5e7eb;border-radius:10px;padding:16px;text-align:center}
-    .kpi-label{font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
-    .kpi-val{font-size:26px;font-weight:800}
-    .kpi-main{background:${bgGlobal};border-color:${colorGlobal};border-width:2px}
-    .kpi-main .kpi-val{color:${colorGlobal}}
-    .leyenda{display:flex;gap:16px;margin-bottom:24px;font-size:12px;color:#6b7280}
-    .leyenda span{display:flex;align-items:center;gap:4px}
-    @media print{@page{margin:10mm}body{background:#fff}.page{box-shadow:none}}
-  </style></head>
-  <body><div class="page">
-    <div class="header">
-      <h1>📊 Informe de Producción Semanal</h1>
-      <p>${semLabel} &nbsp;·&nbsp; Emitido el ${fechaHoy}</p>
-    </div>
-    <div class="content">
-      <div class="kpi-grid">
-        <div class="kpi kpi-main">
-          <div class="kpi-label">Cumplimiento global</div>
-          <div class="kpi-val">${pctGlobal}%</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Total planificado</div>
-          <div class="kpi-val" style="color:#1B3A6B">${tp.toLocaleString('es-AR')}</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Total producido</div>
-          <div class="kpi-val" style="color:#16a34a">${tr.toLocaleString('es-AR')}</div>
-        </div>
-        <div class="kpi">
-          <div class="kpi-label">Items cumplidos</div>
-          <div class="kpi-val" style="color:#374151">${cu}/${totalItems}</div>
-        </div>
-      </div>
-      <div class="leyenda">
-        <span>✅ Cumplido (≥90%)</span>
-        <span>⚠️ Parcial (70–89%)</span>
-        <span>❌ Bajo (&lt;70%)</span>
-      </div>
-      ${seccionesHTML}
-      ${desviosHTML}
-    </div>
-    <div style="padding:20px 40px;border-top:1px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center">
-      Generado desde PAPO · Plan de Producción
-    </div>
-  </div>
-  <script>window.onload=function(){document.querySelector('.page').insertAdjacentHTML('afterend','<div style="text-align:center;padding:16px"><button onclick="window.print()" style="padding:10px 24px;background:#1B3A6B;color:#fff;border:none;border-radius:8px;font-size:14px;cursor:pointer;margin-right:8px">🖨️ Imprimir / PDF</button><button onclick="copiarAlPortapapeles()" style="padding:10px 24px;background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:8px;font-size:14px;cursor:pointer">📋 Copiar para mail</button></div>')}
-  function copiarAlPortapapeles(){
-    const txt=document.querySelector('.page').innerText;
-    navigator.clipboard.writeText(txt).then(()=>alert('Copiado al portapapeles. Podés pegarlo en tu mail.'));
-  }
-  <\/script></body></html>`;
-
-  // Inyectar en la página y usar window.print() igual que etiquetas
-  const area=document.getElementById('etq-print-area');
-  const styleEl=document.createElement('style');
-  styleEl.id='tmp-informe-style';
-  styleEl.textContent=`@media print{@page{size:A4;margin:10mm}#etq-print-area{display:block!important}body>*:not(#etq-print-area){display:none!important}}`;
-  document.head.appendChild(styleEl);
-
-  // Extraer solo el body del HTML generado
-  const match=html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-  // Limpiar el script interno del informe (no lo necesitamos acá)
-  const bodyContent=(match?match[1]:html).replace(/<script[\s\S]*?<\/script>/gi,'');
-  area.innerHTML=bodyContent;
-  window.print();
-  setTimeout(()=>{
-    area.innerHTML='';
-    const tmp=document.getElementById('tmp-informe-style');
-    if(tmp)tmp.remove();
-  },3000);
 
 function generarInformePDF(){
   const k=document.getElementById('cwsel').value;
@@ -2590,8 +2370,6 @@ function generarInformePDF(){
   const re=st.R[k]||{};
   const semLabel=document.getElementById('cwsel').selectedOptions[0]?.textContent||k;
   const fechaHoy=new Date().toLocaleDateString('es-AR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-
-  // Totales globales
   let tp=0,tr=0,cu=0,totalItems=0;
   plan.forEach(r=>{
     const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
@@ -2602,49 +2380,25 @@ function generarInformePDF(){
   });
   const pctGlobal=tp>0?Math.round(tr/tp*100):0;
   const colorGlobal=pctGlobal>=90?'#16a34a':pctGlobal>=70?'#d97706':'#dc2626';
-
-  // Generar tortas SVG por familia (área)
-  function svgTorta(pct, color, size=120){
-    const r=size/2-8; const cx=size/2; const cy=size/2;
+  function svgTorta(pct,color,size=130){
+    const r=size/2-8;const cx=size/2;const cy=size/2;
+    if(pct>=100)return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}"/><text x="${cx}" y="${cy+2}" text-anchor="middle" dominant-baseline="middle" font-size="22" font-weight="800" fill="white">100%</text></svg>`;
+    if(pct<=0)return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="#e5e7eb"/><text x="${cx}" y="${cy+2}" text-anchor="middle" dominant-baseline="middle" font-size="22" font-weight="800" fill="#9ca3af">0%</text></svg>`;
     const ang=(pct/100)*Math.PI*2;
-    const x1=cx+r*Math.sin(0); const y1=cy-r*Math.cos(0);
-    const x2=cx+r*Math.sin(ang); const y2=cy-r*Math.cos(ang);
+    const x1=cx+r*Math.sin(0);const y1=cy-r*Math.cos(0);
+    const x2=cx+r*Math.sin(ang);const y2=cy-r*Math.cos(ang);
     const large=pct>50?1:0;
-    const bgColor=pct>=90?'#dcfce7':pct>=70?'#fef9c3':'#fee2e2';
-    if(pct>=100){
-      return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-        <circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}"/>
-        <text x="${cx}" y="${cy+2}" text-anchor="middle" dominant-baseline="middle" font-size="22" font-weight="800" fill="white">100%</text>
-      </svg>`;
-    }
-    if(pct<=0){
-      return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-        <circle cx="${cx}" cy="${cy}" r="${r}" fill="#e5e7eb"/>
-        <text x="${cx}" y="${cy+2}" text-anchor="middle" dominant-baseline="middle" font-size="22" font-weight="800" fill="#9ca3af">0%</text>
-      </svg>`;
-    }
-    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-      <circle cx="${cx}" cy="${cy}" r="${r}" fill="#e5e7eb"/>
-      <path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z" fill="${color}"/>
-      <circle cx="${cx}" cy="${cy}" r="${r*0.55}" fill="white"/>
-      <text x="${cx}" y="${cy+2}" text-anchor="middle" dominant-baseline="middle" font-size="18" font-weight="800" fill="${color}">${pct}%</text>
-    </svg>`;
+    return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="#e5e7eb"/><path d="M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z" fill="${color}"/><circle cx="${cx}" cy="${cy}" r="${r*0.55}" fill="white"/><text x="${cx}" y="${cy+2}" text-anchor="middle" dominant-baseline="middle" font-size="18" font-weight="800" fill="${color}">${pct}%</text></svg>`;
   }
-
-  // Agrupar por empresa → área
   const bE={};plan.forEach(r=>{const eid=r.empresa_id||'_';if(!bE[eid])bE[eid]=[];bE[eid].push(r)});
-
+  const PALETA=['#3b82f6','#16a34a','#d97706','#7c3aed','#dc2626','#0891b2','#be185d','#059669','#b45309'];
   let familiaCards='';
   Object.entries(bE).forEach(([eid,items])=>{
     const nm=en(eid)||'Sin empresa';
     const empColor=ec(eid)||'#1B3A6B';
     const bA={};items.forEach(r=>{const a=r.area||'SA';if(!bA[a])bA[a]=[];bA[a].push(r)});
-
-    // Una card por área (familia)
-    const PALETA=['#3b82f6','#16a34a','#d97706','#7c3aed','#dc2626','#0891b2','#be185d','#059669','#b45309'];
-    Object.entries(bA).forEach(([area,aItems],ai)=>{
-      let aap=0,aar=0;
-      const productos=[];
+    Object.entries(bA).forEach(([area,aItems])=>{
+      let aap=0,aar=0;const productos=[];
       aItems.forEach((r,ri)=>{
         const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
         const rk=rKey(r);const rdReal=re[rk]||re[oi]||Array(7).fill(0);
@@ -2653,171 +2407,46 @@ function generarInformePDF(){
         if(!pv&&!rv)return;
         aap+=pv;aar+=rv;
         const pct=pv>0?Math.round(rv/pv*100):null;
-        const col=PALETA[ri%PALETA.length];
-        productos.push({nombre:r.producto,pv,rv,pct,col});
+        const prodMaePDF=st.Pr.find(px=>px.nombre===r.producto&&px.empresa_id===r.empresa_id);
+        const pgPDF=prodMaePDF?.peso_gramos?parseFloat(prodMaePDF.peso_gramos):null;
+        productos.push({nombre:r.producto,pv,rv,pct,col:PALETA[ri%PALETA.length],pg:pgPDF});
       });
       if(!productos.length)return;
       const pctArea=aap>0?Math.round(aar/aap*100):0;
       const colorArea=pctArea>=90?'#16a34a':pctArea>=70?'#d97706':'#dc2626';
-
-      // Tabla de productos
-      let filasProd=productos.map(p=>`
-        <tr>
-          <td style="padding:4px 8px;font-size:11px;border-bottom:.5px solid #e5e7eb">
-            <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${p.col};margin-right:5px"></span>${p.nombre}
-          </td>
-          <td style="padding:4px 8px;font-size:11px;text-align:right;border-bottom:.5px solid #e5e7eb;color:#374151">${p.pv>0?p.pv.toLocaleString('es-AR'):'—'}</td>
-          <td style="padding:4px 8px;font-size:11px;text-align:right;border-bottom:.5px solid #e5e7eb;font-weight:600;color:${p.pct!==null?(p.pct>=90?'#16a34a':p.pct>=70?'#d97706':'#dc2626'):'#9ca3af'}">${p.rv>0?p.rv.toLocaleString('es-AR'):'—'}</td>
-          <td style="padding:4px 8px;font-size:11px;text-align:right;border-bottom:.5px solid #e5e7eb;font-weight:700;color:${p.pct!==null?(p.pct>=90?'#16a34a':p.pct>=70?'#d97706':'#dc2626'):'#9ca3af'}">${p.pct!==null?p.pct+'%':'—'}</td>
-        </tr>`).join('');
-
-      familiaCards+=`
-        <div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:20px;break-inside:avoid;page-break-inside:avoid">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:16px">
-            <span style="width:10px;height:10px;border-radius:50%;background:${empColor};display:inline-block"></span>
-            <span style="font-size:10px;color:#6b7280">${nm}</span>
-            <span style="font-size:15px;font-weight:700;color:#111827;margin-left:4px">${area}</span>
-          </div>
-          <div style="display:flex;align-items:center;gap:20px">
-            <div style="flex-shrink:0">${svgTorta(pctArea,colorArea,130)}</div>
-            <div style="flex:1;min-width:0">
-              <table style="width:100%;border-collapse:collapse">
-                <thead><tr style="background:#f9fafb">
-                  <th style="padding:4px 8px;font-size:10px;color:#6b7280;text-align:left;border-bottom:1px solid #e5e7eb">Producto</th>
-                  <th style="padding:4px 8px;font-size:10px;color:#6b7280;text-align:right;border-bottom:1px solid #e5e7eb">Plan</th>
-                  <th style="padding:4px 8px;font-size:10px;color:#6b7280;text-align:right;border-bottom:1px solid #e5e7eb">Real</th>
-                  <th style="padding:4px 8px;font-size:10px;color:#6b7280;text-align:right;border-bottom:1px solid #e5e7eb">%</th>
-                </tr></thead>
-                <tbody>${filasProd}</tbody>
-                <tfoot><tr style="background:#f3f4f6">
-                  <td style="padding:4px 8px;font-size:11px;font-weight:700;border-top:1.5px solid #d1d5db">Total</td>
-                  <td style="padding:4px 8px;font-size:11px;text-align:right;font-weight:700;border-top:1.5px solid #d1d5db">${aap.toLocaleString('es-AR')}</td>
-                  <td style="padding:4px 8px;font-size:11px;text-align:right;font-weight:700;color:${colorArea};border-top:1.5px solid #d1d5db">${aar.toLocaleString('es-AR')}</td>
-                  <td style="padding:4px 8px;font-size:11px;text-align:right;font-weight:700;color:${colorArea};border-top:1.5px solid #d1d5db">${pctArea}%</td>
-                </tfoot>
-              </table>
-            </div>
-          </div>
-        </div>`;
+      const fmtKgPDF=v=>v===null?'—':(v<1?v.toFixed(2):v.toFixed(1));
+      const filasProd=productos.map(p=>{
+        const kgP=p.pg!==null?p.pv*p.pg/1000:null;
+        const kgR=p.pg!==null?p.rv*p.pg/1000:null;
+        const col=p.pct!==null?(p.pct>=90?'#16a34a':p.pct>=70?'#d97706':'#dc2626'):'#9ca3af';
+        return `<tr><td style="padding:4px 8px;font-size:11px;border-bottom:.5px solid #e5e7eb"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${p.col};margin-right:5px"></span>${p.nombre}</td><td style="padding:4px 8px;font-size:11px;text-align:right;border-bottom:.5px solid #e5e7eb">${p.pv>0?p.pv.toLocaleString('es-AR'):'—'}</td><td style="padding:4px 8px;font-size:11px;text-align:right;font-weight:600;border-bottom:.5px solid #e5e7eb;color:${col}">${p.rv>0?p.rv.toLocaleString('es-AR'):'—'}</td><td style="padding:4px 8px;font-size:11px;text-align:right;font-weight:700;border-bottom:.5px solid #e5e7eb;color:${col}">${p.pct!==null?p.pct+'%':'—'}</td><td style="padding:4px 8px;font-size:11px;text-align:right;border-bottom:.5px solid #e5e7eb;color:#2563eb">${fmtKgPDF(kgP)}</td><td style="padding:4px 8px;font-size:11px;text-align:right;font-weight:600;border-bottom:.5px solid #e5e7eb;color:${col}">${fmtKgPDF(kgR)}</td></tr>`;
+      }).join('');
+      const kgPlanArea=productos.reduce((s,p)=>s+(p.pg!==null?p.pv*p.pg/1000:0),0);
+      const kgRealArea=productos.reduce((s,p)=>s+(p.pg!==null?p.rv*p.pg/1000:0),0);
+      const hayKg=productos.some(p=>p.pg!==null);
+      familiaCards+=`<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:20px;break-inside:avoid;page-break-inside:avoid"><div style="display:flex;align-items:center;gap:6px;margin-bottom:14px"><span style="width:10px;height:10px;border-radius:50%;background:${empColor};display:inline-block"></span><span style="font-size:10px;color:#6b7280">${nm}</span><span style="font-size:15px;font-weight:700;color:#111827;margin-left:4px">${area}</span></div><div style="display:flex;align-items:center;gap:20px"><div style="flex-shrink:0">${svgTorta(pctArea,colorArea)}</div><div style="flex:1;min-width:0"><table style="width:100%;border-collapse:collapse"><thead><tr style="background:#f9fafb"><th style="padding:4px 8px;font-size:10px;color:#6b7280;text-align:left;border-bottom:1px solid #e5e7eb">Producto</th><th style="padding:4px 8px;font-size:10px;color:#6b7280;text-align:right;border-bottom:1px solid #e5e7eb">Plan</th><th style="padding:4px 8px;font-size:10px;color:#6b7280;text-align:right;border-bottom:1px solid #e5e7eb">Real</th><th style="padding:4px 8px;font-size:10px;color:#6b7280;text-align:right;border-bottom:1px solid #e5e7eb">%</th>${hayKg?'<th style="padding:4px 8px;font-size:10px;color:#2563eb;text-align:right;border-bottom:1px solid #e5e7eb">Kg Plan</th><th style="padding:4px 8px;font-size:10px;color:#16a34a;text-align:right;border-bottom:1px solid #e5e7eb">Kg Real</th>':''}</tr></thead><tbody>${filasProd}</tbody><tfoot><tr style="background:#f3f4f6"><td style="padding:4px 8px;font-size:11px;font-weight:700;border-top:1.5px solid #d1d5db">Total</td><td style="padding:4px 8px;font-size:11px;text-align:right;font-weight:700;border-top:1.5px solid #d1d5db">${aap.toLocaleString('es-AR')}</td><td style="padding:4px 8px;font-size:11px;text-align:right;font-weight:700;color:${colorArea};border-top:1.5px solid #d1d5db">${aar.toLocaleString('es-AR')}</td><td style="padding:4px 8px;font-size:11px;text-align:right;font-weight:700;color:${colorArea};border-top:1.5px solid #d1d5db">${pctArea}%</td>${hayKg?`<td style="padding:4px 8px;font-size:11px;text-align:right;font-weight:700;color:#2563eb;border-top:1.5px solid #d1d5db">${kgPlanArea.toFixed(1)}</td><td style="padding:4px 8px;font-size:11px;text-align:right;font-weight:700;color:${colorArea};border-top:1.5px solid #d1d5db">${kgRealArea.toFixed(1)}</td>`:''}</tfoot></table></div></div></div>`;
     });
   });
-
-  // Desvíos
   const causasInforme=ef==='all'?st.causas.filter(c=>c.semana===k):st.causas.filter(c=>c.semana===k&&c.empresa_id===ef);
   let desviosHTML='';
   if(causasInforme.length){
     const DIAS_NOM=['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
-    let filasCausas=causasInforme.map(c=>{
+    const filasCausas=causasInforme.map(c=>{
       const emp=st.E.find(e=>e.id===c.empresa_id);
       const empColor=ec(c.empresa_id)||'#1B3A6B';
-      const diaNom=DIAS_NOM[c.dia]||`Día ${c.dia+1}`;
       const causaColor=c.causa==='Falta de MP'?'#dc2626':c.causa==='Problema mecánico'?'#d97706':c.causa==='Falta de personal'?'#7c3aed':'#374151';
       const causaBg=c.causa==='Falta de MP'?'#fef2f2':c.causa==='Problema mecánico'?'#fffbeb':c.causa==='Falta de personal'?'#f5f3ff':'#f9fafb';
-      return `<tr>
-        <td style="padding:6px 10px;font-size:11px;border-bottom:.5px solid #fca5a5">
-          <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${empColor};margin-right:5px"></span>${emp?.nombre||''}
-        </td>
-        <td style="padding:6px 10px;font-size:11px;color:#6b7280;border-bottom:.5px solid #fca5a5">${c.area}</td>
-        <td style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:.5px solid #fca5a5">${c.producto}</td>
-        <td style="padding:6px 10px;font-size:11px;text-align:center;border-bottom:.5px solid #fca5a5">${diaNom}</td>
-        <td style="padding:6px 10px;border-bottom:.5px solid #fca5a5">
-          <span style="background:${causaBg};color:${causaColor};padding:1px 7px;border-radius:10px;font-size:10px;font-weight:600">${c.causa}</span>
-        </td>
-        <td style="padding:6px 10px;font-size:11px;color:#6b7280;border-bottom:.5px solid #fca5a5">${c.observacion||'—'}</td>
-      </tr>`;
+      return `<tr><td style="padding:6px 10px;font-size:11px;border-bottom:.5px solid #fca5a5"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${empColor};margin-right:5px"></span>${emp?.nombre||''}</td><td style="padding:6px 10px;font-size:11px;color:#6b7280;border-bottom:.5px solid #fca5a5">${c.area}</td><td style="padding:6px 10px;font-size:11px;font-weight:600;border-bottom:.5px solid #fca5a5">${c.producto}</td><td style="padding:6px 10px;font-size:11px;text-align:center;border-bottom:.5px solid #fca5a5">${DIAS_NOM[c.dia]||''}</td><td style="padding:6px 10px;border-bottom:.5px solid #fca5a5"><span style="background:${causaBg};color:${causaColor};padding:1px 7px;border-radius:10px;font-size:10px;font-weight:600">${c.causa}</span></td><td style="padding:6px 10px;font-size:11px;color:#6b7280;border-bottom:.5px solid #fca5a5">${c.observacion||'—'}</td></tr>`;
     }).join('');
-    desviosHTML=`<div style="margin-top:32px;break-inside:avoid">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;padding-bottom:8px;border-bottom:2px solid #dc2626">
-        <span style="font-size:16px">⚠️</span>
-        <span style="font-size:15px;font-weight:700;color:#dc2626">Desvíos registrados</span>
-        <span style="font-size:11px;color:#6b7280;background:#fef2f2;padding:1px 7px;border-radius:10px;border:1px solid #fca5a5;margin-left:4px">${causasInforme.length} desvío${causasInforme.length!==1?'s':''}</span>
-      </div>
-      <table style="width:100%;border-collapse:collapse;border:1px solid #fca5a5;border-radius:8px;overflow:hidden">
-        <thead><tr style="background:#fef2f2">
-          <th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;font-weight:600;border-bottom:1px solid #fca5a5">Empresa</th>
-          <th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;font-weight:600;border-bottom:1px solid #fca5a5">Área</th>
-          <th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;font-weight:600;border-bottom:1px solid #fca5a5">Producto</th>
-          <th style="padding:6px 10px;text-align:center;font-size:10px;color:#6b7280;font-weight:600;border-bottom:1px solid #fca5a5">Día</th>
-          <th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;font-weight:600;border-bottom:1px solid #fca5a5">Causa</th>
-          <th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;font-weight:600;border-bottom:1px solid #fca5a5">Observación</th>
-        </tr></thead>
-        <tbody>${filasCausas}</tbody>
-      </table>
-    </div>`;
+    desviosHTML=`<div style="margin-top:24px;break-inside:avoid"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #dc2626"><span style="font-size:16px">⚠️</span><span style="font-size:15px;font-weight:700;color:#dc2626">Desvíos registrados</span><span style="font-size:11px;background:#fef2f2;color:#6b7280;padding:1px 7px;border-radius:10px;border:1px solid #fca5a5;margin-left:4px">${causasInforme.length} desvío${causasInforme.length!==1?'s':''}</span></div><table style="width:100%;border-collapse:collapse;border:1px solid #fca5a5"><thead><tr style="background:#fef2f2"><th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;border-bottom:1px solid #fca5a5">Empresa</th><th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;border-bottom:1px solid #fca5a5">Área</th><th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;border-bottom:1px solid #fca5a5">Producto</th><th style="padding:6px 10px;text-align:center;font-size:10px;color:#6b7280;border-bottom:1px solid #fca5a5">Día</th><th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;border-bottom:1px solid #fca5a5">Causa</th><th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;border-bottom:1px solid #fca5a5">Observación</th></tr></thead><tbody>${filasCausas}</tbody></table></div>`;
   }
-
-  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/>
-  <title>Informe PDF — ${semLabel}</title>
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#111827}
-    .page{max-width:900px;margin:0 auto;background:#f1f5f9;padding:20px}
-    .header{background:linear-gradient(135deg,#1B3A6B 0%,#2563eb 100%);border-radius:16px;padding:28px 32px;color:#fff;margin-bottom:24px}
-    .header h1{font-size:22px;font-weight:800;margin-bottom:4px}
-    .header p{font-size:13px;opacity:.75}
-    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
-    .kpi{background:white;border:1px solid #e5e7eb;border-radius:12px;padding:16px;text-align:center}
-    .kpi-label{font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
-    .kpi-val{font-size:24px;font-weight:800}
-    .familias{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}
-    @media print{
-      @page{size:A4;margin:10mm}
-      body{background:white}
-      .page{padding:0;max-width:100%}
-      .header{border-radius:8px}
-      .familias{grid-template-columns:repeat(2,1fr)}
-    }
-  </style></head>
-  <body><div class="page">
-    <div class="header">
-      <h1>📊 Informe de Producción Semanal</h1>
-      <p>${semLabel} &nbsp;·&nbsp; ${fechaHoy}</p>
-    </div>
-    <div class="kpis">
-      <div class="kpi" style="border-color:${colorGlobal};border-width:2px">
-        <div class="kpi-label">Cumplimiento global</div>
-        <div class="kpi-val" style="color:${colorGlobal}">${pctGlobal}%</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">Total planificado</div>
-        <div class="kpi-val" style="color:#1B3A6B">${tp.toLocaleString('es-AR')}</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">Total producido</div>
-        <div class="kpi-val" style="color:#16a34a">${tr.toLocaleString('es-AR')}</div>
-      </div>
-      <div class="kpi">
-        <div class="kpi-label">Items cumplidos</div>
-        <div class="kpi-val" style="color:#374151">${cu}/${totalItems}</div>
-      </div>
-    </div>
-    <div class="familias">${familiaCards}</div>
-    ${desviosHTML}
-    <div style="margin-top:20px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center">
-      Generado desde PAPO · Plan de Producción · ${fechaHoy}
-    </div>
-  </div>
-  <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
-  </body></html>`;
-
-  // Abrir en ventana nueva con blob
+  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Informe PDF — ${semLabel}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#111827}.page{max-width:900px;margin:0 auto;background:#f1f5f9;padding:20px}.header{background:linear-gradient(135deg,#1B3A6B 0%,#2563eb 100%);border-radius:16px;padding:28px 32px;color:#fff;margin-bottom:24px}.header h1{font-size:22px;font-weight:800;margin-bottom:4px}.header p{font-size:13px;opacity:.75}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}.kpi{background:white;border:1px solid #e5e7eb;border-radius:12px;padding:16px;text-align:center}.kpi-label{font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}.kpi-val{font-size:24px;font-weight:800}.familias{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}@media print{@page{size:A4;margin:10mm}body{background:white}.page{padding:0;max-width:100%}}</style></head><body><div class="page"><div class="header"><h1>📊 Informe de Producción Semanal</h1><p>${semLabel} &nbsp;·&nbsp; ${fechaHoy}</p></div><div class="kpis"><div class="kpi" style="border-color:${colorGlobal};border-width:2px"><div class="kpi-label">Cumplimiento global</div><div class="kpi-val" style="color:${colorGlobal}">${pctGlobal}%</div></div><div class="kpi"><div class="kpi-label">Total planificado</div><div class="kpi-val" style="color:#1B3A6B">${tp.toLocaleString('es-AR')}</div></div><div class="kpi"><div class="kpi-label">Total producido</div><div class="kpi-val" style="color:#16a34a">${tr.toLocaleString('es-AR')}</div></div><div class="kpi"><div class="kpi-label">Items cumplidos</div><div class="kpi-val">${cu}/${totalItems}</div></div></div><div class="familias">${familiaCards}</div>${desviosHTML}<div style="margin-top:20px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center">PAPO · Plan de Producción · ${fechaHoy}</div></div><script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script></body></html>`;
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const w=window.open(url,'_blank');
   setTimeout(()=>URL.revokeObjectURL(url),30000);
-  if(!w){
-    // Fallback: inyectar en página
-    const area=document.getElementById('etq-print-area');
-    const match=html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
-    area.innerHTML=(match?match[1]:html).replace(/<script[\s\S]*?<\/script>/gi,'');
-    const styleEl=document.createElement('style');
-    styleEl.textContent='@media print{@page{size:A4;margin:10mm}}';
-    document.head.appendChild(styleEl);
-    window.print();
-    setTimeout(()=>{area.innerHTML='';styleEl.remove();},3000);
-  }
+  if(!w){alert('Habilitá popups para ver el PDF.');}
 }
-
 function renderCmp(){
   const k=document.getElementById('cwsel').value;const ef=document.getElementById('cesel').value;
   const el=document.getElementById('ccon');if(!k){el.innerHTML='';return}
@@ -2855,9 +2484,9 @@ function renderCmp(){
   const t=tc(k);const as=gas(plan);
   html+=`<div class="grid-card"><div style="overflow-x:auto"><table class="plan-grid"><thead><tr><th class="left">Empresa</th><th class="left">Area</th><th class="left">Producto</th>`;
   DAYS.forEach((d,i)=>{html+=`<th class="${i===t?'today-head':''}" colspan="2" style="font-size:11px">${d.slice(0,3)}</th>`});
-  html+=`<th>Plan</th><th>Real</th><th style="width:44px">%</th><th style="width:66px">Estado</th></tr><tr style="background:var(--bg2)"><th></th><th></th><th></th>`;
+  html+=`<th>Plan</th><th>Real</th><th style="width:60px;color:var(--blue)">Kg Plan</th><th style="width:60px;color:var(--green)">Kg Real</th><th style="width:44px">%</th><th style="width:66px">Estado</th></tr><tr style="background:var(--bg2)"><th></th><th></th><th></th>`;
   DAYS.forEach((_,i)=>{html+=`<th style="font-size:10px;font-weight:400;color:var(--text2);text-align:center;padding:3px${i===t?';background:var(--today-head)':''}">P</th><th style="font-size:10px;font-weight:400;color:var(--green);text-align:center;padding:3px${i===t?';background:var(--today-head)':''}">R</th>`});
-  html+=`<th></th><th></th><th></th><th></th></tr></thead><tbody>`;
+  html+=`<th></th><th></th><th></th><th></th><th></th><th></th></tr></thead><tbody>`;
   const bE={};plan.forEach(r=>{const eid=r.empresa_id||'_';if(!bE[eid])bE[eid]=[];bE[eid].push(r)});
   const ast=[];
   Object.entries(bE).forEach(([eid,items],gi)=>{
@@ -2873,6 +2502,12 @@ function renderCmp(){
         const t2=(r.days||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
         const t3=rdReal.reduce((a,b)=>a+(b||0),0);
         aap+=t2;aar+=t3;
+        // Kg: buscar peso_gramos del producto en el Maestro
+        const prodMae=st.Pr.find(px=>px.nombre===r.producto&&px.empresa_id===r.empresa_id);
+        const pg=prodMae?.peso_gramos?parseFloat(prodMae.peso_gramos):null;
+        const kgPlan=pg!==null?t2*pg/1000:null;
+        const kgReal=pg!==null?t3*pg/1000:null;
+        const fmtKg=v=>v===null?'--':(v<1?v.toFixed(2)+'kg':v.toFixed(1)+'kg');
         const p=t2>0?Math.round(t3/t2*100):0;
         const bdg=p>=90?'<span class="badge badge-ok">OK</span>':p>=70?'<span class="badge badge-warn">Parcial</span>':'<span class="badge badge-bad">Bajo</span>';
         html+=`<tr class="${gi>0&&ef&&ri===0&&ai===0?'emp-sep':!ef&&ri===0&&ai>0?'area-sep':''}">`;
@@ -2887,6 +2522,8 @@ function renderCmp(){
           html+=`<td class="day-cell${di===t?' today-col':''}" style="font-size:11px;font-weight:${rv>0?'600':'400'};color:${ok?'var(--green)':low?'var(--amber)':zero&&pv>0?'var(--red)':'var(--text2)'};background:${cbg}">${rv>0?rv:'--'}</td>`;
         }
         html+=`<td class="total-cell" style="font-size:12px">${fmt(t2)}</td><td class="total-cell" style="color:var(--green);font-size:12px">${fmt(t3)}</td>`;
+        html+=`<td style="text-align:right;font-size:11px;color:var(--blue)">${fmtKg(kgPlan)}</td>`;
+        html+=`<td style="text-align:right;font-size:11px;color:var(--green);font-weight:${kgReal!==null&&kgReal>0?'600':'400'}">${fmtKg(kgReal)}</td>`;
         html+=`<td style="text-align:center;font-size:12px;font-weight:600">${t2>0?p+'%':'--'}</td><td>${t2>0?bdg:'--'}</td></tr>`;
         ef=false;
       });
@@ -2972,6 +2609,7 @@ function rProdDetail(aid){
       <thead><tr><th style="width:44px">Orden</th><th style="min-width:150px">Producto</th><th style="width:100px">Unidad</th><th style="width:80px;text-align:center" title="Habilita campos de hora inicio, hora fin, desperdicio y cantidad al cargar producción">Det. proc.</th>
       <th style="width:80px;text-align:center" title="Cajas que salen de una tanda completa.">Caj/tanda</th>
       <th style="width:80px;text-align:center" title="Unidades por bandeja">Uds/band.</th>
+      <th style="width:80px;text-align:center" title="Peso en gramos por unidad de planificación (si planifica en docenas, el peso es de una docena)">Peso (g)</th>
       <th style="width:70px;text-align:center" title="¿Este producto lleva relleno?">Relleno</th>
       <th style="width:110px;text-align:center" title="Nombre del relleno (ej: Carne, Jamón, Pollo)">Tipo relleno</th>
       <th style="width:90px;text-align:center" title="Caliente = se elabora un día antes del pedido. Frío = mismo día.">Elaboración</th>
@@ -3003,6 +2641,12 @@ function rProdDetail(aid){
           <input type="number" min="1" step="1" value="${p.unidades_bandeja||''}" placeholder="Sin bandeja"
             onchange="updP('${p.id}','unidades_bandeja',this.value?parseInt(this.value):null)"
             style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        </td>
+        <td style="width:80px">
+          <input type="number" min="0" step="0.1" value="${p.peso_gramos||''}" placeholder="g"
+            onchange="updP('${p.id}','peso_gramos',this.value?parseFloat(this.value):null)"
+            style="width:100%;padding:4px 6px;font-size:12px;text-align:right;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
+            title="Peso en gramos por unidad de planificación"/>
         </td>
         <td style="width:80px;text-align:center">
           <label style="display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer">
