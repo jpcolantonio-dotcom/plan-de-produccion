@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.125</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.126</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -6048,11 +6048,9 @@ async function loadProy(){
   const fecha=document.getElementById('proy-fecha').value;
   const ef=document.getElementById('proy-esel').value;
   try{
-    let f=`fecha=eq.${fecha}`;
-    if(ef!=='all')f+=`&empresa_id=eq.${ef}`;
-    proyData=await get('proyeccion_diaria',f+'&order=area.asc,producto.asc');
+    // Cargar siempre todas las empresas para que el Resumen tenga datos completos
+    proyData=await get('proyeccion_diaria',`fecha=eq.${fecha}&order=area.asc,producto.asc`);
   }catch{proyData=[]}
-  // Cargar stock de Joselito para la fecha seleccionada
   try{
     stockJoselitoHoy=await get('stock_joselito',`fecha=eq.${fecha}`);
   }catch{stockJoselitoHoy=[]}
@@ -6062,7 +6060,12 @@ async function loadProy(){
 }
 
 function getProyItem(eid,area,prod){
-  return proyData.find(x=>String(x.empresa_id)===String(eid)&&x.area===area&&x.producto===prod)||null;
+  // Buscar primero con empresa+area+producto exacto
+  const exact=proyData.find(x=>String(x.empresa_id)===String(eid)&&x.area===area&&x.producto===prod);
+  if(exact)return exact;
+  // Fallback: solo area+producto (por si empresa_id viene en formato diferente)
+  return proyData.find(x=>x.area===area&&x.producto===prod&&String(x.empresa_id)===String(eid))||
+         proyData.find(x=>x.area===area&&x.producto===prod)||null;
 }
 
 function renderConteo(){
