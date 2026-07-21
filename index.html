@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.126</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.127</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -6394,21 +6394,20 @@ async function guardarVentas(){
 }
 
 async function upsertProy(fecha,eid,area,producto,unidad,campos){
-  const existing=proyData.find(x=>x.empresa_id===eid&&x.area===area&&x.producto===producto);
-  if(existing){
-    // Calcular nuevo saldo
-    const upd={...campos,updated_at:new Date().toISOString()};
-    const ns={...existing,...upd};
-    upd.saldo=(ns.stock||0)+(ns.a_elaborar||0)-(ns.vendedores||0)-(ns.tyc||0);
-    await fetch(`${SB}/rest/v1/proyeccion_diaria?id=eq.${existing.id}`,{
-      method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify(upd)
-    });
-    Object.assign(existing,upd);
-  } else {
-    const row={empresa_id:eid,fecha,area,producto,unidad,stock:0,a_elaborar:0,vendedores:0,tyc:0,...campos};
-    row.saldo=(row.stock||0)+(row.a_elaborar||0)-(row.vendedores||0)-(row.tyc||0);
-    const res=await ins('proyeccion_diaria',row);
-    if(res&&res[0])proyData.push(res[0]);
+  const row={empresa_id:eid,fecha,area,producto,unidad,stock:0,a_elaborar:0,vendedores:0,tyc:0,...campos};
+  row.saldo=(row.stock||0)+(row.a_elaborar||0)-(row.vendedores||0)-(row.tyc||0);
+  const res=await fetch(`${SB}/rest/v1/proyeccion_diaria?on_conflict=empresa_id,fecha,area,producto`,{
+    method:'POST',
+    headers:{...H,'Prefer':'resolution=merge-duplicates,return=representation'},
+    body:JSON.stringify(row)
+  });
+  if(!res.ok)throw new Error(await res.text());
+  const data=await res.json();
+  if(data&&data[0]){
+    // Actualizar proyData en memoria
+    const idx=proyData.findIndex(x=>String(x.empresa_id)===String(eid)&&x.area===area&&x.producto===producto&&x.fecha===fecha);
+    if(idx>=0)proyData[idx]={...proyData[idx],...data[0]};
+    else proyData.push(data[0]);
   }
 }
 
