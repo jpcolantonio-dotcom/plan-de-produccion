@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.121</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.122</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -8654,14 +8654,38 @@ async function previewStockJoselito(input){
     const wb=window.XLSX.read(buf,{type:'array'});
     const ws=wb.Sheets[wb.SheetNames[0]];
     const rows=window.XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
-    // Buscar fila de datos: empieza donde col A es un código que comienza con 302
-    const datos=[];
+    // El archivo puede tener múltiples bloques — acumular por código
+    // Col A = código 302xxx, Col U (índice 20) = stock
+    // Algunos valores usan punto como separador de miles (ej: 10.659 = 10659)
+    const acum={};
     for(const row of rows){
       const codigo=row[0]!=null?String(row[0]).trim():'';
-      if(!codigo.startsWith('302'))continue;
-      const stock=parseFloat(row[20])||0;
-      datos.push({codigo,stock});
+      if(!codigo.match(/^302\d+$/))continue;
+      let stockRaw=row[20];
+      if(stockRaw===null||stockRaw===undefined)continue;
+      let stock;
+      if(typeof stockRaw==='number'){
+        const str=stockRaw.toString();
+        // Si tiene exactamente 3 decimales, probablemente es separador de miles
+        if(str.includes('.')&&str.split('.')[1].length===3){
+          stock=Math.round(stockRaw*1000)/1000; // mantener como está, es real
+          // Pero si el entero es > 0 y decimales = 3 dígitos, es sep de miles
+          // ej: 10.659 → 10659, pero 0.94 → 0.94
+          if(Math.floor(stockRaw)>0){
+            stock=parseFloat(str.replace('.',''));
+          } else {
+            stock=stockRaw;
+          }
+        } else {
+          stock=stockRaw;
+        }
+      } else {
+        stock=parseFloat(String(stockRaw).replace(/\./g,'').replace(',','.'))||0;
+      }
+      if(!acum[codigo])acum[codigo]=0;
+      acum[codigo]+=stock;
     }
+    const datos=Object.entries(acum).map(([codigo,stock])=>({codigo,stock:Math.round(stock*100)/100}));
     if(!datos.length){
       throw new Error('No se encontraron filas con códigos 302xxx en la columna A.');
     }
