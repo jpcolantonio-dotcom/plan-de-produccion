@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.118</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.120</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2407,8 +2407,8 @@ function generarInformePDF(){
         if(!pv&&!rv)return;
         aap+=pv;aar+=rv;
         const pct=pv>0?Math.round(rv/pv*100):null;
-        const prodMaePDF=st.Pr.find(px=>px.nombre===r.producto&&px.empresa_id===r.empresa_id);
-        const pgPDF=prodMaePDF?.peso_gramos?parseFloat(prodMaePDF.peso_gramos):null;
+        const prodMaePDF=st.Pr.find(px=>px.nombre===r.producto&&String(px.empresa_id)===String(r.empresa_id)&&(st.A.find(a=>a.id===px.area_id)?.nombre||'')===(r.area||''))||st.Pr.find(px=>px.nombre===r.producto&&String(px.empresa_id)===String(r.empresa_id)&&(st.A.find(a=>a.id===px.area_id)?.nombre||'')===(r.area||''))||st.Pr.find(px=>px.nombre===r.producto&&String(px.empresa_id)===String(r.empresa_id))||st.Pr.find(px=>px.nombre===r.producto);
+        const pgPDF=prodMaePDF?.peso_gramos!=null?parseFloat(prodMaePDF.peso_gramos):null;
         productos.push({nombre:r.producto,pv,rv,pct,col:PALETA[ri%PALETA.length],pg:pgPDF});
       });
       if(!productos.length)return;
@@ -2436,8 +2436,8 @@ function generarInformePDF(){
     const rk=rKey(r);const rdReal=re[rk]||re[oi]||Array(7).fill(0);
     const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);
     const rv=rdReal.reduce((a,b)=>a+(b||0),0);
-    const prodM=st.Pr.find(px=>px.nombre===r.producto&&px.empresa_id===r.empresa_id);
-    const pg=prodM?.peso_gramos?parseFloat(prodM.peso_gramos):null;
+    const prodM=st.Pr.find(px=>px.nombre===r.producto&&String(px.empresa_id)===String(r.empresa_id)&&(st.A.find(a=>a.id===px.area_id)?.nombre||'')===(r.area||''))||st.Pr.find(px=>px.nombre===r.producto&&String(px.empresa_id)===String(r.empresa_id))||st.Pr.find(px=>px.nombre===r.producto);
+    const pg=prodM?.peso_gramos!=null?parseFloat(prodM.peso_gramos):null;
     if(pg!==null){
       const kgP=pv*pg/1000; const kgR=rv*pg/1000;
       kgPlanTotal+=kgP; kgRealTotal+=kgR;
@@ -2537,8 +2537,8 @@ function renderCmp(){
         const t3=rdReal.reduce((a,b)=>a+(b||0),0);
         aap+=t2;aar+=t3;
         // Kg: buscar peso_gramos del producto en el Maestro
-        const prodMae=st.Pr.find(px=>px.nombre===r.producto&&px.empresa_id===r.empresa_id);
-        const pg=prodMae?.peso_gramos?parseFloat(prodMae.peso_gramos):null;
+        const prodMae=st.Pr.find(px=>px.nombre===r.producto&&String(px.empresa_id)===String(r.empresa_id)&&(st.A.find(a=>a.id===px.area_id)?.nombre||'')===(r.area||''))||st.Pr.find(px=>px.nombre===r.producto&&String(px.empresa_id)===String(r.empresa_id)&&(st.A.find(a=>a.id===px.area_id)?.nombre||'')===(r.area||''))||st.Pr.find(px=>px.nombre===r.producto&&String(px.empresa_id)===String(r.empresa_id))||st.Pr.find(px=>px.nombre===r.producto);
+        const pg=prodMae?.peso_gramos!=null?parseFloat(prodMae.peso_gramos):null;
         const kgPlan=pg!==null?t2*pg/1000:null;
         const kgReal=pg!==null?t3*pg/1000:null;
         const fmtKg=v=>v===null?'--':(v<1?v.toFixed(2)+'kg':v.toFixed(1)+'kg');
