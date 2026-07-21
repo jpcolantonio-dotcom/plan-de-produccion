@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.122</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.124</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -8593,7 +8593,7 @@ async function volcarStockAConteo(){
       const area=st.A.find(a=>a.id===prod.area_id);
       if(!area)continue;
       // Upsert en proyeccion_diaria
-      const res=await fetch(`${SB}/rest/v1/proyeccion_diaria?on_conflict=fecha,empresa_id,area,producto`,{
+      const res=await fetch(`${SB}/rest/v1/proyeccion_diaria?on_conflict=empresa_id,fecha,area,producto`,{
         method:'POST',
         headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},
         body:JSON.stringify({
@@ -8604,7 +8604,11 @@ async function volcarStockAConteo(){
           stock:parseFloat(sj.stock)||0
         })
       });
-      if(res.ok){volcados++;}else{errores++;}
+      if(res.ok){volcados++;}else{
+        const txt=await res.text();
+        console.error('Error volcando',sj.codigo_articulo,':',txt);
+        errores++;
+      }
     }
     // Actualizar proyData en memoria para que el Resumen refleje los datos sin recargar
     stockData.forEach(sj=>{
@@ -8618,9 +8622,11 @@ async function volcarStockAConteo(){
       else{proyData.push({fecha,empresa_id:joselito.id,area:area.nombre,producto:prod.nombre,stock:parseFloat(sj.stock)||0});}
     });
     btn.innerHTML=orig;btn.disabled=false;
-    msgTxt.textContent=`${volcados} productos volcados al conteo de stock para el ${fecha}.${errores?` (${errores} errores)`:''}`;
+    msgTxt.textContent=`${volcados} productos volcados al conteo de stock para el ${fecha}.${errores?` (${errores} errores — ver consola F12)`:''}`;
     msgEl.style.display='';
-    setTimeout(()=>msgEl.style.display='none',4000);
+    setTimeout(()=>msgEl.style.display='none',5000);
+    // Recargar proyData para que el Resumen tome los datos frescos
+    await loadProy();
   }catch(e){
     btn.innerHTML=orig;btn.disabled=false;
     alert('Error: '+e.message);
