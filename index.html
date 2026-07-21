@@ -244,7 +244,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.124</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.125</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -6062,16 +6062,7 @@ async function loadProy(){
 }
 
 function getProyItem(eid,area,prod){
-  // Para productos con codigo_articulo (Joselito), usar stock importado si existe
-  const prodObj=st.Pr.find(p=>p.nombre===prod&&p.empresa_id===eid);
-  if(prodObj&&prodObj.codigo_articulo&&stockJoselitoHoy.length){
-    const sj=stockJoselitoHoy.find(s=>s.codigo_articulo===prodObj.codigo_articulo);
-    if(sj){
-      const proy=proyData.find(x=>x.empresa_id===eid&&x.area===area&&x.producto===prod)||{};
-      return Object.assign({},proy,{stock:parseFloat(sj.stock)||0});
-    }
-  }
-  return proyData.find(x=>x.empresa_id===eid&&x.area===area&&x.producto===prod)||null;
+  return proyData.find(x=>String(x.empresa_id)===String(eid)&&x.area===area&&x.producto===prod)||null;
 }
 
 function renderConteo(){
@@ -8625,6 +8616,12 @@ async function volcarStockAConteo(){
     msgTxt.textContent=`${volcados} productos volcados al conteo de stock para el ${fecha}.${errores?` (${errores} errores — ver consola F12)`:''}`;
     msgEl.style.display='';
     setTimeout(()=>msgEl.style.display='none',5000);
+    // Actualizar stockJoselitoHoy en memoria para que getProyItem tome los valores volcados
+    // (recargarlo desde la fecha correcta)
+    try{
+      const fechaProy=document.getElementById('proy-fecha').value||hoyLocal();
+      stockJoselitoHoy=await get('stock_joselito',`fecha=eq.${fecha}`);
+    }catch{}
     // Recargar proyData para que el Resumen tome los datos frescos
     await loadProy();
   }catch(e){
