@@ -9129,13 +9129,20 @@ async function toggleCapacitacion(empId,puestoId,nuevoEstado){
   const cap=getCap(empId,puestoId);
   try{
     if(cap){
-      await pat('capacitacion_empleados',cap.id,{
+      const upd={
         capacitado:nuevoEstado,
         fecha_inicio:nuevoEstado?null:cap.fecha_inicio,
         fecha_fin:nuevoEstado?null:cap.fecha_fin
+      };
+      const rpat=await fetch(`${SB}/rest/v1/capacitacion_empleados?id=eq.${cap.id}`,{
+        method:'PATCH',
+        headers:{...H,'Prefer':'return=representation'},
+        body:JSON.stringify(upd)
       });
-      cap.capacitado=nuevoEstado;
-      if(nuevoEstado){cap.fecha_inicio=null;cap.fecha_fin=null;}
+      if(!rpat.ok)throw new Error(await rpat.text());
+      const rows=await rpat.json();
+      if(!rows.length)throw new Error('El servidor no modificó ninguna fila (posible RLS activo en capacitacion_empleados)');
+      Object.assign(cap,upd);
     } else {
       const res=await fetch(`${SB}/rest/v1/capacitacion_empleados?on_conflict=empleado_id,puesto_id`,{
         method:'POST',
@@ -9144,7 +9151,8 @@ async function toggleCapacitacion(empId,puestoId,nuevoEstado){
       });
       if(!res.ok)throw new Error(await res.text());
       const data=await res.json();
-      if(data&&data[0])trenCapacitaciones.push(data[0]);
+      if(!data||!data.length)throw new Error('El servidor no devolvió la fila creada (posible RLS activo en capacitacion_empleados)');
+      trenCapacitaciones.push(data[0]);
     }
   }catch(e){
     // Revertir el checkbox si falla
@@ -9170,13 +9178,20 @@ async function guardarMatrizCapacitacion(){
     if(cap&&cap.capacitado===nuevoEstado)continue; // sin cambios
     try{
       if(cap){
-        await pat('capacitacion_empleados',cap.id,{
+        const upd={
           capacitado:nuevoEstado,
           fecha_inicio:nuevoEstado?null:cap.fecha_inicio,
           fecha_fin:nuevoEstado?null:cap.fecha_fin
+        };
+        const rpat=await fetch(`${SB}/rest/v1/capacitacion_empleados?id=eq.${cap.id}`,{
+          method:'PATCH',
+          headers:{...H,'Prefer':'return=representation'},
+          body:JSON.stringify(upd)
         });
-        cap.capacitado=nuevoEstado;
-        if(nuevoEstado){cap.fecha_inicio=null;cap.fecha_fin=null;}
+        if(!rpat.ok)throw new Error(await rpat.text());
+        const rowsPat=await rpat.json();
+        if(!rowsPat.length)throw new Error('RLS bloqueó el update');
+        Object.assign(cap,upd);
       } else {
         const res=await fetch(`${SB}/rest/v1/capacitacion_empleados?on_conflict=empleado_id,puesto_id`,{
           method:'POST',
@@ -9185,7 +9200,8 @@ async function guardarMatrizCapacitacion(){
         });
         if(!res.ok)throw new Error(await res.text());
         const data=await res.json();
-        if(data&&data[0])trenCapacitaciones.push(data[0]);
+        if(!data||!data.length)throw new Error('RLS bloqueó el insert');
+        trenCapacitaciones.push(data[0]);
       }
       guardados++;
     }catch(e){
