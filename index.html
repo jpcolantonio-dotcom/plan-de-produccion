@@ -9270,17 +9270,24 @@ function renderPlanEntrenamiento(){
 
 async function guardarPlanEntrenamiento(){
   const inputs=document.querySelectorAll('#tren-plan-content input[data-empid]');
-  let guardados=0;
-  try{
-    for(const inp of inputs){
-      const empId=parseInt(inp.dataset.empid);
-      const puestoId=parseInt(inp.dataset.puestoid);
-      const campo=inp.dataset.campo;
-      const valor=inp.value||null;
-      let cap=getCap(empId,puestoId);
+  let guardados=0,errores=0;
+  for(const inp of inputs){
+    const empId=parseInt(inp.dataset.empid);
+    const puestoId=parseInt(inp.dataset.puestoid);
+    const campo=inp.dataset.campo;
+    const valor=inp.value||null;
+    let cap=getCap(empId,puestoId);
+    try{
       if(!cap){
-        const res=await ins('capacitacion_empleados',{empleado_id:empId,puesto_id:puestoId,capacitado:false});
-        if(res&&res[0]){trenCapacitaciones.push(res[0]);cap=res[0];}
+        // Upsert por si el registro ya existe en la base aunque no esté en la caché local
+        const res=await fetch(`${SB}/rest/v1/capacitacion_empleados?on_conflict=empleado_id,puesto_id`,{
+          method:'POST',
+          headers:{...H,'Prefer':'resolution=merge-duplicates,return=representation'},
+          body:JSON.stringify({empleado_id:empId,puesto_id:puestoId,capacitado:false})
+        });
+        if(!res.ok)throw new Error(await res.text());
+        const data=await res.json();
+        if(data&&data[0]){cap=data[0];trenCapacitaciones.push(cap);}
       }
       if(cap){
         const upd=campo==='inicio'?{fecha_inicio:valor}:{fecha_fin:valor};
@@ -9288,9 +9295,12 @@ async function guardarPlanEntrenamiento(){
         Object.assign(cap,upd);
         guardados++;
       }
+    }catch(e){
+      console.error('Error guardando fecha',empId,puestoId,campo,':',e.message);
+      errores++;
     }
-    ss('online',`${guardados} fechas guardadas`);
-  }catch(e){ss('error',e.message)}
+  }
+  ss(errores?'error':'online',errores?`${guardados} guardadas, ${errores} con error (ver consola F12)`:`${guardados} fechas guardadas`);
 }
 
 // ── GESTIONAR PUESTOS ───────────────────────────────────────────
