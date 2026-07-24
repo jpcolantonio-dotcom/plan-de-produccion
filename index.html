@@ -238,6 +238,18 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   body > *:not(#etq-print-area){display:none!important}
   #etq-print-area{display:block!important;margin:0;padding:0}
   @page{size:105mm 150mm;margin:0}
+/* FECHAS ENTRENAMIENTO: ocultar dd/mm/aaaa nativo cuando esta vacio */
+.tren-fecha-input:not(.has-value)::-webkit-datetime-edit-day-field,
+.tren-fecha-input:not(.has-value)::-webkit-datetime-edit-month-field,
+.tren-fecha-input:not(.has-value)::-webkit-datetime-edit-year-field,
+.tren-fecha-input:not(.has-value)::-webkit-datetime-edit-text{
+  color:transparent;
+}
+.tren-fecha-input.has-value::-webkit-datetime-edit-day-field,
+.tren-fecha-input.has-value::-webkit-datetime-edit-month-field,
+.tren-fecha-input.has-value::-webkit-datetime-edit-year-field,
+.tren-fecha-input.has-value::-webkit-datetime-edit-text{
+  color:var(--text);
 }
 </style>
 </head>
@@ -9250,11 +9262,11 @@ function renderPlanEntrenamiento(){
           const ff=cap?.fecha_fin||'';
           html+=`<td style="padding:4px 6px;border:.5px solid var(--border);background:${bg}">
             <div style="display:flex;flex-direction:column;gap:3px">
-              <input type="date" data-empid="${e.id}" data-puestoid="${p.id}" data-campo="inicio"
-                value="${fi}" placeholder="Inicio"
+              <input type="date" class="tren-fecha-input${fi?' has-value':''}" data-empid="${e.id}" data-puestoid="${p.id}" data-campo="inicio"
+                value="${fi}" placeholder="Inicio" oninput="this.classList.toggle('has-value',!!this.value)"
                 style="width:100%;padding:3px 5px;font-size:11px;border:.5px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--text)"/>
-              <input type="date" data-empid="${e.id}" data-puestoid="${p.id}" data-campo="fin"
-                value="${ff}" placeholder="Fin"
+              <input type="date" class="tren-fecha-input${ff?' has-value':''}" data-empid="${e.id}" data-puestoid="${p.id}" data-campo="fin"
+                value="${ff}" placeholder="Fin" oninput="this.classList.toggle('has-value',!!this.value)"
                 style="width:100%;padding:3px 5px;font-size:11px;border:.5px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--text)"/>
             </div>
           </td>`;
@@ -9291,7 +9303,14 @@ async function guardarPlanEntrenamiento(){
       }
       if(cap){
         const upd=campo==='inicio'?{fecha_inicio:valor}:{fecha_fin:valor};
-        await pat('capacitacion_empleados',cap.id,upd);
+        const rpat=await fetch(`${SB}/rest/v1/capacitacion_empleados?id=eq.${cap.id}`,{
+          method:'PATCH',
+          headers:{...H,'Prefer':'return=representation'},
+          body:JSON.stringify(upd)
+        });
+        if(!rpat.ok)throw new Error(await rpat.text());
+        const rows=await rpat.json();
+        if(!rows.length)throw new Error('El servidor no modificó ninguna fila (posible RLS activo en capacitacion_empleados)');
         Object.assign(cap,upd);
         guardados++;
       }
