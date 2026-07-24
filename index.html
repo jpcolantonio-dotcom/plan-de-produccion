@@ -238,19 +238,8 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   body > *:not(#etq-print-area){display:none!important}
   #etq-print-area{display:block!important;margin:0;padding:0}
   @page{size:105mm 150mm;margin:0}
-/* FECHAS ENTRENAMIENTO: ocultar dd/mm/aaaa nativo cuando esta vacio */
-.tren-fecha-input:not(.has-value)::-webkit-datetime-edit-day-field,
-.tren-fecha-input:not(.has-value)::-webkit-datetime-edit-month-field,
-.tren-fecha-input:not(.has-value)::-webkit-datetime-edit-year-field,
-.tren-fecha-input:not(.has-value)::-webkit-datetime-edit-text{
-  color:transparent;
-}
-.tren-fecha-input.has-value::-webkit-datetime-edit-day-field,
-.tren-fecha-input.has-value::-webkit-datetime-edit-month-field,
-.tren-fecha-input.has-value::-webkit-datetime-edit-year-field,
-.tren-fecha-input.has-value::-webkit-datetime-edit-text{
-  color:var(--text);
-}
+/* FECHAS ENTRENAMIENTO: boton "+ Fecha" hasta elegir una (ver renderFechaPicker) */
+.tren-fecha-btn:hover{border-color:var(--blue)!important;background:var(--bg2)!important}
 </style>
 </head>
 <body>
@@ -9209,6 +9198,33 @@ async function guardarMatrizCapacitacion(){
 }
 
 // ── PLAN DE ENTRENAMIENTO ───────────────────────────────────────
+function fmtFechaCorta(iso){
+  if(!iso)return'';
+  const[y,m,d]=iso.split('-');
+  return`${d}/${m}/${y}`;
+}
+
+function renderFechaPicker(empId,puestoId,campo,val,label){
+  const disp=val?fmtFechaCorta(val):`+ ${label}`;
+  return`<div style="position:relative">
+    <input type="date" class="tren-fecha-real" data-empid="${empId}" data-puestoid="${puestoId}" data-campo="${campo}"
+      value="${val}" onchange="actualizarFechaDisplay(this)"
+      style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0;margin:0"/>
+    <button type="button" tabindex="-1" class="tren-fecha-btn"
+      style="width:100%;padding:3px 5px;font-size:11px;border:.5px dashed var(--border2);border-radius:4px;background:var(--bg);color:${val?'var(--text)':'var(--text3)'};cursor:pointer;text-align:center;pointer-events:none">
+      ${disp}
+    </button>
+  </div>`;
+}
+
+function actualizarFechaDisplay(inp){
+  const btn=inp.nextElementSibling;
+  const val=inp.value;
+  const label=inp.dataset.campo==='inicio'?'Inicio':'Fin';
+  btn.textContent=val?fmtFechaCorta(val):`+ ${label}`;
+  btn.style.color=val?'var(--text)':'var(--text3)';
+}
+
 function renderPlanEntrenamiento(){
   const el=document.getElementById('tren-plan-content');
   if(!trenPuestos.length||!trenEmpleadosData.length){
@@ -9262,12 +9278,8 @@ function renderPlanEntrenamiento(){
           const ff=cap?.fecha_fin||'';
           html+=`<td style="padding:4px 6px;border:.5px solid var(--border);background:${bg}">
             <div style="display:flex;flex-direction:column;gap:3px">
-              <input type="date" class="tren-fecha-input${fi?' has-value':''}" data-empid="${e.id}" data-puestoid="${p.id}" data-campo="inicio"
-                value="${fi}" placeholder="Inicio" oninput="this.classList.toggle('has-value',!!this.value)"
-                style="width:100%;padding:3px 5px;font-size:11px;border:.5px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--text)"/>
-              <input type="date" class="tren-fecha-input${ff?' has-value':''}" data-empid="${e.id}" data-puestoid="${p.id}" data-campo="fin"
-                value="${ff}" placeholder="Fin" oninput="this.classList.toggle('has-value',!!this.value)"
-                style="width:100%;padding:3px 5px;font-size:11px;border:.5px solid var(--border2);border-radius:4px;background:var(--bg);color:var(--text)"/>
+              ${renderFechaPicker(e.id,p.id,'inicio',fi,'Inicio')}
+              ${renderFechaPicker(e.id,p.id,'fin',ff,'Fin')}
             </div>
           </td>`;
         }
