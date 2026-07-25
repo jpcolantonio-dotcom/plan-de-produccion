@@ -9306,12 +9306,13 @@ function renderPlanEntrenamiento(){
 
 async function guardarPlanEntrenamiento(){
   const inputs=document.querySelectorAll('#tren-plan-content input[data-empid]');
-  let guardados=0,errores=0;
+  let guardados=0,errores=0,primerError='';
   for(const inp of inputs){
     const empId=inp.dataset.empid;
     const puestoId=inp.dataset.puestoid;
     const campo=inp.dataset.campo;
     const valor=inp.value||null;
+    if(!valor)continue; // celda vacía, nada que guardar
     let cap=getCap(empId,puestoId);
     try{
       if(!cap){
@@ -9323,27 +9324,29 @@ async function guardarPlanEntrenamiento(){
         });
         if(!res.ok)throw new Error(await res.text());
         const data=await res.json();
-        if(data&&data[0]){cap=data[0];trenCapacitaciones.push(cap);}
+        if(!data||!data.length)throw new Error('El servidor no devolvió ninguna fila al crear el registro');
+        cap=data[0];
+        const idx=trenCapacitaciones.findIndex(c=>String(c.empleado_id)===String(empId)&&String(c.puesto_id)===String(puestoId));
+        if(idx>=0)trenCapacitaciones[idx]=cap;else trenCapacitaciones.push(cap);
       }
-      if(cap){
-        const upd=campo==='inicio'?{fecha_inicio:valor}:{fecha_fin:valor};
-        const rpat=await fetch(`${SB}/rest/v1/capacitacion_empleados?id=eq.${cap.id}`,{
-          method:'PATCH',
-          headers:{...H,'Prefer':'return=representation'},
-          body:JSON.stringify(upd)
-        });
-        if(!rpat.ok)throw new Error(await rpat.text());
-        const rows=await rpat.json();
-        if(!rows.length)throw new Error('El servidor no modificó ninguna fila (posible RLS activo en capacitacion_empleados)');
-        Object.assign(cap,upd);
-        guardados++;
-      }
+      const upd=campo==='inicio'?{fecha_inicio:valor}:{fecha_fin:valor};
+      const rpat=await fetch(`${SB}/rest/v1/capacitacion_empleados?id=eq.${cap.id}`,{
+        method:'PATCH',
+        headers:{...H,'Prefer':'return=representation'},
+        body:JSON.stringify(upd)
+      });
+      if(!rpat.ok)throw new Error(await rpat.text());
+      const rows=await rpat.json();
+      if(!rows.length)throw new Error('El servidor no modificó ninguna fila (posible RLS activo en capacitacion_empleados)');
+      Object.assign(cap,upd);
+      guardados++;
     }catch(e){
       console.error('Error guardando fecha',empId,puestoId,campo,':',e.message);
+      if(!primerError)primerError=e.message;
       errores++;
     }
   }
-  ss(errores?'error':'online',errores?`${guardados} guardadas, ${errores} con error (ver consola F12)`:`${guardados} fechas guardadas`);
+  ss(errores?'error':'online',errores?`${guardados} guardadas, ${errores} con error: ${primerError}`:`${guardados} fechas guardadas`);
 }
 
 // ── GESTIONAR PUESTOS ───────────────────────────────────────────
