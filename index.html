@@ -245,7 +245,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.127</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.128</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2324,7 +2324,7 @@ async function renderCmpMensual(){
 
 
 
-function generarInformePDF(){
+async function generarInformePDF(){
   const k=document.getElementById('cwsel').value;
   const ef=document.getElementById('cesel').value;
   if(!k){alert('Seleccioná una semana primero.');return}
@@ -2334,16 +2334,6 @@ function generarInformePDF(){
   const re=st.R[k]||{};
   const semLabel=document.getElementById('cwsel').selectedOptions[0]?.textContent||k;
   const fechaHoy=new Date().toLocaleDateString('es-AR',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  let tp=0,tr=0,cu=0,totalItems=0;
-  plan.forEach(r=>{
-    const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
-    const rk=rKey(r);const rdReal=re[rk]||re[oi]||Array(7).fill(0);
-    const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);
-    const rv=rdReal.reduce((a,b)=>a+(b||0),0);
-    tp+=pv;tr+=rv;if(rv>=pv&&pv>0)cu++;if(pv>0)totalItems++;
-  });
-  const pctGlobal=tp>0?Math.round(tr/tp*100):0;
-  const colorGlobal=pctGlobal>=90?'#16a34a':pctGlobal>=70?'#d97706':'#dc2626';
   function svgTorta(pct,color,size=130){
     const r=size/2-8;const cx=size/2;const cy=size/2;
     if(pct>=100)return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}"/><text x="${cx}" y="${cy+2}" text-anchor="middle" dominant-baseline="middle" font-size="22" font-weight="800" fill="white">100%</text></svg>`;
@@ -2356,7 +2346,11 @@ function generarInformePDF(){
   }
   const bE={};plan.forEach(r=>{const eid=r.empresa_id||'_';if(!bE[eid])bE[eid]=[];bE[eid].push(r)});
   const PALETA=['#3b82f6','#16a34a','#d97706','#7c3aed','#dc2626','#0891b2','#be185d','#059669','#b45309'];
-  const causasInforme=ef==='all'?st.causas.filter(c=>c.semana===k):st.causas.filter(c=>c.semana===k&&c.empresa_id===ef);
+  let causasInforme=[];
+  try{
+    const fCausas=ef==='all'?`semana=eq.${k}`:`semana=eq.${k}&empresa_id=eq.${ef}`;
+    causasInforme=await get('causas',fCausas);
+  }catch(e){console.error('Error cargando desvíos para el informe:',e);causasInforme=[];}
   let familiaCards='';
   Object.entries(bE).forEach(([eid,items])=>{
     const nm=en(eid)||'Sin empresa';
@@ -2420,6 +2414,8 @@ function generarInformePDF(){
   });
   const hayKgGlobal=kgPlanTotal>0||kgRealTotal>0;
   const fmtKgT=v=>v<1?v.toFixed(1):Math.round(v).toLocaleString('es-AR');
+  const pctGlobal=kgPlanTotal>0?Math.round(kgRealTotal/kgPlanTotal*100):0;
+  const colorGlobal=pctGlobal>=90?'#16a34a':pctGlobal>=70?'#d97706':'#dc2626';
 
   // KPIs de Kg por empresa
   const kpiEmpresas=Object.entries(kgPorEmp).map(([eid,d])=>{
@@ -2953,10 +2949,21 @@ async function updP(id,f,v){
         await propagarCambioNombreProducto(prod.empresa_id, prod.nombre, v, prod.area_id);
       }
     }
-    await pat('productos',id,{[f]:v});
-    const p=st.Pr.find(x=>x.id===id);if(p)p[f]=v;
+    const res=await fetch(`${SB}/rest/v1/productos?id=eq.${id}`,{
+      method:'PATCH',
+      headers:{...H,'Prefer':'return=representation'},
+      body:JSON.stringify({[f]:v})
+    });
+    if(!res.ok)throw new Error(await res.text());
+    const rows=await res.json();
+    if(!rows.length)throw new Error('El servidor no modificó ninguna fila (revisá que RLS esté deshabilitado en la tabla productos)');
+    const p=st.Pr.find(x=>x.id===id);if(p)Object.assign(p,rows[0]);
+    ss('online','Guardado');
   }
-  catch(e){ss('error','Error al actualizar')}
+  catch(e){
+    ss('error','Error al actualizar');
+    alert('No se pudo guardar el cambio: '+e.message);
+  }
 }
 
 async function propagarCambioNombreProducto(empresa_id, nombreViejo, nombreNuevo, area_id){
