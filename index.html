@@ -245,7 +245,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.136</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.137</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -9354,7 +9354,29 @@ function renderMatrizCapacitacion(){
       });
       html+=`</tr>`;
     });
-    html+=`</tbody></table></div>`;
+    // Resumen por puesto: total, promedio y cantidad de gente en cada nivel
+    const resumenPorPuesto=puestosDeEsta.map(p=>{
+      const niveles=empsDeEsta.map(e=>{const cap=getCap(e.id,p.id);return cap?.nivel!=null?cap.nivel:0;});
+      const total=niveles.reduce((s,n)=>s+n,0);
+      const prom=niveles.length?total/niveles.length:0;
+      const cant=[0,0,0,0];
+      niveles.forEach(n=>{cant[n]=(cant[n]||0)+1;});
+      return{total,prom,cant};
+    });
+    html+=`</tbody><tfoot>
+      <tr style="border-top:2px solid var(--border2)">
+        <td style="padding:6px 12px;font-size:11px;font-weight:700;color:var(--text2);background:var(--surface2);position:sticky;left:0;z-index:1">Total</td>
+        ${resumenPorPuesto.map(r=>`<td style="text-align:center;padding:5px;font-size:12px;font-weight:700;border:.5px solid var(--border);background:var(--surface2)">${r.total}</td>`).join('')}
+      </tr>
+      <tr>
+        <td style="padding:6px 12px;font-size:11px;font-weight:700;color:var(--text2);background:var(--surface2);position:sticky;left:0;z-index:1">Promedio</td>
+        ${resumenPorPuesto.map(r=>`<td style="text-align:center;padding:5px;font-size:12px;font-weight:700;color:var(--blue);border:.5px solid var(--border);background:var(--surface2)">${r.prom.toFixed(1)}</td>`).join('')}
+      </tr>
+      ${[0,1,2,3].map(niv=>`<tr>
+        <td style="padding:5px 12px;font-size:11px;color:var(--text2);background:var(--bg);position:sticky;left:0;z-index:1">Nivel ${niv}</td>
+        ${resumenPorPuesto.map(r=>`<td style="text-align:center;padding:4px;font-size:11px;border:.5px solid var(--border);${nivelEstilo(niv)};font-weight:${r.cant[niv]>0?'700':'400'};opacity:${r.cant[niv]>0?'1':'.35'}">${r.cant[niv]}</td>`).join('')}
+      </tr>`).join('')}
+    </tfoot></table></div>`;
   });
 
   el.innerHTML=html||'<div class="empty">Seleccioná una empresa con puestos configurados.</div>';
