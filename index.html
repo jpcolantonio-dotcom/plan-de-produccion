@@ -245,7 +245,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.133</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.134</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -4483,7 +4483,7 @@ function generarTablasPDF(eid){
       const famObj=famsDep.find(f=>f.codigo===famCod);
       const capPorFam={};
       famsDep.forEach(f=>{const tF=torres.filter(t=>t.familia===f.codigo);capPorFam[f.codigo]=tF.reduce((s,t)=>s+t.cantidad*t.altura_cajas*(t.estantes||1)*(t.doble?2:1),0);});
-      const capFam=famObj&&capPorFam[famCod]?capPorFam[famCod]:capTotal;
+      const capFam=famObj?(capPorFam[famCod]||0):capTotal;
       const torresFam=famObj?torres.filter(t=>t.familia===famCod):torres;
       const alturaRef=torresFam.length?torresFam[0].altura_cajas:(torres[0]?.altura_cajas||8);
       const estRef=torresFam.length?(torresFam[0].estantes||1):(torres[0]?.estantes||1);
@@ -4512,7 +4512,7 @@ function generarTablasPDF(eid){
       const torresExactas=mixFam.map(({p,pct,ujc})=>{
         const pctNorm=sumPctFam>0?(pct/sumPctFam)*100:100/nProds;
         const torresExtra=torresParaDistribuir*(pctNorm/100);
-        const torresRaw=1+torresExtra;
+        const torresRaw=torresReales>0?(1+torresExtra):0;
         const torresBase=Math.floor(torresRaw);
         const fraccion=torresRaw-torresBase;
         return{p,pct,pctNorm,ujc,torresBase,fraccion,torresExtra:0};
@@ -4623,7 +4623,7 @@ async function renderDepCalc(){
 
     Object.entries(prodsPorFam).forEach(([famCod,fProds])=>{
       const famObj=famsDep2.find(f=>f.codigo===famCod);
-      const capFam=famObj&&capPorFam[famCod]?capPorFam[famCod]:capTotal;
+      const capFam=famObj?(capPorFam[famCod]||0):capTotal;
       const torresFam=famObj?torres.filter(t=>t.familia===famCod):torres;
       // Calcular unidad mínima de asignación: una torre individual (doble = adelante+atrás juntas)
       // Una torre doble NUNCA se puede dividir entre dos variedades
@@ -4683,7 +4683,7 @@ async function renderDepCalc(){
       const torresExactas=mixFam.map(({p,pct,ujc})=>{
         const pctNorm=sumPctFam>0?(pct/sumPctFam)*100:100/nProds;
         const torresExtra=torresParaDistribuir*(pctNorm/100);
-        const torresRaw=1+torresExtra; // mínimo 1 + proporcional
+        const torresRaw=torresReales>0?(1+torresExtra):0; // minimo 1 + proporcional, solo si la familia tiene torres reales
         const torresBase=Math.floor(torresRaw);
         const fraccion=torresRaw-torresBase;
         return{p,pct,pctNorm,ujc,torresBase,fraccion,torresExtra:0};
@@ -5332,7 +5332,7 @@ function calcCajasDeposito(){
       const torresParaDistribuir=Math.max(0,torresReales-torresMinimas);
       const torresExactas=mixFam.map(({p,pct})=>{
         const pctNorm=sumPct>0?(pct/sumPct)*100:100/nProds;
-        const torresRaw=1+torresParaDistribuir*(pctNorm/100);
+        const torresRaw=torresReales>0?(1+torresParaDistribuir*(pctNorm/100)):0;
         return{p,torresBase:Math.floor(torresRaw),fraccion:torresRaw-Math.floor(torresRaw),torresExtra:0};
       });
       const asig=torresExactas.reduce((s,x)=>s+x.torresBase,0);
