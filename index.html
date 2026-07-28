@@ -245,7 +245,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.128</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.129</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -261,7 +261,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('dash')"><i class="ti ti-layout-dashboard"></i>Dashboard</button>
   <button class="tab" onclick="T('rend')"><i class="ti ti-speedometer"></i>Rendimiento</button>
   <button class="tab" onclick="T('stock')"><i class="ti ti-building-warehouse"></i>Stock</button>
-  <button class="tab" onclick="T('proy')"><i class="ti ti-chart-dots-3"></i>Proyección</button>
+  <button class="tab" onclick="T('cong')"><i class="ti ti-snowflake"></i>Congelado</button>
   <button class="tab" onclick="T('rec')"><i class="ti ti-notebook"></i>Recetas</button>
   <button class="tab" onclick="T('hor')"><i class="ti ti-clock-hour-4"></i>Horarios</button>
   <button class="tab" onclick="T('ped')"><i class="ti ti-shopping-cart"></i>Pedidos</button>
@@ -718,15 +718,40 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   </div>
   <!-- SUB-TABS -->
   <div class="proy-subtabs">
-    <button class="proy-tab active" id="stab-hist" onclick="showStockSubTab('hist')"><i class="ti ti-history"></i> Historial</button>
+    <button class="proy-tab active" id="stab-conteo" onclick="showStockSubTab('conteo')"><i class="ti ti-clipboard-check"></i> Conteo de stock</button>
+    <button class="proy-tab" id="stab-hist" onclick="showStockSubTab('hist')"><i class="ti ti-history"></i> Historial</button>
     <button class="proy-tab" id="stab-seg" onclick="showStockSubTab('seg')"><i class="ti ti-shield-check"></i> Stock seguridad</button>
     <button class="proy-tab" id="stab-mix" onclick="showStockSubTab('mix')"><i class="ti ti-chart-pie"></i> Mix ventas</button>
     <button class="proy-tab" id="stab-cajas" onclick="showStockSubTab('cajas')"><i class="ti ti-box"></i> Cajas</button>
     <button class="proy-tab" id="stab-dep" onclick="showStockSubTab('dep')"><i class="ti ti-temperature-snow"></i> Depositos</button>
-    <button class="proy-tab" id="stab-ventas" onclick="showStockSubTab('ventas')"><i class="ti ti-chart-bar"></i> Ventas mensuales</button>
+  </div>
+  <!-- CONTEO DE STOCK -->
+  <div id="stock-sub-conteo">
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Ingresa el stock actual en camara contado fisicamente.</div>
+    <div class="grid-card" style="margin-bottom:1rem">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px"><i class="ti ti-file-spreadsheet"></i> Importar Excel Joselito</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Subí el xlsx del sistema Joselito y se carga automáticamente acá abajo (columna A = código, columna U = stock). Después podés ajustar cualquier valor a mano y guardar.</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <input type="file" id="stock-conteo-xlsx-input" accept=".xlsx,.xls" onchange="importarExcelAStockConteo(this)"
+          style="flex:1;min-width:200px;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        <span id="stock-conteo-import-loading" style="display:none;font-size:13px;color:var(--text2);white-space:nowrap"><span class="spinner" style="width:12px;height:12px;border-width:2px"></span> Importando...</span>
+      </div>
+      <div id="stock-conteo-import-msg" style="display:none;margin-top:8px" class="alert alert-ok"><i class="ti ti-check"></i> <span id="stock-conteo-import-msg-txt"></span></div>
+      <div id="stock-conteo-import-err" style="display:none;margin-top:8px" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="stock-conteo-import-err-txt"></span></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--text2)">Fecha:</label>
+      <input type="date" id="stock-conteo-fecha" onchange="loadStockConteo()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <button class="btn btn-sm" onclick="loadStockConteo()"><i class="ti ti-refresh"></i> Actualizar</button>
+    </div>
+    <div id="stock-conteo-content"></div>
+    <div style="display:flex;justify-content:space-between;margin-top:1rem;flex-wrap:wrap;gap:8px">
+      <div style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px"><i class="ti ti-info-circle"></i> Podes guardar varias veces durante el dia. Los valores se actualizan sin borrar el resto.</div>
+      <button class="btn btn-primary" onclick="guardarStockConteo()"><i class="ti ti-device-floppy"></i> Guardar conteo</button>
+    </div>
   </div>
   <!-- HISTORIAL -->
-  <div id="stock-sub-hist">
+  <div id="stock-sub-hist" style="display:none">
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
       <label style="font-size:13px;color:var(--text2)">Fecha:</label>
       <input type="date" id="stock-hist-fecha" onchange="renderHistStock()" oninput="renderHistStock()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
@@ -797,22 +822,48 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div id="dep-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
   </div>
 
-  <!-- VENTAS MENSUALES -->
-  <div id="stock-sub-ventas" style="display:none">
-    <div class="alert alert-info" style="margin-bottom:1rem">
-      <i class="ti ti-info-circle"></i> Ingresá las ventas mensuales promedio por producto. PAPO las divide por <b>4,2</b> para calcular la venta semanal equivalente.
+</div>
+
+<!-- CONGELADO -->
+<div id="tab-cong" class="section">
+  <div class="toolbar">
+    <div>
+      <div style="font-size:16px;font-weight:600">Congelado</div>
+      <div style="font-size:13px;color:var(--text2)">Carga de productos de Planeta Empanada que van a congelado</div>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
-      <select id="ventas-esel" onchange="renderVentasMensuales()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
-      <button class="btn btn-sm" onclick="renderVentasMensuales()"><i class="ti ti-refresh"></i> Actualizar</button>
-    </div>
-    <div id="stock-ventas-content"></div>
-    <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:1rem">
-      <button class="btn btn-primary" onclick="guardarVentasMensuales()"><i class="ti ti-device-floppy"></i> Guardar ventas</button>
-    </div>
-    <div id="stock-ventas-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Ventas mensuales guardadas.</div>
+  </div>
+  <div class="proy-subtabs">
+    <button class="proy-tab active" id="congtab-carga" onclick="showCongTab('carga')"><i class="ti ti-plus"></i> Cargar</button>
+    <button class="proy-tab" id="congtab-historial" onclick="showCongTab('historial')"><i class="ti ti-history"></i> Historial</button>
   </div>
 
+  <!-- CARGA -->
+  <div id="cong-sub-carga">
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Cargá la cantidad de cada producto que va a congelado para la fecha seleccionada.</div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--text2)">Fecha:</label>
+      <input type="date" id="cong-fecha" onchange="loadCongCarga()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <button class="btn btn-sm" onclick="loadCongCarga()"><i class="ti ti-refresh"></i> Actualizar</button>
+    </div>
+    <div id="cong-carga-content"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+      <button class="btn btn-primary" onclick="guardarCongCarga()"><i class="ti ti-device-floppy"></i> Guardar carga</button>
+    </div>
+    <div id="cong-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> <span id="cong-msg-txt"></span></div>
+    <div id="cong-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="cong-err-txt"></span></div>
+  </div>
+
+  <!-- HISTORIAL -->
+  <div id="cong-sub-historial" style="display:none">
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--text2)">Desde:</label>
+      <input type="date" id="cong-hist-desde" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <label style="font-size:13px;color:var(--text2)">Hasta:</label>
+      <input type="date" id="cong-hist-hasta" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <button class="btn btn-primary" onclick="buscarCongHistorial()"><i class="ti ti-search"></i> Buscar</button>
+    </div>
+    <div id="cong-hist-content"></div>
+  </div>
 </div>
 
 <!-- HORARIOS -->
@@ -1272,7 +1323,7 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['plan','rell','real','cmp','desv','dash','stock','proy','rec','rend','hor','ped','mae','etq','tren'];
+const TABS=['plan','rell','real','cmp','desv','dash','stock','cong','rec','rend','hor','ped','mae','etq','tren'];
 function T(t){
   document.querySelectorAll('.tab').forEach(el=>{
     const m=el.getAttribute('onclick')||'';
@@ -1285,6 +1336,7 @@ function T(t){
   if(t==='desv'){pS('desv-wsel');loadDesv()}
   if(t==='dash'){pS('dash-wsel');initDash()}
   if(t==='stock')initStock();
+  if(t==='cong')initCongelado();
   if(t==='proy')initProy();
   if(t==='hor')initHorarios();
   if(t==='rec'){if(!st.Pr.length||!Object.keys(st.Rec).length){init().then(()=>rRec());}else{rRec();}}
@@ -4796,132 +4848,6 @@ async function guardarMix(){
   }catch(e){ss('error','Error: '+e.message)}
 }
 
-// ── VENTAS MENSUALES ─────────────────────────────────────────────
-let ventasMensualesData=[];
-
-async function initVentasMensuales(){
-  // Poblar selector de empresa si no está poblado
-  const sel=document.getElementById('ventas-esel');
-  if(sel.options.length<=1){
-    st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;sel.appendChild(o);});
-  }
-  await renderVentasMensuales();
-}
-
-async function renderVentasMensuales(){
-  const ef=document.getElementById('ventas-esel').value;
-  const el=document.getElementById('stock-ventas-content');
-  el.innerHTML='<div style="padding:2rem;text-align:center;color:var(--text2)"><span class="spinner spinner-dark"></span></div>';
-  try{
-    const f=ef&&ef!=='all'?`empresa_id=eq.${ef}&order=area.asc,producto.asc`:'order=area.asc,producto.asc';
-    ventasMensualesData=await get('ventas_mensuales',f);
-  }catch{ventasMensualesData=[]}
-
-  let prods=st.Pr;
-  if(ef&&ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
-  if(!prods.length){el.innerHTML='<div class="empty">Sin productos.</div>';return}
-
-  // Agrupar por empresa → área
-  const grupos={};
-  prods.forEach(p=>{
-    const emp=st.E.find(e=>e.id===p.empresa_id);
-    const area=st.A.find(a=>a.id===p.area_id);
-    const eNom=emp?.nombre||p.empresa_id;
-    const aNom=area?.nombre||'Sin área';
-    if(!grupos[eNom])grupos[eNom]={color:emp?.color||'#888',areas:{}};
-    if(!grupos[eNom].areas[aNom])grupos[eNom].areas[aNom]=[];
-    grupos[eNom].areas[aNom].push(p);
-  });
-
-  let h='';
-  Object.entries(grupos).forEach(([eNom,g])=>{
-    h+=`<div class="grid-card" style="margin-bottom:1.5rem">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:1rem">
-        <span style="width:12px;height:12px;border-radius:50%;background:${g.color};display:inline-block"></span>
-        <span style="font-size:14px;font-weight:700">${eNom}</span>
-      </div>`;
-
-    Object.entries(g.areas).forEach(([aNom,aProds])=>{
-      h+=`<div style="margin-bottom:1rem">
-        <div style="font-size:12px;font-weight:600;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px">${aNom}</div>
-        <table class="stock-tbl">
-          <thead><tr>
-            <th>Producto</th>
-            <th style="width:150px;text-align:right">Venta mensual</th>
-            <th style="width:60px;text-align:center">Unidad</th>
-            <th style="width:160px;text-align:right;color:var(--blue)">Venta semanal (÷4,2)</th>
-          </tr></thead>
-          <tbody>`;
-
-      aProds.forEach(p=>{
-        const area=st.A.find(a=>a.id===p.area_id)?.nombre||'SA';
-        const pid=`vm-${p.empresa_id}-${area.replace(/[\s'\/]/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
-        const existing=ventasMensualesData.find(x=>x.empresa_id===p.empresa_id&&x.area===area&&x.producto===p.nombre);
-        const val=existing?.venta_mensual||'';
-        const semanal=val?`<span style="color:var(--blue);font-weight:700">${(parseFloat(val)/4.2).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:1})}</span>`:'<span style="color:var(--text3)">—</span>';
-        h+=`<tr>
-          <td style="font-weight:500">${p.nombre}</td>
-          <td style="text-align:right">
-            <input type="number" min="0" step="1" id="${pid}" value="${val}" placeholder="—"
-              oninput="actualizarSemanales()"
-              style="width:120px;text-align:right;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)"/>
-          </td>
-          <td style="text-align:center;font-size:12px;color:var(--text2)">${p.unidad||'u.'}</td>
-          <td style="text-align:right;font-size:13px" id="sem-${pid}">${semanal}</td>
-        </tr>`;
-      });
-
-      h+=`</tbody></table></div>`;
-    });
-    h+=`</div>`;
-  });
-
-  el.innerHTML=h;
-}
-
-function actualizarSemanales(){
-  // Actualizar columna semanal en tiempo real al tipear
-  document.querySelectorAll('[id^="vm-"]').forEach(inp=>{
-    const semEl=document.getElementById('sem-'+inp.id);
-    if(!semEl)return;
-    const v=parseFloat(inp.value);
-    if(!isNaN(v)&&v>0){
-      semEl.innerHTML=`<span style="color:var(--blue);font-weight:700">${(v/4.2).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:1})}</span>`;
-    } else {
-      semEl.innerHTML='<span style="color:var(--text3)">—</span>';
-    }
-  });
-}
-
-async function guardarVentasMensuales(){
-  const ef=document.getElementById('ventas-esel').value;
-  let prods=st.Pr;
-  if(ef&&ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
-  ss('saving','Guardando...');
-  try{
-    for(const p of prods){
-      const area=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';
-      const pid=`vm-${p.empresa_id}-${area.replace(/[\s'\/]/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
-      const inp=document.getElementById(pid);
-      if(!inp||inp.value===''||inp.value==='0')continue;
-      const venta_mensual=parseFloat(inp.value)||0;
-      if(venta_mensual<=0)continue;
-      const existing=ventasMensualesData.find(x=>x.empresa_id===p.empresa_id&&x.area===area&&x.producto===p.nombre);
-      if(existing){
-        await fetch(`${SB}/rest/v1/ventas_mensuales?id=eq.${existing.id}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({venta_mensual,updated_at:new Date().toISOString()})});
-        existing.venta_mensual=venta_mensual;
-      } else {
-        const res=await ins('ventas_mensuales',{empresa_id:p.empresa_id,area,producto:p.nombre,venta_mensual});
-        if(res&&res[0])ventasMensualesData.push(res[0]);
-      }
-    }
-    ss('online','Guardado');
-    const msg=document.getElementById('stock-ventas-msg');msg.style.display='flex';
-    setTimeout(()=>msg.style.display='none',3000);
-    renderVentasMensuales();
-  }catch(e){ss('error','Error: '+e.message)}
-}
-
 // ── CAJAS POR PRODUCTO ────────────────────────────────────────────
 let cajasData=[];
 
@@ -5078,16 +5004,295 @@ async function guardarCajas(){
 }
 let stockSeg=[];
 
+// ── CONTEO DE STOCK (dentro de la pestaña Stock) ─────────────────
+async function loadStockConteo(){
+  const fecha=document.getElementById('stock-conteo-fecha').value||hoyLocal();
+  try{
+    proyData=await get('proyeccion_diaria',`fecha=eq.${fecha}&order=area.asc,producto.asc`);
+  }catch{proyData=[]}
+  renderStockConteo();
+}
+
+function renderStockConteo(){
+  const ef=document.getElementById('stock-hist-esel').value;
+  const el=document.getElementById('stock-conteo-content');
+  let prods=st.Pr;
+  if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
+  if(!prods.length){el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin productos en el maestro.</div>';return}
+  const byE={};prods.forEach(p=>{const eid=p.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(p)});
+  let h=`<div class="stock-card"><div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
+    <th style="text-align:left">Producto</th>
+    <th style="text-align:left;width:70px">Unidad</th>
+    <th style="text-align:right;width:110px">Stock</th>
+  </tr></thead><tbody>`;
+  Object.entries(byE).forEach(([eid,items])=>{
+    const clr=ec(eid);const nm=en(eid)||'SE';
+    const byArea={};items.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id);const an=a?a.nombre:'SA';if(!byArea[an])byArea[an]=[];byArea[an].push({...p,anom:an})});
+    Object.entries(byArea).forEach(([area,aItems])=>{
+      h+=`<tr><td colspan="3" style="background:var(--bg2);padding:6px 10px;font-size:11px;font-weight:700;color:${clr};border-top:2px solid var(--border2)">
+        <span class="color-dot" style="background:${clr}"></span> ${nm} &mdash; ${area}
+      </td></tr>`;
+      aItems.forEach((p)=>{
+        const existing=getProyItem(eid,area,p.nombre);
+        const val=existing&&existing.stock>0?existing.stock:'';
+        const guardado=existing&&val!=='';
+        const pid=`${eid}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+        h+=`<tr>
+          <td style="font-weight:500">${p.nombre}${guardado?` <span style="color:var(--green);font-size:10px">✓</span>`:''}</td>
+          <td style="font-size:12px;color:var(--text2)">${p.unidad}</td>
+          <td style="text-align:right">
+            <input class="proy-input" type="number" min="0"
+              id="sconteo-${pid}"
+              value="${val}" placeholder="0"
+              style="border-color:${guardado?'var(--green)':'var(--border2)'};width:90px"/>
+          </td>
+        </tr>`;
+      });
+    });
+  });
+  h+=`</tbody></table></div></div>`;
+  el.innerHTML=h;
+}
+
+async function guardarStockConteo(){
+  const fecha=document.getElementById('stock-conteo-fecha').value||hoyLocal();
+  const ef=document.getElementById('stock-hist-esel').value;
+  let prods=st.Pr;if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
+  ss('saving','Guardando conteo...');
+  let guardados=0;
+  try{
+    for(const p of prods){
+      const a=st.A.find(x=>x.id===p.area_id);const area=a?a.nombre:'SA';
+      const pid=`${p.empresa_id}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+      const inp=document.getElementById(`sconteo-${pid}`);
+      if(!inp||inp.value==='')continue;
+      const stock=parseFloat(inp.value)||0;
+      await upsertProy(fecha,p.empresa_id,area,p.nombre,p.unidad,{stock});
+      guardados++;
+    }
+    await loadStockConteo();
+    ss('online',`${guardados} productos guardados`);
+  }catch(e){ss('error','Error: '+e.message)}
+}
+
+async function importarExcelAStockConteo(input){
+  const file=input.files[0];
+  if(!file)return;
+  const errEl=document.getElementById('stock-conteo-import-err');
+  const msgEl=document.getElementById('stock-conteo-import-msg');
+  const loadingEl=document.getElementById('stock-conteo-import-loading');
+  errEl.style.display='none';msgEl.style.display='none';
+  loadingEl.style.display='inline-flex';
+  try{
+    if(!window.XLSX){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload=res;s.onerror=rej;document.head.appendChild(s);
+      });
+    }
+    const buf=await file.arrayBuffer();
+    const wb=window.XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=window.XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+    const acum={};
+    for(const row of rows){
+      const codigo=row[0]!=null?String(row[0]).trim():'';
+      if(!codigo.match(/^302\d+$/))continue;
+      let stockRaw=row[20];
+      if(stockRaw===null||stockRaw===undefined)continue;
+      let stock;
+      if(typeof stockRaw==='number'){
+        const str=stockRaw.toString();
+        if(str.includes('.')&&str.split('.')[1].length===3){
+          if(Math.floor(stockRaw)>0){stock=parseFloat(str.replace('.',''));}
+          else{stock=stockRaw;}
+        } else {stock=stockRaw;}
+      } else {
+        stock=parseFloat(String(stockRaw).replace(/\./g,'').replace(',','.'))||0;
+      }
+      if(!acum[codigo])acum[codigo]=0;
+      acum[codigo]+=stock;
+    }
+    const datos=Object.entries(acum).map(([codigo,stock])=>({codigo,stock:Math.round(stock*100)/100}));
+    if(!datos.length){
+      throw new Error('No se encontraron filas con códigos 302xxx en la columna A.');
+    }
+    const fecha=document.getElementById('stock-conteo-fecha').value||hoyLocal();
+    const joselito=st.E.find(e=>e.nombre.toLowerCase().includes('joselito'));
+    if(!joselito)throw new Error('No se encontró la empresa Joselito en el maestro.');
+    const prods=st.Pr.filter(p=>p.empresa_id===joselito.id&&p.codigo_articulo);
+    let cargados=0,sinMapeo=0;
+    for(const d of datos){
+      const prod=prods.find(p=>p.codigo_articulo===d.codigo);
+      if(!prod){sinMapeo++;continue;}
+      const area=st.A.find(a=>a.id===prod.area_id);
+      if(!area)continue;
+      await upsertProy(fecha,joselito.id,area.nombre,prod.nombre,prod.unidad||'Unidad',{stock:d.stock});
+      cargados++;
+    }
+    await loadStockConteo();
+    loadingEl.style.display='none';
+    document.getElementById('stock-conteo-import-msg-txt').textContent=`${cargados} productos cargados desde el Excel para el ${fecha}.${sinMapeo?` (${sinMapeo} códigos sin mapeo en PAPO — revisá Mapeo Joselito en Maestro)`:''} Podés ajustar cualquier valor a mano y guardar.`;
+    msgEl.style.display='';
+    setTimeout(()=>msgEl.style.display='none',7000);
+    input.value='';
+  }catch(e){
+    loadingEl.style.display='none';
+    document.getElementById('stock-conteo-import-err-txt').textContent=e.message;
+    errEl.style.display='';
+  }
+}
+
+// ── CONGELADO (carga de productos de Planeta Empanada) ──────────
+async function initCongelado(){
+  if(!st.E.length||!st.Pr.length)await init();
+  const hoy=hoyLocal();
+  if(!document.getElementById('cong-fecha').value)document.getElementById('cong-fecha').value=hoy;
+  showCongTab('carga');
+}
+
+function showCongTab(t){
+  ['carga','historial'].forEach(id=>{
+    document.getElementById('cong-sub-'+id).style.display=id===t?'block':'none';
+    document.getElementById('congtab-'+id).classList.toggle('active',id===t);
+  });
+  if(t==='carga')loadCongCarga();
+}
+
+function congGetPlaneta(){
+  return st.E.find(e=>e.nombre.toLowerCase().includes('planeta'));
+}
+
+async function loadCongCarga(){
+  const fecha=document.getElementById('cong-fecha').value||hoyLocal();
+  const planeta=congGetPlaneta();
+  if(!planeta){
+    document.getElementById('cong-carga-content').innerHTML='<div class="empty"><i class="ti ti-alert-circle"></i> No se encontró la empresa Planeta Empanada en el maestro.</div>';
+    return;
+  }
+  let existentes=[];
+  try{existentes=await get('congelado_carga',`fecha=eq.${fecha}&empresa_id=eq.${planeta.id}`);}catch{existentes=[];}
+  renderCongCarga(planeta,existentes);
+}
+
+function renderCongCarga(planeta,existentes){
+  const el=document.getElementById('cong-carga-content');
+  const prods=st.Pr.filter(p=>p.empresa_id===planeta.id);
+  if(!prods.length){el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin productos cargados para Planeta Empanada.</div>';return}
+  const byArea={};
+  prods.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id);const an=a?a.nombre:'SA';if(!byArea[an])byArea[an]=[];byArea[an].push(p);});
+  let h=`<div class="stock-card"><table class="stock-tbl"><thead><tr>
+    <th style="text-align:left">Producto</th>
+    <th style="text-align:left;width:70px">Unidad</th>
+    <th style="text-align:right;width:120px">Cantidad</th>
+  </tr></thead><tbody>`;
+  Object.entries(byArea).forEach(([area,aProds])=>{
+    h+=`<tr><td colspan="3" style="background:var(--bg2);padding:6px 10px;font-size:11px;font-weight:700;color:var(--text2)">${area}</td></tr>`;
+    aProds.forEach(p=>{
+      const ex=existentes.find(e=>e.area===area&&e.producto===p.nombre);
+      const val=ex&&ex.cantidad>0?ex.cantidad:'';
+      const guardado=ex&&val!=='';
+      const pid=`cong-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+      h+=`<tr>
+        <td style="font-weight:500">${p.nombre}${guardado?` <span style="color:var(--green);font-size:10px">✓</span>`:''}</td>
+        <td style="font-size:12px;color:var(--text2)">${p.unidad}</td>
+        <td style="text-align:right"><input class="proy-input" type="number" min="0" id="${pid}" value="${val}" placeholder="0"
+          style="border-color:${guardado?'var(--green)':'var(--border2)'};width:100px"/></td>
+      </tr>`;
+    });
+  });
+  h+=`</tbody></table></div>`;
+  el.innerHTML=h;
+}
+
+async function guardarCongCarga(){
+  const fecha=document.getElementById('cong-fecha').value||hoyLocal();
+  const planeta=congGetPlaneta();
+  const errEl=document.getElementById('cong-err');
+  const msgEl=document.getElementById('cong-msg');
+  errEl.style.display='none';msgEl.style.display='none';
+  if(!planeta){
+    document.getElementById('cong-err-txt').textContent='No se encontró la empresa Planeta Empanada.';
+    errEl.style.display='';
+    return;
+  }
+  const prods=st.Pr.filter(p=>p.empresa_id===planeta.id);
+  let guardados=0,errores=0,primerError='';
+  for(const p of prods){
+    const a=st.A.find(x=>x.id===p.area_id);const area=a?a.nombre:'SA';
+    const pid=`cong-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
+    const inp=document.getElementById(pid);
+    if(!inp||inp.value==='')continue;
+    const cantidad=parseFloat(inp.value)||0;
+    try{
+      const res=await fetch(`${SB}/rest/v1/congelado_carga?on_conflict=fecha,empresa_id,area,producto`,{
+        method:'POST',
+        headers:{...H,'Prefer':'resolution=merge-duplicates,return=representation'},
+        body:JSON.stringify({fecha,empresa_id:planeta.id,area,producto:p.nombre,unidad:p.unidad,cantidad})
+      });
+      if(!res.ok)throw new Error(await res.text());
+      const data=await res.json();
+      if(!data||!data.length)throw new Error('El servidor no devolvió ninguna fila (revisá que exista la tabla congelado_carga y que RLS esté deshabilitado)');
+      guardados++;
+    }catch(e){
+      console.error('Error guardando congelado',p.nombre,':',e.message);
+      if(!primerError)primerError=e.message;
+      errores++;
+    }
+  }
+  if(errores){
+    document.getElementById('cong-err-txt').textContent=`${guardados} guardados, ${errores} con error: ${primerError}`;
+    errEl.style.display='';
+  } else {
+    document.getElementById('cong-msg-txt').textContent=`${guardados} productos guardados para el ${fecha}.`;
+    msgEl.style.display='';
+    setTimeout(()=>msgEl.style.display='none',4000);
+  }
+  await loadCongCarga();
+}
+
+async function buscarCongHistorial(){
+  const desde=document.getElementById('cong-hist-desde').value;
+  const hasta=document.getElementById('cong-hist-hasta').value;
+  const el=document.getElementById('cong-hist-content');
+  if(!desde||!hasta){el.innerHTML='<div class="alert alert-info"><i class="ti ti-info-circle"></i> Seleccioná un rango de fechas.</div>';return}
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
+  try{
+    const data=await get('congelado_carga',`fecha=gte.${desde}&fecha=lte.${hasta}&order=fecha.desc,area.asc,producto.asc`);
+    if(!data.length){el.innerHTML='<div class="empty"><i class="ti ti-snowflake-off"></i>Sin cargas registradas para ese rango.</div>';return}
+    const byFecha={};
+    data.forEach(d=>{if(!byFecha[d.fecha])byFecha[d.fecha]=[];byFecha[d.fecha].push(d)});
+    let h='';
+    Object.entries(byFecha).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([fecha,items])=>{
+      const total=items.reduce((s,i)=>s+(parseFloat(i.cantidad)||0),0);
+      const fLabel=new Date(fecha+'T00:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
+      h+=`<div class="stock-card" style="margin-bottom:1rem">
+        <div style="padding:8px 14px;background:var(--bg2);font-size:13px;font-weight:700;display:flex;justify-content:space-between">
+          <span>${fLabel}</span><span style="color:var(--blue)">Total: ${total.toLocaleString('es-AR')}</span>
+        </div>
+        <table class="stock-tbl"><thead><tr>
+          <th style="text-align:left">Área</th><th style="text-align:left">Producto</th>
+          <th style="text-align:right">Cantidad</th><th style="text-align:left;width:70px">Unidad</th>
+        </tr></thead><tbody>
+        ${items.map(i=>`<tr><td class="muted">${i.area||''}</td><td style="font-weight:500">${i.producto}</td><td style="text-align:right;font-weight:700;color:var(--blue)">${(parseFloat(i.cantidad)||0).toLocaleString('es-AR')}</td><td class="muted">${i.unidad||''}</td></tr>`).join('')}
+        </tbody></table>
+      </div>`;
+    });
+    el.innerHTML=h;
+  }catch(e){el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> Error: ${e.message}</div>`}
+}
+
 function showStockSubTab(t){
-  ['hist','seg','mix','cajas','dep','ventas'].forEach(id=>{
+  ['conteo','hist','seg','mix','cajas','dep'].forEach(id=>{
     document.getElementById('stock-sub-'+id).style.display=id===t?'block':'none';
     document.getElementById('stab-'+id).classList.toggle('active',id===t);
   });
+  if(t==='conteo')loadStockConteo();
   if(t==='seg')renderSeguridad();
   if(t==='mix')renderMix();
   if(t==='cajas')renderCajas();
   if(t==='dep')initDepositos();
-  if(t==='ventas')initVentasMensuales();
 }
 
 function calcCajasDeposito(){
@@ -5419,6 +5624,7 @@ async function guardarSeguridad(){
 async function initStock(){
   const hoy=hoyLocal();
   document.getElementById('stock-hist-fecha').value=hoy;
+  if(!document.getElementById('stock-conteo-fecha').value)document.getElementById('stock-conteo-fecha').value=hoy;
   if(!st.E.length){
     try{
       const[em,ar,pr]=await Promise.all([
@@ -5432,7 +5638,7 @@ async function initStock(){
   const se=document.getElementById('stock-hist-esel');
   se.innerHTML='<option value="all">Todas las empresas</option>';
   st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se.appendChild(o)});
-  renderHistStock();
+  loadStockConteo();
 }
 
 async function renderHistStock(){
