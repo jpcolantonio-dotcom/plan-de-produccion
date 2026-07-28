@@ -245,7 +245,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.134</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.135</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -4488,8 +4488,9 @@ function generarTablasPDF(eid){
       const alturaRef=torresFam.length?torresFam[0].altura_cajas:(torres[0]?.altura_cajas||8);
       const estRef=torresFam.length?(torresFam[0].estantes||1):(torres[0]?.estantes||1);
       const torreDobleFam=torresFam.find(t=>t.doble);
-      const cajasXtorreUnit=alturaRef*(torreDobleFam?2:1);
       const torresReales=torresFam.reduce((s,t)=>s+t.cantidad*(t.estantes||1),0);
+      // Capacidad promedio por unidad: soporta mezclar torres simples y dobles en la misma familia
+      const cajasXtorreUnit=torresReales>0?capFam/torresReales:0;
 
       if(famsDep.length&&famObj){
         out+=`<tr><td colspan="6" class="fam-title" style="padding:3px 7px">${famObj.codigo} · ${famObj.nombre} — ${capFam} cajas</td></tr>`;
@@ -4525,7 +4526,7 @@ function generarTablasPDF(eid){
       let subtotalCajas=0;let subtotalUds=0;
       torresExactas.forEach(({p,pct,pctNorm,ujc,torresBase,torresExtra})=>{
         const torresTotal=torresBase+torresExtra;
-        const cajasReales=torresTotal*cajasXtorreUnit;
+        const cajasReales=Math.round(torresTotal*cajasXtorreUnit);
         const unidades=cajasReales*ujc;
         totalCajasUsadas+=cajasReales;subtotalCajas+=cajasReales;
         if(ujc>0)subtotalUds+=unidades;
@@ -4671,10 +4672,10 @@ async function renderDepCalc(){
       const sumPctFam=mixFam.reduce((s,x)=>s+x.pct,0);
       const nProds=mixFam.length;
 
-      // Unidad mínima = 1 torre (altura × doble)
-      const cajasXtorreUnit=alturaRef*(torreDobleFam?2:1);
-      // Total de torres reales (torres × estantes)
+      // Unidad = capacidad promedio por bloque torre×estante de esta familia.
+      // Soporta mezclar torres simples y dobles: usa el promedio real en vez de un único tipo.
       const torresReales=torresFam.reduce((s,t)=>s+t.cantidad*(t.estantes||1),0);
+      const cajasXtorreUnit=torresReales>0?capFam/torresReales:0;
 
       // Garantizar mínimo 1 torre por producto, distribuir el resto proporcionalmente
       const torresMinimas=Math.min(nProds,torresReales); // 1 por producto (o menos si no alcanza)
@@ -4711,7 +4712,7 @@ async function renderDepCalc(){
       });
 
       prodsConMix.forEach(({p,pct,pctNorm,ujc,cajasRaw,torresBase,torresExtra,torresTotal})=>{
-        const cajasReales=torresTotal*cajasXtorreUnit;
+        const cajasReales=Math.round(torresTotal*cajasXtorreUnit);
         const unidades=cajasReales*ujc;
         totalCajasUsadas+=cajasReales; subtotalCajas+=cajasReales;
         if(ujc>0){totalUnidades+=unidades; subtotalUds+=unidades;}
@@ -5319,8 +5320,8 @@ function calcCajasDeposito(){
       const capFam=famObj?(()=>{const tF=torres.filter(t=>t.familia===famCod);return tF.reduce((s,t)=>s+t.cantidad*t.altura_cajas*(t.estantes||1)*(t.doble?2:1),0);})():capTotal;
       const alturaRef=torresFam.length?torresFam[0].altura_cajas:(torres[0]?.altura_cajas||8);
       const torreDobleFam=torresFam.find(t=>t.doble);
-      const cajasXtorreUnit=alturaRef*(torreDobleFam?2:1);
       const torresReales=torresFam.reduce((s,t)=>s+t.cantidad*(t.estantes||1),0);
+      const cajasXtorreUnit=torresReales>0?capFam/torresReales:0;
       const mixFam=fProds.map(p=>{
         const mix=mixData.find(m=>m.empresa_id===p.empresa_id&&m.area===p.area&&m.producto===p.producto);
         return{p,pct:mix?mix.porcentaje:0};
@@ -5339,7 +5340,7 @@ function calcCajasDeposito(){
       let sob=torresReales-asig;
       [...torresExactas].sort((a,b)=>b.fraccion-a.fraccion).forEach(x=>{if(sob>0){x.torresExtra=1;sob--;}});
       torresExactas.forEach(({p,torresBase,torresExtra})=>{
-        const cajasReales=(torresBase+torresExtra)*cajasXtorreUnit;
+        const cajasReales=Math.round((torresBase+torresExtra)*cajasXtorreUnit);
         const key=`${p.empresa_id}||${p.area}||${p.producto}`;
         result[key]=(result[key]||0)+cajasReales;
       });
