@@ -245,7 +245,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.137</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.139</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -9307,44 +9307,58 @@ function renderMatrizCapacitacion(){
     return;
   }
 
-  // Agrupar por empresa
-  const empresas=[...new Set(trenEmpleadosData.map(e=>e.empresa_id))];
-  let html='';
+  // Agrupar empresas (mismo orden en que aparecen los empleados)
+  const empresas=[...new Set(trenEmpleadosData.map(e=>e.empresa_id))].filter(eid=>trenPuestos.some(p=>p.empresa_id===eid));
+  if(!empresas.length){
+    el.innerHTML='<div class="empty">Seleccioná una empresa con puestos configurados.</div>';
+    return;
+  }
 
-  empresas.forEach(eid=>{
-    const emp=st.E.find(e=>e.id===eid);
-    const empNom=emp?.nombre||eid;
-    const empColor=emp?.color||'#888';
-    const empsDeEsta=trenEmpleadosData.filter(e=>e.empresa_id===eid);
-    const puestosDeEsta=trenPuestos.filter(p=>p.empresa_id===eid);
-    if(!puestosDeEsta.length)return;
+  // Todos los puestos de todas las empresas, agrupados por empresa, en una sola fila de columnas
+  const gruposPuestos=empresas.map(eid=>({eid,puestos:trenPuestos.filter(p=>p.empresa_id===eid)}));
+  const todosPuestos=gruposPuestos.flatMap(g=>g.puestos);
 
-    html+=`<div class="grid-card" style="margin-bottom:1.5rem;overflow-x:auto">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-        <span style="width:12px;height:12px;border-radius:50%;background:${empColor};display:inline-block"></span>
-        <span style="font-size:14px;font-weight:700">${empNom}</span>
-        <span style="font-size:12px;color:var(--text2)">${empsDeEsta.length} empleados · ${puestosDeEsta.length} puestos</span>
-      </div>
-      <table style="border-collapse:collapse;min-width:100%">
-        <thead><tr>
-          <th style="text-align:left;padding:8px 12px;background:var(--surface2);font-size:12px;border:.5px solid var(--border);min-width:160px;position:sticky;left:0;z-index:1">Empleado</th>`;
-    puestosDeEsta.forEach(p=>{
-      html+=`<th style="text-align:center;padding:6px 8px;background:var(--surface2);font-size:11px;border:.5px solid var(--border);min-width:80px;max-width:100px;word-break:break-word;line-height:1.2">${p.nombre}</th>`;
-    });
-    html+=`</tr></thead><tbody>`;
+  let html=`<div class="grid-card" style="margin-bottom:1.5rem;overflow-x:auto">
+    <table style="border-collapse:collapse;min-width:100%">
+      <thead>
+        <tr>
+          <th rowspan="2" style="text-align:left;padding:8px 12px;background:var(--surface2);font-size:12px;border:.5px solid var(--border);min-width:160px;position:sticky;left:0;z-index:2">Empleado</th>`;
+  gruposPuestos.forEach(g=>{
+    const emp=st.E.find(e=>e.id===g.eid);
+    const nm=emp?.nombre||g.eid;const clr=emp?.color||'#888';
+    html+=`<th colspan="${g.puestos.length}" style="text-align:center;padding:6px 8px;background:${clr}18;color:${clr};font-size:12px;font-weight:700;border:.5px solid var(--border)">${nm}</th>`;
+  });
+  html+=`<th rowspan="2" style="text-align:center;padding:8px 10px;background:var(--surface2);font-size:11px;border:.5px solid var(--border);min-width:70px">Total</th>
+        </tr>
+        <tr>`;
+  todosPuestos.forEach(p=>{
+    html+=`<th style="text-align:center;padding:6px 8px;background:var(--surface2);font-size:11px;border:.5px solid var(--border);min-width:80px;max-width:100px;word-break:break-word;line-height:1.2">${p.nombre}</th>`;
+  });
+  html+=`</tr></thead><tbody>`;
 
-    empsDeEsta.forEach((emp,ei)=>{
-      const bg=ei%2===0?'var(--bg)':'var(--surface)';
+  let rowIdx=0;
+  gruposPuestos.forEach(g=>{
+    const emp=st.E.find(e=>e.id===g.eid);
+    const empNom=emp?.nombre||g.eid;const empColor=emp?.color||'#888';
+    const empsDeEsta=trenEmpleadosData.filter(e=>e.empresa_id===g.eid);
+    html+=`<tr><td colspan="${todosPuestos.length+2}" style="padding:5px 12px;font-size:11px;font-weight:700;color:${empColor};background:${empColor}0d;border:.5px solid var(--border);position:sticky;left:0">
+      <span class="color-dot" style="background:${empColor}"></span> ${empNom}
+    </td></tr>`;
+    empsDeEsta.forEach(emp2=>{
+      const bg=rowIdx%2===0?'var(--bg)':'var(--surface)';
+      rowIdx++;
       html+=`<tr>
-        <td style="padding:7px 12px;font-size:13px;font-weight:500;border:.5px solid var(--border);background:${bg};position:sticky;left:0;z-index:1">${emp.nombre}</td>`;
-      puestosDeEsta.forEach(p=>{
-        const cap=getCap(emp.id,p.id);
+        <td style="padding:7px 12px;font-size:13px;font-weight:500;border:.5px solid var(--border);background:${bg};position:sticky;left:0;z-index:1">${emp2.nombre}</td>`;
+      let totalFila=0;
+      todosPuestos.forEach(p=>{
+        const cap=getCap(emp2.id,p.id);
         const nivel=cap?.nivel!=null?cap.nivel:0;
+        totalFila+=nivel;
         html+=`<td style="text-align:center;padding:6px;border:.5px solid var(--border);background:${bg}">
-          <select data-empid="${emp.id}" data-puestoid="${p.id}"
+          <select data-empid="${emp2.id}" data-puestoid="${p.id}"
             style="width:100%;min-width:64px;padding:4px 2px;font-size:12px;font-weight:700;text-align:center;border-radius:6px;cursor:pointer;border:.5px solid var(--border2);${nivelEstilo(nivel)}"
-            onchange="actualizarNivelCapacitacion('${emp.id}','${p.id}',parseInt(this.value),this)"
-            title="${emp.nombre} — ${p.nombre}">
+            onchange="actualizarNivelCapacitacion('${emp2.id}','${p.id}',parseInt(this.value),this)"
+            title="${emp2.nombre} — ${p.nombre}">
             <option value="0"${nivel===0?' selected':''}>0 · Sin cnto.</option>
             <option value="1"${nivel===1?' selected':''}>1 · Básico</option>
             <option value="2"${nivel===2?' selected':''}>2 · Autónomo</option>
@@ -9352,34 +9366,39 @@ function renderMatrizCapacitacion(){
           </select>
         </td>`;
       });
+      html+=`<td style="text-align:center;padding:6px;border:.5px solid var(--border);background:${bg};font-weight:700;font-size:13px;color:var(--text)">${totalFila}</td>`;
       html+=`</tr>`;
     });
-    // Resumen por puesto: total, promedio y cantidad de gente en cada nivel
-    const resumenPorPuesto=puestosDeEsta.map(p=>{
-      const niveles=empsDeEsta.map(e=>{const cap=getCap(e.id,p.id);return cap?.nivel!=null?cap.nivel:0;});
-      const total=niveles.reduce((s,n)=>s+n,0);
-      const prom=niveles.length?total/niveles.length:0;
-      const cant=[0,0,0,0];
-      niveles.forEach(n=>{cant[n]=(cant[n]||0)+1;});
-      return{total,prom,cant};
-    });
-    html+=`</tbody><tfoot>
-      <tr style="border-top:2px solid var(--border2)">
-        <td style="padding:6px 12px;font-size:11px;font-weight:700;color:var(--text2);background:var(--surface2);position:sticky;left:0;z-index:1">Total</td>
-        ${resumenPorPuesto.map(r=>`<td style="text-align:center;padding:5px;font-size:12px;font-weight:700;border:.5px solid var(--border);background:var(--surface2)">${r.total}</td>`).join('')}
-      </tr>
-      <tr>
-        <td style="padding:6px 12px;font-size:11px;font-weight:700;color:var(--text2);background:var(--surface2);position:sticky;left:0;z-index:1">Promedio</td>
-        ${resumenPorPuesto.map(r=>`<td style="text-align:center;padding:5px;font-size:12px;font-weight:700;color:var(--blue);border:.5px solid var(--border);background:var(--surface2)">${r.prom.toFixed(1)}</td>`).join('')}
-      </tr>
-      ${[0,1,2,3].map(niv=>`<tr>
-        <td style="padding:5px 12px;font-size:11px;color:var(--text2);background:var(--bg);position:sticky;left:0;z-index:1">Nivel ${niv}</td>
-        ${resumenPorPuesto.map(r=>`<td style="text-align:center;padding:4px;font-size:11px;border:.5px solid var(--border);${nivelEstilo(niv)};font-weight:${r.cant[niv]>0?'700':'400'};opacity:${r.cant[niv]>0?'1':'.35'}">${r.cant[niv]}</td>`).join('')}
-      </tr>`).join('')}
-    </tfoot></table></div>`;
   });
 
-  el.innerHTML=html||'<div class="empty">Seleccioná una empresa con puestos configurados.</div>';
+  // Resumen por puesto: total, promedio y cantidad de gente en cada nivel (todos los empleados, de cualquier empresa)
+  const resumenPorPuesto=todosPuestos.map(p=>{
+    const niveles=trenEmpleadosData.map(e=>{const cap=getCap(e.id,p.id);return cap?.nivel!=null?cap.nivel:0;});
+    const total=niveles.reduce((s,n)=>s+n,0);
+    const prom=niveles.length?total/niveles.length:0;
+    const cant=[0,0,0,0];
+    niveles.forEach(n=>{cant[n]=(cant[n]||0)+1;});
+    return{total,prom,cant};
+  });
+  html+=`</tbody><tfoot>
+    <tr style="border-top:2px solid var(--border2)">
+      <td style="padding:6px 12px;font-size:11px;font-weight:700;color:var(--text2);background:var(--surface2);position:sticky;left:0;z-index:1">Total</td>
+      ${resumenPorPuesto.map(r=>`<td style="text-align:center;padding:5px;font-size:12px;font-weight:700;border:.5px solid var(--border);background:var(--surface2)">${r.total}</td>`).join('')}
+      <td style="background:var(--surface2);border:.5px solid var(--border)"></td>
+    </tr>
+    <tr>
+      <td style="padding:6px 12px;font-size:11px;font-weight:700;color:var(--text2);background:var(--surface2);position:sticky;left:0;z-index:1">Promedio</td>
+      ${resumenPorPuesto.map(r=>`<td style="text-align:center;padding:5px;font-size:12px;font-weight:700;color:var(--blue);border:.5px solid var(--border);background:var(--surface2)">${r.prom.toFixed(1)}</td>`).join('')}
+      <td style="background:var(--surface2);border:.5px solid var(--border)"></td>
+    </tr>
+    ${[0,1,2,3].map(niv=>`<tr>
+      <td style="padding:5px 12px;font-size:11px;color:var(--text2);background:var(--bg);position:sticky;left:0;z-index:1">Nivel ${niv}</td>
+      ${resumenPorPuesto.map(r=>`<td style="text-align:center;padding:4px;font-size:11px;border:.5px solid var(--border);${nivelEstilo(niv)};font-weight:${r.cant[niv]>0?'700':'400'};opacity:${r.cant[niv]>0?'1':'.35'}">${r.cant[niv]}</td>`).join('')}
+      <td style="border:.5px solid var(--border)"></td>
+    </tr>`).join('')}
+  </tfoot></table></div>`;
+
+  el.innerHTML=html;
 }
 
 function nivelEstilo(nivel){
