@@ -245,7 +245,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.141</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.142</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -9320,19 +9320,19 @@ function renderMatrizCapacitacion(){
 
   let html=`<div class="grid-card" style="margin-bottom:1.5rem;overflow:auto;max-height:75vh">
     <table style="border-collapse:collapse;min-width:100%">
-      <thead style="position:sticky;top:0;z-index:5">
+      <thead>
         <tr>
-          <th rowspan="2" style="text-align:left;padding:8px 12px;background:var(--surface2);font-size:12px;border:.5px solid var(--border);min-width:160px;position:sticky;left:0;z-index:6">Empleado</th>`;
+          <th rowspan="2" style="text-align:left;padding:8px 12px;background:var(--surface2);font-size:12px;border:.5px solid var(--border);min-width:160px;position:sticky;top:0;left:0;z-index:7">Empleado</th>`;
   gruposPuestos.forEach(g=>{
     const emp=st.E.find(e=>e.id===g.eid);
     const nm=emp?.nombre||g.eid;const clr=emp?.color||'#888';
-    html+=`<th colspan="${g.puestos.length}" style="text-align:center;padding:6px 8px;background:${clr}18;color:${clr};font-size:12px;font-weight:700;border:.5px solid var(--border)">${nm}</th>`;
+    html+=`<th colspan="${g.puestos.length}" style="text-align:center;padding:6px 8px;background:${clr}18;color:${clr};font-size:12px;font-weight:700;border:.5px solid var(--border);position:sticky;top:0;z-index:5">${nm}</th>`;
   });
-  html+=`<th rowspan="2" style="text-align:center;padding:8px 10px;background:var(--surface2);font-size:11px;border:.5px solid var(--border);min-width:70px">Total</th>
+  html+=`<th rowspan="2" style="text-align:center;padding:8px 10px;background:var(--surface2);font-size:11px;border:.5px solid var(--border);min-width:70px;position:sticky;top:0;z-index:5">Total</th>
         </tr>
         <tr>`;
   todosPuestos.forEach(p=>{
-    html+=`<th style="text-align:center;padding:6px 8px;background:var(--surface2);font-size:11px;border:.5px solid var(--border);min-width:80px;max-width:100px;word-break:break-word;line-height:1.2">${p.nombre}</th>`;
+    html+=`<th style="text-align:center;padding:6px 8px;background:var(--surface2);font-size:11px;border:.5px solid var(--border);min-width:80px;max-width:100px;word-break:break-word;line-height:1.2;position:sticky;top:34px;z-index:5">${p.nombre}</th>`;
   });
   html+=`</tr></thead><tbody>`;
 
