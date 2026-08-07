@@ -245,7 +245,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.144</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.145</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -871,6 +871,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <div class="proy-subtabs">
     <button class="proy-tab active" id="rrhhtab-horarios" onclick="showRrhhTab('horarios')"><i class="ti ti-clock-hour-4"></i> Horarios</button>
     <button class="proy-tab" id="rrhhtab-indumentaria" onclick="showRrhhTab('indumentaria')"><i class="ti ti-shirt"></i> Indumentaria</button>
+    <button class="proy-tab" id="rrhhtab-personal" onclick="showRrhhTab('personal')"><i class="ti ti-id-badge-2"></i> Personal de estructura</button>
   </div>
 
   <!-- HORARIOS -->
@@ -919,8 +920,9 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <div style="display:flex;flex-direction:column;gap:12px">
           <div>
             <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Quién lo solicita</label>
-            <input type="text" id="ind-solicitante" placeholder="Nombre de quien pide la indumentaria"
-              style="width:100%;padding:8px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+            <select id="ind-solicitante" style="width:100%;padding:8px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+              <option value="">Seleccionar...</option>
+            </select>
           </div>
           <div>
             <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Para qué empleado</label>
@@ -946,6 +948,16 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       </div>
       <div id="ind-lista-content"></div>
     </div>
+  </div>
+
+  <!-- PERSONAL DE ESTRUCTURA -->
+  <div id="rrhh-sub-personal" style="display:none">
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Cargá acá al personal de estructura (administrativos, supervisores, etc.) para que después aparezcan como opción en "Quién lo solicita" al pedir indumentaria.</div>
+    <div class="add-bar" style="margin-bottom:1rem">
+      <input type="text" id="personal-nuevo-nombre" placeholder="Nombre del personal" style="width:240px"/>
+      <button class="btn btn-primary" onclick="agregarPersonalEstructura()"><i class="ti ti-plus"></i> Agregar</button>
+    </div>
+    <div id="personal-lista-content"></div>
   </div>
 </div>
 
@@ -6864,17 +6876,67 @@ async function initRrhh(){
 }
 
 function showRrhhTab(t){
-  ['horarios','indumentaria'].forEach(id=>{
+  ['horarios','indumentaria','personal'].forEach(id=>{
     document.getElementById('rrhh-sub-'+id).style.display=id===t?'block':'none';
     document.getElementById('rrhhtab-'+id).classList.toggle('active',id===t);
   });
   if(t==='horarios')initHorarios();
   if(t==='indumentaria')initIndumentaria();
+  if(t==='personal')cargarPersonalEstructura();
+}
+
+// ── PERSONAL DE ESTRUCTURA ───────────────────────────────────────
+let personalEstructuraData=[];
+
+async function cargarPersonalEstructura(){
+  const el=document.getElementById('personal-lista-content');
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
+  try{
+    personalEstructuraData=await get('personal_estructura','order=nombre.asc');
+    renderPersonalEstructura();
+  }catch(e){el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> Error: ${e.message}</div>`}
+}
+
+function renderPersonalEstructura(){
+  const el=document.getElementById('personal-lista-content');
+  if(!personalEstructuraData.length){el.innerHTML='<div class="empty"><i class="ti ti-id-badge-2-off"></i>Sin personal de estructura cargado.</div>';return}
+  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="text-align:left">Nombre</th><th style="width:60px"></th></tr></thead><tbody>';
+  personalEstructuraData.forEach(p=>{
+    h+=`<tr><td style="font-weight:500">${p.nombre}</td><td style="text-align:center"><button class="btn btn-xs btn-danger" onclick="eliminarPersonalEstructura(${p.id},'${p.nombre.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button></td></tr>`;
+  });
+  h+='</tbody></table></div>';
+  el.innerHTML=h;
+}
+
+async function agregarPersonalEstructura(){
+  const inp=document.getElementById('personal-nuevo-nombre');
+  const nombre=inp.value.trim();
+  if(!nombre){alert('Ingresá un nombre.');return}
+  try{
+    const res=await ins('personal_estructura',{nombre,activo:true});
+    if(res&&res[0])personalEstructuraData.push(res[0]);
+    personalEstructuraData.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    inp.value='';
+    renderPersonalEstructura();
+    // Refrescar el desplegable de "Quién lo solicita" por si Indumentaria ya se cargó
+    ind_solicitantesCargados=false;
+  }catch(e){alert('Error al agregar: '+e.message)}
+}
+
+async function eliminarPersonalEstructura(id,nombre){
+  if(!confirm(`¿Eliminar a "${nombre}" del personal de estructura?`))return;
+  try{
+    await del('personal_estructura',id);
+    personalEstructuraData=personalEstructuraData.filter(p=>p.id!==id);
+    renderPersonalEstructura();
+    ind_solicitantesCargados=false;
+  }catch(e){alert('Error al eliminar: '+e.message)}
 }
 
 // ── INDUMENTARIA ─────────────────────────────────────────────────
 const IND_ITEMS=['Calzado','Pantalón','Remera','Buzo','Cofia','Faja de seguridad'];
 let vestimentaSolicitadaData=[];
+let ind_solicitantesCargados=false;
 
 async function initIndumentaria(){
   if(!empleados.length)await loadEmpleados();
@@ -6892,6 +6954,17 @@ async function initIndumentaria(){
       });
       sel.appendChild(og);
     });
+  }
+  if(!ind_solicitantesCargados){
+    try{
+      personalEstructuraData=await get('personal_estructura','order=nombre.asc');
+      const selSol=document.getElementById('ind-solicitante');
+      selSol.innerHTML='<option value="">Seleccionar...</option>';
+      personalEstructuraData.forEach(p=>{
+        const o=document.createElement('option');o.value=p.nombre;o.textContent=p.nombre;selSol.appendChild(o);
+      });
+      ind_solicitantesCargados=true;
+    }catch(e){console.error('Error cargando personal de estructura:',e)}
   }
   renderIndItemsGrid();
   showIndumentariaTab('pedido');
@@ -6918,13 +6991,13 @@ function renderIndItemsGrid(){
 }
 
 async function guardarPedidoIndumentaria(){
-  const solicitante=document.getElementById('ind-solicitante').value.trim();
+  const solicitante=document.getElementById('ind-solicitante').value;
   const sel=document.getElementById('ind-empleado');
   const empleadoId=sel.value;
   const opt=sel.selectedOptions[0];
   const errEl=document.getElementById('ind-err');const msgEl=document.getElementById('ind-msg');
   errEl.style.display='none';msgEl.style.display='none';
-  if(!solicitante){document.getElementById('ind-err-txt').textContent='Ingresá quién solicita la indumentaria.';errEl.style.display='';return}
+  if(!solicitante){document.getElementById('ind-err-txt').textContent='Seleccioná quién solicita la indumentaria.';errEl.style.display='';return}
   if(!empleadoId){document.getElementById('ind-err-txt').textContent='Seleccioná para qué empleado es el pedido.';errEl.style.display='';return}
   const items={};
   document.querySelectorAll('#ind-items-grid input[data-item]').forEach(inp=>{
