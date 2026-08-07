@@ -245,7 +245,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.143</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.144</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -263,7 +263,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('stock')"><i class="ti ti-building-warehouse"></i>Stock</button>
   <button class="tab" onclick="T('cong')"><i class="ti ti-snowflake"></i>Congelado</button>
   <button class="tab" onclick="T('rec')"><i class="ti ti-notebook"></i>Recetas</button>
-  <button class="tab" onclick="T('hor')"><i class="ti ti-clock-hour-4"></i>Horarios</button>
+  <button class="tab" onclick="T('rrhh')"><i class="ti ti-users-group"></i>RRHH</button>
   <button class="tab" onclick="T('ped')"><i class="ti ti-shopping-cart"></i>Pedidos</button>
   <button class="tab" onclick="T('mae')"><i class="ti ti-building-factory-2"></i>Maestro</button>
   <button class="tab" onclick="T('etq')"><i class="ti ti-qrcode"></i>Etiquetas</button>
@@ -866,36 +866,87 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   </div>
 </div>
 
-<!-- HORARIOS -->
-<div id="tab-hor" class="section">
-  <div class="toolbar">
-    <div>
-      <div style="font-size:16px;font-weight:600">Horarios semanales</div>
-      <div style="font-size:13px;color:var(--text2)">Turnos de entrada y salida por empleado</div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <div class="week-nav">
-        <button class="btn btn-sm" onclick="changeHorSemana(-1)"><i class="ti ti-chevron-left"></i></button>
-        <span id="hor-wlabel" style="font-size:14px;font-weight:500;min-width:220px;text-align:center"></span>
-        <button class="btn btn-sm" onclick="changeHorSemana(1)"><i class="ti ti-chevron-right"></i></button>
+<!-- RRHH -->
+<div id="tab-rrhh" class="section">
+  <div class="proy-subtabs">
+    <button class="proy-tab active" id="rrhhtab-horarios" onclick="showRrhhTab('horarios')"><i class="ti ti-clock-hour-4"></i> Horarios</button>
+    <button class="proy-tab" id="rrhhtab-indumentaria" onclick="showRrhhTab('indumentaria')"><i class="ti ti-shirt"></i> Indumentaria</button>
+  </div>
+
+  <!-- HORARIOS -->
+  <div id="rrhh-sub-horarios">
+    <div class="toolbar">
+      <div>
+        <div style="font-size:16px;font-weight:600">Horarios semanales</div>
+        <div style="font-size:13px;color:var(--text2)">Turnos de entrada y salida por empleado</div>
       </div>
-      <select id="hor-esel" onchange="renderHorarios()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
-      <button class="btn" onclick="copiarSemanaAnterior()" title="Copiar horarios de la semana anterior" style="gap:6px"><i class="ti ti-copy"></i> Copiar sem. anterior</button>
-      <button class="btn btn-pdf" onclick="pdfHorarios()"><i class="ti ti-file-type-pdf"></i> PDF</button>
-      <button class="btn btn-primary" onclick="saveHorarios()"><i class="ti ti-device-floppy"></i> Guardar</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <div class="week-nav">
+          <button class="btn btn-sm" onclick="changeHorSemana(-1)"><i class="ti ti-chevron-left"></i></button>
+          <span id="hor-wlabel" style="font-size:14px;font-weight:500;min-width:220px;text-align:center"></span>
+          <button class="btn btn-sm" onclick="changeHorSemana(1)"><i class="ti ti-chevron-right"></i></button>
+        </div>
+        <select id="hor-esel" onchange="renderHorarios()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
+        <button class="btn" onclick="copiarSemanaAnterior()" title="Copiar horarios de la semana anterior" style="gap:6px"><i class="ti ti-copy"></i> Copiar sem. anterior</button>
+        <button class="btn btn-pdf" onclick="pdfHorarios()"><i class="ti ti-file-type-pdf"></i> PDF</button>
+        <button class="btn btn-primary" onclick="saveHorarios()"><i class="ti ti-device-floppy"></i> Guardar</button>
+      </div>
+    </div>
+    <!-- Agregar empleado -->
+    <div class="add-bar" style="margin-bottom:1rem">
+      <span style="font-size:13px;color:var(--text2)">Nuevo empleado:</span>
+      <input type="text" id="hor-nemp" placeholder="Nombre del empleado" style="width:200px"/>
+      <select id="hor-nemp-emp" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Sin empresa</option></select>
+      <button class="btn btn-primary" onclick="addEmpleado()"><i class="ti ti-plus"></i> Agregar</button>
+    </div>
+    <!-- Tabla de horarios -->
+    <div class="grid-card"><div class="grid-scroll" id="hor-grid"></div></div>
+    <div id="hor-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Horarios guardados.</div>
+    <div id="hor-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="hor-errtxt"></span></div>
+  </div>
+
+  <!-- INDUMENTARIA -->
+  <div id="rrhh-sub-indumentaria" style="display:none">
+    <div class="proy-subtabs" style="margin-bottom:1rem">
+      <button class="proy-tab active" id="indtab-pedido" onclick="showIndumentariaTab('pedido')"><i class="ti ti-plus"></i> Pedido de indumentaria</button>
+      <button class="proy-tab" id="indtab-lista" onclick="showIndumentariaTab('lista')"><i class="ti ti-list"></i> Vestimenta solicitada</button>
+    </div>
+
+    <!-- PEDIDO -->
+    <div id="ind-sub-pedido">
+      <div class="grid-card" style="max-width:560px">
+        <div style="font-size:14px;font-weight:600;margin-bottom:1rem">Nuevo pedido de indumentaria</div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div>
+            <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Quién lo solicita</label>
+            <input type="text" id="ind-solicitante" placeholder="Nombre de quien pide la indumentaria"
+              style="width:100%;padding:8px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Para qué empleado</label>
+            <select id="ind-empleado" style="width:100%;padding:8px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+              <option value="">Seleccionar empleado...</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:6px">Indumentaria solicitada (cantidad)</label>
+            <div id="ind-items-grid" style="display:grid;grid-template-columns:1fr 90px;gap:8px 12px;align-items:center"></div>
+          </div>
+          <button class="btn btn-primary" onclick="guardarPedidoIndumentaria()"><i class="ti ti-device-floppy"></i> Guardar pedido</button>
+        </div>
+        <div id="ind-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Pedido guardado.</div>
+        <div id="ind-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="ind-err-txt"></span></div>
+      </div>
+    </div>
+
+    <!-- VESTIMENTA SOLICITADA -->
+    <div id="ind-sub-lista" style="display:none">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="cargarVestimentaSolicitada()"><i class="ti ti-refresh"></i> Actualizar</button>
+      </div>
+      <div id="ind-lista-content"></div>
     </div>
   </div>
-  <!-- Agregar empleado -->
-  <div class="add-bar" style="margin-bottom:1rem">
-    <span style="font-size:13px;color:var(--text2)">Nuevo empleado:</span>
-    <input type="text" id="hor-nemp" placeholder="Nombre del empleado" style="width:200px"/>
-    <select id="hor-nemp-emp" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Sin empresa</option></select>
-    <button class="btn btn-primary" onclick="addEmpleado()"><i class="ti ti-plus"></i> Agregar</button>
-  </div>
-  <!-- Tabla de horarios -->
-  <div class="grid-card"><div class="grid-scroll" id="hor-grid"></div></div>
-  <div id="hor-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Horarios guardados.</div>
-  <div id="hor-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="hor-errtxt"></span></div>
 </div>
 
 <!-- PEDIDOS -->
@@ -1334,7 +1385,7 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['plan','rell','real','cmp','desv','dash','stock','cong','rec','rend','hor','ped','mae','etq','tren'];
+const TABS=['plan','rell','real','cmp','desv','dash','stock','cong','rec','rend','rrhh','ped','mae','etq','tren'];
 function T(t){
   document.querySelectorAll('.tab').forEach(el=>{
     const m=el.getAttribute('onclick')||'';
@@ -1349,7 +1400,7 @@ function T(t){
   if(t==='stock')initStock();
   if(t==='cong')initCongelado();
   if(t==='proy')initProy();
-  if(t==='hor')initHorarios();
+  if(t==='rrhh')initRrhh();
   if(t==='rec'){if(!st.Pr.length||!Object.keys(st.Rec).length){init().then(()=>rRec());}else{rRec();}}
   if(t==='con'){pSC();renderCon()}
   if(t==='mae')rMae();
@@ -6807,6 +6858,172 @@ async function copiarSemanaAnterior(){
   }catch(e){ss('error','Error');alert('Error: '+e.message);}
 }
 
+// ── RRHH ──────────────────────────────────────────────────────────
+async function initRrhh(){
+  showRrhhTab('horarios');
+}
+
+function showRrhhTab(t){
+  ['horarios','indumentaria'].forEach(id=>{
+    document.getElementById('rrhh-sub-'+id).style.display=id===t?'block':'none';
+    document.getElementById('rrhhtab-'+id).classList.toggle('active',id===t);
+  });
+  if(t==='horarios')initHorarios();
+  if(t==='indumentaria')initIndumentaria();
+}
+
+// ── INDUMENTARIA ─────────────────────────────────────────────────
+const IND_ITEMS=['Calzado','Pantalón','Remera','Buzo','Cofia','Faja de seguridad'];
+let vestimentaSolicitadaData=[];
+
+async function initIndumentaria(){
+  if(!empleados.length)await loadEmpleados();
+  const sel=document.getElementById('ind-empleado');
+  if(sel.options.length<=1){
+    const byE={};
+    empleados.forEach(e=>{const eid=e.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(e)});
+    Object.entries(byE).forEach(([eid,emps])=>{
+      const nm=eid!=='_'?(en(eid)||'Sin empresa'):'Sin empresa';
+      const og=document.createElement('optgroup');og.label=nm;
+      emps.forEach(e=>{
+        const o=document.createElement('option');o.value=e.id;
+        o.dataset.nombre=e.nombre;o.dataset.empresaId=e.empresa_id||'';
+        o.textContent=e.nombre;og.appendChild(o);
+      });
+      sel.appendChild(og);
+    });
+  }
+  renderIndItemsGrid();
+  showIndumentariaTab('pedido');
+}
+
+function showIndumentariaTab(t){
+  ['pedido','lista'].forEach(id=>{
+    document.getElementById('ind-sub-'+id).style.display=id===t?'block':'none';
+    document.getElementById('indtab-'+id).classList.toggle('active',id===t);
+  });
+  if(t==='lista')cargarVestimentaSolicitada();
+}
+
+function renderIndItemsGrid(){
+  const el=document.getElementById('ind-items-grid');
+  let h='';
+  IND_ITEMS.forEach(item=>{
+    const id=`ind-item-${item.replace(/[^a-zA-Z0-9]/g,'_')}`;
+    h+=`<label style="font-size:13px;color:var(--text)">${item}</label>
+      <input type="number" min="0" id="${id}" data-item="${item}" placeholder="0"
+        style="width:100%;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);text-align:right"/>`;
+  });
+  el.innerHTML=h;
+}
+
+async function guardarPedidoIndumentaria(){
+  const solicitante=document.getElementById('ind-solicitante').value.trim();
+  const sel=document.getElementById('ind-empleado');
+  const empleadoId=sel.value;
+  const opt=sel.selectedOptions[0];
+  const errEl=document.getElementById('ind-err');const msgEl=document.getElementById('ind-msg');
+  errEl.style.display='none';msgEl.style.display='none';
+  if(!solicitante){document.getElementById('ind-err-txt').textContent='Ingresá quién solicita la indumentaria.';errEl.style.display='';return}
+  if(!empleadoId){document.getElementById('ind-err-txt').textContent='Seleccioná para qué empleado es el pedido.';errEl.style.display='';return}
+  const items={};
+  document.querySelectorAll('#ind-items-grid input[data-item]').forEach(inp=>{
+    const v=parseFloat(inp.value)||0;
+    if(v>0)items[inp.dataset.item]=v;
+  });
+  if(!Object.keys(items).length){document.getElementById('ind-err-txt').textContent='Cargá al menos una cantidad de indumentaria.';errEl.style.display='';return}
+  try{
+    await ins('pedidos_indumentaria',{
+      fecha:hoyLocal(),
+      solicitante,
+      empleado_id:empleadoId,
+      empleado_nombre:opt?.dataset.nombre||'',
+      empresa_id:opt?.dataset.empresaId||null,
+      items,
+      entregado:false
+    });
+    document.getElementById('ind-solicitante').value='';
+    sel.value='';
+    document.querySelectorAll('#ind-items-grid input[data-item]').forEach(inp=>inp.value='');
+    msgEl.style.display='';
+    setTimeout(()=>msgEl.style.display='none',3000);
+  }catch(e){
+    document.getElementById('ind-err-txt').textContent='Error al guardar: '+e.message;
+    errEl.style.display='';
+  }
+}
+
+async function cargarVestimentaSolicitada(){
+  const el=document.getElementById('ind-lista-content');
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
+  try{
+    vestimentaSolicitadaData=await get('pedidos_indumentaria','order=fecha.desc,created_at.desc');
+    renderVestimentaSolicitada();
+  }catch(e){el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> Error: ${e.message}</div>`}
+}
+
+function renderVestimentaSolicitada(){
+  const el=document.getElementById('ind-lista-content');
+  if(!vestimentaSolicitadaData.length){el.innerHTML='<div class="empty"><i class="ti ti-shirt-off"></i>Sin pedidos de indumentaria todavía.</div>';return}
+  let h=`<div class="grid-card" style="overflow-x:auto"><table class="ptbl">
+    <thead><tr>
+      <th style="text-align:left">Solicitante</th>
+      <th style="text-align:left">Para</th>
+      <th style="text-align:left">Indumentaria</th>
+      <th style="text-align:center;width:100px">Fecha pedido</th>
+      <th style="text-align:center;width:80px">Entregado</th>
+      <th style="text-align:center;width:140px">Fecha entrega</th>
+    </tr></thead><tbody>`;
+  vestimentaSolicitadaData.forEach(p=>{
+    const itemsTxt=Object.entries(p.items||{}).map(([k,v])=>`${k} x${v}`).join(', ');
+    h+=`<tr>
+      <td style="font-weight:500">${p.solicitante}</td>
+      <td>${p.empleado_nombre}</td>
+      <td style="font-size:12px;color:var(--text2)">${itemsTxt||'--'}</td>
+      <td style="text-align:center;font-size:12px">${p.fecha?p.fecha.split('-').reverse().join('/'):'--'}</td>
+      <td style="text-align:center">
+        <input type="checkbox" ${p.entregado?'checked':''} onchange="toggleEntregado(${p.id},this.checked)" style="width:16px;height:16px;cursor:pointer"/>
+      </td>
+      <td style="text-align:center">
+        <input type="date" value="${p.fecha_entrega||''}" ${p.entregado?'':'disabled'} onchange="actualizarFechaEntrega(${p.id},this.value)"
+          style="padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      </td>
+    </tr>`;
+  });
+  h+=`</tbody></table></div>`;
+  el.innerHTML=h;
+}
+
+async function toggleEntregado(id,checked){
+  const p=vestimentaSolicitadaData.find(x=>x.id===id);
+  const fecha_entrega=checked?(p?.fecha_entrega||hoyLocal()):null;
+  try{
+    const res=await fetch(`${SB}/rest/v1/pedidos_indumentaria?id=eq.${id}`,{
+      method:'PATCH',headers:{...H,'Prefer':'return=representation'},
+      body:JSON.stringify({entregado:checked,fecha_entrega})
+    });
+    if(!res.ok)throw new Error(await res.text());
+    const rows=await res.json();
+    if(!rows.length)throw new Error('El servidor no modificó ninguna fila (revisá que RLS esté deshabilitado en pedidos_indumentaria)');
+    if(p){p.entregado=checked;p.fecha_entrega=fecha_entrega;}
+    renderVestimentaSolicitada();
+  }catch(e){alert('Error al actualizar: '+e.message)}
+}
+
+async function actualizarFechaEntrega(id,valor){
+  try{
+    const res=await fetch(`${SB}/rest/v1/pedidos_indumentaria?id=eq.${id}`,{
+      method:'PATCH',headers:{...H,'Prefer':'return=representation'},
+      body:JSON.stringify({fecha_entrega:valor||null})
+    });
+    if(!res.ok)throw new Error(await res.text());
+    const rows=await res.json();
+    if(!rows.length)throw new Error('El servidor no modificó ninguna fila (revisá que RLS esté deshabilitado en pedidos_indumentaria)');
+    const p=vestimentaSolicitadaData.find(x=>x.id===id);
+    if(p)p.fecha_entrega=valor||null;
+  }catch(e){alert('Error al actualizar: '+e.message)}
+}
+
 async function initHorarios(){
   horSemana=wk(new Date());
   if(!empleados.length) await loadEmpleados();
@@ -6999,7 +7216,7 @@ async function desactivarEmpleado(id){
 }
 
 async function saveHorarios(){
-  const btn=document.querySelector('#tab-hor .btn-primary');
+  const btn=document.querySelector('#rrhh-sub-horarios .btn-primary');
   if(btn){btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;}
   ss('saving','Guardando horarios...');
   try{
