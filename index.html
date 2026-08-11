@@ -269,6 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('mae')"><i class="ti ti-building-factory-2"></i>Maestro</button>
   <button class="tab" onclick="T('etq')"><i class="ti ti-qrcode"></i>Etiquetas</button>
   <button class="tab" onclick="T('tren')"><i class="ti ti-school"></i>Entrenamiento</button>
+  <button class="tab" onclick="T('planillas')"><i class="ti ti-file-text"></i>Planillas</button>
 </div>
 <div class="pad">
 
@@ -1247,6 +1248,26 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <button class="btn btn-primary" onclick="agregarPuesto()"><i class="ti ti-plus"></i> Agregar</button>
       </div>
       <div id="tren-puestos-lista"></div>
+    </div>
+  </div>
+</div>
+
+<!-- PLANILLAS -->
+<div id="tab-planillas" class="section">
+  <div class="toolbar">
+    <div>
+      <div style="font-size:16px;font-weight:600">Planillas</div>
+      <div style="font-size:13px;color:var(--text2)">Planillas para imprimir y completar a mano en fábrica</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+    <div class="grid-card" style="padding:1.25rem;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <i class="ti ti-scissors" style="font-size:20px;color:var(--amber)"></i>
+        <div style="font-size:14px;font-weight:600">Recortes</div>
+      </div>
+      <div style="font-size:12px;color:var(--text2)">Fecha, operario, tipo de recorte y kg — para completar a mano.</div>
+      <button class="btn btn-primary" onclick="imprimirPlanillaRecortes()"><i class="ti ti-printer"></i> Imprimir</button>
     </div>
   </div>
 </div>
@@ -10173,6 +10194,68 @@ async function eliminarPuesto(id){
     renderPuestosLista();
     ss('online','Eliminado');
   }catch(e){alert('Error: '+e.message)}
+}
+
+// ── PLANILLAS (para imprimir y completar a mano) ─────────────────
+function imprimirPlanillaRecortes(){
+  const NFILAS=26; // filas más grandes y cómodas para escribir, sigue entrando en una A4
+  let filas='';
+  for(let i=0;i<NFILAS;i++){
+    filas+=`<tr>
+      <td class="c-fecha"></td>
+      <td class="c-op"></td>
+      <td class="c-tipo"><span class="op">Criollo</span> / <span class="op">Hojaldre</span></td>
+      <td class="c-kg"></td>
+    </tr>`;
+  }
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Planilla de Recortes</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;color:#111}
+    .hoja{width:190mm;margin:0 auto;padding:6mm}
+    h1{font-size:13pt;text-align:center;margin-bottom:5mm;text-transform:uppercase;letter-spacing:1px}
+    .nota{font-size:8pt;text-align:center;color:#444;margin-bottom:4mm;font-style:italic}
+    table{width:100%;border-collapse:collapse}
+    th{background:#1B3A6B;color:#fff;padding:5px 8px;font-size:8.5pt;text-align:left;border:1px solid #1B3A6B}
+    th.th-fecha{width:22mm}
+    th.th-op{width:48mm}
+    th.th-tipo{width:60mm;text-align:center}
+    th.th-kg{width:30mm;text-align:center}
+    td{border:1px solid #999;height:9.5mm;font-size:9.5pt;padding:0 6px}
+    td.c-fecha{width:22mm}
+    td.c-op{width:48mm}
+    td.c-tipo{width:60mm;text-align:center;font-size:8.5pt;color:#666}
+    td.c-tipo .op{display:inline-block;padding:0 3px}
+    td.c-kg{width:30mm;text-align:center}
+    tr:nth-child(even) td{background:#fafafa}
+    @media print{
+      @page{size:A4;margin:8mm}
+      body{margin:0}
+      .hoja{width:100%;padding:0}
+    }
+  </style></head>
+  <body>
+    <div class="hoja">
+      <h1>Recortes</h1>
+      <div class="nota">Tachar el tipo de recorte que no corresponde</div>
+      <table>
+        <thead><tr>
+          <th class="th-fecha">Fecha</th>
+          <th class="th-op">Operario</th>
+          <th class="th-tipo">Tipo de recorte</th>
+          <th class="th-kg">KG</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},350)};<\/script>
+  </body></html>`;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para imprimir.');
 }
 </script>
 </body>
