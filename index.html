@@ -6,6 +6,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -871,7 +872,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <div class="proy-subtabs">
     <button class="proy-tab active" id="rrhhtab-horarios" onclick="showRrhhTab('horarios')"><i class="ti ti-clock-hour-4"></i> Horarios</button>
     <button class="proy-tab" id="rrhhtab-indumentaria" onclick="showRrhhTab('indumentaria')"><i class="ti ti-shirt"></i> Indumentaria</button>
-    <button class="proy-tab" id="rrhhtab-personal" onclick="showRrhhTab('personal')"><i class="ti ti-id-badge-2"></i> Personal de estructura</button>
+    <button class="proy-tab" id="rrhhtab-configuracion" onclick="showRrhhTab('configuracion')"><i class="ti ti-settings"></i> Configuración</button>
   </div>
 
   <!-- HORARIOS -->
@@ -950,14 +951,44 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     </div>
   </div>
 
-  <!-- PERSONAL DE ESTRUCTURA -->
-  <div id="rrhh-sub-personal" style="display:none">
-    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Cargá acá al personal de estructura (administrativos, supervisores, etc.) para que después aparezcan como opción en "Quién lo solicita" al pedir indumentaria.</div>
-    <div class="add-bar" style="margin-bottom:1rem">
-      <input type="text" id="personal-nuevo-nombre" placeholder="Nombre del personal" style="width:240px"/>
-      <button class="btn btn-primary" onclick="agregarPersonalEstructura()"><i class="ti ti-plus"></i> Agregar</button>
+  <!-- CONFIGURACION -->
+  <div id="rrhh-sub-configuracion" style="display:none">
+    <div class="proy-subtabs" style="margin-bottom:1rem">
+      <button class="proy-tab active" id="cfgtab-moi" onclick="showConfigTab('moi')"><i class="ti ti-id-badge-2"></i> MOI</button>
+      <button class="proy-tab" id="cfgtab-sucursal" onclick="showConfigTab('sucursal')"><i class="ti ti-building-store"></i> Persona de sucursal</button>
+      <button class="proy-tab" id="cfgtab-equipo" onclick="showConfigTab('equipo')"><i class="ti ti-shirt"></i> Equipo</button>
     </div>
-    <div id="personal-lista-content"></div>
+
+    <!-- MOI (ex Personal de estructura) -->
+    <div id="cfg-sub-moi">
+      <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Cargá acá al personal de estructura (MOI: administrativos, supervisores, etc.) para que después aparezcan como opción en "Quién lo solicita" al pedir indumentaria.</div>
+      <div class="add-bar" style="margin-bottom:1rem">
+        <input type="text" id="personal-nuevo-nombre" placeholder="Nombre del personal" style="width:240px"/>
+        <button class="btn btn-primary" onclick="agregarPersonalEstructura()"><i class="ti ti-plus"></i> Agregar</button>
+      </div>
+      <div id="personal-lista-content"></div>
+    </div>
+
+    <!-- PERSONA DE SUCURSAL -->
+    <div id="cfg-sub-sucursal" style="display:none">
+      <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Cargá acá al personal de sucursales.</div>
+      <div class="add-bar" style="margin-bottom:1rem">
+        <input type="text" id="persuc-nuevo-nombre" placeholder="Nombre del personal" style="width:240px"/>
+        <button class="btn btn-primary" onclick="agregarPersonalSucursal()"><i class="ti ti-plus"></i> Agregar</button>
+      </div>
+      <div id="persuc-lista-content"></div>
+    </div>
+
+    <!-- EQUIPO (config de indumentaria) -->
+    <div id="cfg-sub-equipo" style="display:none">
+      <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Cargá acá los items de indumentaria del equipo (pantalón, remera, buzo, etc.) con la cantidad estándar. Esta lista se refleja en "Pedido de indumentaria" y la cantidad queda pre-cargada pero se puede ajustar en cada pedido.</div>
+      <div class="add-bar" style="margin-bottom:1rem">
+        <input type="text" id="equipo-nuevo-item" placeholder="Nombre del item (ej: Remera)" style="width:200px"/>
+        <input type="number" min="0" id="equipo-nueva-cant" placeholder="Cant. estándar" style="width:130px"/>
+        <button class="btn btn-primary" onclick="agregarItemEquipo()"><i class="ti ti-plus"></i> Agregar</button>
+      </div>
+      <div id="equipo-lista-content"></div>
+    </div>
   </div>
 </div>
 
@@ -6876,16 +6907,31 @@ async function initRrhh(){
 }
 
 function showRrhhTab(t){
-  ['horarios','indumentaria','personal'].forEach(id=>{
+  ['horarios','indumentaria','configuracion'].forEach(id=>{
     document.getElementById('rrhh-sub-'+id).style.display=id===t?'block':'none';
     document.getElementById('rrhhtab-'+id).classList.toggle('active',id===t);
   });
   if(t==='horarios')initHorarios();
   if(t==='indumentaria')initIndumentaria();
-  if(t==='personal')cargarPersonalEstructura();
+  if(t==='configuracion')initConfigRrhh();
 }
 
-// ── PERSONAL DE ESTRUCTURA ───────────────────────────────────────
+// ── CONFIGURACION (MOI / Persona de sucursal / Equipo) ───────────
+function initConfigRrhh(){
+  showConfigTab('moi');
+}
+
+function showConfigTab(t){
+  ['moi','sucursal','equipo'].forEach(id=>{
+    document.getElementById('cfg-sub-'+id).style.display=id===t?'block':'none';
+    document.getElementById('cfgtab-'+id).classList.toggle('active',id===t);
+  });
+  if(t==='moi')cargarPersonalEstructura();
+  if(t==='sucursal')cargarPersonalSucursal();
+  if(t==='equipo')cargarEquipoIndumentaria();
+}
+
+// ── PERSONAL DE ESTRUCTURA (MOI) ─────────────────────────────────
 let personalEstructuraData=[];
 
 async function cargarPersonalEstructura(){
@@ -6937,8 +6983,131 @@ async function eliminarPersonalEstructura(id,nombre){
   }catch(e){alert('Error al eliminar: '+e.message)}
 }
 
+// ── PERSONA DE SUCURSAL ───────────────────────────────────────────
+let personalSucursalData=[];
+
+async function cargarPersonalSucursal(){
+  const el=document.getElementById('persuc-lista-content');
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
+  try{
+    personalSucursalData=await get('personal_sucursal','order=nombre.asc');
+    renderPersonalSucursal();
+  }catch(e){el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> Error: ${e.message}</div>`}
+}
+
+function renderPersonalSucursal(){
+  const el=document.getElementById('persuc-lista-content');
+  if(!personalSucursalData.length){el.innerHTML='<div class="empty"><i class="ti ti-building-store"></i>Sin personal de sucursal cargado.</div>';return}
+  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="text-align:left">Nombre</th><th style="width:60px"></th></tr></thead><tbody>';
+  personalSucursalData.forEach(p=>{
+    h+=`<tr><td style="font-weight:500">${p.nombre}</td><td style="text-align:center"><button class="btn btn-xs btn-danger" onclick="eliminarPersonalSucursal(${p.id},'${p.nombre.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button></td></tr>`;
+  });
+  h+='</tbody></table></div>';
+  el.innerHTML=h;
+}
+
+async function agregarPersonalSucursal(){
+  const inp=document.getElementById('persuc-nuevo-nombre');
+  const nombre=inp.value.trim();
+  if(!nombre){alert('Ingresá un nombre.');return}
+  if(personalSucursalData.find(p=>p.nombre.toLowerCase()===nombre.toLowerCase())){
+    alert(`"${nombre}" ya está cargado en la lista.`);
+    return;
+  }
+  try{
+    const res=await ins('personal_sucursal',{nombre,activo:true});
+    if(res&&res[0])personalSucursalData.push(res[0]);
+    personalSucursalData.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    inp.value='';
+    renderPersonalSucursal();
+  }catch(e){alert('Error al agregar: '+e.message)}
+}
+
+async function eliminarPersonalSucursal(id,nombre){
+  if(!confirm(`¿Eliminar a "${nombre}" del personal de sucursal?`))return;
+  try{
+    await del('personal_sucursal',id);
+    personalSucursalData=personalSucursalData.filter(p=>p.id!==id);
+    renderPersonalSucursal();
+  }catch(e){alert('Error al eliminar: '+e.message)}
+}
+
+// ── EQUIPO (config de indumentaria — items y cantidad estándar) ──
+let equipoIndumentariaData=[];
+let equipoCargado=false;
+
+async function cargarEquipoIndumentaria(){
+  const el=document.getElementById('equipo-lista-content');
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
+  try{
+    equipoIndumentariaData=await get('equipo_indumentaria','order=orden.asc,item.asc');
+    equipoCargado=true;
+    renderEquipoIndumentaria();
+  }catch(e){el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> Error: ${e.message}</div>`}
+}
+
+function renderEquipoIndumentaria(){
+  const el=document.getElementById('equipo-lista-content');
+  if(!equipoIndumentariaData.length){el.innerHTML='<div class="empty"><i class="ti ti-shirt-off"></i>Sin items de equipo cargados. Agregá el primero (ej: Remera).</div>';return}
+  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="text-align:left">Item</th><th style="width:160px;text-align:right">Cant. estándar</th><th style="width:60px"></th></tr></thead><tbody>';
+  equipoIndumentariaData.forEach(it=>{
+    h+=`<tr>
+      <td style="font-weight:500">${it.item}</td>
+      <td style="text-align:right">
+        <input type="number" min="0" value="${it.cantidad_estandar||0}"
+          style="width:90px;padding:4px 8px;font-size:13px;text-align:right;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
+          onchange="actualizarCantidadEquipo(${it.id},this.value)"/>
+      </td>
+      <td style="text-align:center"><button class="btn btn-xs btn-danger" onclick="eliminarItemEquipo(${it.id},'${it.item.replace(/'/g,"\\'")}')"><i class="ti ti-trash"></i></button></td>
+    </tr>`;
+  });
+  h+='</tbody></table></div>';
+  el.innerHTML=h;
+}
+
+async function agregarItemEquipo(){
+  const inpNom=document.getElementById('equipo-nuevo-item');
+  const inpCant=document.getElementById('equipo-nueva-cant');
+  const item=inpNom.value.trim();
+  const cantidad_estandar=parseFloat(inpCant.value)||0;
+  if(!item){alert('Ingresá el nombre del item.');return}
+  if(equipoIndumentariaData.find(x=>x.item.toLowerCase()===item.toLowerCase())){
+    alert(`"${item}" ya está en la lista.`);
+    return;
+  }
+  try{
+    const res=await ins('equipo_indumentaria',{item,cantidad_estandar,orden:equipoIndumentariaData.length});
+    if(res&&res[0])equipoIndumentariaData.push(res[0]);
+    inpNom.value='';inpCant.value='';
+    renderEquipoIndumentaria();
+    equipoCargado=false; // forzar recarga la próxima vez que se abra el pedido
+  }catch(e){alert('Error al agregar: '+e.message)}
+}
+
+async function actualizarCantidadEquipo(id,valor){
+  const cantidad_estandar=parseFloat(valor)||0;
+  try{
+    await fetch(`${SB}/rest/v1/equipo_indumentaria?id=eq.${id}`,{
+      method:'PATCH',headers:{...H,'Prefer':'return=minimal'},
+      body:JSON.stringify({cantidad_estandar})
+    });
+    const it=equipoIndumentariaData.find(x=>x.id===id);
+    if(it)it.cantidad_estandar=cantidad_estandar;
+    equipoCargado=false;
+  }catch(e){alert('Error al actualizar: '+e.message)}
+}
+
+async function eliminarItemEquipo(id,item){
+  if(!confirm(`¿Eliminar "${item}" del equipo?`))return;
+  try{
+    await del('equipo_indumentaria',id);
+    equipoIndumentariaData=equipoIndumentariaData.filter(x=>x.id!==id);
+    renderEquipoIndumentaria();
+    equipoCargado=false;
+  }catch(e){alert('Error al eliminar: '+e.message)}
+}
+
 // ── INDUMENTARIA ─────────────────────────────────────────────────
-const IND_ITEMS=['Calzado','Pantalón','Remera','Buzo','Cofia','Faja de seguridad'];
 let vestimentaSolicitadaData=[];
 let ind_solicitantesCargados=false;
 
@@ -6970,6 +7139,12 @@ async function initIndumentaria(){
       ind_solicitantesCargados=true;
     }catch(e){console.error('Error cargando personal de estructura:',e)}
   }
+  if(!equipoCargado){
+    try{
+      equipoIndumentariaData=await get('equipo_indumentaria','order=orden.asc,item.asc');
+      equipoCargado=true;
+    }catch(e){console.error('Error cargando equipo de indumentaria:',e)}
+  }
   renderIndItemsGrid();
   showIndumentariaTab('pedido');
 }
@@ -6984,11 +7159,15 @@ function showIndumentariaTab(t){
 
 function renderIndItemsGrid(){
   const el=document.getElementById('ind-items-grid');
+  if(!equipoIndumentariaData.length){
+    el.innerHTML='<div style="grid-column:1/-1;font-size:12px;color:var(--text2)"><i class="ti ti-info-circle"></i> Sin items de equipo configurados. Cargalos en RRHH → Configuración → Equipo.</div>';
+    return;
+  }
   let h='';
-  IND_ITEMS.forEach(item=>{
-    const id=`ind-item-${item.replace(/[^a-zA-Z0-9]/g,'_')}`;
-    h+=`<label style="font-size:13px;color:var(--text)">${item}</label>
-      <input type="number" min="0" id="${id}" data-item="${item}" placeholder="0"
+  equipoIndumentariaData.forEach(it=>{
+    const id=`ind-item-${it.item.replace(/[^a-zA-Z0-9]/g,'_')}`;
+    h+=`<label style="font-size:13px;color:var(--text)">${it.item}</label>
+      <input type="number" min="0" id="${id}" data-item="${it.item}" value="${it.cantidad_estandar>0?it.cantidad_estandar:''}" placeholder="0"
         style="width:100%;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);text-align:right"/>`;
   });
   el.innerHTML=h;
