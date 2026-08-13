@@ -7,6 +7,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -246,7 +247,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.146</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.147</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -268,7 +269,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('ped')"><i class="ti ti-shopping-cart"></i>Pedidos</button>
   <button class="tab" onclick="T('mae')"><i class="ti ti-building-factory-2"></i>Maestro</button>
   <button class="tab" onclick="T('etq')"><i class="ti ti-qrcode"></i>Etiquetas</button>
-  <button class="tab" onclick="T('tren')"><i class="ti ti-school"></i>Entrenamiento</button>
   <button class="tab" onclick="T('planillas')"><i class="ti ti-file-text"></i>Planillas</button>
 </div>
 <div class="pad">
@@ -874,6 +874,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab active" id="rrhhtab-horarios" onclick="showRrhhTab('horarios')"><i class="ti ti-clock-hour-4"></i> Horarios</button>
     <button class="proy-tab" id="rrhhtab-indumentaria" onclick="showRrhhTab('indumentaria')"><i class="ti ti-shirt"></i> Indumentaria</button>
     <button class="proy-tab" id="rrhhtab-configuracion" onclick="showRrhhTab('configuracion')"><i class="ti ti-settings"></i> Configuración</button>
+    <button class="proy-tab" id="rrhhtab-entrenamiento" onclick="showRrhhTab('entrenamiento')"><i class="ti ti-school"></i> Entrenamiento</button>
   </div>
 
   <!-- HORARIOS -->
@@ -991,6 +992,76 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <div id="equipo-lista-content"></div>
     </div>
   </div>
+
+  <!-- ENTRENAMIENTO (dentro de RRHH) -->
+<div id="rrhh-sub-entrenamiento" style="display:none">
+  <div class="toolbar">
+    <div>
+      <div style="font-size:16px;font-weight:600">Entrenamiento</div>
+      <div style="font-size:13px;color:var(--text2)">Matriz de capacitación y plan de entrenamiento por empresa</div>
+    </div>
+    <div class="btns">
+      <select id="tren-esel" onchange="initEntrenamiento()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
+    </div>
+  </div>
+
+  <div class="proy-subtabs">
+    <button class="proy-tab active" id="ttab-matriz" onclick="showTrenTab('matriz')"><i class="ti ti-table"></i> Matriz de capacitación</button>
+    <button class="proy-tab" id="ttab-plan" onclick="showTrenTab('plan')"><i class="ti ti-calendar-event"></i> Plan de entrenamiento</button>
+    <button class="proy-tab" id="ttab-puestos" onclick="showTrenTab('puestos')"><i class="ti ti-settings"></i> Gestionar puestos</button>
+  </div>
+
+  <!-- MATRIZ -->
+  <div id="tren-sub-matriz">
+    <div class="alert alert-info" style="margin-bottom:1rem;display:block">
+      <div><i class="ti ti-info-circle"></i> Elegí el nivel de cada empleado en cada puesto:
+        <span style="margin-left:6px"><b>0-1</b> En entrenamiento</span> ·
+        <span><b>2</b> Principiante</span> ·
+        <span><b>3</b> Intermedio</span> ·
+        <span><b>4</b> Sabe</span> ·
+        <span><b>5</b> Destacado</span>
+      </div>
+      <details style="margin-top:8px">
+        <summary style="cursor:pointer;font-size:12px;color:var(--blue)">Ver criterios de evaluación completos</summary>
+        <div style="margin-top:10px;display:flex;flex-direction:column;gap:10px;font-size:12px;color:var(--text)">
+          <div><b>0-1 · En Entrenamiento</b><br>El aprendiz está en una fase inicial del aprendizaje y no tiene aún las habilidades suficientes para realizar la tarea sin supervisión. Necesita orientación constante y aún no ha practicado la tarea de manera autónoma. El puntaje será <b>0</b> si no ha comenzado el proceso de aprendizaje, o <b>1</b> si ha demostrado alguna capacidad para realizar la tarea con supervisión constante.</div>
+          <div><b>2 · Principiante</b><br>Tiene nociones básicas del puesto, pero necesita supervisión constante. Ha realizado la tarea de manera autónoma en muy pocas ocasiones, sin demostrar dominio total. Comete errores frecuentes, aunque está aprendiendo a corregirlos bajo supervisión.</div>
+          <div><b>3 · Intermedio</b><br>Tiene noción técnica del puesto y realiza la tarea de forma autónoma con intervención mínima. Puede completar las tareas correctamente, pero aún necesita orientación ocasional o en situaciones más complejas.</div>
+          <div><b>4 · Sabe</b><br>Puede realizar todas las tareas de forma autónoma con mínima supervisión. Los errores son poco frecuentes y, cuando ocurren, es capaz de corregirlos sin intervención. Muestra dominio en el puesto y puede completar tareas de manera consistente.</div>
+          <div><b>5 · Destacado</b><br>No solo ejecuta las tareas de manera autónoma, sino que también identifica y corrige errores sin supervisión. Demuestra una comprensión profunda del puesto y es capaz de optimizar procesos. Se muestra proactivo al identificar oportunidades de mejora en su trabajo y el de otros.</div>
+        </div>
+      </details>
+    </div>
+    <div id="tren-matriz-content"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+      <button class="btn btn-primary" onclick="guardarMatrizCapacitacion()"><i class="ti ti-device-floppy"></i> Guardar</button>
+    </div>
+  </div>
+
+  <!-- PLAN -->
+  <div id="tren-sub-plan" style="display:none">
+    <div class="alert alert-info" style="margin-bottom:1rem">
+      <i class="ti ti-info-circle"></i> Si el empleado no está capacitado en un puesto, podés programar las fechas de entrenamiento. Los capacitados se muestran en verde automáticamente.
+    </div>
+    <div id="tren-plan-content"></div>
+    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
+      <button class="btn btn-primary" onclick="guardarPlanEntrenamiento()"><i class="ti ti-device-floppy"></i> Guardar plan</button>
+    </div>
+  </div>
+
+  <!-- PUESTOS -->
+  <div id="tren-sub-puestos" style="display:none">
+    <div class="grid-card" style="max-width:500px">
+      <div style="font-size:14px;font-weight:600;margin-bottom:1rem">Puestos por empresa</div>
+      <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
+        <select id="tren-puesto-esel" style="flex:1;padding:8px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Seleccionar empresa...</option></select>
+        <input type="text" id="tren-puesto-nombre" placeholder="Nombre del puesto" style="flex:2;padding:8px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        <button class="btn btn-primary" onclick="agregarPuesto()"><i class="ti ti-plus"></i> Agregar</button>
+      </div>
+      <div id="tren-puestos-lista"></div>
+    </div>
+  </div>
+</div>
 </div>
 
 <!-- PEDIDOS -->
@@ -1046,7 +1117,10 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <div id="tab-mae" class="section">
   <div class="toolbar">
     <div><div style="font-size:16px;font-weight:600">Maestro</div><div style="font-size:13px;color:var(--text2)">Empresas &rarr; Areas &rarr; Productos</div></div>
-    <button class="btn btn-sm" onclick="toggleMapeoJoselito()"><i class="ti ti-link"></i> Mapeo Joselito</button>
+    <div class="btns">
+      <button class="btn btn-sm" onclick="exportarMaestroExcel()"><i class="ti ti-file-spreadsheet"></i> Exportar Excel</button>
+      <button class="btn btn-sm" onclick="toggleMapeoJoselito()"><i class="ti ti-link"></i> Mapeo Joselito</button>
+    </div>
   </div>
 
   <!-- PANEL MAPEO JOSELITO -->
@@ -1181,77 +1255,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div id="etq-stock-content"></div>
   </div>
 </div>
-
-<!-- ENTRENAMIENTO -->
-<div id="tab-tren" class="section">
-  <div class="toolbar">
-    <div>
-      <div style="font-size:16px;font-weight:600">Entrenamiento</div>
-      <div style="font-size:13px;color:var(--text2)">Matriz de capacitación y plan de entrenamiento por empresa</div>
-    </div>
-    <div class="btns">
-      <select id="tren-esel" onchange="initEntrenamiento()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
-    </div>
-  </div>
-
-  <div class="proy-subtabs">
-    <button class="proy-tab active" id="ttab-matriz" onclick="showTrenTab('matriz')"><i class="ti ti-table"></i> Matriz de capacitación</button>
-    <button class="proy-tab" id="ttab-plan" onclick="showTrenTab('plan')"><i class="ti ti-calendar-event"></i> Plan de entrenamiento</button>
-    <button class="proy-tab" id="ttab-puestos" onclick="showTrenTab('puestos')"><i class="ti ti-settings"></i> Gestionar puestos</button>
-  </div>
-
-  <!-- MATRIZ -->
-  <div id="tren-sub-matriz">
-    <div class="alert alert-info" style="margin-bottom:1rem;display:block">
-      <div><i class="ti ti-info-circle"></i> Elegí el nivel de cada empleado en cada puesto:
-        <span style="margin-left:6px"><b>0-1</b> En entrenamiento</span> ·
-        <span><b>2</b> Principiante</span> ·
-        <span><b>3</b> Intermedio</span> ·
-        <span><b>4</b> Sabe</span> ·
-        <span><b>5</b> Destacado</span>
-      </div>
-      <details style="margin-top:8px">
-        <summary style="cursor:pointer;font-size:12px;color:var(--blue)">Ver criterios de evaluación completos</summary>
-        <div style="margin-top:10px;display:flex;flex-direction:column;gap:10px;font-size:12px;color:var(--text)">
-          <div><b>0-1 · En Entrenamiento</b><br>El aprendiz está en una fase inicial del aprendizaje y no tiene aún las habilidades suficientes para realizar la tarea sin supervisión. Necesita orientación constante y aún no ha practicado la tarea de manera autónoma. El puntaje será <b>0</b> si no ha comenzado el proceso de aprendizaje, o <b>1</b> si ha demostrado alguna capacidad para realizar la tarea con supervisión constante.</div>
-          <div><b>2 · Principiante</b><br>Tiene nociones básicas del puesto, pero necesita supervisión constante. Ha realizado la tarea de manera autónoma en muy pocas ocasiones, sin demostrar dominio total. Comete errores frecuentes, aunque está aprendiendo a corregirlos bajo supervisión.</div>
-          <div><b>3 · Intermedio</b><br>Tiene noción técnica del puesto y realiza la tarea de forma autónoma con intervención mínima. Puede completar las tareas correctamente, pero aún necesita orientación ocasional o en situaciones más complejas.</div>
-          <div><b>4 · Sabe</b><br>Puede realizar todas las tareas de forma autónoma con mínima supervisión. Los errores son poco frecuentes y, cuando ocurren, es capaz de corregirlos sin intervención. Muestra dominio en el puesto y puede completar tareas de manera consistente.</div>
-          <div><b>5 · Destacado</b><br>No solo ejecuta las tareas de manera autónoma, sino que también identifica y corrige errores sin supervisión. Demuestra una comprensión profunda del puesto y es capaz de optimizar procesos. Se muestra proactivo al identificar oportunidades de mejora en su trabajo y el de otros.</div>
-        </div>
-      </details>
-    </div>
-    <div id="tren-matriz-content"></div>
-    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
-      <button class="btn btn-primary" onclick="guardarMatrizCapacitacion()"><i class="ti ti-device-floppy"></i> Guardar</button>
-    </div>
-  </div>
-
-  <!-- PLAN -->
-  <div id="tren-sub-plan" style="display:none">
-    <div class="alert alert-info" style="margin-bottom:1rem">
-      <i class="ti ti-info-circle"></i> Si el empleado no está capacitado en un puesto, podés programar las fechas de entrenamiento. Los capacitados se muestran en verde automáticamente.
-    </div>
-    <div id="tren-plan-content"></div>
-    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
-      <button class="btn btn-primary" onclick="guardarPlanEntrenamiento()"><i class="ti ti-device-floppy"></i> Guardar plan</button>
-    </div>
-  </div>
-
-  <!-- PUESTOS -->
-  <div id="tren-sub-puestos" style="display:none">
-    <div class="grid-card" style="max-width:500px">
-      <div style="font-size:14px;font-weight:600;margin-bottom:1rem">Puestos por empresa</div>
-      <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap">
-        <select id="tren-puesto-esel" style="flex:1;padding:8px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Seleccionar empresa...</option></select>
-        <input type="text" id="tren-puesto-nombre" placeholder="Nombre del puesto" style="flex:2;padding:8px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-        <button class="btn btn-primary" onclick="agregarPuesto()"><i class="ti ti-plus"></i> Agregar</button>
-      </div>
-      <div id="tren-puestos-lista"></div>
-    </div>
-  </div>
-</div>
-
 <!-- PLANILLAS -->
 <div id="tab-planillas" class="section">
   <div class="toolbar">
@@ -1449,7 +1452,7 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['plan','rell','real','cmp','desv','dash','stock','cong','rec','rend','rrhh','ped','mae','etq','tren'];
+const TABS=['plan','rell','real','cmp','desv','dash','stock','cong','rec','rend','rrhh','ped','mae','etq'];
 function T(t){
   document.querySelectorAll('.tab').forEach(el=>{
     const m=el.getAttribute('onclick')||'';
@@ -1472,7 +1475,6 @@ function T(t){
   if(t==='ped')initPedidos();
   if(t==='etq')initEtiquetas();
   if(t==='rell')initRellenos();
-  if(t==='tren')initEntrenamiento();
 }
 function pS(id){
   const s=document.getElementById(id);const c=s.value||st.w;
@@ -2766,6 +2768,7 @@ function rAreaList(eid){
       const cnt=st.Pr.filter(p=>p.area_id===a.id).length;const sel=a.id===st.aaid;
       h+=`<div class="m-row${sel?' sel':''}" onclick="selArea('${a.id}')">
         <div style="flex:1;min-width:0"><div class="m-name">${a.nombre}</div><div class="m-meta">${cnt} prod.</div></div>
+        <button class="btn btn-xs" onclick="event.stopPropagation();renombrarArea('${a.id}')" title="Renombrar área"><i class="ti ti-pencil"></i></button>
         <button class="btn btn-xs btn-danger" onclick="event.stopPropagation();delArea('${a.id}')"><i class="ti ti-trash"></i></button>
       </div>`;
     });
@@ -3142,6 +3145,72 @@ async function updP(id,f,v){
     ss('error','Error al actualizar');
     alert('No se pudo guardar el cambio: '+e.message);
   }
+}
+
+async function renombrarArea(id){
+  const area=st.A.find(a=>a.id===id);
+  if(!area)return;
+  const nuevoNombre=prompt('Nuevo nombre para el área:',area.nombre);
+  if(nuevoNombre===null)return;
+  const nombreLimpio=nuevoNombre.trim();
+  if(!nombreLimpio||nombreLimpio===area.nombre)return;
+  const nombreViejo=area.nombre;
+  ss('saving','Renombrando área...');
+  try{
+    const res=await fetch(`${SB}/rest/v1/areas?id=eq.${id}`,{
+      method:'PATCH',
+      headers:{...H,'Prefer':'return=representation'},
+      body:JSON.stringify({nombre:nombreLimpio})
+    });
+    if(!res.ok)throw new Error(await res.text());
+    const rows=await res.json();
+    if(!rows.length)throw new Error('El servidor no modificó ninguna fila (revisá que RLS esté deshabilitado en areas)');
+    area.nombre=nombreLimpio;
+    await propagarCambioNombreArea(area.empresa_id,nombreViejo,nombreLimpio);
+    rAreaList(area.empresa_id);
+    rMae();
+    ss('online','Área renombrada ✓');
+  }catch(e){
+    ss('error','Error');
+    alert('No se pudo renombrar: '+e.message);
+  }
+}
+
+async function propagarCambioNombreArea(empresa_id,nombreViejo,nombreNuevo){
+  const tablas=['proyeccion_diaria','mix_ventas','stock_seguridad','cajas_producto','causas','rendimiento_proceso','deposito_productos'];
+  for(const tabla of tablas){
+    try{
+      const filtro=`area=eq.${encodeURIComponent(nombreViejo)}&empresa_id=eq.${empresa_id}`;
+      await fetch(`${SB}/rest/v1/${tabla}?${filtro}`,{
+        method:'PATCH',
+        headers:{...H,'Prefer':'return=minimal'},
+        body:JSON.stringify({area:nombreNuevo})
+      });
+    }catch{}
+  }
+  // Actualizar planes (JSON con filas) — actualiza el nombre de área en los planes ya guardados
+  try{
+    const planesData=await get('planes','select=id,semana,filas');
+    for(const plan of planesData){
+      if(!plan.filas)continue;
+      let modificado=false;
+      const filas=plan.filas.map(f=>{
+        if(f.empresa_id===empresa_id&&f.area===nombreViejo){
+          modificado=true;
+          return {...f,area:nombreNuevo};
+        }
+        return f;
+      });
+      if(modificado){
+        await fetch(`${SB}/rest/v1/planes?id=eq.${plan.id}`,{
+          method:'PATCH',
+          headers:{...H,'Prefer':'return=minimal'},
+          body:JSON.stringify({filas})
+        });
+        if(st.P[plan.semana])st.P[plan.semana]=filas;
+      }
+    }
+  }catch{}
 }
 
 async function propagarCambioNombreProducto(empresa_id, nombreViejo, nombreNuevo, area_id){
@@ -6928,13 +6997,14 @@ async function initRrhh(){
 }
 
 function showRrhhTab(t){
-  ['horarios','indumentaria','configuracion'].forEach(id=>{
+  ['horarios','indumentaria','configuracion','entrenamiento'].forEach(id=>{
     document.getElementById('rrhh-sub-'+id).style.display=id===t?'block':'none';
     document.getElementById('rrhhtab-'+id).classList.toggle('active',id===t);
   });
   if(t==='horarios')initHorarios();
   if(t==='indumentaria')initIndumentaria();
   if(t==='configuracion')initConfigRrhh();
+  if(t==='entrenamiento')initEntrenamiento();
 }
 
 // ── CONFIGURACION (MOI / Persona de sucursal / Equipo) ───────────
@@ -9235,6 +9305,37 @@ async function importarExcelAConteo(input){
 const JOSELITO_CSV=[{"codigo": "30200201", "desc": "AGNOLOTTIS POR KILOS", "rubro": "ÑOQUIS Y PASTAS RELLENAS"}, {"codigo": "30200601", "desc": "CANELONES POR KILOS", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200602", "desc": "FIAMBRE ALEMAN POR UNIDAD (APROX. 1KG.)", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200502", "desc": "FUCCILES PAQUETE 500 GRS.", "rubro": "FIDEOS ESPECIALES"}, {"codigo": "30200501", "desc": "FUCCILES POR KILOS", "rubro": "FIDEOS ESPECIALES"}, {"codigo": "30200603", "desc": "LASAGNA POR KILOS", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200604", "desc": "MASA DE LASAGNA 50X60 INDUSTRIAL POR KILOS", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200605", "desc": "MASA DE TALLARINES/LASAGNA POR KILOS", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200606", "desc": "MASA HOJALDRE POR KILOS", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200504", "desc": "MOSTACHOLES PAQUETE 500 GRS.", "rubro": "FIDEOS ESPECIALES"}, {"codigo": "30200503", "desc": "MOSTACHOLES POR KILOS", "rubro": "FIDEOS ESPECIALES"}, {"codigo": "30200213", "desc": "ÑOQUIS DE PAPAS PAQUETE 500 GRS.", "rubro": "ÑOQUIS Y PASTAS RELLENAS"}, {"codigo": "30200212", "desc": "ÑOQUIS DE PAPAS POR KILOS", "rubro": "ÑOQUIS Y PASTAS RELLENAS"}, {"codigo": "30200607", "desc": "PANQUEQUES POR 12 UNIDADES", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200610", "desc": "PASTELES DE MEMBRILLO CAJA POR 6 UNIDADES", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200611", "desc": "PASTELES DE MEMBRILLO MASA CRUDA CAJA POR 60 UNIDADES", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200612", "desc": "PASTELES DE MEMBRILLO POR UNIDAD", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200613", "desc": "PIZZA DE MOZZA UNIDAD", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200614", "desc": "PIZZA DE MOZZA, JAMON Y ACEITUNAS UNIDAD", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200615", "desc": "PIZZA DE MOZZA, JAMON, MORRON Y HUEVO UNIDAD", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200616", "desc": "PRE-PIZZAS UNIDAD", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200617", "desc": "QUESO SARDO RALLADO BOLSA 100 GRS.", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200618", "desc": "QUESO SARDO RALLADO POR KILOS", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200202", "desc": "RAVIOLES DE CUATRO QUESOS CAJA POR 96 UNIDADES", "rubro": "ÑOQUIS Y PASTAS RELLENAS"}, {"codigo": "30200203", "desc": "RAVIOLES DE JAMON Y QUESO CAJA POR 96 UNIDADES", "rubro": "ÑOQUIS Y PASTAS RELLENAS"}, {"codigo": "30200204", "desc": "RAVIOLES DE POLLO Y VERDURA CAJA POR 96 UNIDADES", "rubro": "ÑOQUIS Y PASTAS RELLENAS"}, {"codigo": "30200205", "desc": "RAVIOLES DE RICOTA CAJA POR 96 UNIDADES", "rubro": "ÑOQUIS Y PASTAS RELLENAS"}, {"codigo": "30200206", "desc": "RAVIOLES DE RICOTA CON JAMON CAJA POR 96 UNIDADES", "rubro": "ÑOQUIS Y PASTAS RELLENAS"}, {"codigo": "30200207", "desc": "RAVIOLES DE VERDURA CAJA POR 96 UNIDADES", "rubro": "ÑOQUIS Y PASTAS RELLENAS"}, {"codigo": "30200619", "desc": "SALSA BOLOGNESA 220 GRS.", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200620", "desc": "SALSA BOLOGNESA 390 GRS.", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200621", "desc": "SALSA FILETO 220 GRS.", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200622", "desc": "SALSA FILETO 390 GRS.", "rubro": "PASTELES Y ROTISERIA"}, {"codigo": "30200208", "desc": "SORRENTINOS DE JAMON Y QUESO CAJA POR 15 UNIDADES", "rubro": "ÑOQUIS Y PASTAS RELLENAS"}, {"codigo": "30200104", "desc": "TALLARINES ANCHOS AL HUEVO PAQUETE 500 GRS.", "rubro": "TALLARINES"}, {"codigo": "30200101", "desc": "TALLARINES ANCHOS AL HUEVO POR KILOS", "rubro": "TALLARINES"}, {"codigo": "30200110", "desc": "TALLARINES DE AJO PAQUETE 500 GRS.", "rubro": "TALLARINES"}, {"codigo": "30200107", "desc": "TALLARINES DE AJO POR KILOS", "rubro": "TALLARINES"}, {"codigo": "30200111", "desc": "TALLARINES DE ESPINACA PAQUETE 500 GRS.", "rubro": "TALLARINES"}, {"codigo": "30200108", "desc": "TALLARINES DE ESPINACA POR KILOS", "rubro": "TALLARINES"}, {"codigo": "30200112", "desc": "TALLARINES DE MORRON PAQUETE 500 GRS.", "rubro": "TALLARINES"}, {"codigo": "30200109", "desc": "TALLARINES DE MORRON POR KILOS", "rubro": "TALLARINES"}, {"codigo": "30200105", "desc": "TALLARINES FINOS AL HUEVO PAQUETE 500 GRS.", "rubro": "TALLARINES"}, {"codigo": "30200102", "desc": "TALLARINES FINOS AL HUEVO POR KILOS", "rubro": "TALLARINES"}, {"codigo": "30200106", "desc": "TALLARINES MEDIANOS AL HUEVO PAQUETE 500 GRS.", "rubro": "TALLARINES"}, {"codigo": "30200103", "desc": "TALLARINES MEDIANOS AL HUEVO POR KILOS", "rubro": "TALLARINES"}, {"codigo": "30200312", "desc": "TAPA CRIOLLA PARA PASCUALINA 50X60 INDUSTRIAL POR KILOS", "rubro": "TAPAS PARA EMPANADAS Y PASCUALINAS"}, {"codigo": "30200311", "desc": "TAPA HOJALDRE PARA CALZONES 100 GRS. INDUSTRIAL POR UNIDADES", "rubro": "TAPAS PARA EMPANADAS Y PASCUALINAS"}, {"codigo": "30200401", "desc": "TAPAS DE COPETIN PAQUETE POR 3 DOCENAS", "rubro": "TAPAS PARA COPETIN Y PASTELES"}, {"codigo": "30200303", "desc": "TAPAS DE EMPANADAS CRIOLLO 13 PAQUETE POR 12 UNIDADES", "rubro": "TAPAS PARA EMPANADAS Y PASCUALINAS"}, {"codigo": "30200304", "desc": "TAPAS DE EMPANADAS CRIOLLO 15 PAQUETE POR 12 UNIDADES", "rubro": "TAPAS PARA EMPANADAS Y PASCUALINAS"}, {"codigo": "30200305", "desc": "TAPAS DE EMPANADAS FREIR 13 PAQUETE POR 12 UNIDADES", "rubro": "TAPAS PARA EMPANADAS Y PASCUALINAS"}, {"codigo": "30200306", "desc": "TAPAS DE EMPANADAS FREIR 15 PAQUETE POR 12 UNIDADES", "rubro": "TAPAS PARA EMPANADAS Y PASCUALINAS"}, {"codigo": "30200307", "desc": "TAPAS DE EMPANADAS HORNO 13 PAQUETE POR 12 UNIDADES", "rubro": "TAPAS PARA EMPANADAS Y PASCUALINAS"}, {"codigo": "30200308", "desc": "TAPAS DE EMPANADAS HORNO 15 PAQUETE POR 12 UNIDADES", "rubro": "TAPAS PARA EMPANADAS Y PASCUALINAS"}, {"codigo": "30200309", "desc": "TAPAS DE EMPANADAS HORNO/FREIR 13 PAQUETE POR 12 UNIDADES", "rubro": "TAPAS PARA EMPANADAS Y PASCUALINAS"}, {"codigo": "30200310", "desc": "TAPAS DE EMPANADAS HORNO/FREIR 15 PAQUETE POR 12 UNIDADES", "rubro": "TAPAS PARA EMPANADAS Y PASCUALINAS"}, {"codigo": "30200402", "desc": "TAPAS PARA PASTELES CHICOS POR 6 DOCENAS", "rubro": "TAPAS PARA COPETIN Y PASTELES"}, {"codigo": "30200403", "desc": "TAPAS PARA PASTELES GRANDES POR 2 DOCENAS", "rubro": "TAPAS PARA COPETIN Y PASTELES"}, {"codigo": "30200301", "desc": "TAPAS PARA PASCUALINA CRIOLLA 30 PAQUETE POR 2 UNIDADES", "rubro": "TAPAS PARA EMPANADAS Y PASCUALINAS"}, {"codigo": "30200302", "desc": "TAPAS PARA PASCUALINA HOJALDRE 33 PAQUETE POR 2 UNIDADES", "rubro": "TAPAS PARA EMPANADAS Y PASCUALINAS"}, {"codigo": "30200211", "desc": "TORTELETTIS PAQUETE 500 GRS.", "rubro": "ÑOQUIS Y PASTAS RELLENAS"}, {"codigo": "30200210", "desc": "TORTELETTIS POR KILOS", "rubro": "ÑOQUIS Y PASTAS RELLENAS"}, {"codigo": "30200623", "desc": "TORTA FRITAS POR KILOS", "rubro": "PASTELES Y ROTISERIA"}];
 
 let mapeoVisible=false;
+
+async function exportarMaestroExcel(){
+  if(!st.E.length||!st.Pr.length){alert('No hay datos del maestro cargados todavía.');return}
+  if(!window.XLSX){
+    await new Promise((res,rej)=>{
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload=res;s.onerror=rej;document.head.appendChild(s);
+    });
+  }
+  const wb=window.XLSX.utils.book_new();
+  st.E.forEach(emp=>{
+    const prods=st.Pr.filter(p=>p.empresa_id===emp.id);
+    if(!prods.length)return;
+    const filas=prods.map(p=>{
+      const area=st.A.find(a=>a.id===p.area_id);
+      return{
+        'Área':area?area.nombre:'Sin área',
+        'Producto':p.nombre,
+        'Unidad':p.unidad||'',
+        'Código artículo':p.codigo_articulo||''
+      };
+    }).sort((a,b)=>a['Área'].localeCompare(b['Área'])||a['Producto'].localeCompare(b['Producto']));
+    const ws=window.XLSX.utils.json_to_sheet(filas);
+    ws['!cols']=[{wch:24},{wch:36},{wch:12},{wch:16}];
+    const nombreHoja=emp.nombre.replace(/[\\\/\?\*\[\]:]/g,'').slice(0,31)||'Empresa';
+    window.XLSX.utils.book_append_sheet(wb,ws,nombreHoja);
+  });
+  const fecha=hoyLocal();
+  window.XLSX.writeFile(wb,`Maestro_Productos_${fecha}.xlsx`);
+}
 
 function toggleMapeoJoselito(){
   mapeoVisible=!mapeoVisible;
