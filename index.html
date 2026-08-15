@@ -247,7 +247,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.148</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.149</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -7205,20 +7205,6 @@ let ind_solicitantesCargados=false;
 async function initIndumentaria(){
   if(!empleados.length)await loadEmpleados();
   const sel=document.getElementById('ind-empleado');
-  if(sel.options.length<=1){
-    const byE={};
-    empleados.forEach(e=>{const eid=e.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(e)});
-    Object.entries(byE).forEach(([eid,emps])=>{
-      const nm=eid!=='_'?(en(eid)||'Sin empresa'):'Sin empresa';
-      const og=document.createElement('optgroup');og.label=nm;
-      emps.forEach(e=>{
-        const o=document.createElement('option');o.value=e.id;
-        o.dataset.nombre=e.nombre;o.dataset.empresaId=e.empresa_id||'';
-        o.textContent=e.nombre;og.appendChild(o);
-      });
-      sel.appendChild(og);
-    });
-  }
   if(!ind_solicitantesCargados){
     try{
       personalEstructuraData=await get('personal_estructura','order=nombre.asc');
@@ -7229,6 +7215,29 @@ async function initIndumentaria(){
       });
       ind_solicitantesCargados=true;
     }catch(e){console.error('Error cargando personal de estructura:',e)}
+  }
+  if(sel.options.length<=1){
+    const byE={};
+    empleados.forEach(e=>{const eid=e.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(e)});
+    Object.entries(byE).forEach(([eid,emps])=>{
+      const nm=eid!=='_'?(en(eid)||'Sin empresa'):'Sin empresa';
+      const og=document.createElement('optgroup');og.label=nm;
+      emps.forEach(e=>{
+        const o=document.createElement('option');o.value=`emp:${e.id}`;
+        o.dataset.tipo='empleado';o.dataset.nombre=e.nombre;o.dataset.empresaId=e.empresa_id||'';
+        o.textContent=e.nombre;og.appendChild(o);
+      });
+      sel.appendChild(og);
+    });
+    if(personalEstructuraData.length){
+      const ogMoi=document.createElement('optgroup');ogMoi.label='MOI (personal de estructura)';
+      personalEstructuraData.forEach(p=>{
+        const o=document.createElement('option');o.value=`moi:${p.id}`;
+        o.dataset.tipo='moi';o.dataset.nombre=p.nombre;o.dataset.empresaId='';
+        o.textContent=p.nombre;ogMoi.appendChild(o);
+      });
+      sel.appendChild(ogMoi);
+    }
   }
   if(!equipoCargado){
     try{
@@ -7267,12 +7276,14 @@ function renderIndItemsGrid(){
 async function guardarPedidoIndumentaria(){
   const solicitante=document.getElementById('ind-solicitante').value;
   const sel=document.getElementById('ind-empleado');
-  const empleadoId=sel.value;
+  const valorSel=sel.value;
   const opt=sel.selectedOptions[0];
   const errEl=document.getElementById('ind-err');const msgEl=document.getElementById('ind-msg');
   errEl.style.display='none';msgEl.style.display='none';
   if(!solicitante){document.getElementById('ind-err-txt').textContent='Seleccioná quién solicita la indumentaria.';errEl.style.display='';return}
-  if(!empleadoId){document.getElementById('ind-err-txt').textContent='Seleccioná para qué empleado es el pedido.';errEl.style.display='';return}
+  if(!valorSel){document.getElementById('ind-err-txt').textContent='Seleccioná para qué empleado es el pedido.';errEl.style.display='';return}
+  const esMoi=opt?.dataset.tipo==='moi';
+  const empleadoId=esMoi?null:valorSel.replace(/^emp:/,'');
   const items={};
   document.querySelectorAll('#ind-items-grid input[data-item]').forEach(inp=>{
     const v=parseFloat(inp.value)||0;
@@ -7285,7 +7296,7 @@ async function guardarPedidoIndumentaria(){
       solicitante,
       empleado_id:empleadoId,
       empleado_nombre:opt?.dataset.nombre||'',
-      empresa_id:opt?.dataset.empresaId||null,
+      empresa_id:esMoi?null:(opt?.dataset.empresaId||null),
       items,
       entregado:false
     });
