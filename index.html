@@ -247,7 +247,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.153</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.154</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -10398,17 +10398,24 @@ async function imprimirPlanillaEnvasePastas(){
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:Arial,sans-serif;color:#111}
-    .hoja{width:190mm;margin:0 auto;padding:6mm;display:flex;gap:0}
-    .col{width:50%;padding:0 4mm}
+    .hoja{width:277mm;margin:0 auto;padding:6mm;display:flex;gap:0}
+    .col{width:50%;padding:0 6mm;overflow:hidden}
     .col.izq{border-right:2px dashed #999}
     h1{font-size:16pt;text-align:center;margin-bottom:2mm;text-transform:uppercase;letter-spacing:.5px}
     .sub{font-size:12pt;text-align:center;color:#444;margin-bottom:5mm}
-    table{width:100%;border-collapse:collapse}
-    th{background:#1B3A6B;color:#fff;padding:6px 6px;font-size:13pt;text-align:left;border:1px solid #1B3A6B}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
+    .col.izq table{table-layout:fixed}
+    .col.izq col.c-prod{width:34%}
+    .col.izq col.c-cant{width:20%}
+    .col.izq col.c-fenv{width:20%}
+    .col.izq col.c-fvenc{width:26%}
+    .col.der col.c-prod{width:60%}
+    .col.der col.c-cant{width:40%}
+    th{background:#1B3A6B;color:#fff;padding:6px 5px;font-size:12.5pt;text-align:left;border:1px solid #1B3A6B;word-break:break-word}
     th.center{text-align:center}
-    td{border:1px solid #999;padding:6px;font-size:14pt}
+    td{border:1px solid #999;padding:6px 5px;font-size:14pt;word-break:break-word}
     td.prod{font-weight:700}
-    td.fecha{text-align:center;white-space:nowrap}
+    td.fecha{text-align:center;font-size:12.5pt}
     td.fecha.venc{color:#A32D2D;font-weight:700}
     td.cant{text-align:center;font-weight:700;color:#0F6E56}
     .sinunidad{color:#A32D2D;font-weight:400;font-size:10pt;font-style:italic}
@@ -10416,7 +10423,7 @@ async function imprimirPlanillaEnvasePastas(){
     tr:nth-child(even) td{background:#fafafa}
     .cortar{text-align:center;font-size:9pt;color:#888;margin:3mm 0}
     @media print{
-      @page{size:A4;margin:8mm}
+      @page{size:A4 landscape;margin:8mm}
       body{margin:0}
       .hoja{width:100%;padding:0}
     }
@@ -10427,6 +10434,7 @@ async function imprimirPlanillaEnvasePastas(){
         <h1>Envase</h1>
         <div class="sub">${hoyStr}</div>
         <table>
+          <colgroup><col class="c-prod"><col class="c-cant"><col class="c-fenv"><col class="c-fvenc"></colgroup>
           <thead><tr><th>Producto</th><th class="center">Cantidad</th><th class="center">Fecha envase</th><th class="center">Fecha vencimiento</th></tr></thead>
           <tbody>${filasEnvase}</tbody>
         </table>
@@ -10435,6 +10443,7 @@ async function imprimirPlanillaEnvasePastas(){
         <h1>Pastas Especiales</h1>
         <div class="sub">A hacer hoy — ${hoyStr}</div>
         <table>
+          <colgroup><col class="c-prod"><col class="c-cant"></colgroup>
           <thead><tr><th>Producto</th><th class="center">Cantidad</th></tr></thead>
           <tbody>${filasPastasHtml}</tbody>
         </table>
