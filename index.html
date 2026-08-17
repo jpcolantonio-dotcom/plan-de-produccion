@@ -247,7 +247,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.150</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.153</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -10323,7 +10323,8 @@ async function imprimirPlanillaEnvasePastas(){
   if(!joselito){alert('No se encontró ninguna empresa cargada.');return}
 
   const fmtFecha=d=>`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
-  const hoy=new Date();
+  const hoyISO=hoyLocal(); // fecha local correcta (evita el desfase de new Date()/UTC)
+  const hoy=new Date(hoyISO+'T00:00:00');
   const hoyStr=fmtFecha(hoy);
 
   // Días de vencimiento según tipo de producto
@@ -10334,39 +10335,61 @@ async function imprimirPlanillaEnvasePastas(){
     return 21; // default para el resto de envase
   }
 
-  // Productos de ENVASE
-  const prodsEnvase=st.Pr.filter(p=>{
-    const a=st.A.find(x=>x.id===p.area_id);
-    return p.empresa_id===joselito.id&&a&&a.nombre.toLowerCase().includes('envase');
-  }).sort((a,b)=>a.nombre.localeCompare(b.nombre));
-
-  // Filas Pastas Especiales: lo planificado para HOY
+  // Forzar recarga del plan de esta semana (por si el que estaba en memoria es viejo)
   const semKey=wk(hoy);
+  delete st.P[semKey];
   await lp(semKey);
   const diIdx=(hoy.getDay()+6)%7; // 0=lunes
   const planHoy=st.P[semKey]||[];
+
+  function cantidadHoy(p,areaNombre){
+    const norm=s=>(s||'').trim().toLowerCase();
+    let row=planHoy.find(r=>r.empresa_id===joselito.id&&norm(r.area)===norm(areaNombre)&&norm(r.producto)===norm(p.nombre));
+    if(!row){
+      // Fallback: si no coincide el área guardada en el plan (por un renombre viejo, etc.), buscar solo por producto+empresa
+      row=planHoy.find(r=>r.empresa_id===joselito.id&&norm(r.producto)===norm(p.nombre));
+    }
+    return(row&&row.days&&row.days[diIdx])||0;
+  }
+
+  // Productos de ENVASE — solo lo planificado para hoy
+  const prodsEnvase=st.Pr.filter(p=>{
+    const a=st.A.find(x=>x.id===p.area_id);
+    return p.empresa_id===joselito.id&&a&&a.nombre.trim().toLowerCase().includes('envase');
+  }).map(p=>{
+    const a=st.A.find(x=>x.id===p.area_id);
+    return{...p,cant:cantidadHoy(p,a.nombre)};
+  }).filter(p=>p.cant>0).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+
+  // Productos de PASTAS ESPECIALES — solo lo planificado para hoy
   const prodsPastas=st.Pr.filter(p=>{
     const a=st.A.find(x=>x.id===p.area_id);
-    return p.empresa_id===joselito.id&&a&&a.nombre.toLowerCase().includes('pastas especial');
+    return p.empresa_id===joselito.id&&a&&a.nombre.trim().toLowerCase().includes('pastas especial');
   });
   const filasPastas=prodsPastas.map(p=>{
     const a=st.A.find(x=>x.id===p.area_id);
-    const row=planHoy.find(r=>r.empresa_id===joselito.id&&r.area===a.nombre&&r.producto===p.nombre);
-    const cant=(row&&row.days&&row.days[diIdx])||0;
-    return{nombre:p.nombre,unidad:p.unidad,cant};
+    return{nombre:p.nombre,unidad:p.unidad,cant:cantidadHoy(p,a.nombre)};
   }).filter(f=>f.cant>0).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+
+  console.log('[Envase/Pastas] debug:',{
+    semKey,diIdx,filasPlan:planHoy.length,
+    areasJoselito:st.A.filter(a=>a.empresa_id===joselito.id).map(a=>a.nombre),
+    prodsPastasNombres:prodsPastas.map(p=>p.nombre),
+    filasPastas
+  });
 
   let filasEnvase='';
   prodsEnvase.forEach(p=>{
     const dias=diasVenc(p.nombre);
     const venc=new Date(hoy);venc.setDate(venc.getDate()+dias);
-    filasEnvase+=`<tr><td class="prod">${p.nombre}</td><td class="fecha">${hoyStr}</td><td class="fecha venc">${fmtFecha(venc)}</td></tr>`;
+    const unidadTxt=p.unidad?p.unidad:'<span class="sinunidad">(falta unidad)</span>';
+    filasEnvase+=`<tr><td class="prod">${p.nombre}</td><td class="cant">${p.cant.toLocaleString('es-AR')} ${unidadTxt}</td><td class="fecha">${hoyStr}</td><td class="fecha venc">${fmtFecha(venc)}</td></tr>`;
   });
-  if(!prodsEnvase.length)filasEnvase='<tr><td colspan="3" class="vacio">Sin productos en el área Envase.</td></tr>';
+  if(!prodsEnvase.length)filasEnvase='<tr><td colspan="4" class="vacio">Sin producción planificada para hoy en Envase.</td></tr>';
 
   let filasPastasHtml='';
   filasPastas.forEach(f=>{
-    filasPastasHtml+=`<tr><td class="prod">${f.nombre}</td><td class="cant">${f.cant.toLocaleString('es-AR')} ${f.unidad||''}</td></tr>`;
+    filasPastasHtml+=`<tr><td class="prod">${f.nombre}</td><td class="cant">${f.cant.toLocaleString('es-AR')} ${f.unidad?f.unidad:'<span class="sinunidad">(falta unidad en Maestro)</span>'}</td></tr>`;
   });
   if(!filasPastas.length)filasPastasHtml='<tr><td colspan="2" class="vacio">Sin producción planificada para hoy en Pastas Especiales.</td></tr>';
 
@@ -10388,6 +10411,7 @@ async function imprimirPlanillaEnvasePastas(){
     td.fecha{text-align:center;white-space:nowrap}
     td.fecha.venc{color:#A32D2D;font-weight:700}
     td.cant{text-align:center;font-weight:700;color:#0F6E56}
+    .sinunidad{color:#A32D2D;font-weight:400;font-size:10pt;font-style:italic}
     td.vacio{text-align:center;color:#777;font-style:italic;font-size:12pt}
     tr:nth-child(even) td{background:#fafafa}
     .cortar{text-align:center;font-size:9pt;color:#888;margin:3mm 0}
@@ -10403,7 +10427,7 @@ async function imprimirPlanillaEnvasePastas(){
         <h1>Envase</h1>
         <div class="sub">${hoyStr}</div>
         <table>
-          <thead><tr><th>Producto</th><th class="center">Fecha envase</th><th class="center">Fecha vencimiento</th></tr></thead>
+          <thead><tr><th>Producto</th><th class="center">Cantidad</th><th class="center">Fecha envase</th><th class="center">Fecha vencimiento</th></tr></thead>
           <tbody>${filasEnvase}</tbody>
         </table>
       </div>
