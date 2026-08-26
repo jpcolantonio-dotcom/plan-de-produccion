@@ -8,6 +8,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -387,9 +388,16 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   </div>
   <!-- Sub-tab Recetas -->
   <div id="rsub-recetas">
-    <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <input type="file" id="rec-xlsx-input" accept=".xlsx,.xls" style="display:none" onchange="importarRecetasExcel(this)"/>
+        <button class="btn" onclick="document.getElementById('rec-xlsx-input').click()"><i class="ti ti-file-spreadsheet"></i> Importar desde Excel</button>
+        <span id="rec-import-loading" style="display:none;font-size:13px;color:var(--text2);align-items:center;gap:6px"><span class="spinner spinner-dark"></span> Procesando Excel...</span>
+      </div>
       <button class="btn btn-primary" id="btnsaverec2" onclick="saveRecetas()"><i class="ti ti-device-floppy"></i> Guardar recetas</button>
     </div>
+    <div id="rec-import-msg" style="display:none;margin-bottom:12px" class="alert alert-ok"></div>
+    <div id="rec-import-err" style="display:none;margin-bottom:12px" class="alert alert-err"></div>
     <div style="display:grid;grid-template-columns:270px 1fr;gap:1.5rem">
       <div>
         <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Productos</div>
@@ -3282,6 +3290,7 @@ async function delProd(id){
 
 // RECETAS
 let arec=null;
+let recImportWarn=new Set(); // productos importados con datos a revisar (cantidad no numerica, tanda no detectada)
 function gprod(){const all=new Set();st.Pr.forEach(p=>all.add(p.nombre));Object.keys(st.Rec).forEach(p=>all.add(p));return[...all].sort()}
 function rRec(){
   const ps=gprod();const list=document.getElementById('rplist');
@@ -3293,8 +3302,10 @@ function rRec(){
   psFilt.forEach(p=>{
     const ings=st.Rec[p]||[];const sel=p===arec;
     const pr=st.Pr.find(x=>x.nombre===p);const ar=pr?st.A.find(a=>a.id===pr.area_id):null;const em=pr?st.E.find(e=>e.id===pr.empresa_id):null;
+    const warn=recImportWarn.has(p);
+    const noMaestro=!pr;
     h+=`<div class="rrow${sel?' sel':''}" onclick="selRec('${p.replace(/'/g,"\'")}')">
-      <div><div style="font-size:13px;font-weight:500">${p}</div><div style="font-size:12px;color:var(--text2)">${em?em.nombre:''}${ar?' / '+ar.nombre:''} - ${ings.length?ings.length+' ing.':'Sin receta'}</div></div>
+      <div><div style="font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px">${p}${warn?'<span class="badge badge-warn" style="font-size:10px;padding:1px 6px" title="Revisar: cantidad o tanda sin detectar en la importacion">revisar</span>':''}${noMaestro?'<span class="badge" style="font-size:10px;padding:1px 6px;background:var(--bg3);color:var(--text2)" title="No existe en Maestro de productos">sin maestro</span>':''}</div><div style="font-size:12px;color:var(--text2)">${em?em.nombre:''}${ar?' / '+ar.nombre:''} - ${ings.length?ings.length+' ing.':'Sin receta'}</div></div>
       <i class="ti ti-chevron-right" style="color:var(--text3);font-size:14px"></i>
     </div>`;
   });
@@ -3745,6 +3756,223 @@ async function saveRecetas(){
   try{await upsert('recetas',{id:1,datos:JSON.parse(JSON.stringify(st.Rec)),tandas:JSON.parse(JSON.stringify(st.RecTanda||{})),updated_at:new Date().toISOString()});ss('online','Guardado');fl('recmsg');}
   catch(e){ss('error','Error');alert('Error: '+e.message)}
   btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar recetas';btn.disabled=false;
+}
+
+// ===== IMPORTAR RECETAS DESDE EXCEL (formato "RECETARIO DE FABRICACIÓN": una hoja por producto,
+// fila con 'Descripcion MP'/'Unidad' como encabezado, columna(s) de cantidad x tanda, columna 'Etapa') =====
+async function importarRecetasExcel(input){
+  const file=input.files[0];
+  if(!file)return;
+  const loadingEl=document.getElementById('rec-import-loading');
+  const msgEl=document.getElementById('rec-import-msg');
+  const errEl=document.getElementById('rec-import-err');
+  msgEl.style.display='none';errEl.style.display='none';
+  loadingEl.style.display='inline-flex';
+  try{
+    if(!window.XLSX){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload=res;s.onerror=rej;document.head.appendChild(s);
+      });
+    }
+    const buf=await file.arrayBuffer();
+    let wb;
+    try{
+      wb=window.XLSX.read(buf,{type:'array'});
+    }catch(e){
+      if(/password/i.test(e.message||'')){
+        throw new Error('Este Excel está protegido con contraseña y el navegador no puede quitarla automáticamente. Guardalo sin contraseña desde Excel (Archivo > Información > Proteger libro > Quitar contraseña o Cifrar con contraseña en blanco) y volvé a subirlo.');
+      }
+      throw e;
+    }
+
+    const strip=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const normUnit=u=>{
+      if(u==null)return '';
+      const s=strip(String(u).trim().toLowerCase());
+      if(s.startsWith('kg'))return 'Kg';
+      if(s.startsWith('gr')||s==='g')return 'Gr';
+      if(s.startsWith('lit')||s==='lt'||s==='lts')return 'Litros';
+      if(s.startsWith('cc')||s.startsWith('cm3'))return 'CC';
+      return 'Unidad';
+    };
+    const findNumInText=v=>{
+      if(v==null)return null;
+      if(typeof v==='number')return v;
+      const m=String(v).match(/([\d]+[.,]?[\d]*)\s*kg/i);
+      if(m)return parseFloat(m[1].replace(',','.'));
+      return null;
+    };
+
+    const parsed=[]; // {sheet, producto, tanda, ingredientes:[{ingrediente,cantidad,unidad,nota?}], notas}
+    const skipped=[];
+
+    wb.SheetNames.forEach(sheetName=>{
+      const ws=wb.Sheets[sheetName];
+      const rows=window.XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+
+      let titleIdx=null;
+      rows.forEach((row,ri)=>{
+        (row||[]).forEach(val=>{
+          if(typeof val==='string' && strip(val.trim().toLowerCase()).startsWith('recetario de fabricacion'))titleIdx=ri;
+        });
+      });
+
+      let headerIdx=null,descCol=null,unitCol=null;
+      for(let ri=0;ri<rows.length && headerIdx===null;ri++){
+        const row=rows[ri]||[];
+        for(let ci=0;ci<row.length;ci++){
+          const val=row[ci];
+          if(typeof val==='string' && val.trim().toLowerCase().startsWith('descripcion mp')){
+            headerIdx=ri;descCol=ci;
+            for(let cj=ci+1;cj<row.length;cj++){ if(row[cj]!=null){unitCol=cj;break;} }
+            break;
+          }
+        }
+      }
+      if(headerIdx===null){skipped.push(sheetName);return;}
+
+      const headerRow=rows[headerIdx]||[];
+      let etapaCol=null;
+      for(let ci=0;ci<headerRow.length;ci++){
+        const val=headerRow[ci];
+        if(typeof val==='string' && val.trim().toLowerCase().startsWith('etapa')){etapaCol=ci;break;}
+      }
+      if(etapaCol===null)etapaCol=headerRow.length;
+
+      let rowEnd=rows.length;
+      for(let ri=headerIdx+1;ri<rows.length;ri++){
+        const desc=(rows[ri]||[])[descCol];
+        if(typeof desc==='string' && strip(desc.trim().toLowerCase()).startsWith('rev')){rowEnd=ri;break;}
+      }
+
+      const nzCount=c=>{
+        let cnt=0;
+        for(let ri=headerIdx+1;ri<rowEnd;ri++){
+          const v=(rows[ri]||[])[c];
+          if(typeof v==='number' && v!==0)cnt++;
+        }
+        return cnt;
+      };
+
+      const scored=[];
+      for(let c=unitCol+1;c<etapaCol;c++){
+        const dc=nzCount(c);
+        if(dc===0)continue;
+        const hv=headerRow[c];
+        const hvNumeric=(typeof hv==='number' && hv!==0)?1:0;
+        scored.push({dc,hvNumeric,c,hv});
+      }
+      scored.sort((a,b)=>a.dc-b.dc || a.hvNumeric-b.hvNumeric || a.c-b.c);
+      let refCol=null,tanda=null;
+      if(scored.length){
+        const best=scored[scored.length-1];
+        refCol=best.c;
+        tanda=(typeof best.hv==='number' && best.hv!==0)?best.hv:findNumInText(best.hv);
+      }
+      for(let ri=0;ri<headerIdx;ri++){
+        (rows[ri]||[]).forEach(val=>{
+          if(typeof val==='string' && val.toLowerCase().includes('equivalen')){
+            const m=val.match(/=\s*([\d]+[.,]?[\d]*)\s*kg/i);
+            if(m)tanda=parseFloat(m[1].replace(',','.'));
+          }
+        });
+      }
+      if(refCol===null){skipped.push(sheetName+' (sin columna de cantidad reconocible)');return;}
+
+      let prodName=null;
+      if(titleIdx!=null && rows[titleIdx+1]){
+        for(const val of rows[titleIdx+1]){
+          if(typeof val==='string'){
+            const v=val.trim();
+            if(v && !strip(v.toLowerCase()).startsWith('rev')){prodName=v;break;}
+          }
+        }
+      }
+      if(!prodName)prodName=sheetName.trim();
+
+      const ingredientes=[];
+      let notas=0;
+      for(let ri=headerIdx+1;ri<rowEnd;ri++){
+        const row=rows[ri]||[];
+        const desc=row[descCol];
+        if(desc==null || (typeof desc==='string' && desc.trim()===''))continue;
+        const unit=row[unitCol];
+        const qty=row[refCol];
+        if(qty==null)continue;
+        if(typeof qty==='number'){
+          if(qty===0)continue;
+          ingredientes.push({ingrediente:String(desc).trim(),unidad:normUnit(unit),cantidad:qty});
+        }else{
+          notas++;
+          ingredientes.push({ingrediente:String(desc).trim(),unidad:normUnit(unit),cantidad:0,nota:String(qty)});
+        }
+      }
+      if(!ingredientes.length){skipped.push(sheetName+' (sin ingredientes con cantidad)');return;}
+
+      parsed.push({sheet:sheetName,producto:prodName,tanda,ingredientes,notas});
+    });
+
+    if(!parsed.length){
+      throw new Error('No se encontraron hojas con formato de receta reconocible (buscamos una fila con "Descripcion MP" y "Unidad"). Verificá que sea el recetario original.');
+    }
+
+    // Detectar hojas distintas que resuelven al mismo nombre de producto (se pisarian entre si)
+    const hojasPorProducto=new Map();
+    parsed.forEach(r=>{
+      if(!hojasPorProducto.has(r.producto))hojasPorProducto.set(r.producto,[]);
+      hojasPorProducto.get(r.producto).push(r.sheet);
+    });
+    const colisiones=[...hojasPorProducto.entries()].filter(([,hojas])=>hojas.length>1);
+
+    if(!st.RecTanda)st.RecTanda={};
+    let nuevos=0,actualizados=0;
+    const revisarSet=new Set();
+    const nuevosIngredientes=new Map();
+    parsed.forEach(r=>{
+      const existia=st.Rec[r.producto]!==undefined;
+      st.Rec[r.producto]=r.ingredientes.map(i=>({ingrediente:i.ingrediente,cantidad:i.cantidad,unidad:i.unidad}));
+      st.RecTanda[r.producto]=(r.tanda&&r.tanda>0)?r.tanda:1;
+      if(existia)actualizados++;else nuevos++;
+      const esColision=hojasPorProducto.get(r.producto).length>1;
+      if(r.notas>0 || !r.tanda || r.tanda<=0 || esColision){recImportWarn.add(r.producto);revisarSet.add(r.producto);}
+      else recImportWarn.delete(r.producto);
+      r.ingredientes.forEach(ing=>{
+        const key=ing.ingrediente.toLowerCase();
+        if(!mpData.find(m=>m.nombre.toLowerCase()===key) && !nuevosIngredientes.has(key)){
+          nuevosIngredientes.set(key,{nombre:ing.ingrediente,unidad:ing.unidad||'Unidad'});
+        }
+      });
+    });
+    const revisar=revisarSet.size;
+
+    let mpCreadas=0;
+    for(const {nombre,unidad} of nuevosIngredientes.values()){
+      try{
+        const res=await ins('materias_primas',{nombre,unidad});
+        mpData.push(res[0]);
+        mpCreadas++;
+      }catch(e){/* si falla la creo a mano despues desde Materias Primas */}
+    }
+    mpData.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+
+    rRec();
+    loadingEl.style.display='none';
+    const partes=[`${parsed.length} recetas importadas (${nuevos} nuevas, ${actualizados} actualizadas)`];
+    if(revisar)partes.push(`${revisar} para revisar (marcadas "revisar" en la lista de la izquierda)`);
+    if(colisiones.length)partes.push(`⚠ ${colisiones.length} nombre(s) de producto aparecen en más de una hoja del Excel y se pisan entre sí — se cargó la última: ${colisiones.map(([nom,hojas])=>`"${nom}" (hojas: ${hojas.join(', ')})`).join('; ')}`);
+    if(mpCreadas)partes.push(`${mpCreadas} materias primas nuevas agregadas al maestro`);
+    if(skipped.length)partes.push(`${skipped.length} hojas omitidas por no tener formato de receta de producto (${skipped.join(', ')})`);
+    msgEl.innerHTML=`<i class="ti ti-check"></i> ${partes.join('. ')}. Todavía no se guardó nada: revisá las recetas marcadas y después hacé click en "Guardar recetas".`;
+    msgEl.style.display='';
+    input.value='';
+  }catch(e){
+    loadingEl.style.display='none';
+    errEl.innerHTML=`<i class="ti ti-alert-circle"></i> ${e.message}`;
+    errEl.style.display='';
+    input.value='';
+  }
 }
 
 // CONSUMO
