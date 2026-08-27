@@ -409,13 +409,20 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   </div>
   <!-- Sub-tab Materias Primas -->
   <div id="rsub-mp" style="display:none">
-    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <input type="text" id="mp-new-codigo" placeholder="Código (opcional)" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);width:120px"/>
       <input type="text" id="mp-new-nombre" placeholder="Nombre MP (ej: Harina 000)" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);width:220px"/>
       <select id="mp-new-unidad" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)">
         <option>Kg</option><option>Gr</option><option>Litros</option><option>CC</option><option>Unidad</option>
       </select>
       <button class="btn btn-primary" onclick="addMateriaPrima()"><i class="ti ti-plus"></i> Agregar MP</button>
+      <span style="flex:1"></span>
+      <input type="file" id="mp-csv-input" accept=".csv" style="display:none" onchange="importarMPCsv(this)"/>
+      <button class="btn" onclick="document.getElementById('mp-csv-input').click()"><i class="ti ti-file-spreadsheet"></i> Actualizar desde CSV (Flexxus)</button>
+      <span id="mp-import-loading" style="display:none;font-size:13px;color:var(--text2);align-items:center;gap:6px"><span class="spinner spinner-dark"></span> Procesando CSV...</span>
     </div>
+    <div id="mp-import-msg" style="display:none;margin-bottom:12px" class="alert alert-ok"></div>
+    <div id="mp-import-err" style="display:none;margin-bottom:12px" class="alert alert-err"></div>
     <div id="mp-list-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
   </div>
   <!-- Sub-tab Consumo MP -->
@@ -3694,10 +3701,13 @@ function renderMPList(){
   const el=document.getElementById('mp-list-content');
   if(!mpData.length){el.innerHTML='<div class="empty"><i class="ti ti-packages"></i> Sin materias primas. Agregá la primera.</div>';return}
   const unOpts=u=>['Kg','Gr','Litros','CC','Unidad'].map(x=>`<option${x===u?' selected':''}>${x}</option>`).join('');
-  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th>Nombre</th><th style="width:110px">Unidad</th><th style="width:60px"></th></tr></thead><tbody>';
+  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="width:110px">Código</th><th>Nombre</th><th style="width:110px">Unidad</th><th style="width:60px"></th></tr></thead><tbody>';
   mpData.forEach(mp=>{
     h+=`<tr>
-      <td><input value="${mp.nombre.replace(/"/g,'&quot;')}" 
+      <td><input value="${(mp.codigo||'').toString().replace(/"/g,'&quot;')}" placeholder="—"
+        style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
+        onchange="updateMP('${mp.id}','codigo',this.value)"/></td>
+      <td><input value="${mp.nombre.replace(/"/g,'&quot;')}"
         style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
         onchange="updateMP('${mp.id}','nombre',this.value)"/></td>
       <td><select style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
@@ -3711,33 +3721,144 @@ function renderMPList(){
 
 async function updateMP(id,field,value){
   value=value.trim();
-  if(!value)return;
   const mp=mpData.find(m=>m.id===id);
-  if(!mp||mp[field]===value)return;
+  if(!mp)return;
+  if(field!=='codigo' && !value)return; // codigo se puede vaciar; nombre/unidad no
+  if((mp[field]||'')===value)return;
   ss('saving','Guardando...');
   try{
     await fetch(`${SB}/rest/v1/materias_primas?id=eq.${id}`,{
       method:'PATCH',headers:{...H,'Content-Type':'application/json'},
-      body:JSON.stringify({[field]:value})
+      body:JSON.stringify({[field]:value||null})
     });
+    const nombreViejo=mp.nombre;
     mp[field]=value;
-    if(field==='nombre')mpData.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    if(field==='nombre'){
+      mpData.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+      // Propagar el nuevo nombre a las recetas que usan esta MP como ingrediente (en memoria; falta "Guardar recetas")
+      let tocadas=0;
+      Object.keys(st.Rec||{}).forEach(p=>{
+        (st.Rec[p]||[]).forEach(ing=>{ if(ing.ingrediente===nombreViejo){ing.ingrediente=value;tocadas++;} });
+      });
+      if(tocadas){rRec();ss('online',`MP renombrada, ${tocadas} ingrediente(s) actualizados en recetas — recordá "Guardar recetas"`);return}
+    }
     ss('online','MP actualizada');
-  }catch(e){ss('error','Error: '+e.message);renderMPList();}
+  }catch(e){
+    const hint=/column .*codigo.* does not exist|codigo.*column/i.test(e.message||'')?' (falta la columna "codigo" en materias_primas — agregala en Supabase)':'';
+    ss('error','Error: '+e.message+hint);renderMPList();
+  }
 }
 
 async function addMateriaPrima(){
   const nombre=document.getElementById('mp-new-nombre').value.trim();
+  const codigo=document.getElementById('mp-new-codigo').value.trim();
   const unidad=document.getElementById('mp-new-unidad').value;
   if(!nombre){alert('Ingresá el nombre de la MP.');return}
   if(mpData.find(m=>m.nombre.toLowerCase()===nombre.toLowerCase())){alert('Ya existe esa MP.');return}
   ss('saving','Guardando...');
   try{
-    const res=await ins('materias_primas',{nombre,unidad});
+    const res=await ins('materias_primas',{nombre,unidad,...(codigo?{codigo}:{})});
     mpData.push(res[0]);mpData.sort((a,b)=>a.nombre.localeCompare(b.nombre));
     document.getElementById('mp-new-nombre').value='';
+    document.getElementById('mp-new-codigo').value='';
     renderMPList();ss('online','MP agregada');
-  }catch(e){ss('error','Error: '+e.message)}
+  }catch(e){
+    const hint=/column .*codigo.* does not exist|codigo.*column/i.test(e.message||'')?' (falta la columna "codigo" en materias_primas — agregala en Supabase)':'';
+    ss('error','Error: '+e.message+hint);
+  }
+}
+
+// ===== ACTUALIZAR MATERIAS PRIMAS DESDE CSV (export Flexxus: Codigo Articulo;Descripcion;...) =====
+async function importarMPCsv(input){
+  const file=input.files[0];
+  if(!file)return;
+  const loadingEl=document.getElementById('mp-import-loading');
+  const msgEl=document.getElementById('mp-import-msg');
+  const errEl=document.getElementById('mp-import-err');
+  msgEl.style.display='none';errEl.style.display='none';
+  loadingEl.style.display='inline-flex';
+  try{
+    const buf=await file.arrayBuffer();
+    let text;
+    try{ text=new TextDecoder('windows-1252').decode(buf); }
+    catch(e){ text=new TextDecoder('utf-8').decode(buf); }
+    const lines=text.split(/\r\n|\n|\r/).filter(l=>l.trim()!=='');
+    if(!lines.length)throw new Error('El CSV está vacío.');
+    const delim=lines[0].includes(';')?';':',';
+    const parseLine=l=>l.split(delim).map(c=>c.trim());
+    const header=parseLine(lines[0]).map(h=>h.toLowerCase());
+    const codIdx=header.findIndex(h=>h.includes('codigo') && h.includes('articulo'));
+    const descIdx=header.findIndex(h=>h.includes('descripcion'));
+    if(codIdx===-1||descIdx===-1){
+      throw new Error('No se encontraron las columnas "Codigo Articulo" y "Descripcion" en el CSV.');
+    }
+
+    const strip=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const UNIT_RE=/\s*POR\s+(KILOS?|LITROS?|UNIDADES?|GRAMOS?|CC\.?|DOCENAS?)\s*$/i;
+    const coreName=desc=>desc.replace(UNIT_RE,'').trim();
+    const inferUnidad=desc=>{
+      const m=desc.match(UNIT_RE);
+      if(!m)return 'Unidad';
+      const u=strip(m[1]).toLowerCase();
+      if(u.startsWith('kilo'))return 'Kg';
+      if(u.startsWith('litro'))return 'Litros';
+      if(u.startsWith('gramo'))return 'Gr';
+      if(u.startsWith('cc'))return 'CC';
+      return 'Unidad';
+    };
+    const normKey=s=>strip(coreName(s)).trim().toUpperCase().replace(/\s+/g,' ');
+
+    // Indice de las MP actuales por nombre normalizado
+    const porNombre=new Map();
+    mpData.forEach(mp=>porNombre.set(normKey(mp.nombre),mp));
+
+    let vinculados=0,creadas=0,sinCambio=0;
+    const errores=[];
+    for(let i=1;i<lines.length;i++){
+      const cols=parseLine(lines[i]);
+      const codigo=(cols[codIdx]||'').trim();
+      const descripcion=(cols[descIdx]||'').trim();
+      if(!codigo||!descripcion)continue;
+      const key=normKey(descripcion);
+      const existente=porNombre.get(key);
+      if(existente){
+        if(existente.codigo===codigo){sinCambio++;continue}
+        try{
+          await fetch(`${SB}/rest/v1/materias_primas?id=eq.${existente.id}`,{
+            method:'PATCH',headers:{...H,'Content-Type':'application/json'},
+            body:JSON.stringify({codigo})
+          });
+          existente.codigo=codigo;vinculados++;
+        }catch(e){errores.push(descripcion)}
+      }else{
+        const nombre=coreName(descripcion);
+        const unidad=inferUnidad(descripcion);
+        try{
+          const res=await ins('materias_primas',{nombre,unidad,codigo});
+          mpData.push(res[0]);
+          porNombre.set(key,res[0]);
+          creadas++;
+        }catch(e){errores.push(descripcion)}
+      }
+    }
+    mpData.sort((a,b)=>a.nombre.localeCompare(b.nombre));
+    renderMPList();
+    loadingEl.style.display='none';
+    if(errores.length && !vinculados && !creadas){
+      throw new Error(`No se pudo guardar ningún código (¿falta la columna "codigo" en la tabla materias_primas de Supabase? agregala con: alter table materias_primas add column codigo text;).`);
+    }
+    const partes=[`${vinculados} materias primas existentes vinculadas a su código por nombre exacto`,`${creadas} materias primas nuevas creadas desde el catálogo`];
+    if(sinCambio)partes.push(`${sinCambio} ya tenían ese código`);
+    if(errores.length)partes.push(`${errores.length} filas no se pudieron guardar`);
+    msgEl.innerHTML=`<i class="ti ti-check"></i> ${partes.join('. ')}. Los nombres que no coinciden exacto con el catálogo (por ejemplo "Aceite" vs "ACEITE DE GIRASOL") no se vincularon automáticamente para no linkear mal — quedaron como materias primas nuevas separadas; podés fusionarlas renombrando la que ya usás en tus recetas para que coincida y volviendo a correr esta importación.`;
+    msgEl.style.display='';
+    input.value='';
+  }catch(e){
+    loadingEl.style.display='none';
+    errEl.innerHTML=`<i class="ti ti-alert-circle"></i> ${e.message}`;
+    errEl.style.display='';
+    input.value='';
+  }
 }
 
 async function deleteMP(id,nombre){
