@@ -3344,6 +3344,7 @@ function rRecDet(p){
       </div>
     </div>
     <table class="itbl"><thead><tr>
+      <th style="width:90px">Código</th>
       <th>Ingrediente / MP</th>
       <th style="width:130px">Cant. x tanda</th>
       <th style="width:130px;color:var(--green)">Cant. x unidad</th>
@@ -3361,8 +3362,11 @@ function rRecDet(p){
       `<option value="frio"${tempVal==='frio'?' selected':''}>❄️ Frío</option>`,
       `<option value="caliente"${tempVal==='caliente'?' selected':''}>🔥 Caliente</option>`,
     ].join('');
+    const mpMatch=mpData.find(m=>m.nombre.trim().toLowerCase()===(ing.ingrediente||'').trim().toLowerCase());
+    const codMP=mpMatch&&mpMatch.codigo?mpMatch.codigo:'';
     h+=`<tr>
-      <td><input value="${ing.ingrediente}" onchange="uIng('${p.replace(/'/g,"\'")}',${i},'ingrediente',this.value)" 
+      <td style="text-align:center;font-size:12px;color:${codMP?'var(--text2)':'var(--text3)'}" title="${codMP?'Código de '+mpMatch.nombre+' en Materias Primas':'No hay MP con este nombre exacto en Materias Primas'}">${codMP||'—'}</td>
+      <td><input value="${ing.ingrediente}" onchange="uIng('${p.replace(/'/g,"\'")}',${i},'ingrediente',this.value);rRecDet('${p.replace(/'/g,"\'")}');"
         oninput="mpAC(this)" onfocus="mpAC(this)" onblur="setTimeout(()=>mpHide(this),200)"
         autocomplete="off" style="position:relative"/></td>
       <td><input type="number" min="0" step="0.001" value="${ing.cantidad}" onchange="uIng('${p.replace(/'/g,"\'")}',${i},'cantidad',this.value);rRecDet('${p.replace(/'/g,"\'")}');" style="width:110px;text-align:right"/></td>
@@ -3404,7 +3408,10 @@ function imprimirReceta(p){
   ings.forEach(ing=>{
     const xUnd=tanda>0?(ing.cantidad/tanda):0;
     const tempLabel=ing.temp==='frio'?'❄️ Frío':ing.temp==='caliente'?'🔥 Caliente':'—';
+    const mpMatch=mpData.find(m=>m.nombre.trim().toLowerCase()===(ing.ingrediente||'').trim().toLowerCase());
+    const codMP=mpMatch&&mpMatch.codigo?mpMatch.codigo:'—';
     filas+=`<tr>
+      <td class="left">${codMP}</td>
       <td class="left">${ing.ingrediente}</td>
       <td>${fmtNum(ing.cantidad)}</td>
       <td>${fmtNum(xUnd)}</td>
@@ -3429,6 +3436,7 @@ function imprimirReceta(p){
     <h1>${p}</h1>
     <div class="sub">Unidades por tanda: <b>${tanda}</b> &nbsp;|&nbsp; Impreso: ${fechaHoy}</div>
     <table><thead><tr>
+      <th class="left">Código</th>
       <th class="left">Ingrediente / MP</th>
       <th>Cant. x tanda</th>
       <th>Cant. x unidad</th>
