@@ -383,7 +383,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   </div>
   <div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1.25rem">
     <button class="proy-tab active" id="rtab-recetas" onclick="showRecTab('recetas')"><i class="ti ti-notebook"></i> Recetas</button>
-    <button class="proy-tab" id="rtab-mp" onclick="showRecTab('mp')"><i class="ti ti-packages"></i> Materias Primas</button>
     <button class="proy-tab" id="rtab-consumo" onclick="showRecTab('consumo')"><i class="ti ti-chart-bar"></i> Consumo MP</button>
   </div>
   <!-- Sub-tab Recetas -->
@@ -406,43 +405,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       </div>
       <div id="rdetail"><div class="empty"><i class="ti ti-arrow-left"></i>Selecciona un producto.</div></div>
     </div>
-  </div>
-  <!-- Sub-tab Materias Primas -->
-  <div id="rsub-mp" style="display:none">
-    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-      <input type="text" id="mp-new-codigo" placeholder="Código (opcional)" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);width:120px"/>
-      <input type="text" id="mp-new-nombre" placeholder="Nombre MP (ej: Harina 000)" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);width:220px"/>
-      <select id="mp-new-unidad" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)">
-        <option>Kg</option><option>Gr</option><option>Litros</option><option>CC</option><option>Unidad</option>
-      </select>
-      <button class="btn btn-primary" onclick="addMateriaPrima()"><i class="ti ti-plus"></i> Agregar MP</button>
-      <span style="flex:1"></span>
-      <input type="file" id="mp-csv-input" accept=".csv" style="display:none" onchange="importarMPCsv(this)"/>
-      <button class="btn" onclick="document.getElementById('mp-csv-input').click()"><i class="ti ti-file-spreadsheet"></i> Actualizar desde CSV (Flexxus)</button>
-      <button class="btn btn-danger" onclick="borrarMPSinCodigo()"><i class="ti ti-trash"></i> Borrar sin código</button>
-      <span id="mp-import-loading" style="display:none;font-size:13px;color:var(--text2);align-items:center;gap:6px"><span class="spinner spinner-dark"></span> Procesando CSV...</span>
-    </div>
-    <div id="mp-import-msg" style="display:none;margin-bottom:12px" class="alert alert-ok"></div>
-    <div id="mp-import-err" style="display:none;margin-bottom:12px" class="alert alert-err"></div>
-    <div class="alert alert-info" style="margin-bottom:10px"><i class="ti ti-info-circle"></i> La columna "Tipo" clasifica cada fila: <b>MP</b> es materia prima real (aparece en Stock &gt; Materias Primas para el conteo). <b>P. Terminado</b>/<b>P. Proceso</b> son en realidad productos que se colaron acá (por ejemplo al importar el CSV). <b>Insumos</b> es para lo que no es materia prima de receta (packaging, limpieza, etc.). Ninguna de estas tres últimas se cuenta como MP en el conteo de Stock.</div>
-    <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
-      <input type="text" id="mp-list-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="filtrarMPList()"
-        style="flex:1;min-width:200px;max-width:320px;padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-      <span id="mp-list-resumen" style="font-size:12px;color:var(--text2)"></span>
-    </div>
-    <div id="mp-bulk-bar" style="display:none;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;padding:8px 10px;background:var(--bg2);border-radius:var(--radius);border:.5px solid var(--border2)">
-      <span id="mp-bulk-count" style="font-size:12px;font-weight:600"></span>
-      <span style="font-size:12px;color:var(--text2)">Marcar como:</span>
-      <button class="btn btn-xs" onclick="mpBulkSetTipo('mp')">Materia Prima</button>
-      <button class="btn btn-xs" onclick="mpBulkSetTipo('terminado')">Producto Terminado</button>
-      <button class="btn btn-xs" onclick="mpBulkSetTipo('proceso')">Producto en Proceso</button>
-      <button class="btn btn-xs" onclick="mpBulkSetTipo('insumos')">Insumos</button>
-      <button class="btn btn-xs" onclick="mpDeselAll()">Deseleccionar</button>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:8px">
-      <button class="btn btn-xs" onclick="mpSelAllVisible()"><i class="ti ti-checkbox"></i> Seleccionar visibles</button>
-    </div>
-    <div id="mp-list-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
   </div>
   <!-- Sub-tab Consumo MP -->
   <div id="rsub-consumo" style="display:none">
@@ -1153,62 +1115,108 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     </div>
   </div>
 
-  <!-- PANEL MAPEO JOSELITO -->
-  <div id="mapeo-joselito-panel" style="display:none;margin-bottom:1.5rem">
-    <div class="grid-card">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap">
-        <div style="font-size:14px;font-weight:700"><i class="ti ti-link" style="color:var(--blue)"></i> Mapeo de códigos Joselito</div>
-        <span style="font-size:12px;color:var(--text2)">Asociá cada artículo del sistema externo con el producto correspondiente en PAPO</span>
-        <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="guardarMapeoJoselito()"><i class="ti ti-device-floppy"></i> Guardar todos</button>
-      </div>
-      <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
-        <input type="text" id="mapeo-buscar" placeholder="Buscar en el listado..." oninput="filtrarMapeo()" style="padding:6px 10px;font-size:13px;width:250px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-        <span id="mapeo-progress" style="font-size:12px;color:var(--text2)"></span>
-      </div>
-      <div style="overflow-x:auto">
-        <table class="ptbl" id="mapeo-table">
-          <thead><tr>
-            <th style="width:100px">Código</th>
-            <th>Descripción (sistema externo)</th>
-            <th style="width:100px">Rubro</th>
-            <th style="min-width:220px">Producto en PAPO</th>
-            <th style="width:70px;text-align:center">Estado</th>
-          </tr></thead>
-          <tbody id="mapeo-tbody"></tbody>
-        </table>
-      </div>
-    </div>
+  <div class="proy-subtabs">
+    <button class="proy-tab active" id="maetab-prod" onclick="showMaeSubTab('prod')"><i class="ti ti-package"></i> Productos</button>
+    <button class="proy-tab" id="maetab-config" onclick="showMaeSubTab('config')"><i class="ti ti-settings"></i> Configuración</button>
   </div>
-  <div class="maestro-cols">
-    <div>
-      <div class="mc-title">1. Empresas</div>
-      <div id="emplist" class="m-list"><div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Sin empresas.</div></div>
-      <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
-        <input type="text" id="nemp" placeholder="Nombre empresa" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:100%"/>
-        <div style="display:flex;gap:6px;align-items:center">
-          <label style="font-size:12px;color:var(--text2)">Color:</label>
-          <input type="color" id="nempcolor" value="#378ADD" style="width:36px;height:30px;border:none;cursor:pointer;border-radius:4px"/>
-          <button class="btn btn-primary btn-sm" style="flex:1" onclick="addEmpresa()"><i class="ti ti-plus"></i> Agregar</button>
+
+  <!-- SUB-TAB PRODUCTOS -->
+  <div id="mae-sub-prod">
+    <!-- PANEL MAPEO JOSELITO -->
+    <div id="mapeo-joselito-panel" style="display:none;margin-bottom:1.5rem">
+      <div class="grid-card">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap">
+          <div style="font-size:14px;font-weight:700"><i class="ti ti-link" style="color:var(--blue)"></i> Mapeo de códigos Joselito</div>
+          <span style="font-size:12px;color:var(--text2)">Asociá cada artículo del sistema externo con el producto correspondiente en PAPO</span>
+          <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="guardarMapeoJoselito()"><i class="ti ti-device-floppy"></i> Guardar todos</button>
+        </div>
+        <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
+          <input type="text" id="mapeo-buscar" placeholder="Buscar en el listado..." oninput="filtrarMapeo()" style="padding:6px 10px;font-size:13px;width:250px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+          <span id="mapeo-progress" style="font-size:12px;color:var(--text2)"></span>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="ptbl" id="mapeo-table">
+            <thead><tr>
+              <th style="width:100px">Código</th>
+              <th>Descripción (sistema externo)</th>
+              <th style="width:100px">Rubro</th>
+              <th style="min-width:220px">Producto en PAPO</th>
+              <th style="width:70px;text-align:center">Estado</th>
+            </tr></thead>
+            <tbody id="mapeo-tbody"></tbody>
+          </table>
         </div>
       </div>
     </div>
-    <div>
-      <div class="mc-title">2. Areas</div>
-      <div id="arealist" class="m-list"><div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Selecciona empresa</div></div>
-      <div id="areaadd" style="display:none;margin-top:8px">
-        <div style="display:flex;gap:6px">
-          <input type="text" id="narea" placeholder="Nombre del area" style="flex:1;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-          <button class="btn btn-primary btn-sm" onclick="addArea()"><i class="ti ti-plus"></i></button>
+    <div class="maestro-cols">
+      <div>
+        <div class="mc-title">1. Empresas</div>
+        <div id="emplist" class="m-list"><div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Sin empresas.</div></div>
+        <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+          <input type="text" id="nemp" placeholder="Nombre empresa" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:100%"/>
+          <div style="display:flex;gap:6px;align-items:center">
+            <label style="font-size:12px;color:var(--text2)">Color:</label>
+            <input type="color" id="nempcolor" value="#378ADD" style="width:36px;height:30px;border:none;cursor:pointer;border-radius:4px"/>
+            <button class="btn btn-primary btn-sm" style="flex:1" onclick="addEmpresa()"><i class="ti ti-plus"></i> Agregar</button>
+          </div>
         </div>
       </div>
+      <div>
+        <div class="mc-title">2. Areas</div>
+        <div id="arealist" class="m-list"><div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Selecciona empresa</div></div>
+        <div id="areaadd" style="display:none;margin-top:8px">
+          <div style="display:flex;gap:6px">
+            <input type="text" id="narea" placeholder="Nombre del area" style="flex:1;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+            <button class="btn btn-primary btn-sm" onclick="addArea()"><i class="ti ti-plus"></i></button>
+          </div>
+        </div>
+      </div>
+      <div style="min-width:0;overflow-x:auto">
+        <div class="mc-title">3. Productos</div>
+        <div id="proddetail"><div style="padding:2rem;text-align:center;font-size:13px;color:var(--text2)"><i class="ti ti-arrow-left" style="display:block;font-size:24px;margin-bottom:6px;color:var(--text3)"></i>Selecciona un area</div></div>
+      </div>
     </div>
-    <div style="min-width:0;overflow-x:auto">
-      <div class="mc-title">3. Productos</div>
-      <div id="proddetail"><div style="padding:2rem;text-align:center;font-size:13px;color:var(--text2)"><i class="ti ti-arrow-left" style="display:block;font-size:24px;margin-bottom:6px;color:var(--text3)"></i>Selecciona un area</div></div>
-    </div>
+    <div id="maemsg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
+    <div id="maeerr" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="maeErrtxt"></span></div>
   </div>
-  <div id="maemsg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
-  <div id="maeerr" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="maeErrtxt"></span></div>
+
+  <!-- SUB-TAB CONFIGURACIÓN (Materias Primas) -->
+  <div id="mae-sub-config" style="display:none">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <input type="text" id="mp-new-codigo" placeholder="Código (opcional)" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);width:120px"/>
+      <input type="text" id="mp-new-nombre" placeholder="Nombre MP (ej: Harina 000)" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);width:220px"/>
+      <select id="mp-new-unidad" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)">
+        <option>Kg</option><option>Gr</option><option>Litros</option><option>CC</option><option>Unidad</option>
+      </select>
+      <button class="btn btn-primary" onclick="addMateriaPrima()"><i class="ti ti-plus"></i> Agregar MP</button>
+      <span style="flex:1"></span>
+      <input type="file" id="mp-csv-input" accept=".csv" style="display:none" onchange="importarMPCsv(this)"/>
+      <button class="btn" onclick="document.getElementById('mp-csv-input').click()"><i class="ti ti-file-spreadsheet"></i> Actualizar desde CSV (Flexxus)</button>
+      <button class="btn btn-danger" onclick="borrarMPSinCodigo()"><i class="ti ti-trash"></i> Borrar sin código</button>
+      <span id="mp-import-loading" style="display:none;font-size:13px;color:var(--text2);align-items:center;gap:6px"><span class="spinner spinner-dark"></span> Procesando CSV...</span>
+    </div>
+    <div id="mp-import-msg" style="display:none;margin-bottom:12px" class="alert alert-ok"></div>
+    <div id="mp-import-err" style="display:none;margin-bottom:12px" class="alert alert-err"></div>
+    <div class="alert alert-info" style="margin-bottom:10px"><i class="ti ti-info-circle"></i> La columna "Tipo" clasifica cada fila: <b>MP</b> es materia prima real (aparece en Stock &gt; Materias Primas para el conteo). <b>P. Terminado</b>/<b>P. Proceso</b> son en realidad productos que se colaron acá (por ejemplo al importar el CSV) — vinculalos desde Maestro &gt; Productos. <b>Insumos</b> es para lo que no es materia prima de receta (packaging, limpieza, etc.). Ninguna de estas tres últimas se cuenta como MP en el conteo de Stock.</div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+      <input type="text" id="mp-list-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="filtrarMPList()"
+        style="flex:1;min-width:200px;max-width:320px;padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <span id="mp-list-resumen" style="font-size:12px;color:var(--text2)"></span>
+    </div>
+    <div id="mp-bulk-bar" style="display:none;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;padding:8px 10px;background:var(--bg2);border-radius:var(--radius);border:.5px solid var(--border2)">
+      <span id="mp-bulk-count" style="font-size:12px;font-weight:600"></span>
+      <span style="font-size:12px;color:var(--text2)">Marcar como:</span>
+      <button class="btn btn-xs" onclick="mpBulkSetTipo('mp')">Materia Prima</button>
+      <button class="btn btn-xs" onclick="mpBulkSetTipo('terminado')">Producto Terminado</button>
+      <button class="btn btn-xs" onclick="mpBulkSetTipo('proceso')">Producto en Proceso</button>
+      <button class="btn btn-xs" onclick="mpBulkSetTipo('insumos')">Insumos</button>
+      <button class="btn btn-xs" onclick="mpDeselAll()">Deseleccionar</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button class="btn btn-xs" onclick="mpSelAllVisible()"><i class="ti ti-checkbox"></i> Seleccionar visibles</button>
+    </div>
+    <div id="mp-list-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
+  </div>
 </div>
 
 <!-- ETIQUETAS / CAJAS CONGELADAS -->
@@ -2835,9 +2843,12 @@ function rProdDetail(aid){
       <th style="width:100px;text-align:center" title="Nombre del relleno (ej: Carne, Jamón, Pollo)">Tipo relleno</th>
       <th style="width:100px;text-align:center" title="Caliente = se elabora un día antes del pedido. Frío = mismo día.">Elaboración</th>
       <th style="width:110px;text-align:center" title="Código del artículo en el sistema externo (ej: Joselito)">Cód. artículo</th>
-      <th style="width:120px;text-align:center" title="Usado solo como ayuda: cuando un nombre de Materia Prima se parece a este producto, Recetas > Materias Primas sugiere clasificarlo con este mismo tipo (Terminado/Proceso)">Tipo stock (ref.)</th>
+      <th style="width:120px;text-align:center" title="Usado solo como ayuda: cuando un nombre de Materia Prima se parece a este producto, Maestro > Configuración sugiere clasificarlo con este mismo tipo (Terminado/Proceso)">Tipo stock (ref.)</th>
+      <th style="width:170px" title="Vínculo con la fila de Maestro > Configuración (código Flexxus). Es lo que usa Stock > Conteo de stock para este producto.">Vínculo MP</th>
       <th style="width:44px;position:sticky;right:0;background:var(--bg2);box-shadow:-2px 0 4px rgba(0,0,0,.06)"></th></tr></thead><tbody>`;
     prods.forEach((p,idx)=>{
+      const linkedMp=p.mp_id?mpData.find(m=>m.id===p.mp_id):null;
+      const sugMp=!linkedMp?sugerenciaProdMp(p):null;
       h+=`<tr>
         <td style="text-align:center">
           <div style="display:flex;flex-direction:column;gap:2px;align-items:center">
@@ -2903,6 +2914,21 @@ function rProdDetail(aid){
             <option value="terminado"${p.tipo_stock==='terminado'?' selected':''}>Producto Terminado</option>
             <option value="proceso"${p.tipo_stock==='proceso'?' selected':''}>Producto en Proceso</option>
           </select>
+        </td>
+        <td style="width:170px">
+          ${linkedMp?`
+            <div style="display:flex;align-items:center;gap:5px;font-size:11.5px">
+              <span style="font-family:monospace;color:var(--green);white-space:nowrap">${linkedMp.codigo}</span>
+              <span style="color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${linkedMp.nombre.replace(/"/g,'&quot;')}">${linkedMp.nombre}</span>
+              <button class="btn btn-xs" onclick="prodMpUnlink('${p.id}')" title="Quitar vínculo" style="flex-shrink:0"><i class="ti ti-x"></i></button>
+            </div>
+          `:`
+            <div style="position:relative">
+              <input type="text" placeholder="Buscar en Configuración..." oninput="prodMpAC(this,'${p.id}')" onfocus="prodMpAC(this,'${p.id}')" onblur="setTimeout(()=>mpHide(this),200)" autocomplete="off"
+                style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+            </div>
+            ${sugMp?`<div style="margin-top:2px"><span style="font-size:10px;color:var(--amber);cursor:pointer" onclick="prodMpLink('${p.id}','${sugMp.id}')">⚠ ¿"${sugMp.nombre.replace(/"/g,'&quot;')}" (${sugMp.codigo})? · <u>vincular</u></span></div>`:''}
+          `}
         </td>
         <td style="position:sticky;right:0;background:var(--bg);box-shadow:-2px 0 4px rgba(0,0,0,.06)"><button class="btn btn-xs btn-danger" onclick="delProd('${p.id}')"><i class="ti ti-trash"></i></button></td>
       </tr>`;
@@ -3736,13 +3762,68 @@ function sugerenciaMp(m){
   return {producto:mejor.producto, tipo:tipoStockDe(mejor.producto)};
 }
 
+// Inversa de sugerenciaMp: dado un producto del Maestro, busca en la lista de Configuración (materias_primas)
+// una fila clasificada como Terminado/Proceso con nombre parecido, para sugerir el vínculo.
+function sugerenciaProdMp(p){
+  const nP=normTxt(p.nombre);
+  if(!nP)return null;
+  let mejor=null;
+  mpData.forEach(m=>{
+    if(!m.codigo)return;
+    const t=tipoMpDe(m);
+    if(t!=='terminado'&&t!=='proceso')return;
+    const nMp=normTxt(m.nombre);
+    if(!nMp)return;
+    let match=false;
+    if(nP===nMp)match=true;
+    else if(nP.length>=6&&(nP.includes(nMp)||nMp.includes(nP)))match=true;
+    if(match&&(!mejor||nMp.length>mejor._len))mejor={mp:m,_len:nMp.length};
+  });
+  return mejor?mejor.mp:null;
+}
+
+// Autocomplete para vincular un producto del Maestro con una fila de Configuración (MP Terminado/Proceso con código)
+function prodMpAC(input,prodId){
+  const q=(input.value||'').toLowerCase().trim();
+  const wrap=input.parentElement;
+  let drop=wrap.querySelector('.mp-ac-drop');
+  if(!drop){drop=document.createElement('div');drop.className='mp-ac-drop';wrap.style.position='relative';wrap.appendChild(drop);}
+  const eligibles=mpData.filter(m=>m.codigo&&(tipoMpDe(m)==='terminado'||tipoMpDe(m)==='proceso'));
+  const results=q?eligibles.filter(m=>m.nombre.toLowerCase().includes(q)||(m.codigo||'').toLowerCase().includes(q)):eligibles;
+  if(!results.length){drop.innerHTML=`<div style="padding:8px 10px;font-size:12px;color:var(--text2)">Sin resultados. Clasificalo primero en Maestro &gt; Configuración.</div>`;drop.style.display='block';return}
+  let h='';
+  results.slice(0,10).forEach(m=>{
+    h+=`<div class="mp-ac-item" onmousedown="prodMpLink('${prodId}','${m.id}')">
+      <span>${highlight(m.nombre,q)}</span><span class="mp-ac-unit">${m.codigo}</span>
+    </div>`;
+  });
+  drop.innerHTML=h;drop.style.display='block';
+}
+
+async function prodMpLink(prodId,mpId){
+  await updP(prodId,'mp_id',mpId);
+  if(st.aaid)rProdDetail(st.aaid);
+}
+
+async function prodMpUnlink(prodId){
+  await updP(prodId,'mp_id',null);
+  if(st.aaid)rProdDetail(st.aaid);
+}
+
+function showMaeSubTab(t){
+  ['prod','config'].forEach(x=>{
+    document.getElementById('mae-sub-'+x).style.display=x===t?'':'none';
+    document.getElementById('maetab-'+x).classList.toggle('active',x===t);
+  });
+  if(t==='config')renderMPList();
+}
+
 function showRecTab(t){
-  ['recetas','mp','consumo'].forEach(x=>{
+  ['recetas','consumo'].forEach(x=>{
     document.getElementById('rsub-'+x).style.display=x===t?'':'none';
     document.getElementById('rtab-'+x).classList.toggle('active',x===t);
   });
   document.getElementById('btnsaverec2').style.display=t==='recetas'?'':'none';
-  if(t==='mp')renderMPList();
   if(t==='consumo'){
     // Populate empresa selector
     const sel=document.getElementById('rcon-esel');
