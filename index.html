@@ -746,7 +746,12 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <!-- CONTEO DE STOCK -->
   <div id="stock-sub-conteo">
     <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Ingresa el stock actual en camara contado fisicamente.</div>
-    <div class="grid-card" style="margin-bottom:1rem">
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:1rem;flex-wrap:wrap;border-bottom:.5px solid var(--border);padding-bottom:2px">
+      <button class="proy-tab active" id="sctab-terminado" onclick="showStockConteoTipo('terminado')"><i class="ti ti-package"></i> Producto Terminado</button>
+      <button class="proy-tab" id="sctab-proceso" onclick="showStockConteoTipo('proceso')"><i class="ti ti-flask"></i> Producto en Proceso</button>
+      <button class="proy-tab" id="sctab-mp" onclick="showStockConteoTipo('mp')"><i class="ti ti-wheat"></i> Materias Primas</button>
+    </div>
+    <div class="grid-card" style="margin-bottom:1rem" id="stock-conteo-import-box">
       <div style="font-size:13px;font-weight:600;margin-bottom:8px"><i class="ti ti-file-spreadsheet"></i> Importar Excel Joselito</div>
       <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Subí el xlsx del sistema Joselito y se carga automáticamente acá abajo (columna A = código, columna U = stock). Después podés ajustar cualquier valor a mano y guardar.</div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -761,6 +766,8 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <label style="font-size:13px;color:var(--text2)">Fecha:</label>
       <input type="date" id="stock-conteo-fecha" onchange="loadStockConteo()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
       <button class="btn btn-sm" onclick="loadStockConteo()"><i class="ti ti-refresh"></i> Actualizar</button>
+      <input type="text" id="mp-conteo-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="filtrarMpConteo()"
+        style="display:none;flex:1;min-width:200px;max-width:320px;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
     </div>
     <div id="stock-conteo-content"></div>
     <div style="display:flex;justify-content:space-between;margin-top:1rem;flex-wrap:wrap;gap:8px">
@@ -2821,6 +2828,7 @@ function rProdDetail(aid){
       <th style="width:100px;text-align:center" title="Nombre del relleno (ej: Carne, Jamón, Pollo)">Tipo relleno</th>
       <th style="width:100px;text-align:center" title="Caliente = se elabora un día antes del pedido. Frío = mismo día.">Elaboración</th>
       <th style="width:110px;text-align:center" title="Código del artículo en el sistema externo (ej: Joselito)">Cód. artículo</th>
+      <th style="width:120px;text-align:center" title="Clasificación usada en Stock > Conteo de stock, para separar producto terminado de producto en proceso (rellenos, muzza en fideos, etc.)">Tipo stock</th>
       <th style="width:44px;position:sticky;right:0;background:var(--bg2);box-shadow:-2px 0 4px rgba(0,0,0,.06)"></th></tr></thead><tbody>`;
     prods.forEach((p,idx)=>{
       h+=`<tr>
@@ -2879,6 +2887,15 @@ function rProdDetail(aid){
             onchange="updP('${p.id}','codigo_articulo',this.value.trim()||null)"
             style="width:100%;padding:4px 6px;font-size:12px;text-align:center;font-family:monospace;letter-spacing:0.5px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
             title="Código del artículo en el sistema externo (ej: 30200203)"/>
+        </td>
+        <td style="width:120px;text-align:center">
+          <select onchange="updP('${p.id}','tipo_stock',this.value||null)"
+            style="width:100%;padding:4px 5px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
+            title="Si lo dejás en 'Auto', se toma como Producto en Proceso cuando el área contiene 'Cocina', y Producto Terminado en el resto">
+            <option value=""${!p.tipo_stock?' selected':''}>Auto (${tipoStockDe(p)==='proceso'?'Proceso':'Terminado'})</option>
+            <option value="terminado"${p.tipo_stock==='terminado'?' selected':''}>Producto Terminado</option>
+            <option value="proceso"${p.tipo_stock==='proceso'?' selected':''}>Producto en Proceso</option>
+          </select>
         </td>
         <td style="position:sticky;right:0;background:var(--bg);box-shadow:-2px 0 4px rgba(0,0,0,.06)"><button class="btn btn-xs btn-danger" onclick="delProd('${p.id}')"><i class="ti ti-trash"></i></button></td>
       </tr>`;
@@ -5130,20 +5147,31 @@ function generarTablasPDF(eid){
       let sob=torresReales-torresAsignadas;
       [...torresExactas].sort((a,b)=>b.fraccion-a.fraccion).forEach((x,i)=>{if(sob>0){x.torresExtra=1;sob--;}});
 
-      prodsSinMix.forEach(p=>{out+=`<tr class="sinmix"><td class="name">${p.producto}</td><td class="muted">${p.area}</td><td colspan="4" style="text-align:center;color:#bbb">Sin % mix</td></tr>`;});
+      // Agrupar por Área dentro de la familia (o de todo el depósito si no hay familias)
       let subtotalCajas=0;let subtotalUds=0;
-      torresExactas.forEach(({p,pct,pctNorm,ujc,torresBase,torresExtra})=>{
-        const torresTotal=torresBase+torresExtra;
-        const cajasReales=Math.round(torresTotal*cajasXtorreUnit);
-        const unidades=cajasReales*ujc;
-        totalCajasUsadas+=cajasReales;subtotalCajas+=cajasReales;
-        if(ujc>0)subtotalUds+=unidades;
-        out+=`<tr><td class="name">${p.producto}</td><td class="muted">${p.area}</td>
-          <td class="r">${pct.toFixed(1)}%${Math.abs(pctNorm-pct)>0.5?` <span style="color:#888;font-size:7pt">(${pctNorm.toFixed(1)}%)</span>`:''}</td>
-          <td class="r">${torresTotal}${torreDobleFam?' <span style="font-size:7pt;color:#888">(d)</span>':''}</td>
-          <td class="r verde">${cajasReales.toLocaleString('es-AR')}</td>
-          <td class="r">${ujc>0?unidades.toLocaleString('es-AR')+' uds':'--'}</td>
-        </tr>`;
+      const porAreaPDF=new Map();
+      const getGrupoAreaPDF=a=>{if(!porAreaPDF.has(a))porAreaPDF.set(a,{sinMix:[],conMix:[]});return porAreaPDF.get(a)};
+      prodsSinMix.forEach(p=>getGrupoAreaPDF(p.area||'Sin área').sinMix.push(p));
+      torresExactas.forEach(x=>getGrupoAreaPDF(x.p.area||'Sin área').conMix.push(x));
+      const areasOrdenadasPDF=[...porAreaPDF.keys()].sort((a,b)=>a.localeCompare(b,'es'));
+
+      areasOrdenadasPDF.forEach(area=>{
+        const grupoPDF=porAreaPDF.get(area);
+        out+=`<tr><td colspan="6" style="padding:3px 7px 3px 16px;font-size:7.5pt;font-weight:700;color:#666;text-transform:uppercase;background:#f0f0f0">${area}</td></tr>`;
+        grupoPDF.sinMix.forEach(p=>{out+=`<tr class="sinmix"><td class="name">${p.producto}</td><td class="muted">${p.area}</td><td colspan="4" style="text-align:center;color:#bbb">Sin % mix</td></tr>`;});
+        grupoPDF.conMix.forEach(({p,pct,pctNorm,ujc,torresBase,torresExtra})=>{
+          const torresTotal=torresBase+torresExtra;
+          const cajasReales=Math.round(torresTotal*cajasXtorreUnit);
+          const unidades=cajasReales*ujc;
+          totalCajasUsadas+=cajasReales;subtotalCajas+=cajasReales;
+          if(ujc>0)subtotalUds+=unidades;
+          out+=`<tr><td class="name">${p.producto}</td><td class="muted">${p.area}</td>
+            <td class="r">${pct.toFixed(1)}%${Math.abs(pctNorm-pct)>0.5?` <span style="color:#888;font-size:7pt">(${pctNorm.toFixed(1)}%)</span>`:''}</td>
+            <td class="r">${torresTotal}${torreDobleFam?' <span style="font-size:7pt;color:#888">(d)</span>':''}</td>
+            <td class="r verde">${cajasReales.toLocaleString('es-AR')}</td>
+            <td class="r">${ujc>0?unidades.toLocaleString('es-AR')+' uds':'--'}</td>
+          </tr>`;
+        });
       });
       if(famsDep.length&&famObj){
         const sobFam=capFam-subtotalCajas;
@@ -5313,31 +5341,42 @@ async function renderDepCalc(){
         torresTotal:x.torresBase+x.torresExtra
       });});
 
-      // Paso 3: renderizar
-      prodsSinMix.forEach(p=>{
-        h+=`<tr><td style="font-weight:500">${p.producto}</td><td class="muted">${p.area}</td>
-          <td colspan="5" style="text-align:center;color:var(--text3);font-size:12px">Sin % mix definido</td></tr>`;
-      });
+      // Paso 3: renderizar, agrupado por Área dentro de la familia (o de todo el depósito si no hay familias)
+      const porArea=new Map();
+      const getGrupoArea=a=>{if(!porArea.has(a))porArea.set(a,{sinMix:[],conMix:[]});return porArea.get(a)};
+      prodsSinMix.forEach(p=>getGrupoArea(p.area||'Sin área').sinMix.push(p));
+      prodsConMix.forEach(x=>getGrupoArea(x.p.area||'Sin área').conMix.push(x));
+      const areasOrdenadas=[...porArea.keys()].sort((a,b)=>a.localeCompare(b,'es'));
 
-      prodsConMix.forEach(({p,pct,pctNorm,ujc,cajasRaw,torresBase,torresExtra,torresTotal})=>{
-        const cajasReales=Math.round(torresTotal*cajasXtorreUnit);
-        const unidades=cajasReales*ujc;
-        totalCajasUsadas+=cajasReales; subtotalCajas+=cajasReales;
-        if(ujc>0){totalUnidades+=unidades; subtotalUds+=unidades;}
-        const esDoble=!!torreDobleFam;
-        const extraBadge=torresExtra>0?`<span style="background:var(--blue)22;border-radius:8px;padding:1px 5px;font-size:10px;color:var(--blue)">+1</span>`:'';
-        const torreLabel=(esDoble
-          ?`${torresTotal} <span style="font-size:10px;color:var(--blue)">(doble)</span>`
-          :`${torresTotal}`)+' '+extraBadge;
-        h+=`<tr${torresExtra?` style="background:var(--blue)07"`:'>'}>
-          <td style="font-weight:500">${p.producto}</td>
-          <td class="muted">${p.area}</td>
-          <td style="text-align:right">${pct.toFixed(1)}%${Math.abs(pctNorm-pct)>0.5?`<span style="font-size:10px;color:var(--blue);margin-left:3px">(${pctNorm.toFixed(1)}%↑)</span>`:''}</td>
-          <td style="text-align:right;color:var(--text2)">${cajasRaw.toFixed(1)}</td>
-          <td style="text-align:right">${torreLabel}</td>
-          <td style="text-align:right;font-weight:700;color:var(--green)">${cajasReales.toLocaleString('es-AR')}</td>
-          <td style="text-align:right;color:var(--text2)">${ujc>0?unidades.toLocaleString('es-AR')+'<span style="font-size:10px"> uds</span>':'--'}</td>
-        </tr>`;
+      areasOrdenadas.forEach(area=>{
+        const grupo=porArea.get(area);
+        h+=`<tr style="background:var(--bg2)"><td colspan="7" style="padding:4px 12px 4px 22px;font-size:10.5px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">${area}</td></tr>`;
+
+        grupo.sinMix.forEach(p=>{
+          h+=`<tr><td style="font-weight:500">${p.producto}</td><td class="muted">${p.area}</td>
+            <td colspan="5" style="text-align:center;color:var(--text3);font-size:12px">Sin % mix definido</td></tr>`;
+        });
+
+        grupo.conMix.forEach(({p,pct,pctNorm,ujc,cajasRaw,torresBase,torresExtra,torresTotal})=>{
+          const cajasReales=Math.round(torresTotal*cajasXtorreUnit);
+          const unidades=cajasReales*ujc;
+          totalCajasUsadas+=cajasReales; subtotalCajas+=cajasReales;
+          if(ujc>0){totalUnidades+=unidades; subtotalUds+=unidades;}
+          const esDoble=!!torreDobleFam;
+          const extraBadge=torresExtra>0?`<span style="background:var(--blue)22;border-radius:8px;padding:1px 5px;font-size:10px;color:var(--blue)">+1</span>`:'';
+          const torreLabel=(esDoble
+            ?`${torresTotal} <span style="font-size:10px;color:var(--blue)">(doble)</span>`
+            :`${torresTotal}`)+' '+extraBadge;
+          h+=`<tr${torresExtra?` style="background:var(--blue)07"`:'>'}>
+            <td style="font-weight:500">${p.producto}</td>
+            <td class="muted">${p.area}</td>
+            <td style="text-align:right">${pct.toFixed(1)}%${Math.abs(pctNorm-pct)>0.5?`<span style="font-size:10px;color:var(--blue);margin-left:3px">(${pctNorm.toFixed(1)}%↑)</span>`:''}</td>
+            <td style="text-align:right;color:var(--text2)">${cajasRaw.toFixed(1)}</td>
+            <td style="text-align:right">${torreLabel}</td>
+            <td style="text-align:right;font-weight:700;color:var(--green)">${cajasReales.toLocaleString('es-AR')}</td>
+            <td style="text-align:right;color:var(--text2)">${ujc>0?unidades.toLocaleString('es-AR')+'<span style="font-size:10px"> uds</span>':'--'}</td>
+          </tr>`;
+        });
       });
       // Subtotal por familia
       if(famsDep2.length && fProds.length>0){
@@ -5625,15 +5664,36 @@ async function loadStockConteo(){
   try{
     proyData=await get('proyeccion_diaria',`fecha=eq.${fecha}&order=area.asc,producto.asc`);
   }catch{proyData=[]}
+  try{
+    mpConteoData=await get('mp_conteo',`fecha=eq.${fecha}`);
+  }catch{mpConteoData=[]}
+  renderStockConteo();
+}
+
+function showStockConteoTipo(t){
+  stockConteoTipo=t;
+  ['terminado','proceso','mp'].forEach(x=>{
+    const btn=document.getElementById(`sctab-${x}`);
+    if(btn)btn.classList.toggle('active',x===t);
+  });
+  const importBox=document.getElementById('stock-conteo-import-box');
+  if(importBox)importBox.style.display=(t==='terminado')?'':'none';
+  const filtro=document.getElementById('mp-conteo-filtro');
+  if(filtro){filtro.style.display=(t==='mp')?'':'none';filtro.value='';}
   renderStockConteo();
 }
 
 function renderStockConteo(){
+  if(stockConteoTipo==='mp'){renderStockConteoMP();return}
   const ef=document.getElementById('stock-hist-esel').value;
   const el=document.getElementById('stock-conteo-content');
-  let prods=st.Pr;
+  let prods=st.Pr.filter(p=>tipoStockDe(p)===stockConteoTipo);
   if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
-  if(!prods.length){el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin productos en el maestro.</div>';return}
+  if(!prods.length){
+    const tipoLbl=stockConteoTipo==='proceso'?'en proceso':'terminados';
+    el.innerHTML=`<div class="empty"><i class="ti ti-package-off"></i>Sin productos ${tipoLbl}.${stockConteoTipo==='proceso'?' Marcá productos como "Producto en proceso" en Maestro &gt; Productos.':''}</div>`;
+    return;
+  }
   const byE={};prods.forEach(p=>{const eid=p.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(p)});
   let h=`<div class="stock-card"><div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
     <th style="text-align:left">Producto</th>
@@ -5669,10 +5729,49 @@ function renderStockConteo(){
   el.innerHTML=h;
 }
 
+function renderStockConteoMP(){
+  const el=document.getElementById('stock-conteo-content');
+  const items=[...mpData.filter(m=>m.codigo)].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  if(!items.length){el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin materias primas con código asignado. Agregá el código en Materias Primas.</div>';return}
+  let h=`<div class="stock-card"><div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
+    <th style="text-align:left;width:100px">Código</th>
+    <th style="text-align:left">Materia Prima</th>
+    <th style="text-align:left;width:70px">Unidad</th>
+    <th style="text-align:right;width:110px">Stock</th>
+  </tr></thead><tbody>`;
+  items.forEach(m=>{
+    const existing=mpConteoData.find(x=>x.mp_id===m.id);
+    const val=existing&&existing.stock>0?existing.stock:'';
+    const guardado=existing&&val!=='';
+    h+=`<tr class="mpc-row" data-txt="${(m.nombre+' '+(m.codigo||'')).toLowerCase()}">
+      <td style="font-size:12px;color:var(--text2);font-family:monospace">${m.codigo||''}</td>
+      <td style="font-weight:500">${m.nombre}${guardado?` <span style="color:var(--green);font-size:10px">✓</span>`:''}</td>
+      <td style="font-size:12px;color:var(--text2)">${m.unidad||''}</td>
+      <td style="text-align:right">
+        <input class="proy-input" type="number" min="0"
+          id="mpconteo-${m.id}"
+          value="${val}" placeholder="0"
+          style="border-color:${guardado?'var(--green)':'var(--border2)'};width:90px"/>
+      </td>
+    </tr>`;
+  });
+  h+=`</tbody></table></div></div>`;
+  el.innerHTML=h;
+}
+
+function filtrarMpConteo(){
+  const flt=(document.getElementById('mp-conteo-filtro')?.value||'').toLowerCase().trim();
+  document.querySelectorAll('#stock-conteo-content tr.mpc-row').forEach(tr=>{
+    tr.style.display=(!flt||tr.dataset.txt.includes(flt))?'':'none';
+  });
+}
+
 async function guardarStockConteo(){
   const fecha=document.getElementById('stock-conteo-fecha').value||hoyLocal();
+  if(stockConteoTipo==='mp'){await guardarStockConteoMP(fecha);return}
   const ef=document.getElementById('stock-hist-esel').value;
-  let prods=st.Pr;if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
+  let prods=st.Pr.filter(p=>tipoStockDe(p)===stockConteoTipo);
+  if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
   ss('saving','Guardando conteo...');
   let guardados=0;
   try{
@@ -5688,6 +5787,42 @@ async function guardarStockConteo(){
     await loadStockConteo();
     ss('online',`${guardados} productos guardados`);
   }catch(e){ss('error','Error: '+e.message)}
+}
+
+async function guardarStockConteoMP(fecha){
+  ss('saving','Guardando conteo de MP...');
+  let guardados=0;
+  try{
+    const items=mpData.filter(m=>m.codigo);
+    for(const m of items){
+      const inp=document.getElementById(`mpconteo-${m.id}`);
+      if(!inp||inp.value==='')continue;
+      const stock=parseFloat(inp.value)||0;
+      await upsertMpConteo(fecha,m.id,stock);
+      guardados++;
+    }
+    await loadStockConteo();
+    ss('online',`${guardados} materias primas guardadas`);
+  }catch(e){
+    const hint=/relation .*mp_conteo.* does not exist/i.test(e.message||'')?' (falta crear la tabla mp_conteo en Supabase)':'';
+    ss('error','Error: '+e.message+hint);
+  }
+}
+
+async function upsertMpConteo(fecha,mpId,stock){
+  const row={fecha,mp_id:mpId,stock};
+  const res=await fetch(`${SB}/rest/v1/mp_conteo?on_conflict=fecha,mp_id`,{
+    method:'POST',
+    headers:{...H,'Prefer':'resolution=merge-duplicates,return=representation'},
+    body:JSON.stringify(row)
+  });
+  if(!res.ok)throw new Error(await res.text());
+  const data=await res.json();
+  if(data&&data[0]){
+    const idx=mpConteoData.findIndex(x=>x.mp_id===mpId&&x.fecha===fecha);
+    if(idx>=0)mpConteoData[idx]={...mpConteoData[idx],...data[0]};
+    else mpConteoData.push(data[0]);
+  }
 }
 
 async function importarExcelAStockConteo(input){
@@ -6796,6 +6931,15 @@ async function confirmarImport(){
 
 // ── PROYECCION DIARIA ─────────────────────────────────────────────
 let proyData = []; // cache proyeccion del dia
+let mpConteoData = []; // cache conteo de MP del dia
+let stockConteoTipo = 'terminado'; // 'terminado' | 'proceso' | 'mp'
+
+function tipoStockDe(p){
+  if(p.tipo_stock)return p.tipo_stock;
+  const a=st.A.find(x=>x.id===p.area_id);
+  if(a&&a.nombre&&a.nombre.toLowerCase().includes('cocina'))return 'proceso';
+  return 'terminado';
+}
 
 function showProyTab(t){
   ['conteo','ventas','resumen','stats','pedidos-fut'].forEach(id=>{
