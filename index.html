@@ -424,7 +424,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     </div>
     <div id="mp-import-msg" style="display:none;margin-bottom:12px" class="alert alert-ok"></div>
     <div id="mp-import-err" style="display:none;margin-bottom:12px" class="alert alert-err"></div>
-    <div class="alert alert-info" style="margin-bottom:10px"><i class="ti ti-info-circle"></i> La columna "Tipo" clasifica cada fila: <b>MP</b> es materia prima real (aparece en Stock &gt; Materias Primas para el conteo), <b>Terminado</b>/<b>Proceso</b> son en realidad productos que se colaron acá (por ejemplo al importar el CSV) y no se cuentan como MP.</div>
+    <div class="alert alert-info" style="margin-bottom:10px"><i class="ti ti-info-circle"></i> La columna "Tipo" clasifica cada fila: <b>MP</b> es materia prima real (aparece en Stock &gt; Materias Primas para el conteo). <b>P. Terminado</b>/<b>P. Proceso</b> son en realidad productos que se colaron acá (por ejemplo al importar el CSV). <b>Insumos</b> es para lo que no es materia prima de receta (packaging, limpieza, etc.). Ninguna de estas tres últimas se cuenta como MP en el conteo de Stock.</div>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
       <input type="text" id="mp-list-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="filtrarMPList()"
         style="flex:1;min-width:200px;max-width:320px;padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
@@ -436,6 +436,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <button class="btn btn-xs" onclick="mpBulkSetTipo('mp')">Materia Prima</button>
       <button class="btn btn-xs" onclick="mpBulkSetTipo('terminado')">Producto Terminado</button>
       <button class="btn btn-xs" onclick="mpBulkSetTipo('proceso')">Producto en Proceso</button>
+      <button class="btn btn-xs" onclick="mpBulkSetTipo('insumos')">Insumos</button>
       <button class="btn btn-xs" onclick="mpDeselAll()">Deseleccionar</button>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:8px">
@@ -3716,7 +3717,14 @@ async function renderConsumoMP(){
 let mpData=[];
 let mpSelected=new Set(); // ids seleccionados para acciones en lote en la lista de MP
 
-function tipoMpDe(m){ return m.tipo||'mp'; } // 'mp' | 'terminado' | 'proceso' — default mp (asi lo que no se clasifico sigue contando como materia prima)
+function tipoMpDe(m){ return m.tipo||'mp'; } // 'mp' | 'terminado' | 'proceso' | 'insumos' — default mp (asi lo que no se clasifico sigue contando como materia prima)
+
+// Detecta el error de Supabase/PostgREST cuando falta una columna (incluye el mensaje "schema cache" que tira justo despues de crear la columna, antes de que se refresque el cache)
+function hintFaltaColumna(msg,col,tabla){
+  const m=String(msg||'');
+  const re=new RegExp(`column .*${col}.* does not exist|${col}.*column does not exist|could not find the '${col}' column`,'i');
+  return re.test(m)?` (falta la columna "${col}" en ${tabla} — agregala en Supabase. Si ya la agregaste, esperá unos segundos: a veces Supabase tarda en refrescar el cache)`:'';
+}
 
 function normTxt(s){
   return String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
@@ -3768,7 +3776,7 @@ function renderMPList(){
   const el=document.getElementById('mp-list-content');
   if(!mpData.length){el.innerHTML='<div class="empty"><i class="ti ti-packages"></i> Sin materias primas. Agregá la primera.</div>';return}
   const unOpts=u=>['Kg','Gr','Litros','CC','Unidad'].map(x=>`<option${x===u?' selected':''}>${x}</option>`).join('');
-  const tipoOpts=t=>`<option value="mp"${t==='mp'?' selected':''}>MP</option><option value="terminado"${t==='terminado'?' selected':''}>Terminado</option><option value="proceso"${t==='proceso'?' selected':''}>Proceso</option>`;
+  const tipoOpts=t=>`<option value="mp"${t==='mp'?' selected':''}>MP</option><option value="terminado"${t==='terminado'?' selected':''}>P. Terminado</option><option value="proceso"${t==='proceso'?' selected':''}>P. Proceso</option><option value="insumos"${t==='insumos'?' selected':''}>Insumos</option>`;
   let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="width:34px"></th><th style="width:110px">Código</th><th>Nombre</th><th style="width:110px">Unidad</th><th style="width:120px">Tipo</th><th style="width:60px"></th></tr></thead><tbody>';
   mpData.forEach(mp=>{
     const sug=sugerenciaMp(mp);
@@ -3806,7 +3814,8 @@ function renderMPResumen(){
   const nMp=mpData.filter(m=>tipoMpDe(m)==='mp').length;
   const nTerm=mpData.filter(m=>tipoMpDe(m)==='terminado').length;
   const nProc=mpData.filter(m=>tipoMpDe(m)==='proceso').length;
-  el.textContent=`${mpData.length} filas · ${nMp} MP · ${nTerm} Terminado · ${nProc} Proceso`;
+  const nIns=mpData.filter(m=>tipoMpDe(m)==='insumos').length;
+  el.textContent=`${mpData.length} filas · ${nMp} MP · ${nTerm} Terminado · ${nProc} Proceso · ${nIns} Insumos`;
 }
 
 function filtrarMPList(){
@@ -3866,8 +3875,7 @@ async function mpBulkSetTipo(tipo){
     renderMPList();
     ss('online',`${ids.length} MP marcadas como ${tipo}`);
   }catch(e){
-    const hint=/column .*tipo.* does not exist/i.test(e.message||'')?' (falta la columna "tipo" en materias_primas — agregala en Supabase)':'';
-    ss('error','Error: '+e.message+hint);
+    ss('error','Error: '+e.message+hintFaltaColumna(e.message,'tipo','materias_primas'));
   }
 }
 
@@ -3898,7 +3906,7 @@ async function updateMP(id,field,value){
     if(field==='tipo')renderMPList();
     ss('online','MP actualizada');
   }catch(e){
-    const hint=/column .*codigo.* does not exist|codigo.*column/i.test(e.message||'')?' (falta la columna "codigo" en materias_primas — agregala en Supabase)':/column .*tipo.* does not exist/i.test(e.message||'')?' (falta la columna "tipo" en materias_primas — agregala en Supabase)':'';
+    const hint=hintFaltaColumna(e.message,'codigo','materias_primas')||hintFaltaColumna(e.message,'tipo','materias_primas');
     ss('error','Error: '+e.message+hint);renderMPList();
   }
 }
@@ -3917,8 +3925,7 @@ async function addMateriaPrima(){
     document.getElementById('mp-new-codigo').value='';
     renderMPList();ss('online','MP agregada');
   }catch(e){
-    const hint=/column .*codigo.* does not exist|codigo.*column/i.test(e.message||'')?' (falta la columna "codigo" en materias_primas — agregala en Supabase)':'';
-    ss('error','Error: '+e.message+hint);
+    ss('error','Error: '+e.message+hintFaltaColumna(e.message,'codigo','materias_primas'));
   }
 }
 
