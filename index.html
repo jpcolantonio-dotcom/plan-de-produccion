@@ -424,6 +424,23 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     </div>
     <div id="mp-import-msg" style="display:none;margin-bottom:12px" class="alert alert-ok"></div>
     <div id="mp-import-err" style="display:none;margin-bottom:12px" class="alert alert-err"></div>
+    <div class="alert alert-info" style="margin-bottom:10px"><i class="ti ti-info-circle"></i> La columna "Tipo" clasifica cada fila: <b>MP</b> es materia prima real (aparece en Stock &gt; Materias Primas para el conteo), <b>Terminado</b>/<b>Proceso</b> son en realidad productos que se colaron acá (por ejemplo al importar el CSV) y no se cuentan como MP.</div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+      <input type="text" id="mp-list-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="filtrarMPList()"
+        style="flex:1;min-width:200px;max-width:320px;padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <span id="mp-list-resumen" style="font-size:12px;color:var(--text2)"></span>
+    </div>
+    <div id="mp-bulk-bar" style="display:none;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;padding:8px 10px;background:var(--bg2);border-radius:var(--radius);border:.5px solid var(--border2)">
+      <span id="mp-bulk-count" style="font-size:12px;font-weight:600"></span>
+      <span style="font-size:12px;color:var(--text2)">Marcar como:</span>
+      <button class="btn btn-xs" onclick="mpBulkSetTipo('mp')">Materia Prima</button>
+      <button class="btn btn-xs" onclick="mpBulkSetTipo('terminado')">Producto Terminado</button>
+      <button class="btn btn-xs" onclick="mpBulkSetTipo('proceso')">Producto en Proceso</button>
+      <button class="btn btn-xs" onclick="mpDeselAll()">Deseleccionar</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button class="btn btn-xs" onclick="mpSelAllVisible()"><i class="ti ti-checkbox"></i> Seleccionar visibles</button>
+    </div>
     <div id="mp-list-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
   </div>
   <!-- Sub-tab Consumo MP -->
@@ -3697,6 +3714,30 @@ async function renderConsumoMP(){
 
 // MATERIAS PRIMAS
 let mpData=[];
+let mpSelected=new Set(); // ids seleccionados para acciones en lote en la lista de MP
+
+function tipoMpDe(m){ return m.tipo||'mp'; } // 'mp' | 'terminado' | 'proceso' — default mp (asi lo que no se clasifico sigue contando como materia prima)
+
+function normTxt(s){
+  return String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+}
+
+// Sugiere si una MP en realidad es un producto (terminado o en proceso) del maestro, comparando nombres normalizados
+function sugerenciaMp(m){
+  const nMp=normTxt(m.nombre);
+  if(!nMp)return null;
+  let mejor=null;
+  (st.Pr||[]).forEach(p=>{
+    const nP=normTxt(p.nombre);
+    if(!nP)return;
+    let match=false;
+    if(nMp===nP)match=true;
+    else if(nMp.length>=6&&(nMp.includes(nP)||nP.includes(nMp)))match=true;
+    if(match&&(!mejor||nP.length>mejor._len)){mejor={producto:p,_len:nP.length};}
+  });
+  if(!mejor)return null;
+  return {producto:mejor.producto, tipo:tipoStockDe(mejor.producto)};
+}
 
 function showRecTab(t){
   ['recetas','mp','consumo'].forEach(x=>{
@@ -3727,22 +3768,107 @@ function renderMPList(){
   const el=document.getElementById('mp-list-content');
   if(!mpData.length){el.innerHTML='<div class="empty"><i class="ti ti-packages"></i> Sin materias primas. Agregá la primera.</div>';return}
   const unOpts=u=>['Kg','Gr','Litros','CC','Unidad'].map(x=>`<option${x===u?' selected':''}>${x}</option>`).join('');
-  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="width:110px">Código</th><th>Nombre</th><th style="width:110px">Unidad</th><th style="width:60px"></th></tr></thead><tbody>';
+  const tipoOpts=t=>`<option value="mp"${t==='mp'?' selected':''}>MP</option><option value="terminado"${t==='terminado'?' selected':''}>Terminado</option><option value="proceso"${t==='proceso'?' selected':''}>Proceso</option>`;
+  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="width:34px"></th><th style="width:110px">Código</th><th>Nombre</th><th style="width:110px">Unidad</th><th style="width:120px">Tipo</th><th style="width:60px"></th></tr></thead><tbody>';
   mpData.forEach(mp=>{
-    h+=`<tr>
+    const sug=sugerenciaMp(mp);
+    const tipo=tipoMpDe(mp);
+    const mostrarSug=sug&&sug.tipo!==tipo;
+    const sugLbl=sug&&sug.tipo==='proceso'?'Proceso':'Terminado';
+    h+=`<tr class="mp-row" data-id="${mp.id}" data-txt="${(mp.nombre+' '+(mp.codigo||'')).toLowerCase().replace(/"/g,'&quot;')}">
+      <td style="text-align:center"><input type="checkbox" id="mpsel-${mp.id}" onchange="mpToggleSel('${mp.id}',this.checked)" style="width:15px;height:15px;cursor:pointer"/></td>
       <td><input value="${(mp.codigo||'').toString().replace(/"/g,'&quot;')}" placeholder="—"
         style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
         onchange="updateMP('${mp.id}','codigo',this.value)"/></td>
       <td><input value="${mp.nombre.replace(/"/g,'&quot;')}"
         style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
-        onchange="updateMP('${mp.id}','nombre',this.value)"/></td>
+        onchange="updateMP('${mp.id}','nombre',this.value)"/>
+        ${mostrarSug?`<div style="margin-top:3px"><span style="font-size:10.5px;color:var(--amber);cursor:pointer" onclick="updateMP('${mp.id}','tipo','${sug.tipo}')" title="Hay un producto '${sug.producto.nombre.replace(/'/g,"&#39;")}' con nombre parecido en el Maestro">⚠ ¿Es "${sug.producto.nombre}" (${sugLbl})? · <u>aplicar</u></span></div>`:''}
+      </td>
       <td><select style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
         onchange="updateMP('${mp.id}','unidad',this.value)">${unOpts(mp.unidad)}</select></td>
+      <td><select style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:${tipo==='mp'?'var(--text)':'var(--amber)'}"
+        onchange="updateMP('${mp.id}','tipo',this.value)">${tipoOpts(tipo)}</select></td>
       <td style="text-align:center"><button class="btn btn-xs btn-danger" onclick="deleteMP('${mp.id}','${mp.nombre.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button></td>
     </tr>`;
   });
   h+='</tbody></table></div>';
   el.innerHTML=h;
+  const filtro=document.getElementById('mp-list-filtro');
+  if(filtro&&filtro.value)filtrarMPList();
+  renderMPResumen();
+  renderMPBulkBar();
+}
+
+function renderMPResumen(){
+  const el=document.getElementById('mp-list-resumen');
+  if(!el)return;
+  const nMp=mpData.filter(m=>tipoMpDe(m)==='mp').length;
+  const nTerm=mpData.filter(m=>tipoMpDe(m)==='terminado').length;
+  const nProc=mpData.filter(m=>tipoMpDe(m)==='proceso').length;
+  el.textContent=`${mpData.length} filas · ${nMp} MP · ${nTerm} Terminado · ${nProc} Proceso`;
+}
+
+function filtrarMPList(){
+  const flt=(document.getElementById('mp-list-filtro')?.value||'').toLowerCase().trim();
+  document.querySelectorAll('#mp-list-content tr.mp-row').forEach(tr=>{
+    tr.style.display=(!flt||tr.dataset.txt.includes(flt))?'':'none';
+  });
+}
+
+function mpToggleSel(id,checked){
+  if(checked)mpSelected.add(id);else mpSelected.delete(id);
+  renderMPBulkBar();
+}
+
+function mpSelAllVisible(){
+  document.querySelectorAll('#mp-list-content tr.mp-row').forEach(tr=>{
+    if(tr.style.display==='none')return;
+    mpSelected.add(tr.dataset.id);
+    const cb=document.getElementById(`mpsel-${tr.dataset.id}`);
+    if(cb)cb.checked=true;
+  });
+  renderMPBulkBar();
+}
+
+function mpDeselAll(){
+  mpSelected.clear();
+  document.querySelectorAll('#mp-list-content input[type=checkbox]').forEach(cb=>cb.checked=false);
+  renderMPBulkBar();
+}
+
+function renderMPBulkBar(){
+  const bar=document.getElementById('mp-bulk-bar');
+  if(!bar)return;
+  if(mpSelected.size){
+    bar.style.display='flex';
+    document.getElementById('mp-bulk-count').textContent=`${mpSelected.size} seleccionada(s)`;
+  }else{
+    bar.style.display='none';
+  }
+}
+
+async function mpBulkSetTipo(tipo){
+  if(!mpSelected.size)return;
+  const ids=[...mpSelected];
+  ss('saving',`Actualizando ${ids.length} MP...`);
+  try{
+    for(let i=0;i<ids.length;i+=150){
+      const chunk=ids.slice(i,i+150);
+      const res=await fetch(`${SB}/rest/v1/materias_primas?id=in.(${chunk.join(',')})`,{
+        method:'PATCH',headers:{...H,'Content-Type':'application/json'},
+        body:JSON.stringify({tipo})
+      });
+      if(!res.ok)throw new Error(await res.text());
+    }
+    ids.forEach(id=>{const mp=mpData.find(m=>m.id===id);if(mp)mp.tipo=tipo;});
+    mpDeselAll();
+    renderMPList();
+    ss('online',`${ids.length} MP marcadas como ${tipo}`);
+  }catch(e){
+    const hint=/column .*tipo.* does not exist/i.test(e.message||'')?' (falta la columna "tipo" en materias_primas — agregala en Supabase)':'';
+    ss('error','Error: '+e.message+hint);
+  }
 }
 
 async function updateMP(id,field,value){
@@ -3753,10 +3879,11 @@ async function updateMP(id,field,value){
   if((mp[field]||'')===value)return;
   ss('saving','Guardando...');
   try{
-    await fetch(`${SB}/rest/v1/materias_primas?id=eq.${id}`,{
+    const res=await fetch(`${SB}/rest/v1/materias_primas?id=eq.${id}`,{
       method:'PATCH',headers:{...H,'Content-Type':'application/json'},
       body:JSON.stringify({[field]:value||null})
     });
+    if(!res.ok)throw new Error(await res.text());
     const nombreViejo=mp.nombre;
     mp[field]=value;
     if(field==='nombre'){
@@ -3768,9 +3895,10 @@ async function updateMP(id,field,value){
       });
       if(tocadas){rRec();ss('online',`MP renombrada, ${tocadas} ingrediente(s) actualizados en recetas — recordá "Guardar recetas"`);return}
     }
+    if(field==='tipo')renderMPList();
     ss('online','MP actualizada');
   }catch(e){
-    const hint=/column .*codigo.* does not exist|codigo.*column/i.test(e.message||'')?' (falta la columna "codigo" en materias_primas — agregala en Supabase)':'';
+    const hint=/column .*codigo.* does not exist|codigo.*column/i.test(e.message||'')?' (falta la columna "codigo" en materias_primas — agregala en Supabase)':/column .*tipo.* does not exist/i.test(e.message||'')?' (falta la columna "tipo" en materias_primas — agregala en Supabase)':'';
     ss('error','Error: '+e.message+hint);renderMPList();
   }
 }
@@ -5731,8 +5859,8 @@ function renderStockConteo(){
 
 function renderStockConteoMP(){
   const el=document.getElementById('stock-conteo-content');
-  const items=[...mpData.filter(m=>m.codigo)].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
-  if(!items.length){el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin materias primas con código asignado. Agregá el código en Materias Primas.</div>';return}
+  const items=[...mpData.filter(m=>m.codigo&&tipoMpDe(m)==='mp')].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  if(!items.length){el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin materias primas con código asignado. Agregá el código en Materias Primas, y revisá que estén marcadas como "MP" (no Terminado/Proceso).</div>';return}
   let h=`<div class="stock-card"><div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
     <th style="text-align:left;width:100px">Código</th>
     <th style="text-align:left">Materia Prima</th>
@@ -5793,7 +5921,7 @@ async function guardarStockConteoMP(fecha){
   ss('saving','Guardando conteo de MP...');
   let guardados=0;
   try{
-    const items=mpData.filter(m=>m.codigo);
+    const items=mpData.filter(m=>m.codigo&&tipoMpDe(m)==='mp');
     for(const m of items){
       const inp=document.getElementById(`mpconteo-${m.id}`);
       if(!inp||inp.value==='')continue;
