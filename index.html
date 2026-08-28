@@ -769,23 +769,12 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <button class="proy-tab" id="sctab-proceso" onclick="showStockConteoTipo('proceso')"><i class="ti ti-flask"></i> Producto en Proceso</button>
       <button class="proy-tab" id="sctab-mp" onclick="showStockConteoTipo('mp')"><i class="ti ti-wheat"></i> Materias Primas</button>
     </div>
-    <div class="grid-card" style="margin-bottom:1rem" id="stock-conteo-import-box">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px"><i class="ti ti-file-spreadsheet"></i> Importar Excel Joselito</div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Subí el xlsx del sistema Joselito y se carga automáticamente acá abajo (columna A = código, columna U = stock). Después podés ajustar cualquier valor a mano y guardar.</div>
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <input type="file" id="stock-conteo-xlsx-input" accept=".xlsx,.xls" onchange="importarExcelAStockConteo(this)"
-          style="flex:1;min-width:200px;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-        <span id="stock-conteo-import-loading" style="display:none;font-size:13px;color:var(--text2);white-space:nowrap"><span class="spinner" style="width:12px;height:12px;border-width:2px"></span> Importando...</span>
-      </div>
-      <div id="stock-conteo-import-msg" style="display:none;margin-top:8px" class="alert alert-ok"><i class="ti ti-check"></i> <span id="stock-conteo-import-msg-txt"></span></div>
-      <div id="stock-conteo-import-err" style="display:none;margin-top:8px" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="stock-conteo-import-err-txt"></span></div>
-    </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
       <label style="font-size:13px;color:var(--text2)">Fecha:</label>
       <input type="date" id="stock-conteo-fecha" onchange="loadStockConteo()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
       <button class="btn btn-sm" onclick="loadStockConteo()"><i class="ti ti-refresh"></i> Actualizar</button>
       <input type="text" id="mp-conteo-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="filtrarMpConteo()"
-        style="display:none;flex:1;min-width:200px;max-width:320px;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        style="flex:1;min-width:200px;max-width:320px;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
     </div>
     <div id="stock-conteo-content"></div>
     <div style="display:flex;justify-content:space-between;margin-top:1rem;flex-wrap:wrap;gap:8px">
@@ -2846,7 +2835,7 @@ function rProdDetail(aid){
       <th style="width:100px;text-align:center" title="Nombre del relleno (ej: Carne, Jamón, Pollo)">Tipo relleno</th>
       <th style="width:100px;text-align:center" title="Caliente = se elabora un día antes del pedido. Frío = mismo día.">Elaboración</th>
       <th style="width:110px;text-align:center" title="Código del artículo en el sistema externo (ej: Joselito)">Cód. artículo</th>
-      <th style="width:120px;text-align:center" title="Clasificación usada en Stock > Conteo de stock, para separar producto terminado de producto en proceso (rellenos, muzza en fideos, etc.)">Tipo stock</th>
+      <th style="width:120px;text-align:center" title="Usado solo como ayuda: cuando un nombre de Materia Prima se parece a este producto, Recetas > Materias Primas sugiere clasificarlo con este mismo tipo (Terminado/Proceso)">Tipo stock (ref.)</th>
       <th style="width:44px;position:sticky;right:0;background:var(--bg2);box-shadow:-2px 0 4px rgba(0,0,0,.06)"></th></tr></thead><tbody>`;
     prods.forEach((p,idx)=>{
       h+=`<tr>
@@ -5797,9 +5786,6 @@ let stockSeg=[];
 async function loadStockConteo(){
   const fecha=document.getElementById('stock-conteo-fecha').value||hoyLocal();
   try{
-    proyData=await get('proyeccion_diaria',`fecha=eq.${fecha}&order=area.asc,producto.asc`);
-  }catch{proyData=[]}
-  try{
     mpConteoData=await get('mp_conteo',`fecha=eq.${fecha}`);
   }catch{mpConteoData=[]}
   renderStockConteo();
@@ -5811,66 +5797,25 @@ function showStockConteoTipo(t){
     const btn=document.getElementById(`sctab-${x}`);
     if(btn)btn.classList.toggle('active',x===t);
   });
-  const importBox=document.getElementById('stock-conteo-import-box');
-  if(importBox)importBox.style.display=(t==='terminado')?'':'none';
   const filtro=document.getElementById('mp-conteo-filtro');
-  if(filtro){filtro.style.display=(t==='mp')?'':'none';filtro.value='';}
+  if(filtro)filtro.value='';
   renderStockConteo();
 }
 
+// Todo el conteo de stock (Producto Terminado / Producto en Proceso / Materias Primas) sale de la
+// misma lista con código (Recetas > Materias Primas), filtrada por el campo "tipo" de cada fila.
 function renderStockConteo(){
-  if(stockConteoTipo==='mp'){renderStockConteoMP();return}
-  const ef=document.getElementById('stock-hist-esel').value;
   const el=document.getElementById('stock-conteo-content');
-  let prods=st.Pr.filter(p=>tipoStockDe(p)===stockConteoTipo);
-  if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
-  if(!prods.length){
-    const tipoLbl=stockConteoTipo==='proceso'?'en proceso':'terminados';
-    el.innerHTML=`<div class="empty"><i class="ti ti-package-off"></i>Sin productos ${tipoLbl}.${stockConteoTipo==='proceso'?' Marcá productos como "Producto en proceso" en Maestro &gt; Productos.':''}</div>`;
+  const items=[...mpData.filter(m=>m.codigo&&tipoMpDe(m)===stockConteoTipo)].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  const etiqueta={mp:'materias primas',terminado:'productos terminados',proceso:'productos en proceso'}[stockConteoTipo]||'items';
+  const colLbl={mp:'Materia Prima',terminado:'Producto',proceso:'Producto'}[stockConteoTipo]||'Item';
+  if(!items.length){
+    el.innerHTML=`<div class="empty"><i class="ti ti-package-off"></i>Sin ${etiqueta} con código asignado. Clasificalas en Recetas &gt; Materias Primas (columna "Tipo").</div>`;
     return;
   }
-  const byE={};prods.forEach(p=>{const eid=p.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(p)});
-  let h=`<div class="stock-card"><div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
-    <th style="text-align:left">Producto</th>
-    <th style="text-align:left;width:70px">Unidad</th>
-    <th style="text-align:right;width:110px">Stock</th>
-  </tr></thead><tbody>`;
-  Object.entries(byE).forEach(([eid,items])=>{
-    const clr=ec(eid);const nm=en(eid)||'SE';
-    const byArea={};items.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id);const an=a?a.nombre:'SA';if(!byArea[an])byArea[an]=[];byArea[an].push({...p,anom:an})});
-    Object.entries(byArea).forEach(([area,aItems])=>{
-      h+=`<tr><td colspan="3" style="background:var(--bg2);padding:6px 10px;font-size:11px;font-weight:700;color:${clr};border-top:2px solid var(--border2)">
-        <span class="color-dot" style="background:${clr}"></span> ${nm} &mdash; ${area}
-      </td></tr>`;
-      aItems.forEach((p)=>{
-        const existing=getProyItem(eid,area,p.nombre);
-        const val=existing&&existing.stock>0?existing.stock:'';
-        const guardado=existing&&val!=='';
-        const pid=`${eid}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
-        h+=`<tr>
-          <td style="font-weight:500">${p.nombre}${guardado?` <span style="color:var(--green);font-size:10px">✓</span>`:''}</td>
-          <td style="font-size:12px;color:var(--text2)">${p.unidad}</td>
-          <td style="text-align:right">
-            <input class="proy-input" type="number" min="0"
-              id="sconteo-${pid}"
-              value="${val}" placeholder="0"
-              style="border-color:${guardado?'var(--green)':'var(--border2)'};width:90px"/>
-          </td>
-        </tr>`;
-      });
-    });
-  });
-  h+=`</tbody></table></div></div>`;
-  el.innerHTML=h;
-}
-
-function renderStockConteoMP(){
-  const el=document.getElementById('stock-conteo-content');
-  const items=[...mpData.filter(m=>m.codigo&&tipoMpDe(m)==='mp')].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
-  if(!items.length){el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin materias primas con código asignado. Agregá el código en Materias Primas, y revisá que estén marcadas como "MP" (no Terminado/Proceso).</div>';return}
   let h=`<div class="stock-card"><div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
     <th style="text-align:left;width:100px">Código</th>
-    <th style="text-align:left">Materia Prima</th>
+    <th style="text-align:left">${colLbl}</th>
     <th style="text-align:left;width:70px">Unidad</th>
     <th style="text-align:right;width:110px">Stock</th>
   </tr></thead><tbody>`;
@@ -5903,32 +5848,10 @@ function filtrarMpConteo(){
 
 async function guardarStockConteo(){
   const fecha=document.getElementById('stock-conteo-fecha').value||hoyLocal();
-  if(stockConteoTipo==='mp'){await guardarStockConteoMP(fecha);return}
-  const ef=document.getElementById('stock-hist-esel').value;
-  let prods=st.Pr.filter(p=>tipoStockDe(p)===stockConteoTipo);
-  if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
   ss('saving','Guardando conteo...');
   let guardados=0;
   try{
-    for(const p of prods){
-      const a=st.A.find(x=>x.id===p.area_id);const area=a?a.nombre:'SA';
-      const pid=`${p.empresa_id}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
-      const inp=document.getElementById(`sconteo-${pid}`);
-      if(!inp||inp.value==='')continue;
-      const stock=parseFloat(inp.value)||0;
-      await upsertProy(fecha,p.empresa_id,area,p.nombre,p.unidad,{stock});
-      guardados++;
-    }
-    await loadStockConteo();
-    ss('online',`${guardados} productos guardados`);
-  }catch(e){ss('error','Error: '+e.message)}
-}
-
-async function guardarStockConteoMP(fecha){
-  ss('saving','Guardando conteo de MP...');
-  let guardados=0;
-  try{
-    const items=mpData.filter(m=>m.codigo&&tipoMpDe(m)==='mp');
+    const items=mpData.filter(m=>m.codigo&&tipoMpDe(m)===stockConteoTipo);
     for(const m of items){
       const inp=document.getElementById(`mpconteo-${m.id}`);
       if(!inp||inp.value==='')continue;
@@ -5937,10 +5860,10 @@ async function guardarStockConteoMP(fecha){
       guardados++;
     }
     await loadStockConteo();
-    ss('online',`${guardados} materias primas guardadas`);
+    ss('online',`${guardados} items guardados`);
   }catch(e){
-    const hint=/relation .*mp_conteo.* does not exist/i.test(e.message||'')?' (falta crear la tabla mp_conteo en Supabase)':'';
-    ss('error','Error: '+e.message+hint);
+    const hintTabla=/relation .*mp_conteo.* does not exist/i.test(e.message||'')?' (falta crear la tabla mp_conteo en Supabase)':'';
+    ss('error','Error: '+e.message+hintTabla);
   }
 }
 
@@ -5957,75 +5880,6 @@ async function upsertMpConteo(fecha,mpId,stock){
     const idx=mpConteoData.findIndex(x=>x.mp_id===mpId&&x.fecha===fecha);
     if(idx>=0)mpConteoData[idx]={...mpConteoData[idx],...data[0]};
     else mpConteoData.push(data[0]);
-  }
-}
-
-async function importarExcelAStockConteo(input){
-  const file=input.files[0];
-  if(!file)return;
-  const errEl=document.getElementById('stock-conteo-import-err');
-  const msgEl=document.getElementById('stock-conteo-import-msg');
-  const loadingEl=document.getElementById('stock-conteo-import-loading');
-  errEl.style.display='none';msgEl.style.display='none';
-  loadingEl.style.display='inline-flex';
-  try{
-    if(!window.XLSX){
-      await new Promise((res,rej)=>{
-        const s=document.createElement('script');
-        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-        s.onload=res;s.onerror=rej;document.head.appendChild(s);
-      });
-    }
-    const buf=await file.arrayBuffer();
-    const wb=window.XLSX.read(buf,{type:'array'});
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    const rows=window.XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
-    const acum={};
-    for(const row of rows){
-      const codigo=row[0]!=null?String(row[0]).trim():'';
-      if(!codigo.match(/^302\d+$/))continue;
-      let stockRaw=row[20];
-      if(stockRaw===null||stockRaw===undefined)continue;
-      let stock;
-      if(typeof stockRaw==='number'){
-        const str=stockRaw.toString();
-        if(str.includes('.')&&str.split('.')[1].length===3){
-          if(Math.floor(stockRaw)>0){stock=parseFloat(str.replace('.',''));}
-          else{stock=stockRaw;}
-        } else {stock=stockRaw;}
-      } else {
-        stock=parseFloat(String(stockRaw).replace(/\./g,'').replace(',','.'))||0;
-      }
-      if(!acum[codigo])acum[codigo]=0;
-      acum[codigo]+=stock;
-    }
-    const datos=Object.entries(acum).map(([codigo,stock])=>({codigo,stock:Math.round(stock*100)/100}));
-    if(!datos.length){
-      throw new Error('No se encontraron filas con códigos 302xxx en la columna A.');
-    }
-    const fecha=document.getElementById('stock-conteo-fecha').value||hoyLocal();
-    const joselito=st.E.find(e=>e.nombre.toLowerCase().includes('joselito'));
-    if(!joselito)throw new Error('No se encontró la empresa Joselito en el maestro.');
-    const prods=st.Pr.filter(p=>p.empresa_id===joselito.id&&p.codigo_articulo);
-    let cargados=0,sinMapeo=0;
-    for(const d of datos){
-      const prod=prods.find(p=>p.codigo_articulo===d.codigo);
-      if(!prod){sinMapeo++;continue;}
-      const area=st.A.find(a=>a.id===prod.area_id);
-      if(!area)continue;
-      await upsertProy(fecha,joselito.id,area.nombre,prod.nombre,prod.unidad||'Unidad',{stock:d.stock});
-      cargados++;
-    }
-    await loadStockConteo();
-    loadingEl.style.display='none';
-    document.getElementById('stock-conteo-import-msg-txt').textContent=`${cargados} productos cargados desde el Excel para el ${fecha}.${sinMapeo?` (${sinMapeo} códigos sin mapeo en PAPO — revisá Mapeo Joselito en Maestro)`:''} Podés ajustar cualquier valor a mano y guardar.`;
-    msgEl.style.display='';
-    setTimeout(()=>msgEl.style.display='none',7000);
-    input.value='';
-  }catch(e){
-    loadingEl.style.display='none';
-    document.getElementById('stock-conteo-import-err-txt').textContent=e.message;
-    errEl.style.display='';
   }
 }
 
