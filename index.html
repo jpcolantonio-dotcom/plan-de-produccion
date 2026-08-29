@@ -738,6 +738,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <input type="text" id="mp-conteo-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="filtrarMpConteo()"
         style="flex:1;min-width:200px;max-width:320px;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
     </div>
+    <div id="stock-conteo-emp-tabs" style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:0;flex-wrap:wrap"></div>
     <div id="stock-conteo-content"></div>
     <div style="display:flex;justify-content:space-between;margin-top:1rem;flex-wrap:wrap;gap:8px">
       <div style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px"><i class="ti ti-info-circle"></i> Podes guardar varias veces durante el dia. Los valores se actualizan sin borrar el resto.</div>
@@ -5863,6 +5864,7 @@ async function loadStockConteo(){
   try{
     mpConteoData=await get('mp_conteo',`fecha=eq.${fecha}`);
   }catch{mpConteoData=[]}
+  stockConteoDraft={};
   renderStockConteo();
 }
 
@@ -5878,16 +5880,101 @@ function showStockConteoTipo(t){
 }
 
 // Todo el conteo de stock (Producto Terminado / Producto en Proceso / Materias Primas) sale de la
-// misma lista con código (Recetas > Materias Primas), filtrada por el campo "tipo" de cada fila.
+// misma lista con código (Maestro > Configuración), filtrada por el campo "tipo" de cada fila.
+// Producto Terminado y Producto en Proceso ademas se separan por empresa (y por area dentro de
+// cada empresa), igual que en Produccion > Real, usando el producto vinculado (mp_id) de cada item.
 function renderStockConteo(){
   const el=document.getElementById('stock-conteo-content');
+  const empTabsEl=document.getElementById('stock-conteo-emp-tabs');
   const items=[...mpData.filter(m=>m.codigo&&tipoMpDe(m)===stockConteoTipo)].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
   const etiqueta={mp:'materias primas',terminado:'productos terminados',proceso:'productos en proceso'}[stockConteoTipo]||'items';
   const colLbl={mp:'Materia Prima',terminado:'Producto',proceso:'Producto'}[stockConteoTipo]||'Item';
+
   if(!items.length){
-    el.innerHTML=`<div class="empty"><i class="ti ti-package-off"></i>Sin ${etiqueta} con código asignado. Clasificalas en Recetas &gt; Materias Primas (columna "Tipo").</div>`;
+    if(empTabsEl)empTabsEl.innerHTML='';
+    el.innerHTML=`<div class="empty"><i class="ti ti-package-off"></i>Sin ${etiqueta} con código asignado. Clasificalas en Maestro &gt; Configuración (columna "Tipo").</div>`;
     return;
   }
+
+  // Materias Primas: lista plana, no se separa por empresa
+  if(stockConteoTipo==='mp'){
+    if(empTabsEl)empTabsEl.innerHTML='';
+    el.innerHTML=tablaStockConteo(items,colLbl);
+    return;
+  }
+
+  // Producto Terminado / En Proceso: separar por empresa usando el producto vinculado de cada item
+  const bE={};
+  items.forEach(m=>{
+    const prod=st.Pr.find(p=>p.mp_id===m.id);
+    const eid=prod?(prod.empresa_id||'_'):'_sinvinc';
+    if(!bE[eid])bE[eid]=[];
+    bE[eid].push({m,prod});
+  });
+  const eids=Object.keys(bE).sort((a,b)=>(a==='_sinvinc')-(b==='_sinvinc'));
+  if(!stockConteoActiveEmp[stockConteoTipo]||!bE[stockConteoActiveEmp[stockConteoTipo]])stockConteoActiveEmp[stockConteoTipo]=eids[0];
+  const activeEmp=stockConteoActiveEmp[stockConteoTipo];
+
+  let tabsH='';
+  eids.forEach(eid=>{
+    const sinvinc=eid==='_sinvinc';
+    const clr=sinvinc?'#999':ec(eid);
+    const nm=sinvinc?'Sin vincular':(en(eid)||'SE');
+    const active=eid===activeEmp;
+    tabsH+=`<button class="proy-tab${active?' active':''}" onclick="stockConteoSetEmp('${eid}')" style="${active?'border-bottom:2px solid '+clr+';color:'+clr:''}"><span class="color-dot" style="background:${clr};display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>${nm}${sinvinc?` <span style="font-size:10px;opacity:.7">(${bE[eid].length})</span>`:''}</button>`;
+  });
+  if(empTabsEl)empTabsEl.innerHTML=tabsH;
+
+  renderStockConteoEmpresa(activeEmp,bE[activeEmp],colLbl);
+}
+
+function stockConteoSetEmp(eid){
+  stockConteoActiveEmp[stockConteoTipo]=eid;
+  renderStockConteo();
+}
+
+function stockConteoSetArea(eid,area){
+  stockConteoActiveArea[`${stockConteoTipo}|${eid}`]=area;
+  renderStockConteo();
+}
+
+function renderStockConteoEmpresa(eid,entries,colLbl){
+  const el=document.getElementById('stock-conteo-content');
+  if(!entries||!entries.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin items.</div>';
+    return;
+  }
+  if(eid==='_sinvinc'){
+    el.innerHTML=`<div class="alert alert-info" style="margin-bottom:1rem;font-size:12px"><i class="ti ti-link-off"></i> Estos items de Maestro &gt; Configuración todavía no están vinculados a un producto del Maestro, por eso no se puede saber su empresa/área. Vinculalos en Maestro &gt; Productos ("Vínculo MP").</div>`
+      +tablaStockConteo(entries.map(x=>x.m),colLbl);
+    return;
+  }
+  const bA={};
+  entries.forEach(({m,prod})=>{
+    const a=prod&&st.A.find(x=>x.id===prod.area_id);
+    const area=a?a.nombre:'SA';
+    if(!bA[area])bA[area]=[];
+    bA[area].push(m);
+  });
+  const areas=Object.keys(bA).sort((a,b)=>a.localeCompare(b,'es'));
+  const key=`${stockConteoTipo}|${eid}`;
+  if(!stockConteoActiveArea[key]||!bA[stockConteoActiveArea[key]])stockConteoActiveArea[key]=areas[0];
+  const activeArea=stockConteoActiveArea[key];
+
+  let h='';
+  if(areas.length>1){
+    h+=`<div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1rem;flex-wrap:wrap">`;
+    areas.forEach(area=>{
+      const isActive=area===activeArea;
+      h+=`<button class="proy-tab${isActive?' active':''}" onclick="stockConteoSetArea('${eid}','${area.replace(/'/g,"\\'")}')">${area}</button>`;
+    });
+    h+=`</div>`;
+  }
+  h+=tablaStockConteo(bA[activeArea],colLbl);
+  el.innerHTML=h;
+}
+
+function tablaStockConteo(items,colLbl){
   let h=`<div class="stock-card"><div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
     <th style="text-align:left;width:100px">Código</th>
     <th style="text-align:left">${colLbl}</th>
@@ -5895,9 +5982,10 @@ function renderStockConteo(){
     <th style="text-align:right;width:110px">Stock</th>
   </tr></thead><tbody>`;
   items.forEach(m=>{
+    const draftVal=stockConteoDraft[m.id];
     const existing=mpConteoData.find(x=>x.mp_id===m.id);
-    const val=existing&&existing.stock>0?existing.stock:'';
-    const guardado=existing&&val!=='';
+    const val=draftVal!==undefined?draftVal:(existing&&existing.stock>0?existing.stock:'');
+    const guardado=existing&&existing.stock>0&&draftVal===undefined;
     h+=`<tr class="mpc-row" data-txt="${(m.nombre+' '+(m.codigo||'')).toLowerCase()}">
       <td style="font-size:12px;color:var(--text2);font-family:monospace">${m.codigo||''}</td>
       <td style="font-weight:500">${m.nombre}${guardado?` <span style="color:var(--green);font-size:10px">✓</span>`:''}</td>
@@ -5905,13 +5993,13 @@ function renderStockConteo(){
       <td style="text-align:right">
         <input class="proy-input" type="number" min="0"
           id="mpconteo-${m.id}"
-          value="${val}" placeholder="0"
+          value="${val}" placeholder="0" oninput="stockConteoDraft['${m.id}']=this.value"
           style="border-color:${guardado?'var(--green)':'var(--border2)'};width:90px"/>
       </td>
     </tr>`;
   });
   h+=`</tbody></table></div></div>`;
-  el.innerHTML=h;
+  return h;
 }
 
 function filtrarMpConteo(){
@@ -5928,12 +6016,13 @@ async function guardarStockConteo(){
   try{
     const items=mpData.filter(m=>m.codigo&&tipoMpDe(m)===stockConteoTipo);
     for(const m of items){
-      const inp=document.getElementById(`mpconteo-${m.id}`);
-      if(!inp||inp.value==='')continue;
-      const stock=parseFloat(inp.value)||0;
+      const val=stockConteoDraft[m.id];
+      if(val===undefined||val==='')continue;
+      const stock=parseFloat(val)||0;
       await upsertMpConteo(fecha,m.id,stock);
       guardados++;
     }
+    stockConteoDraft={};
     await loadStockConteo();
     ss('online',`${guardados} items guardados`);
   }catch(e){
@@ -6997,6 +7086,9 @@ async function confirmarImport(){
 let proyData = []; // cache proyeccion del dia
 let mpConteoData = []; // cache conteo de MP del dia
 let stockConteoTipo = 'terminado'; // 'terminado' | 'proceso' | 'mp'
+let stockConteoDraft = {}; // valores tipeados sin guardar todavia, por mp_id (sobreviven al cambiar de pestaña empresa/area)
+let stockConteoActiveEmp = {}; // pestaña de empresa activa, por tipo ('terminado'|'proceso')
+let stockConteoActiveArea = {}; // pestaña de area activa, por "tipo|empresa_id"
 
 function tipoStockDe(p){
   if(p.tipo_stock)return p.tipo_stock;
