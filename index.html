@@ -5894,7 +5894,9 @@ function showStockConteoTipo(t){
 function renderStockConteo(){
   const el=document.getElementById('stock-conteo-content');
   const empTabsEl=document.getElementById('stock-conteo-emp-tabs');
-  const items=[...mpData.filter(m=>m.codigo&&tipoMpDe(m)===stockConteoTipo)].sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  const rawItems=mpData.filter(m=>m.codigo&&tipoMpDe(m)===stockConteoTipo);
+  // Se ordena por el nombre que se termina mostrando (el del producto vinculado si hay, sino el de Configuración)
+  const items=rawItems.map(m=>({m,prod:prodPorMp(m)})).sort((a,b)=>(a.prod?a.prod.nombre:a.m.nombre).localeCompare(b.prod?b.prod.nombre:b.m.nombre,'es'));
   const etiqueta={mp:'materias primas',terminado:'productos terminados',proceso:'productos en proceso'}[stockConteoTipo]||'items';
   const colLbl={mp:'Materia Prima',terminado:'Producto',proceso:'Producto'}[stockConteoTipo]||'Item';
 
@@ -5904,17 +5906,18 @@ function renderStockConteo(){
     return;
   }
 
-  // Materias Primas: lista plana, no se separa por empresa
-  if(stockConteoTipo==='mp'){
+  // Producto en Proceso y Materias Primas: por ahora lista plana en orden alfabetico, sin separar
+  // por empresa (mas adelante se va a agrupar por deposito). Solo Producto Terminado se separa
+  // por empresa/area.
+  if(stockConteoTipo==='mp'||stockConteoTipo==='proceso'){
     if(empTabsEl)empTabsEl.innerHTML='';
-    el.innerHTML=tablaStockConteo(items.map(m=>({m,prod:prodPorMp(m)})),colLbl);
+    el.innerHTML=tablaStockConteo(items,colLbl);
     return;
   }
 
-  // Producto Terminado / En Proceso: separar por empresa usando el producto vinculado de cada item
+  // Producto Terminado: separar por empresa usando el producto vinculado de cada item
   const bE={};
-  items.forEach(m=>{
-    const prod=prodPorMp(m);
+  items.forEach(({m,prod})=>{
     const eid=prod?(prod.empresa_id||'_'):'_sinvinc';
     if(!bE[eid])bE[eid]=[];
     bE[eid].push({m,prod});
