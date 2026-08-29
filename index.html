@@ -3729,6 +3729,14 @@ let mpSelected=new Set(); // ids seleccionados para acciones en lote en la lista
 
 function tipoMpDe(m){ return m.tipo||'mp'; } // 'mp' | 'terminado' | 'proceso' | 'insumos' — default mp (asi lo que no se clasifico sigue contando como materia prima)
 
+// Producto del Maestro vinculado a una fila de Maestro>Configuración. Primero busca el vinculo
+// explicito (mp_id, hecho a mano desde "Vínculo MP"); si no hay, cae al código de artículo que
+// ya venía pre-cargado en muchos productos (p.codigo_articulo) y lo compara contra m.codigo —
+// asi no hace falta re-vincular a mano lo que ya coincide por código.
+function prodPorMp(m){
+  return st.Pr.find(p=>p.mp_id===m.id) || (m.codigo?st.Pr.find(p=>p.codigo_articulo===m.codigo):undefined);
+}
+
 // Detecta el error de Supabase/PostgREST cuando falta una columna (incluye el mensaje "schema cache" que tira justo despues de crear la columna, antes de que se refresque el cache)
 function hintFaltaColumna(msg,col,tabla){
   const m=String(msg||'');
@@ -5899,14 +5907,14 @@ function renderStockConteo(){
   // Materias Primas: lista plana, no se separa por empresa
   if(stockConteoTipo==='mp'){
     if(empTabsEl)empTabsEl.innerHTML='';
-    el.innerHTML=tablaStockConteo(items,colLbl);
+    el.innerHTML=tablaStockConteo(items.map(m=>({m,prod:prodPorMp(m)})),colLbl);
     return;
   }
 
   // Producto Terminado / En Proceso: separar por empresa usando el producto vinculado de cada item
   const bE={};
   items.forEach(m=>{
-    const prod=st.Pr.find(p=>p.mp_id===m.id);
+    const prod=prodPorMp(m);
     const eid=prod?(prod.empresa_id||'_'):'_sinvinc';
     if(!bE[eid])bE[eid]=[];
     bE[eid].push({m,prod});
@@ -5945,8 +5953,8 @@ function renderStockConteoEmpresa(eid,entries,colLbl){
     return;
   }
   if(eid==='_sinvinc'){
-    el.innerHTML=`<div class="alert alert-info" style="margin-bottom:1rem;font-size:12px"><i class="ti ti-link-off"></i> Estos items de Maestro &gt; Configuración todavía no están vinculados a un producto del Maestro, por eso no se puede saber su empresa/área. Vinculalos en Maestro &gt; Productos ("Vínculo MP").</div>`
-      +tablaStockConteo(entries.map(x=>x.m),colLbl);
+    el.innerHTML=`<div class="alert alert-info" style="margin-bottom:1rem;font-size:12px"><i class="ti ti-link-off"></i> Estos items de Maestro &gt; Configuración todavía no están vinculados a un producto del Maestro, por eso no se puede saber su empresa/área ni mostrar el nombre abreviado. Vinculalos en Maestro &gt; Productos ("Vínculo MP").</div>`
+      +tablaStockConteo(entries,colLbl);
     return;
   }
   const bA={};
@@ -5954,7 +5962,7 @@ function renderStockConteoEmpresa(eid,entries,colLbl){
     const a=prod&&st.A.find(x=>x.id===prod.area_id);
     const area=a?a.nombre:'SA';
     if(!bA[area])bA[area]=[];
-    bA[area].push(m);
+    bA[area].push({m,prod});
   });
   const areas=Object.keys(bA).sort((a,b)=>a.localeCompare(b,'es'));
   const key=`${stockConteoTipo}|${eid}`;
@@ -5974,21 +5982,25 @@ function renderStockConteoEmpresa(eid,entries,colLbl){
   el.innerHTML=h;
 }
 
-function tablaStockConteo(items,colLbl){
+// entries: array de {m,prod} — m es la fila de Maestro>Configuración, prod es el producto del
+// Maestro vinculado (mp_id) si existe. Cuando hay vinculo se muestra el nombre del Maestro
+// (normalmente mas corto/abreviado, ej. "BCA") en vez del nombre largo de Configuración.
+function tablaStockConteo(entries,colLbl){
   let h=`<div class="stock-card"><div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
     <th style="text-align:left;width:100px">Código</th>
     <th style="text-align:left">${colLbl}</th>
     <th style="text-align:left;width:70px">Unidad</th>
     <th style="text-align:right;width:110px">Stock</th>
   </tr></thead><tbody>`;
-  items.forEach(m=>{
+  entries.forEach(({m,prod})=>{
     const draftVal=stockConteoDraft[m.id];
     const existing=mpConteoData.find(x=>x.mp_id===m.id);
     const val=draftVal!==undefined?draftVal:(existing&&existing.stock>0?existing.stock:'');
     const guardado=existing&&existing.stock>0&&draftVal===undefined;
-    h+=`<tr class="mpc-row" data-txt="${(m.nombre+' '+(m.codigo||'')).toLowerCase()}">
+    const nombreMostrado=prod?prod.nombre:m.nombre;
+    h+=`<tr class="mpc-row" data-txt="${((prod?prod.nombre:'')+' '+m.nombre+' '+(m.codigo||'')).toLowerCase()}">
       <td style="font-size:12px;color:var(--text2);font-family:monospace">${m.codigo||''}</td>
-      <td style="font-weight:500">${m.nombre}${guardado?` <span style="color:var(--green);font-size:10px">✓</span>`:''}</td>
+      <td style="font-weight:500">${nombreMostrado}${guardado?` <span style="color:var(--green);font-size:10px">✓</span>`:''}${prod&&prod.nombre!==m.nombre?`<div style="font-size:10px;color:var(--text3);font-weight:400">${m.nombre}</div>`:''}</td>
       <td style="font-size:12px;color:var(--text2)">${m.unidad||''}</td>
       <td style="text-align:right">
         <input class="proy-input" type="number" min="0"
