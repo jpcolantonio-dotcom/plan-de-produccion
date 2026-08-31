@@ -3735,7 +3735,7 @@ async function renderConsumoStockProceso(){
   proceso.forEach(m=>{
     const stock=stockPorMp.get(m.id);
     if(!stock)return;
-    const recKey=Object.keys(st.Rec).find(k=>k.trim().toLowerCase()===m.nombre.trim().toLowerCase());
+    const recKey=recKeyForMp(m);
     const ings=recKey?(st.Rec[recKey]||[]):[];
     if(!ings.length){sinReceta.push(m.nombre);return}
     conStock.push(m.nombre);
@@ -3913,6 +3913,19 @@ function prodPorMp(m){
 function mpPorProducto(pr){
   if(!pr)return undefined;
   return mpData.find(m=>m.id===pr.mp_id) || (pr.codigo_articulo?mpData.find(m=>m.codigo===pr.codigo_articulo):undefined);
+}
+// Encuentra la clave de st.Rec (recetas) que corresponde a una fila de Maestro>Configuración,
+// sin importar si la receta se cargó con el nombre de esa fila (ej. Rellenos importados por CSV)
+// o con el nombre del producto de Maestro vinculado, que puede ser distinto (ej. mpData
+// "TAPA CRIOLLA 13" vinculado por código al producto "Criolla 13", que es como se llama la
+// receta en Recetas). Antes esto se buscaba solo por el nombre de la fila de Configuración y
+// fallaba en silencio (mostraba "sin receta" aunque la receta existiera con otro nombre).
+function recKeyForMp(m){
+  let k=Object.keys(st.Rec).find(k=>k.trim().toLowerCase()===m.nombre.trim().toLowerCase());
+  if(k)return k;
+  const pr=prodPorMp(m);
+  if(pr)k=Object.keys(st.Rec).find(k=>k.trim().toLowerCase()===pr.nombre.trim().toLowerCase());
+  return k;
 }
 
 // Detecta el error de Supabase/PostgREST cuando falta una columna (incluye el mensaje "schema cache" que tira justo despues de crear la columna, antes de que se refresque el cache)
@@ -6799,7 +6812,7 @@ function renderScmpLista(){
       lastTipo=tipo;
     }
     const checked=scmpSelected.has(m.id);
-    const recKey=Object.keys(st.Rec).find(k=>k.trim().toLowerCase()===m.nombre.trim().toLowerCase());
+    const recKey=recKeyForMp(m);
     const sinReceta=!recKey||!(st.Rec[recKey]||[]).length;
     h+=`<label class="rrow" style="cursor:pointer;gap:8px">
       <input type="checkbox" ${checked?'checked':''} onchange="scmpToggle('${m.id}',this.checked)" style="flex-shrink:0"/>
@@ -6891,7 +6904,7 @@ function renderConsumoMPStockSel(){
   const conReceta=[];
   seleccionados.forEach(m=>{
     const stock=scmpStockPorMp.get(m.id);
-    const recKey=Object.keys(st.Rec).find(k=>k.trim().toLowerCase()===m.nombre.trim().toLowerCase());
+    const recKey=recKeyForMp(m);
     const ings=recKey?(st.Rec[recKey]||[]):[];
     if(!ings.length){sinReceta.push(m.nombre);return}
     conReceta.push(m.nombre);
