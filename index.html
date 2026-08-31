@@ -739,7 +739,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         style="flex:1;min-width:200px;max-width:320px;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
     </div>
     <div id="stock-conteo-emp-tabs" style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:0;flex-wrap:wrap"></div>
-    <div id="stock-conteo-unidad-tabs" style="display:flex;gap:6px;align-items:center;margin:10px 0 8px;flex-wrap:wrap"></div>
     <div id="stock-conteo-content"></div>
     <div style="display:flex;justify-content:space-between;margin-top:1rem;flex-wrap:wrap;gap:8px">
       <div style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px"><i class="ti ti-info-circle"></i> Podes guardar varias veces durante el dia. Los valores se actualizan sin borrar el resto.</div>
@@ -5986,8 +5985,10 @@ function showStockConteoTipo(t){
 function renderStockConteo(){
   const el=document.getElementById('stock-conteo-content');
   const empTabsEl=document.getElementById('stock-conteo-emp-tabs');
-  const unidadTabsEl=document.getElementById('stock-conteo-unidad-tabs');
-  const rawItems=mpData.filter(m=>m.codigo&&tipoMpDe(m)===stockConteoTipo);
+  // Los items clasificados como variante "por unidad" (m.unidad_tipo==='unidad') no se cuentan en
+  // Stock > Conteo de stock — solo se conteoa la caja cerrada (o items sin esa clasificacion, que
+  // no tienen variante caja/unidad, ej. pastas, ravioles).
+  const rawItems=mpData.filter(m=>m.codigo&&tipoMpDe(m)===stockConteoTipo&&m.unidad_tipo!=='unidad');
   // Se ordena por el nombre que se termina mostrando (el del producto vinculado si hay, sino la sigla, sino el de Configuración)
   const nombreOrden=e=>e.prod?e.prod.nombre:(e.m.sigla||e.m.nombre);
   const items=rawItems.map(m=>({m,prod:prodPorMp(m)})).sort((a,b)=>nombreOrden(a).localeCompare(nombreOrden(b),'es'));
@@ -5996,25 +5997,20 @@ function renderStockConteo(){
 
   if(!items.length){
     if(empTabsEl)empTabsEl.innerHTML='';
-    if(unidadTabsEl)unidadTabsEl.innerHTML='';
     el.innerHTML=`<div class="empty"><i class="ti ti-package-off"></i>Sin ${etiqueta} con código asignado. Clasificalas en Maestro &gt; Configuración (columna "Tipo").</div>`;
     return;
   }
 
   // Producto en Proceso y Materias Primas: por ahora lista plana en orden alfabetico, sin separar
   // por empresa (mas adelante se va a agrupar por deposito). Solo Producto Terminado se separa
-  // por empresa/area (y por Caja Cerrada/Unidad).
+  // por empresa/area.
   if(stockConteoTipo==='mp'||stockConteoTipo==='proceso'){
     if(empTabsEl)empTabsEl.innerHTML='';
-    if(unidadTabsEl)unidadTabsEl.innerHTML='';
     el.innerHTML=tablaStockConteo(items,colLbl);
     return;
   }
 
-  // Producto Terminado: primero separar por empresa (igual que Producción), y dentro de cada
-  // empresa, por Caja Cerrada / Unidad / Otros (segun m.unidad_tipo, cargado desde el CSV de
-  // Iniciales) y despues por area — algunos codigos comparten la misma sigla entre su variante
-  // caja y unidad (ej. "A"), asi que separarlos en pestañas evita confundirlos.
+  // Producto Terminado: separar por empresa usando el producto vinculado de cada item
   const bE={};
   items.forEach(({m,prod})=>{
     const eid=prod?(prod.empresa_id||'_'):'_sinvinc';
@@ -6038,68 +6034,36 @@ function renderStockConteo(){
   renderStockConteoEmpresa(activeEmp,bE[activeEmp],colLbl);
 }
 
-function stockConteoSetUnidadTipo(eid,k){
-  stockConteoActiveUnidadTipo[`${stockConteoTipo}|${eid}`]=k;
-  renderStockConteo();
-}
-
 function stockConteoSetEmp(eid){
   stockConteoActiveEmp[stockConteoTipo]=eid;
   renderStockConteo();
 }
 
-function stockConteoSetArea(eid,uTipo,area){
-  stockConteoActiveArea[`${stockConteoTipo}|${eid}|${uTipo}`]=area;
+function stockConteoSetArea(eid,area){
+  stockConteoActiveArea[`${stockConteoTipo}|${eid}`]=area;
   renderStockConteo();
 }
 
 function renderStockConteoEmpresa(eid,entries,colLbl){
   const el=document.getElementById('stock-conteo-content');
-  const unidadTabsEl=document.getElementById('stock-conteo-unidad-tabs');
   if(!entries||!entries.length){
-    if(unidadTabsEl)unidadTabsEl.innerHTML='';
     el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin items.</div>';
     return;
   }
-
-  // Dentro de la empresa (o de Sin vincular): separar Caja Cerrada / Unidad / Otros
-  const bU={caja:[],unidad:[],otros:[]};
-  entries.forEach(e=>{ bU[e.m.unidad_tipo==='caja'?'caja':e.m.unidad_tipo==='unidad'?'unidad':'otros'].push(e); });
-  const uLbl={caja:'Caja Cerrada',unidad:'Unidad',otros:'Otros'};
-  const empKey=`${stockConteoTipo}|${eid}`;
-  if(!stockConteoActiveUnidadTipo[empKey]||!bU[stockConteoActiveUnidadTipo[empKey]]||!bU[stockConteoActiveUnidadTipo[empKey]].length){
-    stockConteoActiveUnidadTipo[empKey]=['caja','unidad','otros'].find(k=>bU[k].length)||'caja';
-  }
-  const activeU=stockConteoActiveUnidadTipo[empKey];
-  const multi=['caja','unidad','otros'].filter(k=>bU[k].length).length>1;
-  if(unidadTabsEl){
-    if(!multi){unidadTabsEl.innerHTML='';}
-    else{
-      let uH='';
-      ['caja','unidad','otros'].forEach(k=>{
-        if(!bU[k].length)return;
-        const active=k===activeU;
-        uH+=`<button class="proy-tab${active?' active':''}" onclick="stockConteoSetUnidadTipo('${eid}','${k}')">${uLbl[k]} <span style="font-size:10px;opacity:.7">(${bU[k].length})</span></button>`;
-      });
-      unidadTabsEl.innerHTML=uH;
-    }
-  }
-  const itemsU=bU[activeU];
-
   if(eid==='_sinvinc'){
     el.innerHTML=`<div class="alert alert-info" style="margin-bottom:1rem;font-size:12px"><i class="ti ti-link-off"></i> Estos items de Maestro &gt; Configuración todavía no están vinculados a un producto del Maestro, por eso no se puede saber su empresa/área ni mostrar el nombre abreviado. Vinculalos en Maestro &gt; Productos ("Vínculo MP").</div>`
-      +tablaStockConteo(itemsU,colLbl);
+      +tablaStockConteo(entries,colLbl);
     return;
   }
   const bA={};
-  itemsU.forEach(({m,prod})=>{
+  entries.forEach(({m,prod})=>{
     const a=prod&&st.A.find(x=>x.id===prod.area_id);
     const area=a?a.nombre:'SA';
     if(!bA[area])bA[area]=[];
     bA[area].push({m,prod});
   });
   const areas=Object.keys(bA).sort((a,b)=>a.localeCompare(b,'es'));
-  const key=`${stockConteoTipo}|${eid}|${activeU}`;
+  const key=`${stockConteoTipo}|${eid}`;
   if(!stockConteoActiveArea[key]||!bA[stockConteoActiveArea[key]])stockConteoActiveArea[key]=areas[0];
   const activeArea=stockConteoActiveArea[key];
 
@@ -6108,7 +6072,7 @@ function renderStockConteoEmpresa(eid,entries,colLbl){
     h+=`<div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1rem;flex-wrap:wrap">`;
     areas.forEach(area=>{
       const isActive=area===activeArea;
-      h+=`<button class="proy-tab${isActive?' active':''}" onclick="stockConteoSetArea('${eid}','${activeU}','${area.replace(/'/g,"\\'")}')">${area}</button>`;
+      h+=`<button class="proy-tab${isActive?' active':''}" onclick="stockConteoSetArea('${eid}','${area.replace(/'/g,"\\'")}')">${area}</button>`;
     });
     h+=`</div>`;
   }
@@ -6163,7 +6127,7 @@ async function guardarStockConteo(){
   ss('saving','Guardando conteo...');
   let guardados=0;
   try{
-    const items=mpData.filter(m=>m.codigo&&tipoMpDe(m)===stockConteoTipo);
+    const items=mpData.filter(m=>m.codigo&&tipoMpDe(m)===stockConteoTipo&&m.unidad_tipo!=='unidad');
     for(const m of items){
       const val=stockConteoDraft[m.id];
       if(val===undefined||val==='')continue;
@@ -7238,7 +7202,6 @@ let stockConteoTipo = 'terminado'; // 'terminado' | 'proceso' | 'mp'
 let stockConteoDraft = {}; // valores tipeados sin guardar todavia, por mp_id (sobreviven al cambiar de pestaña empresa/area)
 let stockConteoActiveEmp = {}; // pestaña de empresa activa, por tipo ('terminado'|'proceso')
 let stockConteoActiveArea = {}; // pestaña de area activa, por "tipo|empresa_id"
-let stockConteoActiveUnidadTipo = {}; // pestaña Caja Cerrada/Unidad/Otros activa, por "tipo|empresa_id" — solo aplica a Producto Terminado
 
 function tipoStockDe(p){
   if(p.tipo_stock)return p.tipo_stock;
