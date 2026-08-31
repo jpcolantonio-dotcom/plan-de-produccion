@@ -738,8 +738,8 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <input type="text" id="mp-conteo-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="filtrarMpConteo()"
         style="flex:1;min-width:200px;max-width:320px;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
     </div>
-    <div id="stock-conteo-unidad-tabs" style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap"></div>
     <div id="stock-conteo-emp-tabs" style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:0;flex-wrap:wrap"></div>
+    <div id="stock-conteo-unidad-tabs" style="display:flex;gap:6px;align-items:center;margin:10px 0 8px;flex-wrap:wrap"></div>
     <div id="stock-conteo-content"></div>
     <div style="display:flex;justify-content:space-between;margin-top:1rem;flex-wrap:wrap;gap:8px">
       <div style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px"><i class="ti ti-info-circle"></i> Podes guardar varias veces durante el dia. Los valores se actualizan sin borrar el resto.</div>
@@ -6003,37 +6003,19 @@ function renderStockConteo(){
     return;
   }
 
-  // Producto Terminado: primero separar Caja Cerrada / Unidad / Otros (segun m.unidad_tipo, cargado
-  // desde el CSV de Iniciales) — algunos codigos comparten la misma sigla entre su variante caja y
-  // unidad (ej. "A"), asi que separarlos en pestañas evita confundirlos.
-  const bU={caja:[],unidad:[],otros:[]};
-  items.forEach(e=>{ bU[e.m.unidad_tipo==='caja'?'caja':e.m.unidad_tipo==='unidad'?'unidad':'otros'].push(e); });
-  const uLbl={caja:'Caja Cerrada',unidad:'Unidad',otros:'Otros'};
-  if(!bU[stockConteoActiveUnidadTipo]||!bU[stockConteoActiveUnidadTipo].length){
-    stockConteoActiveUnidadTipo=['caja','unidad','otros'].find(k=>bU[k].length)||'caja';
-  }
-  if(unidadTabsEl){
-    let uH='';
-    ['caja','unidad','otros'].forEach(k=>{
-      if(!bU[k].length)return;
-      const active=k===stockConteoActiveUnidadTipo;
-      uH+=`<button class="proy-tab${active?' active':''}" onclick="stockConteoSetUnidadTipo('${k}')">${uLbl[k]} <span style="font-size:10px;opacity:.7">(${bU[k].length})</span></button>`;
-    });
-    unidadTabsEl.innerHTML=uH;
-  }
-  const itemsU=bU[stockConteoActiveUnidadTipo];
-
-  // Despues, separar por empresa usando el producto vinculado de cada item
+  // Producto Terminado: primero separar por empresa (igual que Producción), y dentro de cada
+  // empresa, por Caja Cerrada / Unidad / Otros (segun m.unidad_tipo, cargado desde el CSV de
+  // Iniciales) y despues por area — algunos codigos comparten la misma sigla entre su variante
+  // caja y unidad (ej. "A"), asi que separarlos en pestañas evita confundirlos.
   const bE={};
-  itemsU.forEach(({m,prod})=>{
+  items.forEach(({m,prod})=>{
     const eid=prod?(prod.empresa_id||'_'):'_sinvinc';
     if(!bE[eid])bE[eid]=[];
     bE[eid].push({m,prod});
   });
   const eids=Object.keys(bE).sort((a,b)=>(a==='_sinvinc')-(b==='_sinvinc'));
-  const empKey=`${stockConteoTipo}|${stockConteoActiveUnidadTipo}`;
-  if(!stockConteoActiveEmp[empKey]||!bE[stockConteoActiveEmp[empKey]])stockConteoActiveEmp[empKey]=eids[0];
-  const activeEmp=stockConteoActiveEmp[empKey];
+  if(!stockConteoActiveEmp[stockConteoTipo]||!bE[stockConteoActiveEmp[stockConteoTipo]])stockConteoActiveEmp[stockConteoTipo]=eids[0];
+  const activeEmp=stockConteoActiveEmp[stockConteoTipo];
 
   let tabsH='';
   eids.forEach(eid=>{
@@ -6048,41 +6030,68 @@ function renderStockConteo(){
   renderStockConteoEmpresa(activeEmp,bE[activeEmp],colLbl);
 }
 
-function stockConteoSetUnidadTipo(k){
-  stockConteoActiveUnidadTipo=k;
+function stockConteoSetUnidadTipo(eid,k){
+  stockConteoActiveUnidadTipo[`${stockConteoTipo}|${eid}`]=k;
   renderStockConteo();
 }
 
 function stockConteoSetEmp(eid){
-  stockConteoActiveEmp[`${stockConteoTipo}|${stockConteoActiveUnidadTipo}`]=eid;
+  stockConteoActiveEmp[stockConteoTipo]=eid;
   renderStockConteo();
 }
 
-function stockConteoSetArea(eid,area){
-  stockConteoActiveArea[`${stockConteoTipo}|${stockConteoActiveUnidadTipo}|${eid}`]=area;
+function stockConteoSetArea(eid,uTipo,area){
+  stockConteoActiveArea[`${stockConteoTipo}|${eid}|${uTipo}`]=area;
   renderStockConteo();
 }
 
 function renderStockConteoEmpresa(eid,entries,colLbl){
   const el=document.getElementById('stock-conteo-content');
+  const unidadTabsEl=document.getElementById('stock-conteo-unidad-tabs');
   if(!entries||!entries.length){
+    if(unidadTabsEl)unidadTabsEl.innerHTML='';
     el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin items.</div>';
     return;
   }
+
+  // Dentro de la empresa (o de Sin vincular): separar Caja Cerrada / Unidad / Otros
+  const bU={caja:[],unidad:[],otros:[]};
+  entries.forEach(e=>{ bU[e.m.unidad_tipo==='caja'?'caja':e.m.unidad_tipo==='unidad'?'unidad':'otros'].push(e); });
+  const uLbl={caja:'Caja Cerrada',unidad:'Unidad',otros:'Otros'};
+  const empKey=`${stockConteoTipo}|${eid}`;
+  if(!stockConteoActiveUnidadTipo[empKey]||!bU[stockConteoActiveUnidadTipo[empKey]]||!bU[stockConteoActiveUnidadTipo[empKey]].length){
+    stockConteoActiveUnidadTipo[empKey]=['caja','unidad','otros'].find(k=>bU[k].length)||'caja';
+  }
+  const activeU=stockConteoActiveUnidadTipo[empKey];
+  const multi=['caja','unidad','otros'].filter(k=>bU[k].length).length>1;
+  if(unidadTabsEl){
+    if(!multi){unidadTabsEl.innerHTML='';}
+    else{
+      let uH='';
+      ['caja','unidad','otros'].forEach(k=>{
+        if(!bU[k].length)return;
+        const active=k===activeU;
+        uH+=`<button class="proy-tab${active?' active':''}" onclick="stockConteoSetUnidadTipo('${eid}','${k}')">${uLbl[k]} <span style="font-size:10px;opacity:.7">(${bU[k].length})</span></button>`;
+      });
+      unidadTabsEl.innerHTML=uH;
+    }
+  }
+  const itemsU=bU[activeU];
+
   if(eid==='_sinvinc'){
     el.innerHTML=`<div class="alert alert-info" style="margin-bottom:1rem;font-size:12px"><i class="ti ti-link-off"></i> Estos items de Maestro &gt; Configuración todavía no están vinculados a un producto del Maestro, por eso no se puede saber su empresa/área ni mostrar el nombre abreviado. Vinculalos en Maestro &gt; Productos ("Vínculo MP").</div>`
-      +tablaStockConteo(entries,colLbl);
+      +tablaStockConteo(itemsU,colLbl);
     return;
   }
   const bA={};
-  entries.forEach(({m,prod})=>{
+  itemsU.forEach(({m,prod})=>{
     const a=prod&&st.A.find(x=>x.id===prod.area_id);
     const area=a?a.nombre:'SA';
     if(!bA[area])bA[area]=[];
     bA[area].push({m,prod});
   });
   const areas=Object.keys(bA).sort((a,b)=>a.localeCompare(b,'es'));
-  const key=`${stockConteoTipo}|${stockConteoActiveUnidadTipo}|${eid}`;
+  const key=`${stockConteoTipo}|${eid}|${activeU}`;
   if(!stockConteoActiveArea[key]||!bA[stockConteoActiveArea[key]])stockConteoActiveArea[key]=areas[0];
   const activeArea=stockConteoActiveArea[key];
 
@@ -6091,7 +6100,7 @@ function renderStockConteoEmpresa(eid,entries,colLbl){
     h+=`<div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1rem;flex-wrap:wrap">`;
     areas.forEach(area=>{
       const isActive=area===activeArea;
-      h+=`<button class="proy-tab${isActive?' active':''}" onclick="stockConteoSetArea('${eid}','${area.replace(/'/g,"\\'")}')">${area}</button>`;
+      h+=`<button class="proy-tab${isActive?' active':''}" onclick="stockConteoSetArea('${eid}','${activeU}','${area.replace(/'/g,"\\'")}')">${area}</button>`;
     });
     h+=`</div>`;
   }
@@ -7221,7 +7230,7 @@ let stockConteoTipo = 'terminado'; // 'terminado' | 'proceso' | 'mp'
 let stockConteoDraft = {}; // valores tipeados sin guardar todavia, por mp_id (sobreviven al cambiar de pestaña empresa/area)
 let stockConteoActiveEmp = {}; // pestaña de empresa activa, por tipo ('terminado'|'proceso')
 let stockConteoActiveArea = {}; // pestaña de area activa, por "tipo|empresa_id"
-let stockConteoActiveUnidadTipo = 'caja'; // 'caja' | 'unidad' | 'otros' — solo aplica a Producto Terminado
+let stockConteoActiveUnidadTipo = {}; // pestaña Caja Cerrada/Unidad/Otros activa, por "tipo|empresa_id" — solo aplica a Producto Terminado
 
 function tipoStockDe(p){
   if(p.tipo_stock)return p.tipo_stock;
