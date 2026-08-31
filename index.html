@@ -3751,49 +3751,53 @@ async function renderConsumoStockProceso(){
     });
   });
 
-  const items=Object.values(cm).sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
+  const allItems=Object.values(cm).sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
   const fFecha=new Date(fecha+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
 
-  if(!items.length){
+  if(!allItems.length){
     let msg=`Sin stock cargado de Producto en Proceso para el ${fFecha}`;
     msg+=sinReceta.length?`, o ninguno de los que tienen stock tiene receta cargada todavía (${sinReceta.join(', ')}).`:'.';
     el.innerHTML=`<div class="empty"><i class="ti ti-package-off"></i> ${msg}</div>`;
     return;
   }
 
+  // Separar: ingredientes que son a su vez un producto con stock propio cargado
+  // (ej: "Salsa blanca" que está en la cámara Y también entra en la receta de RELLENO V)
+  // de las materias primas puras, para no mezclar ambas cosas en un mismo total.
+  const rawItems=[];
+  const subItems=[];
+  allItems.forEach(item=>{
+    const matchMp=mpData.find(m=>normTxt(m.nombre)===normTxt(item.ingrediente));
+    if(matchMp&&stockPorMp.has(matchMp.id)){
+      item.stockPropio=stockPorMp.get(matchMp.id);
+      subItems.push(item);
+    }else{
+      rawItems.push(item);
+    }
+  });
+
   let h=`<div class="metric-grid">
     <div class="metric"><div class="metric-label">Fecha</div><div style="font-size:13px;font-weight:600;margin-top:2px">${fFecha}</div></div>
     <div class="metric"><div class="metric-label">Prod. en proceso con stock y receta</div><div class="metric-val">${conStock.length}</div></div>
-    <div class="metric"><div class="metric-label">Materias primas</div><div class="metric-val">${items.length}</div></div>
+    <div class="metric"><div class="metric-label">Materias primas</div><div class="metric-val">${rawItems.length}</div></div>
+    <div class="metric"><div class="metric-label">Sub-productos con stock propio</div><div class="metric-val">${subItems.length}</div></div>
   </div>`;
 
   if(sinReceta.length){
     h+=`<div class="alert alert-info" style="margin:10px 0"><i class="ti ti-alert-circle"></i> ${sinReceta.length} producto(s) en proceso tienen stock cargado para esta fecha pero todavía no tienen receta en Maestro &gt; Recetas, así que no se pudieron traducir a MP: <b>${sinReceta.join(', ')}</b>. Cargales la receta (con "Importar Rellenos/Proceso" o a mano) para que entren en este cálculo.</div>`;
   }
+  if(subItems.length){
+    h+=`<div class="alert alert-info" style="margin:10px 0"><i class="ti ti-info-circle"></i> ${subItems.length} ingrediente(s) también tienen su propio stock cargado aparte (ej. en cámara). Se separaron abajo para no mezclarlos con las materias primas puras.</div>`;
+  }
 
-  h+=`<div class="grid-card"><table class="stock-tbl"><thead><tr>
-    <th>#</th><th>Materia Prima</th>
-    <th style="text-align:right">Total</th>
-    <th style="width:70px">Unidad</th>
-    <th>Detalle por producto en proceso</th>
-  </tr></thead><tbody>`;
-
-  const mx=Math.max(...items.map(i=>i.total));
-  items.forEach((item,idx)=>{
-    const pct=mx>0?Math.round(item.total/mx*100):0;
-    const det=Object.entries(item.det).sort((a,b)=>b[1]-a[1])
-      .map(([p,c])=>`<span style="margin-right:8px"><b>${p}</b>: ${c.toLocaleString('es-AR')} ${item.unidad}</span>`).join('');
-    h+=`<tr class="con-row">
-      <td style="color:var(--text3);font-size:12px">${idx+1}</td>
-      <td><span class="ichip">${item.ingrediente}</span>
-        <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
-      </td>
-      <td style="text-align:right;font-size:16px;font-weight:700">${item.total.toLocaleString('es-AR')}</td>
-      <td class="muted">${item.unidad}</td>
-      <td class="muted" style="font-size:12px">${det||'--'}</td>
-    </tr>`;
-  });
-  h+=`</tbody></table></div>`;
+  if(rawItems.length){
+    h+=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin:14px 0 6px">Materias primas</div>`;
+    h+=scmpTablaHtml(rawItems,'Detalle por producto en proceso');
+  }
+  if(subItems.length){
+    h+=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin:14px 0 6px">Sub-productos con stock propio</div>`;
+    h+=scmpTablaSubproductosHtml(subItems);
+  }
   el.innerHTML=h;
 }
 
@@ -6821,6 +6825,60 @@ function scmpSelAll(all){
   renderScmpLista();
 }
 
+function scmpTablaHtml(items,detLabel){
+  let h=`<div class="grid-card"><table class="stock-tbl"><thead><tr>
+    <th>#</th><th>Ingrediente</th>
+    <th style="text-align:right">Consumido en recetas</th>
+    <th style="width:70px">Unidad</th>
+    <th>${detLabel}</th>
+  </tr></thead><tbody>`;
+  const mx=Math.max(...items.map(i=>i.total));
+  items.forEach((item,idx)=>{
+    const pct=mx>0?Math.round(item.total/mx*100):0;
+    const det=Object.entries(item.det).sort((a,b)=>b[1]-a[1])
+      .map(([p,c])=>`<span style="margin-right:8px"><b>${p}</b>: ${c.toLocaleString('es-AR')} ${item.unidad}</span>`).join('');
+    h+=`<tr class="con-row">
+      <td style="color:var(--text3);font-size:12px">${idx+1}</td>
+      <td><span class="ichip">${item.ingrediente}</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
+      </td>
+      <td style="text-align:right;font-size:16px;font-weight:700">${item.total.toLocaleString('es-AR')}</td>
+      <td class="muted">${item.unidad}</td>
+      <td class="muted" style="font-size:12px">${det||'--'}</td>
+    </tr>`;
+  });
+  h+=`</tbody></table></div>`;
+  return h;
+}
+
+function scmpTablaSubproductosHtml(items){
+  let h=`<div class="grid-card"><table class="stock-tbl"><thead><tr>
+    <th>#</th><th>Sub-producto</th>
+    <th style="text-align:right">Consumido en recetas</th>
+    <th style="width:70px">Unidad</th>
+    <th style="text-align:right">Stock propio (aparte)</th>
+    <th>Detalle por producto</th>
+  </tr></thead><tbody>`;
+  const mx=Math.max(...items.map(i=>i.total));
+  items.forEach((item,idx)=>{
+    const pct=mx>0?Math.round(item.total/mx*100):0;
+    const det=Object.entries(item.det).sort((a,b)=>b[1]-a[1])
+      .map(([p,c])=>`<span style="margin-right:8px"><b>${p}</b>: ${c.toLocaleString('es-AR')} ${item.unidad}</span>`).join('');
+    h+=`<tr class="con-row">
+      <td style="color:var(--text3);font-size:12px">${idx+1}</td>
+      <td><span class="ichip">${item.ingrediente}</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
+      </td>
+      <td style="text-align:right;font-size:16px;font-weight:700">${item.total.toLocaleString('es-AR')}</td>
+      <td class="muted">${item.unidad}</td>
+      <td style="text-align:right;font-size:16px;font-weight:700;color:var(--accent)">${item.stockPropio.toLocaleString('es-AR')}</td>
+      <td class="muted" style="font-size:12px">${det||'--'}</td>
+    </tr>`;
+  });
+  h+=`</tbody></table></div>`;
+  return h;
+}
+
 function renderConsumoMPStockSel(){
   const el=document.getElementById('scmp-content');
   const seleccionados=scmpItemList.filter(m=>scmpSelected.has(m.id));
@@ -6848,40 +6906,44 @@ function renderConsumoMPStockSel(){
       cm[key].det[m.nombre]=fn(cm[key].det[m.nombre]+c);
     });
   });
-  const items=Object.values(cm).sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
-  if(!items.length){
+  const allItems=Object.values(cm).sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
+  if(!allItems.length){
     el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i> Ninguno de los productos tildados tiene receta cargada, así que no se pudo calcular nada.</div>';
     return;
   }
+  // Separar: ingredientes que son a su vez un producto con stock propio cargado
+  // (ej: "Salsa blanca" que está en la cámara Y también entra en la receta de RELLENO V)
+  // de las materias primas puras, para no mezclar ambas cosas en un mismo total.
+  const rawItems=[];
+  const subItems=[];
+  allItems.forEach(item=>{
+    const matchMp=mpData.find(m=>normTxt(m.nombre)===normTxt(item.ingrediente));
+    if(matchMp&&scmpStockPorMp.has(matchMp.id)){
+      item.stockPropio=scmpStockPorMp.get(matchMp.id);
+      subItems.push(item);
+    }else{
+      rawItems.push(item);
+    }
+  });
   let h=`<div class="metric-grid">
     <div class="metric"><div class="metric-label">Productos tildados con receta</div><div class="metric-val">${conReceta.length}</div></div>
-    <div class="metric"><div class="metric-label">Materias primas</div><div class="metric-val">${items.length}</div></div>
+    <div class="metric"><div class="metric-label">Materias primas</div><div class="metric-val">${rawItems.length}</div></div>
+    <div class="metric"><div class="metric-label">Sub-productos con stock propio</div><div class="metric-val">${subItems.length}</div></div>
   </div>`;
   if(sinReceta.length){
     h+=`<div class="alert alert-info" style="margin:10px 0"><i class="ti ti-alert-circle"></i> ${sinReceta.length} de los tildados no tiene receta cargada, se ignoraron: <b>${sinReceta.join(', ')}</b>.</div>`;
   }
-  h+=`<div class="grid-card"><table class="stock-tbl"><thead><tr>
-    <th>#</th><th>Materia Prima</th>
-    <th style="text-align:right">Total</th>
-    <th style="width:70px">Unidad</th>
-    <th>Detalle por producto</th>
-  </tr></thead><tbody>`;
-  const mx=Math.max(...items.map(i=>i.total));
-  items.forEach((item,idx)=>{
-    const pct=mx>0?Math.round(item.total/mx*100):0;
-    const det=Object.entries(item.det).sort((a,b)=>b[1]-a[1])
-      .map(([p,c])=>`<span style="margin-right:8px"><b>${p}</b>: ${c.toLocaleString('es-AR')} ${item.unidad}</span>`).join('');
-    h+=`<tr class="con-row">
-      <td style="color:var(--text3);font-size:12px">${idx+1}</td>
-      <td><span class="ichip">${item.ingrediente}</span>
-        <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
-      </td>
-      <td style="text-align:right;font-size:16px;font-weight:700">${item.total.toLocaleString('es-AR')}</td>
-      <td class="muted">${item.unidad}</td>
-      <td class="muted" style="font-size:12px">${det||'--'}</td>
-    </tr>`;
-  });
-  h+=`</tbody></table></div>`;
+  if(subItems.length){
+    h+=`<div class="alert alert-info" style="margin:10px 0"><i class="ti ti-info-circle"></i> ${subItems.length} ingrediente(s) también tienen su propio stock cargado aparte (ej. en cámara). Se separaron abajo para no mezclarlos con las materias primas puras: la columna "Consumido en recetas" es lo que está atado dentro de los productos tildados, y "Stock propio (aparte)" es lo que tenés cargado directamente para ese ítem.</div>`;
+  }
+  if(rawItems.length){
+    h+=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin:14px 0 6px">Materias primas</div>`;
+    h+=scmpTablaHtml(rawItems,'Detalle por producto');
+  }
+  if(subItems.length){
+    h+=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin:14px 0 6px">Sub-productos con stock propio</div>`;
+    h+=scmpTablaSubproductosHtml(subItems);
+  }
   el.innerHTML=h;
 }
 
