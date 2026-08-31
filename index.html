@@ -1195,6 +1195,8 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <button class="btn" onclick="document.getElementById('mp-csv-input').click()"><i class="ti ti-file-spreadsheet"></i> Actualizar desde CSV (Flexxus)</button>
       <input type="file" id="mp-iniciales-csv-input" accept=".csv" style="display:none" onchange="importarMPIniciales(this)"/>
       <button class="btn" onclick="document.getElementById('mp-iniciales-csv-input').click()"><i class="ti ti-tag"></i> Importar Iniciales/Caja-Unidad (CSV)</button>
+      <input type="file" id="mp-articulos-csv-input" accept=".csv" style="display:none" onchange="importarArticulosCsv(this)"/>
+      <button class="btn" onclick="document.getElementById('mp-articulos-csv-input').click()"><i class="ti ti-list-check"></i> Controlar y Agregar Faltantes (CSV Artículos)</button>
       <button class="btn btn-danger" onclick="borrarMPSinCodigo()"><i class="ti ti-trash"></i> Borrar sin código</button>
       <span id="mp-import-loading" style="display:none;font-size:13px;color:var(--text2);align-items:center;gap:6px"><span class="spinner spinner-dark"></span> Procesando CSV...</span>
     </div>
@@ -4176,6 +4178,96 @@ async function importarMPIniciales(input){
     if(ignoradas)partes.push(`${ignoradas} filas con sigla pero sin Tipo (CAJA/UNIDAD) se ignoraron por seguridad`);
     if(errores.length)partes.push(`${errores.length} filas no se pudieron guardar`);
     msgEl.innerHTML=`<i class="ti ti-check"></i> ${partes.join('. ')}.`;
+    msgEl.style.display='';
+    input.value='';
+  }catch(e){
+    loadingEl.style.display='none';
+    errEl.innerHTML=`<i class="ti ti-alert-circle"></i> ${e.message}`;
+    errEl.style.display='';
+    input.value='';
+  }
+}
+
+// Importa el catálogo completo de Artículos de Flexxus (export con columnas "Código;Descripción;..."
+// y celdas envueltas como ="valor", tal como lo genera Flexxus a Excel/CSV) y agrega como materia
+// prima nueva (Maestro > Configuración) cualquier código que todavía no exista en el sistema. No
+// modifica ni borra las filas existentes — solo agrega las que faltan, para poder controlar el
+// catálogo completo contra lo que ya está cargado y no dejar nada afuera.
+async function importarArticulosCsv(input){
+  const file=input.files[0];
+  if(!file)return;
+  const loadingEl=document.getElementById('mp-import-loading');
+  const msgEl=document.getElementById('mp-import-msg');
+  const errEl=document.getElementById('mp-import-err');
+  msgEl.style.display='none';errEl.style.display='none';
+  loadingEl.style.display='inline-flex';
+  try{
+    const buf=await file.arrayBuffer();
+    let text;
+    try{ text=new TextDecoder('windows-1252').decode(buf); }
+    catch(e){ text=new TextDecoder('utf-8').decode(buf); }
+    const lines=text.split(/\r\n|\n|\r/).filter(l=>l.trim()!=='');
+    if(!lines.length)throw new Error('El CSV está vacío.');
+    const delim=lines[0].includes(';')?';':',';
+    const strip=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    // Flexxus exporta cada celda como ="valor" (formula de Excel para forzar texto) — hay que sacarle
+    // el envoltorio antes de leer código/descripción.
+    const unwrap=c=>{
+      let v=c.trim();
+      if(v.startsWith('="')&&v.endsWith('"'))v=v.slice(2,-1);
+      return v.trim();
+    };
+    const parseLine=l=>l.split(delim).map(unwrap);
+    const header=parseLine(lines[0]).map(h=>strip(h).toLowerCase());
+    const codIdx=header.findIndex(h=>h.includes('codigo'));
+    const descIdx=header.findIndex(h=>h.includes('descripcion'));
+    if(codIdx===-1||descIdx===-1){
+      throw new Error('No se encontraron las columnas "Código" y "Descripción" en el CSV.');
+    }
+
+    const UNIT_RE=/\s*POR\s+(KILOS?|LITROS?|UNIDADES?|GRAMOS?|CC\.?|DOCENAS?)\s*$/i;
+    const coreName=desc=>desc.replace(UNIT_RE,'').trim();
+    const inferUnidad=desc=>{
+      const m=desc.match(UNIT_RE);
+      if(!m)return 'Unidad';
+      const u=strip(m[1]).toLowerCase();
+      if(u.startsWith('kilo'))return 'Kg';
+      if(u.startsWith('litro'))return 'Litros';
+      if(u.startsWith('gramo'))return 'Gr';
+      if(u.startsWith('cc'))return 'CC';
+      return 'Unidad';
+    };
+
+    const porCodigo=new Map();
+    mpData.forEach(mp=>{ if(mp.codigo)porCodigo.set(mp.codigo,mp); });
+
+    let agregadas=0,yaExistian=0,ignoradas=0;
+    const errores=[];
+    for(let i=1;i<lines.length;i++){
+      const cols=parseLine(lines[i]);
+      const codigo=(cols[codIdx]||'').trim();
+      const descripcion=(cols[descIdx]||'').trim();
+      if(!codigo||!descripcion){ignoradas++;continue}
+      if(porCodigo.has(codigo)){yaExistian++;continue}
+      const nombre=coreName(descripcion);
+      const unidad=inferUnidad(descripcion);
+      try{
+        const res=await ins('materias_primas',{nombre,unidad,codigo});
+        mpData.push(res[0]);
+        porCodigo.set(codigo,res[0]);
+        agregadas++;
+      }catch(e){errores.push(`${codigo} ${descripcion}: ${e.message}`)}
+    }
+    mpData.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+    renderMPList();
+    loadingEl.style.display='none';
+    if(errores.length && !agregadas){
+      throw new Error(`No se pudo agregar ninguna materia prima nueva. Detalle: ${errores[0]}`);
+    }
+    const partes=[`${agregadas} artículos nuevos agregados a Maestro &gt; Configuración`,`${yaExistian} ya existían (mismo código)`];
+    if(ignoradas)partes.push(`${ignoradas} filas sin código o descripción se ignoraron`);
+    if(errores.length)partes.push(`${errores.length} filas no se pudieron agregar`);
+    msgEl.innerHTML=`<i class="ti ti-check"></i> ${partes.join('. ')}. Los agregados quedan sin clasificar (columna "Tipo") — clasificalos como MP, Producto Terminado, Producto en Proceso o Insumos, y vinculalos en Maestro &gt; Productos si corresponde.`;
     msgEl.style.display='';
     input.value='';
   }catch(e){
