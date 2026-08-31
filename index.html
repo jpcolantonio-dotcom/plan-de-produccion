@@ -391,7 +391,9 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <input type="file" id="rec-xlsx-input" accept=".xlsx,.xls" style="display:none" onchange="importarRecetasExcel(this)"/>
         <button class="btn" onclick="document.getElementById('rec-xlsx-input').click()"><i class="ti ti-file-spreadsheet"></i> Importar desde Excel</button>
-        <span id="rec-import-loading" style="display:none;font-size:13px;color:var(--text2);align-items:center;gap:6px"><span class="spinner spinner-dark"></span> Procesando Excel...</span>
+        <input type="file" id="rec-csv-estructura-input" accept=".csv" style="display:none" onchange="importarRecetasCsvEstructura(this)"/>
+        <button class="btn" onclick="document.getElementById('rec-csv-estructura-input').click()"><i class="ti ti-sitemap"></i> Importar Rellenos/Proceso (CSV Estructura)</button>
+        <span id="rec-import-loading" style="display:none;font-size:13px;color:var(--text2);align-items:center;gap:6px"><span class="spinner spinner-dark"></span> Procesando archivo...</span>
       </div>
       <button class="btn btn-primary" id="btnsaverec2" onclick="saveRecetas()"><i class="ti ti-device-floppy"></i> Guardar recetas</button>
     </div>
@@ -4545,6 +4547,178 @@ async function importarRecetasExcel(input){
     if(mpCreadas)partes.push(`${mpCreadas} materias primas nuevas agregadas al maestro`);
     if(skipped.length)partes.push(`${skipped.length} hojas omitidas por no tener formato de receta de producto (${skipped.join(', ')})`);
     msgEl.innerHTML=`<i class="ti ti-check"></i> ${partes.join('. ')}. Todavía no se guardó nada: revisá las recetas marcadas y después hacé click en "Guardar recetas".`;
+    msgEl.style.display='';
+    input.value='';
+  }catch(e){
+    loadingEl.style.display='none';
+    errEl.innerHTML=`<i class="ti ti-alert-circle"></i> ${e.message}`;
+    errEl.style.display='';
+    input.value='';
+  }
+}
+
+// Importa el CSV "Estructura de Producto" de Flexxus: un export plano de TODA la estructura de
+// recetas (una fila por componente, con "Nivel" indicando la profundidad respecto del producto raíz
+// de esa fila — Nivel 1 son los ingredientes directos de ese producto raíz; Nivel 2+ es la expansión
+// recursiva de un ingrediente que a su vez tiene su propia receta, y se ignora acá porque esa
+// sub-receta ya se importa aparte cuando ese ingrediente sea, a su vez, el producto raíz de otro
+// grupo de filas). Como el archivo trae TODOS los productos (terminados, materias primas, rellenos,
+// etc.) y sólo pedimos los Rellenos y Productos en Proceso, sólo se importa la receta de un producto
+// raíz cuando: (a) ya está clasificado tipo="proceso" en Maestro > Configuración, o (b) su nombre
+// empieza con "RELLENO" (ahí se lo reclasifica a "proceso" automáticamente). Si el código del
+// producto raíz ni siquiera existe en Configuración, se lo deja afuera y se informa en el resumen.
+async function importarRecetasCsvEstructura(input){
+  const file=input.files[0];
+  if(!file)return;
+  const loadingEl=document.getElementById('rec-import-loading');
+  const msgEl=document.getElementById('rec-import-msg');
+  const errEl=document.getElementById('rec-import-err');
+  msgEl.style.display='none';errEl.style.display='none';
+  loadingEl.style.display='inline-flex';
+  try{
+    const buf=await file.arrayBuffer();
+    let text;
+    try{ text=new TextDecoder('windows-1252').decode(buf); }
+    catch(e){ text=new TextDecoder('utf-8').decode(buf); }
+    const lines=text.split(/\r\n|\n|\r/).filter(l=>l.trim()!=='');
+    if(!lines.length)throw new Error('El CSV está vacío.');
+    const delim=lines[0].includes(';')?';':',';
+    const strip=s=>String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    // Flexxus exporta cada celda como ="valor" (formula de Excel para forzar texto).
+    const unwrap=c=>{
+      let v=c.trim();
+      if(v.startsWith('="')&&v.endsWith('"'))v=v.slice(2,-1);
+      return v.trim();
+    };
+    const parseLine=l=>l.split(delim).map(unwrap);
+    const norm=h=>strip(h).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+    const header=parseLine(lines[0]).map(norm);
+    const codIdx=header.findIndex(h=>h==='codigo');
+    const descIdx=header.findIndex(h=>h==='descripcion');
+    const unidadesIdx=header.findIndex(h=>h==='unidades');
+    const nivelIdx=header.findIndex(h=>h==='nivel');
+    const codPadreIdx=header.findIndex(h=>h==='codigo padre');
+    const descPadreIdx=header.findIndex(h=>h==='desc padre');
+    if([codIdx,descIdx,unidadesIdx,nivelIdx,codPadreIdx,descPadreIdx].some(i=>i===-1)){
+      throw new Error('No se encontraron todas las columnas esperadas (Código, Descripción, Unidades, Nivel, Codigo Padre, Desc. Padre). ¿Es un export de "Estructura de Producto" de Flexxus?');
+    }
+
+    const UNIT_RE=/\s*POR\s+(KILOS?|LITROS?|UNIDADES?|GRAMOS?|CC\.?|DOCENAS?)\s*$/i;
+    const coreName=desc=>desc.replace(UNIT_RE,'').trim();
+    const inferUnidad=desc=>{
+      const m=desc.match(UNIT_RE);
+      if(!m)return 'Unidad';
+      const u=strip(m[1]).toLowerCase();
+      if(u.startsWith('kilo'))return 'Kg';
+      if(u.startsWith('litro'))return 'Litros';
+      if(u.startsWith('gramo'))return 'Gr';
+      if(u.startsWith('cc'))return 'CC';
+      return 'Unidad';
+    };
+
+    const porCodigo=new Map();
+    const porNombre=new Map();
+    mpData.forEach(mp=>{
+      if(mp.codigo)porCodigo.set(mp.codigo,mp);
+      porNombre.set(strip(mp.nombre).toUpperCase().trim(),mp);
+    });
+
+    // Agrupar todas las filas por su producto raíz (Codigo Padre)
+    const porPadre=new Map(); // codigoPadre -> {descPadre, filas:[]}
+    for(let i=1;i<lines.length;i++){
+      const cols=parseLine(lines[i]);
+      const codigoPadre=(cols[codPadreIdx]||'').trim();
+      if(!codigoPadre)continue;
+      if(!porPadre.has(codigoPadre))porPadre.set(codigoPadre,{descPadre:(cols[descPadreIdx]||'').trim(),filas:[]});
+      porPadre.get(codigoPadre).filas.push(cols);
+    }
+
+    let nuevas=0,actualizadas=0,reclasificadas=0,mpCreadas=0;
+    const sinCodigoEnSistema=[];
+    const sinIngredientes=[];
+    const nuevosIngredientes=new Map(); // key normalizado -> {nombre,unidad,codigo}
+
+    for(const [codigoPadre,{descPadre,filas}] of porPadre.entries()){
+      const mpPadre=porCodigo.get(codigoPadre);
+      const nombrePadreUpper=strip(descPadre).toUpperCase();
+      const esRelleno=nombrePadreUpper.trim().startsWith('RELLENO');
+      if(!mpPadre){
+        if(esRelleno)sinCodigoEnSistema.push(descPadre);
+        continue; // ni siquiera está cargado en Maestro > Configuración -> no se puede clasificar ni nombrar de forma confiable
+      }
+      const yaProceso=tipoMpDe(mpPadre)==='proceso';
+      if(!yaProceso && !esRelleno)continue; // fuera de alcance: no es relleno y no está marcado "Producto en Proceso"
+
+      if(!yaProceso && esRelleno){
+        try{
+          const res=await fetch(`${SB}/rest/v1/materias_primas?id=eq.${mpPadre.id}`,{
+            method:'PATCH',headers:{...H,'Content-Type':'application/json'},
+            body:JSON.stringify({tipo:'proceso'})
+          });
+          if(!res.ok)throw new Error(await res.text());
+          mpPadre.tipo='proceso';
+          reclasificadas++;
+        }catch(e){/* si falla la reclasificación automática, igual seguimos con la receta */}
+      }
+
+      const nivel1=filas.filter(f=>parseInt(f[nivelIdx],10)===1);
+      const ingredientes=[];
+      nivel1.forEach(f=>{
+        const codigoHijo=(f[codIdx]||'').trim();
+        const descHijo=(f[descIdx]||'').trim();
+        const cantidad=parseFloat((f[unidadesIdx]||'0').replace(',','.'));
+        if(!descHijo || !isFinite(cantidad) || cantidad===0)return;
+
+        let mpHijo=codigoHijo?porCodigo.get(codigoHijo):undefined;
+        if(!mpHijo)mpHijo=porNombre.get(strip(coreName(descHijo)).toUpperCase().trim());
+        let ingrediente,unidad;
+        if(mpHijo){
+          ingrediente=mpHijo.nombre;unidad=mpHijo.unidad||inferUnidad(descHijo);
+        }else{
+          const nombre=coreName(descHijo);
+          unidad=inferUnidad(descHijo);
+          ingrediente=nombre;
+          const key=strip(nombre).toUpperCase().trim();
+          if(!nuevosIngredientes.has(key))nuevosIngredientes.set(key,{nombre,unidad,codigo:codigoHijo||null});
+        }
+        ingredientes.push({ingrediente,cantidad,unidad});
+      });
+
+      if(!ingredientes.length){sinIngredientes.push(mpPadre.nombre);continue}
+
+      const existia=st.Rec[mpPadre.nombre]!==undefined;
+      st.Rec[mpPadre.nombre]=ingredientes;
+      if(existia)actualizadas++;else nuevas++;
+    }
+
+    // Crear en Maestro > Configuración los ingredientes que todavía no existían (ahora con código,
+    // ya que a diferencia del importador de Excel acá sí lo tenemos)
+    for(const {nombre,unidad,codigo} of nuevosIngredientes.values()){
+      try{
+        const payload={nombre,unidad};
+        if(codigo)payload.codigo=codigo;
+        const res=await ins('materias_primas',payload);
+        mpData.push(res[0]);
+        porNombre.set(strip(nombre).toUpperCase().trim(),res[0]);
+        if(codigo)porCodigo.set(codigo,res[0]);
+        mpCreadas++;
+      }catch(e){/* si falla la creo a mano despues desde Maestro > Configuracion */}
+    }
+    mpData.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+
+    rRec();
+    loadingEl.style.display='none';
+    const total=nuevas+actualizadas;
+    if(!total){
+      const extra=sinCodigoEnSistema.length?` ${sinCodigoEnSistema.length} rellenos del CSV ni siquiera están cargados en Maestro &gt; Configuración (agregalos primero, ej. con "Controlar y Agregar Faltantes").`:'';
+      throw new Error(`No se importó ninguna receta de Relleno/Producto en Proceso.${extra} Verificá que sea el CSV de "Estructura de Producto" de Flexxus.`);
+    }
+    const partes=[`${total} recetas importadas (${nuevas} nuevas, ${actualizadas} actualizadas)`];
+    if(reclasificadas)partes.push(`${reclasificadas} productos reclasificados a "Producto en Proceso" por empezar su nombre con "RELLENO"`);
+    if(mpCreadas)partes.push(`${mpCreadas} materias primas nuevas agregadas al maestro (con su código de Flexxus)`);
+    if(sinIngredientes.length)partes.push(`${sinIngredientes.length} sin ingredientes de Nivel 1 en el CSV, se dejaron sin tocar (${sinIngredientes.join(', ')})`);
+    if(sinCodigoEnSistema.length)partes.push(`${sinCodigoEnSistema.length} rellenos del CSV no están cargados en Maestro &gt; Configuración y se omitieron (${sinCodigoEnSistema.join(', ')})`);
+    msgEl.innerHTML=`<i class="ti ti-check"></i> ${partes.join('. ')}. Todavía no se guardó nada: revisá las recetas y después hacé click en "Guardar recetas".`;
     msgEl.style.display='';
     input.value='';
   }catch(e){
