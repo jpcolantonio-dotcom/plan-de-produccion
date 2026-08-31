@@ -384,6 +384,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1.25rem">
     <button class="proy-tab active" id="rtab-recetas" onclick="showRecTab('recetas')"><i class="ti ti-notebook"></i> Recetas</button>
     <button class="proy-tab" id="rtab-consumo" onclick="showRecTab('consumo')"><i class="ti ti-chart-bar"></i> Consumo MP</button>
+    <button class="proy-tab" id="rtab-consumostock" onclick="showRecTab('consumostock')"><i class="ti ti-stack-2"></i> MP en Stock de Proceso</button>
   </div>
   <!-- Sub-tab Recetas -->
   <div id="rsub-recetas">
@@ -399,7 +400,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     </div>
     <div id="rec-import-msg" style="display:none;margin-bottom:12px" class="alert alert-ok"></div>
     <div id="rec-import-err" style="display:none;margin-bottom:12px" class="alert alert-err"></div>
-    <div style="display:grid;grid-template-columns:270px 1fr;gap:1.5rem">
+    <div style="display:grid;grid-template-columns:340px 1fr;gap:1.5rem">
       <div>
         <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Productos</div>
         <input type="text" id="rec-buscar" placeholder="🔍 Buscar producto..." oninput="rRec()" style="width:100%;padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);margin-bottom:8px"/>
@@ -429,6 +430,26 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       </div>
     </div>
     <div id="rcon-content"><div class="empty"><i class="ti ti-package"></i> Seleccioná un rango de fechas y calculá.</div></div>
+  </div>
+  <!-- Sub-tab MP en Stock de Proceso: cuánta materia prima virgen representa el stock ACTUAL de
+       Productos en Proceso (rellenos y demás), según su receta -->
+  <div id="rsub-consumostock" style="display:none">
+    <div class="alert alert-info" style="margin-bottom:12px"><i class="ti ti-info-circle"></i> Toma el stock cargado en Stock &gt; Conteo de stock &gt; Producto en Proceso para la fecha elegida y lo traduce a materia prima virgen usando la receta de cada uno (Cant. x unidad × stock). Sirve para saber cuánta MP tenés "atada" en el stock de rellenos/proceso que tenés en cámara.</div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--text2)">Fecha:</label>
+      <input type="date" id="rconstock-fecha" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+      <button class="btn btn-primary" onclick="renderConsumoStockProceso()"><i class="ti ti-calculator"></i> Calcular</button>
+      <div style="display:flex;align-items:center;gap:6px;margin-left:8px">
+        <i class="ti ti-search" style="font-size:14px;color:var(--text2)"></i>
+        <input type="text" id="rconstock-filt" placeholder="Buscar MP..." oninput="filtrarConsumoStockProceso()"
+          style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:180px"/>
+        <button onclick="document.getElementById('rconstock-filt').value='';filtrarConsumoStockProceso()"
+          style="padding:6px 10px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:transparent;color:var(--text2);cursor:pointer" title="Limpiar">
+          <i class="ti ti-x"></i>
+        </button>
+      </div>
+    </div>
+    <div id="rconstock-content"><div class="empty"><i class="ti ti-package"></i> Seleccioná una fecha y calculá.</div></div>
   </div>
 
   <div id="recmsg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Recetas guardadas.</div>
@@ -3364,8 +3385,13 @@ function rRec(){
     const pr=st.Pr.find(x=>x.nombre===p);const ar=pr?st.A.find(a=>a.id===pr.area_id):null;const em=pr?st.E.find(e=>e.id===pr.empresa_id):null;
     const warn=recImportWarn.has(p);
     const noMaestro=!pr;
+    const mpSelf=mpData.find(m=>m.nombre.trim().toLowerCase()===p.trim().toLowerCase());
+    const codSelf=mpSelf&&mpSelf.codigo?mpSelf.codigo:'';
     h+=`<div class="rrow${sel?' sel':''}" onclick="selRec('${p.replace(/'/g,"\'")}')">
-      <div><div style="font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px">${p}${warn?'<span class="badge badge-warn" style="font-size:10px;padding:1px 6px" title="Revisar: cantidad o tanda sin detectar en la importacion">revisar</span>':''}${noMaestro?'<span class="badge" style="font-size:10px;padding:1px 6px;background:var(--bg3);color:var(--text2)" title="No existe en Maestro de productos">sin maestro</span>':''}</div><div style="font-size:12px;color:var(--text2)">${em?em.nombre:''}${ar?' / '+ar.nombre:''} - ${ings.length?ings.length+' ing.':'Sin receta'}</div></div>
+      <div style="min-width:0;flex:1">
+        <div style="font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;flex-wrap:nowrap;white-space:nowrap">${codSelf?`<span style="font-size:10px;color:var(--text2);font-family:monospace;flex-shrink:0">${codSelf}</span>`:''}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis" title="${p}">${p}</span>${warn?'<span class="badge badge-warn" style="font-size:10px;padding:1px 6px;flex-shrink:0" title="Revisar: cantidad o tanda sin detectar en la importacion">revisar</span>':''}${noMaestro?'<span class="badge" style="font-size:10px;padding:1px 6px;flex-shrink:0;background:var(--bg3);color:var(--text2)" title="No existe en Maestro de productos">sin maestro</span>':''}</div>
+        <div style="font-size:12px;color:var(--text2)">${em?em.nombre:''}${ar?' / '+ar.nombre:''} - ${ings.length?ings.length+' ing.':'Sin receta'}</div>
+      </div>
       <i class="ti ti-chevron-right" style="color:var(--text3);font-size:14px"></i>
     </div>`;
   });
@@ -3376,12 +3402,14 @@ function rRecDet(p){
   const ings=st.Rec[p]||[];const wrap=document.getElementById('rdetail');
   const k=p.replace(/[\s']/g,'_');
   const tanda=st.RecTanda&&st.RecTanda[p]?st.RecTanda[p]:1;
+  const mpSelf=mpData.find(m=>m.nombre.trim().toLowerCase()===p.trim().toLowerCase());
+  const codSelf=mpSelf&&mpSelf.codigo?mpSelf.codigo:'';
   // Calcular cant x unidad = cant x tanda / unidades x tanda
   h_xund=(cant)=>tanda>0?`<span style="font-size:10px;color:var(--text3);margin-left:4px">= ${fn(cant/tanda)} x ud</span>`:'';
   let h=`<div class="rdetail">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:10px">
       <div style="font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px">
-        <i class="ti ti-notebook" style="color:var(--purple)"></i>${p}
+        <i class="ti ti-notebook" style="color:var(--purple)"></i>${p}${codSelf?`<span style="font-size:11px;font-weight:400;color:var(--text2);font-family:monospace;background:var(--bg2);border-radius:4px;padding:2px 7px" title="Código de Maestro > Configuración">${codSelf}</span>`:''}
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <div style="display:flex;align-items:center;gap:8px;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);padding:6px 12px">
@@ -3473,6 +3501,8 @@ function imprimirReceta(p){
     </tr>`;
   });
   const fechaHoy=new Date().toLocaleDateString('es-AR');
+  const mpSelfImp=mpData.find(m=>m.nombre.trim().toLowerCase()===p.trim().toLowerCase());
+  const codSelfImp=mpSelfImp&&mpSelfImp.codigo?mpSelfImp.codigo:'';
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Receta - ${p}</title>
   <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10pt;padding:12mm;color:#1a1a1a}
   h1{font-size:15pt;margin-bottom:2px}
@@ -3486,7 +3516,7 @@ function imprimirReceta(p){
   .foot{margin-top:14px;font-size:8.5pt;color:#777}
   @media print{@page{size:A4;margin:10mm}}</style></head>
   <body>
-    <h1>${p}</h1>
+    <h1>${p}${codSelfImp?` <span style="font-size:10pt;font-weight:400;color:#555">(Cód. ${codSelfImp})</span>`:''}</h1>
     <div class="sub">Unidades por tanda: <b>${tanda}</b> &nbsp;|&nbsp; Impreso: ${fechaHoy}</div>
     <table><thead><tr>
       <th class="left">Código</th>
@@ -3644,6 +3674,103 @@ function filtrarConsumoMP(){
   rows.forEach(tr=>{
     const tds=tr.querySelectorAll('td');
     const mp=tds[1]?.textContent?.toLowerCase()||''; // segundo td = nombre MP
+    tr.style.display=(!flt||mp.includes(flt))?'':'none';
+  });
+}
+
+// Traduce el stock ACTUAL de Productos en Proceso (rellenos y demás materias primas en proceso,
+// tipo="proceso" en Maestro > Configuración) a materia prima virgen, usando la receta de cada uno.
+// Mismo cálculo que Consumo MP (cant. x tanda / unidades x tanda × cantidad), pero acá la "cantidad"
+// sale del conteo de stock de Stock > Conteo de stock > Producto en Proceso para la fecha elegida,
+// en vez de producción planificada/real — para saber cuánta MP virgen está "atada" en lo que hay
+// en cámara. Un producto en proceso con stock cargado pero sin receta se lista aparte, para dejar
+// claro qué falta vincular.
+async function renderConsumoStockProceso(){
+  const fecha=document.getElementById('rconstock-fecha').value||hoyLocal();
+  const el=document.getElementById('rconstock-content');
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Calculando...</div>';
+
+  let conteo=[];
+  try{ conteo=await get('mp_conteo',`fecha=eq.${fecha}`); }catch{conteo=[]}
+  const stockPorMp=new Map();
+  conteo.forEach(c=>{ if(c.stock>0)stockPorMp.set(c.mp_id,c.stock); });
+
+  const proceso=mpData.filter(m=>tipoMpDe(m)==='proceso');
+  const cm={};
+  const sinReceta=[];
+  const conStock=[];
+
+  proceso.forEach(m=>{
+    const stock=stockPorMp.get(m.id);
+    if(!stock)return;
+    const recKey=Object.keys(st.Rec).find(k=>k.trim().toLowerCase()===m.nombre.trim().toLowerCase());
+    const ings=recKey?(st.Rec[recKey]||[]):[];
+    if(!ings.length){sinReceta.push(m.nombre);return}
+    conStock.push(m.nombre);
+    const tanda=(recKey&&st.RecTanda&&st.RecTanda[recKey])||1;
+    ings.forEach(ing=>{
+      const key=ing.ingrediente+'||'+ing.unidad;
+      if(!cm[key])cm[key]={ingrediente:ing.ingrediente,unidad:ing.unidad,total:0,det:{}};
+      const cantXUnidad=tanda>0?ing.cantidad/tanda:ing.cantidad;
+      const c=cantXUnidad*stock;
+      cm[key].total=fn(cm[key].total+c);
+      if(!cm[key].det[m.nombre])cm[key].det[m.nombre]=0;
+      cm[key].det[m.nombre]=fn(cm[key].det[m.nombre]+c);
+    });
+  });
+
+  const items=Object.values(cm).sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
+  const fFecha=new Date(fecha+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+
+  if(!items.length){
+    let msg=`Sin stock cargado de Producto en Proceso para el ${fFecha}`;
+    msg+=sinReceta.length?`, o ninguno de los que tienen stock tiene receta cargada todavía (${sinReceta.join(', ')}).`:'.';
+    el.innerHTML=`<div class="empty"><i class="ti ti-package-off"></i> ${msg}</div>`;
+    return;
+  }
+
+  let h=`<div class="metric-grid">
+    <div class="metric"><div class="metric-label">Fecha</div><div style="font-size:13px;font-weight:600;margin-top:2px">${fFecha}</div></div>
+    <div class="metric"><div class="metric-label">Prod. en proceso con stock y receta</div><div class="metric-val">${conStock.length}</div></div>
+    <div class="metric"><div class="metric-label">Materias primas</div><div class="metric-val">${items.length}</div></div>
+  </div>`;
+
+  if(sinReceta.length){
+    h+=`<div class="alert alert-info" style="margin:10px 0"><i class="ti ti-alert-circle"></i> ${sinReceta.length} producto(s) en proceso tienen stock cargado para esta fecha pero todavía no tienen receta en Maestro &gt; Recetas, así que no se pudieron traducir a MP: <b>${sinReceta.join(', ')}</b>. Cargales la receta (con "Importar Rellenos/Proceso" o a mano) para que entren en este cálculo.</div>`;
+  }
+
+  h+=`<div class="grid-card"><table class="stock-tbl"><thead><tr>
+    <th>#</th><th>Materia Prima</th>
+    <th style="text-align:right">Total</th>
+    <th style="width:70px">Unidad</th>
+    <th>Detalle por producto en proceso</th>
+  </tr></thead><tbody>`;
+
+  const mx=Math.max(...items.map(i=>i.total));
+  items.forEach((item,idx)=>{
+    const pct=mx>0?Math.round(item.total/mx*100):0;
+    const det=Object.entries(item.det).sort((a,b)=>b[1]-a[1])
+      .map(([p,c])=>`<span style="margin-right:8px"><b>${p}</b>: ${c.toLocaleString('es-AR')} ${item.unidad}</span>`).join('');
+    h+=`<tr class="con-row">
+      <td style="color:var(--text3);font-size:12px">${idx+1}</td>
+      <td><span class="ichip">${item.ingrediente}</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
+      </td>
+      <td style="text-align:right;font-size:16px;font-weight:700">${item.total.toLocaleString('es-AR')}</td>
+      <td class="muted">${item.unidad}</td>
+      <td class="muted" style="font-size:12px">${det||'--'}</td>
+    </tr>`;
+  });
+  h+=`</tbody></table></div>`;
+  el.innerHTML=h;
+}
+
+function filtrarConsumoStockProceso(){
+  const flt=(document.getElementById('rconstock-filt')?.value||'').toLowerCase().trim();
+  const rows=document.querySelectorAll('#rconstock-content tr.con-row');
+  rows.forEach(tr=>{
+    const tds=tr.querySelectorAll('td');
+    const mp=tds[1]?.textContent?.toLowerCase()||'';
     tr.style.display=(!flt||mp.includes(flt))?'':'none';
   });
 }
@@ -3836,7 +3963,7 @@ function showMaeSubTab(t){
 }
 
 function showRecTab(t){
-  ['recetas','consumo'].forEach(x=>{
+  ['recetas','consumo','consumostock'].forEach(x=>{
     document.getElementById('rsub-'+x).style.display=x===t?'':'none';
     document.getElementById('rtab-'+x).classList.toggle('active',x===t);
   });
@@ -3852,6 +3979,10 @@ function showRecTab(t){
       const hasta=new Date(W0+'T00:00:00');hasta.setDate(hasta.getDate()+6);
       document.getElementById('rcon-hasta').value=hasta.getFullYear()+'-'+String(hasta.getMonth()+1).padStart(2,'0')+'-'+String(hasta.getDate()).padStart(2,'0');
     }
+  }
+  if(t==='consumostock'){
+    const fEl=document.getElementById('rconstock-fecha');
+    if(!fEl.value)fEl.value=hoyLocal();
   }
 }
 
