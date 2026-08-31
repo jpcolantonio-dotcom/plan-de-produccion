@@ -738,6 +738,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <input type="text" id="mp-conteo-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="filtrarMpConteo()"
         style="flex:1;min-width:200px;max-width:320px;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
     </div>
+    <div id="stock-conteo-unidad-tabs" style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap"></div>
     <div id="stock-conteo-emp-tabs" style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:0;flex-wrap:wrap"></div>
     <div id="stock-conteo-content"></div>
     <div style="display:flex;justify-content:space-between;margin-top:1rem;flex-wrap:wrap;gap:8px">
@@ -1193,6 +1194,8 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <span style="flex:1"></span>
       <input type="file" id="mp-csv-input" accept=".csv" style="display:none" onchange="importarMPCsv(this)"/>
       <button class="btn" onclick="document.getElementById('mp-csv-input').click()"><i class="ti ti-file-spreadsheet"></i> Actualizar desde CSV (Flexxus)</button>
+      <input type="file" id="mp-iniciales-csv-input" accept=".csv" style="display:none" onchange="importarMPIniciales(this)"/>
+      <button class="btn" onclick="document.getElementById('mp-iniciales-csv-input').click()"><i class="ti ti-tag"></i> Importar Iniciales/Caja-Unidad (CSV)</button>
       <button class="btn btn-danger" onclick="borrarMPSinCodigo()"><i class="ti ti-trash"></i> Borrar sin código</button>
       <span id="mp-import-loading" style="display:none;font-size:13px;color:var(--text2);align-items:center;gap:6px"><span class="spinner spinner-dark"></span> Procesando CSV...</span>
     </div>
@@ -3864,6 +3867,7 @@ function renderMPList(){
       <td><input value="${mp.nombre.replace(/"/g,'&quot;')}"
         style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
         onchange="updateMP('${mp.id}','nombre',this.value)"/>
+        ${mp.sigla?`<div style="margin-top:3px"><span style="font-size:10.5px;background:var(--bg2);color:var(--text2);border-radius:4px;padding:1px 5px;font-family:monospace">${mp.sigla}</span>${mp.unidad_tipo?` <span style="font-size:10px;color:var(--text3)">(${mp.unidad_tipo==='caja'?'Caja Cerrada':'Unidad'})</span>`:''}</div>`:''}
         ${mostrarSug?`<div style="margin-top:3px"><span style="font-size:10.5px;color:var(--amber);cursor:pointer" onclick="updateMP('${mp.id}','tipo','${sug.tipo}')" title="Hay un producto '${sug.producto.nombre.replace(/'/g,"&#39;")}' con nombre parecido en el Maestro">⚠ ¿Es "${sug.producto.nombre}" (${sugLbl})? · <u>aplicar</u></span></div>`:''}
       </td>
       <td><select style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
@@ -4085,6 +4089,86 @@ async function importarMPCsv(input){
     if(sinCambio)partes.push(`${sinCambio} ya tenían ese código`);
     if(errores.length)partes.push(`${errores.length} filas no se pudieron guardar`);
     msgEl.innerHTML=`<i class="ti ti-check"></i> ${partes.join('. ')}. Los nombres que no coinciden exacto con el catálogo (por ejemplo "Aceite" vs "ACEITE DE GIRASOL") no se vincularon automáticamente para no linkear mal — quedaron como materias primas nuevas separadas; podés fusionarlas renombrando la que ya usás en tus recetas para que coincida y volviendo a correr esta importación.`;
+    msgEl.style.display='';
+    input.value='';
+  }catch(e){
+    loadingEl.style.display='none';
+    errEl.innerHTML=`<i class="ti ti-alert-circle"></i> ${e.message}`;
+    errEl.style.display='';
+    input.value='';
+  }
+}
+
+// Importa el CSV de Flexxus que trae, ademas de Codigo Articulo y Descripcion, las columnas
+// "Iniciales" (la sigla corta del producto, ej. "BCA") y una cuarta columna sin nombre fijo con
+// "CAJA COMPLETA" / "UNIDAD" (que variante es cada codigo). Solo toca filas de Configuracion que
+// ya existen (por codigo) y donde el CSV trae AMBOS datos completos — asi se ignoran automaticamente
+// filas de materia prima donde la sigla quedo mal cargada en el Excel de origen (ej. "OREGANO" con
+// sigla "V" pero sin Tipo) en vez de arrastrar ese error a la app.
+async function importarMPIniciales(input){
+  const file=input.files[0];
+  if(!file)return;
+  const loadingEl=document.getElementById('mp-import-loading');
+  const msgEl=document.getElementById('mp-import-msg');
+  const errEl=document.getElementById('mp-import-err');
+  msgEl.style.display='none';errEl.style.display='none';
+  loadingEl.style.display='inline-flex';
+  try{
+    const buf=await file.arrayBuffer();
+    let text;
+    try{ text=new TextDecoder('windows-1252').decode(buf); }
+    catch(e){ text=new TextDecoder('utf-8').decode(buf); }
+    const lines=text.split(/\r\n|\n|\r/).filter(l=>l.trim()!=='');
+    if(!lines.length)throw new Error('El CSV está vacío.');
+    const delim=lines[0].includes(';')?';':',';
+    const parseLine=l=>l.split(delim).map(c=>c.trim());
+    const header=parseLine(lines[0]).map(h=>h.toLowerCase());
+    const codIdx=header.findIndex(h=>h.includes('codigo')&&h.includes('articulo'));
+    const inicIdx=header.findIndex(h=>h.includes('inicial'));
+    let tipoIdx=header.findIndex(h=>h.includes('tipo')||h.includes('caja')||h.includes('unidad'));
+    if(tipoIdx===-1 && inicIdx!==-1 && inicIdx+1<header.length)tipoIdx=inicIdx+1; // columna sin nombre justo despues de Iniciales
+    if(codIdx===-1||inicIdx===-1){
+      throw new Error('No se encontraron las columnas "Codigo Articulo" e "Iniciales" en el CSV.');
+    }
+
+    const porCodigo=new Map();
+    mpData.forEach(mp=>{ if(mp.codigo)porCodigo.set(mp.codigo,mp); });
+
+    let actualizadas=0,sinCambio=0,sinMatch=0,ignoradas=0;
+    const errores=[];
+    for(let i=1;i<lines.length;i++){
+      const cols=parseLine(lines[i]);
+      const codigo=(cols[codIdx]||'').trim();
+      const sigla=(cols[inicIdx]||'').trim();
+      const tipoRaw=(tipoIdx>-1?(cols[tipoIdx]||''):'').trim().toUpperCase();
+      if(!codigo||!sigla){continue}
+      if(!tipoRaw){ignoradas++;continue} // sigla sin Tipo -> dato sospechoso del Excel de origen, se ignora
+      const unidadTipo=tipoRaw.includes('UNIDAD')?'unidad':(tipoRaw.includes('CAJA')?'caja':null);
+      if(!unidadTipo){ignoradas++;continue}
+      const mp=porCodigo.get(codigo);
+      if(!mp){sinMatch++;continue}
+      if(mp.sigla===sigla && mp.unidad_tipo===unidadTipo){sinCambio++;continue}
+      try{
+        const res=await fetch(`${SB}/rest/v1/materias_primas?id=eq.${mp.id}`,{
+          method:'PATCH',headers:{...H,'Content-Type':'application/json'},
+          body:JSON.stringify({sigla,unidad_tipo:unidadTipo})
+        });
+        if(!res.ok)throw new Error(await res.text());
+        mp.sigla=sigla;mp.unidad_tipo=unidadTipo;
+        actualizadas++;
+      }catch(e){errores.push(`${codigo} ${e.message}`)}
+    }
+    renderMPList();
+    loadingEl.style.display='none';
+    if(errores.length && !actualizadas){
+      throw new Error(`No se pudo guardar ningún dato (¿faltan las columnas "sigla"/"unidad_tipo" en la tabla materias_primas de Supabase? agregalas con: alter table materias_primas add column sigla text; alter table materias_primas add column unidad_tipo text;). Detalle: ${errores[0]}`);
+    }
+    const partes=[`${actualizadas} filas actualizadas con sigla + caja/unidad`];
+    if(sinCambio)partes.push(`${sinCambio} ya estaban al día`);
+    if(sinMatch)partes.push(`${sinMatch} códigos del CSV no existen todavía en Maestro &gt; Configuración`);
+    if(ignoradas)partes.push(`${ignoradas} filas con sigla pero sin Tipo (CAJA/UNIDAD) se ignoraron por seguridad`);
+    if(errores.length)partes.push(`${errores.length} filas no se pudieron guardar`);
+    msgEl.innerHTML=`<i class="ti ti-check"></i> ${partes.join('. ')}.`;
     msgEl.style.display='';
     input.value='';
   }catch(e){
@@ -5894,37 +5978,62 @@ function showStockConteoTipo(t){
 function renderStockConteo(){
   const el=document.getElementById('stock-conteo-content');
   const empTabsEl=document.getElementById('stock-conteo-emp-tabs');
+  const unidadTabsEl=document.getElementById('stock-conteo-unidad-tabs');
   const rawItems=mpData.filter(m=>m.codigo&&tipoMpDe(m)===stockConteoTipo);
-  // Se ordena por el nombre que se termina mostrando (el del producto vinculado si hay, sino el de Configuración)
-  const items=rawItems.map(m=>({m,prod:prodPorMp(m)})).sort((a,b)=>(a.prod?a.prod.nombre:a.m.nombre).localeCompare(b.prod?b.prod.nombre:b.m.nombre,'es'));
+  // Se ordena por el nombre que se termina mostrando (el del producto vinculado si hay, sino la sigla, sino el de Configuración)
+  const nombreOrden=e=>e.prod?e.prod.nombre:(e.m.sigla||e.m.nombre);
+  const items=rawItems.map(m=>({m,prod:prodPorMp(m)})).sort((a,b)=>nombreOrden(a).localeCompare(nombreOrden(b),'es'));
   const etiqueta={mp:'materias primas',terminado:'productos terminados',proceso:'productos en proceso'}[stockConteoTipo]||'items';
   const colLbl={mp:'Materia Prima',terminado:'Producto',proceso:'Producto'}[stockConteoTipo]||'Item';
 
   if(!items.length){
     if(empTabsEl)empTabsEl.innerHTML='';
+    if(unidadTabsEl)unidadTabsEl.innerHTML='';
     el.innerHTML=`<div class="empty"><i class="ti ti-package-off"></i>Sin ${etiqueta} con código asignado. Clasificalas en Maestro &gt; Configuración (columna "Tipo").</div>`;
     return;
   }
 
   // Producto en Proceso y Materias Primas: por ahora lista plana en orden alfabetico, sin separar
   // por empresa (mas adelante se va a agrupar por deposito). Solo Producto Terminado se separa
-  // por empresa/area.
+  // por empresa/area (y por Caja Cerrada/Unidad).
   if(stockConteoTipo==='mp'||stockConteoTipo==='proceso'){
     if(empTabsEl)empTabsEl.innerHTML='';
+    if(unidadTabsEl)unidadTabsEl.innerHTML='';
     el.innerHTML=tablaStockConteo(items,colLbl);
     return;
   }
 
-  // Producto Terminado: separar por empresa usando el producto vinculado de cada item
+  // Producto Terminado: primero separar Caja Cerrada / Unidad / Otros (segun m.unidad_tipo, cargado
+  // desde el CSV de Iniciales) — algunos codigos comparten la misma sigla entre su variante caja y
+  // unidad (ej. "A"), asi que separarlos en pestañas evita confundirlos.
+  const bU={caja:[],unidad:[],otros:[]};
+  items.forEach(e=>{ bU[e.m.unidad_tipo==='caja'?'caja':e.m.unidad_tipo==='unidad'?'unidad':'otros'].push(e); });
+  const uLbl={caja:'Caja Cerrada',unidad:'Unidad',otros:'Otros'};
+  if(!bU[stockConteoActiveUnidadTipo]||!bU[stockConteoActiveUnidadTipo].length){
+    stockConteoActiveUnidadTipo=['caja','unidad','otros'].find(k=>bU[k].length)||'caja';
+  }
+  if(unidadTabsEl){
+    let uH='';
+    ['caja','unidad','otros'].forEach(k=>{
+      if(!bU[k].length)return;
+      const active=k===stockConteoActiveUnidadTipo;
+      uH+=`<button class="proy-tab${active?' active':''}" onclick="stockConteoSetUnidadTipo('${k}')">${uLbl[k]} <span style="font-size:10px;opacity:.7">(${bU[k].length})</span></button>`;
+    });
+    unidadTabsEl.innerHTML=uH;
+  }
+  const itemsU=bU[stockConteoActiveUnidadTipo];
+
+  // Despues, separar por empresa usando el producto vinculado de cada item
   const bE={};
-  items.forEach(({m,prod})=>{
+  itemsU.forEach(({m,prod})=>{
     const eid=prod?(prod.empresa_id||'_'):'_sinvinc';
     if(!bE[eid])bE[eid]=[];
     bE[eid].push({m,prod});
   });
   const eids=Object.keys(bE).sort((a,b)=>(a==='_sinvinc')-(b==='_sinvinc'));
-  if(!stockConteoActiveEmp[stockConteoTipo]||!bE[stockConteoActiveEmp[stockConteoTipo]])stockConteoActiveEmp[stockConteoTipo]=eids[0];
-  const activeEmp=stockConteoActiveEmp[stockConteoTipo];
+  const empKey=`${stockConteoTipo}|${stockConteoActiveUnidadTipo}`;
+  if(!stockConteoActiveEmp[empKey]||!bE[stockConteoActiveEmp[empKey]])stockConteoActiveEmp[empKey]=eids[0];
+  const activeEmp=stockConteoActiveEmp[empKey];
 
   let tabsH='';
   eids.forEach(eid=>{
@@ -5939,13 +6048,18 @@ function renderStockConteo(){
   renderStockConteoEmpresa(activeEmp,bE[activeEmp],colLbl);
 }
 
+function stockConteoSetUnidadTipo(k){
+  stockConteoActiveUnidadTipo=k;
+  renderStockConteo();
+}
+
 function stockConteoSetEmp(eid){
-  stockConteoActiveEmp[stockConteoTipo]=eid;
+  stockConteoActiveEmp[`${stockConteoTipo}|${stockConteoActiveUnidadTipo}`]=eid;
   renderStockConteo();
 }
 
 function stockConteoSetArea(eid,area){
-  stockConteoActiveArea[`${stockConteoTipo}|${eid}`]=area;
+  stockConteoActiveArea[`${stockConteoTipo}|${stockConteoActiveUnidadTipo}|${eid}`]=area;
   renderStockConteo();
 }
 
@@ -5968,7 +6082,7 @@ function renderStockConteoEmpresa(eid,entries,colLbl){
     bA[area].push({m,prod});
   });
   const areas=Object.keys(bA).sort((a,b)=>a.localeCompare(b,'es'));
-  const key=`${stockConteoTipo}|${eid}`;
+  const key=`${stockConteoTipo}|${stockConteoActiveUnidadTipo}|${eid}`;
   if(!stockConteoActiveArea[key]||!bA[stockConteoActiveArea[key]])stockConteoActiveArea[key]=areas[0];
   const activeArea=stockConteoActiveArea[key];
 
@@ -5986,8 +6100,11 @@ function renderStockConteoEmpresa(eid,entries,colLbl){
 }
 
 // entries: array de {m,prod} — m es la fila de Maestro>Configuración, prod es el producto del
-// Maestro vinculado (mp_id) si existe. Cuando hay vinculo se muestra el nombre del Maestro
-// (normalmente mas corto/abreviado, ej. "BCA") en vez del nombre largo de Configuración.
+// Maestro vinculado (mp_id) si existe. El nombre que se muestra prioriza: 1) el nombre del
+// producto vinculado del Maestro (normalmente el mas corto/abreviado, ej. "BCA"), 2) la sigla
+// cargada desde el CSV de Iniciales (m.sigla) cuando todavia no hay producto vinculado, 3) el
+// nombre largo de Configuración como ultimo recurso. Siempre que se use 1) o 2), el nombre largo
+// original queda como referencia chica debajo.
 function tablaStockConteo(entries,colLbl){
   let h=`<div class="stock-card"><div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
     <th style="text-align:left;width:100px">Código</th>
@@ -6000,10 +6117,10 @@ function tablaStockConteo(entries,colLbl){
     const existing=mpConteoData.find(x=>x.mp_id===m.id);
     const val=draftVal!==undefined?draftVal:(existing&&existing.stock>0?existing.stock:'');
     const guardado=existing&&existing.stock>0&&draftVal===undefined;
-    const nombreMostrado=prod?prod.nombre:m.nombre;
-    h+=`<tr class="mpc-row" data-txt="${((prod?prod.nombre:'')+' '+m.nombre+' '+(m.codigo||'')).toLowerCase()}">
+    const nombreMostrado=prod?prod.nombre:(m.sigla||m.nombre);
+    h+=`<tr class="mpc-row" data-txt="${((prod?prod.nombre:'')+' '+(m.sigla||'')+' '+m.nombre+' '+(m.codigo||'')).toLowerCase()}">
       <td style="font-size:12px;color:var(--text2);font-family:monospace">${m.codigo||''}</td>
-      <td style="font-weight:500">${nombreMostrado}${guardado?` <span style="color:var(--green);font-size:10px">✓</span>`:''}${prod&&prod.nombre!==m.nombre?`<div style="font-size:10px;color:var(--text3);font-weight:400">${m.nombre}</div>`:''}</td>
+      <td style="font-weight:500">${nombreMostrado}${guardado?` <span style="color:var(--green);font-size:10px">✓</span>`:''}${nombreMostrado!==m.nombre?`<div style="font-size:10px;color:var(--text3);font-weight:400">${m.nombre}</div>`:''}</td>
       <td style="font-size:12px;color:var(--text2)">${m.unidad||''}</td>
       <td style="text-align:right">
         <input class="proy-input" type="number" min="0"
@@ -7104,6 +7221,7 @@ let stockConteoTipo = 'terminado'; // 'terminado' | 'proceso' | 'mp'
 let stockConteoDraft = {}; // valores tipeados sin guardar todavia, por mp_id (sobreviven al cambiar de pestaña empresa/area)
 let stockConteoActiveEmp = {}; // pestaña de empresa activa, por tipo ('terminado'|'proceso')
 let stockConteoActiveArea = {}; // pestaña de area activa, por "tipo|empresa_id"
+let stockConteoActiveUnidadTipo = 'caja'; // 'caja' | 'unidad' | 'otros' — solo aplica a Producto Terminado
 
 function tipoStockDe(p){
   if(p.tipo_stock)return p.tipo_stock;
