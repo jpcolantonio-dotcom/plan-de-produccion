@@ -745,6 +745,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab" id="stab-mix" onclick="showStockSubTab('mix')"><i class="ti ti-chart-pie"></i> Mix ventas</button>
     <button class="proy-tab" id="stab-cajas" onclick="showStockSubTab('cajas')"><i class="ti ti-box"></i> Cajas</button>
     <button class="proy-tab" id="stab-dep" onclick="showStockSubTab('dep')"><i class="ti ti-temperature-snow"></i> Depositos</button>
+    <button class="proy-tab" id="stab-consumomp" onclick="showStockSubTab('consumomp')"><i class="ti ti-calculator"></i> Consumo MP según stock</button>
   </div>
   <!-- CONTEO DE STOCK -->
   <div id="stock-sub-conteo">
@@ -838,6 +839,33 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <div id="dep-calc-content"></div>
     </div>
     <div id="dep-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
+  </div>
+
+  <!-- CONSUMO MP SEGÚN STOCK: elegís qué Productos en Proceso (rellenos y demás) tomar del conteo
+       de una fecha, y calcula cuánta materia prima virgen se consumió/está atada en esos valores. -->
+  <div id="stock-sub-consumomp" style="display:none">
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Elegí la fecha y tildá los Productos en Proceso y/o Terminados que quieras incluir. Para cada uno toma el stock cargado en "Conteo de stock" y lo traduce a materia prima usando su receta.</div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--text2)">Fecha:</label>
+      <input type="date" id="scmp-fecha" onchange="loadConsumoMPStock()" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+      <button class="btn btn-sm" onclick="loadConsumoMPStock()"><i class="ti ti-refresh"></i> Actualizar</button>
+    </div>
+    <div style="display:grid;grid-template-columns:340px 1fr;gap:1.5rem;align-items:start">
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px">Productos con stock</div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <button class="btn btn-xs" onclick="scmpSelAll(true)">Todos</button>
+          <button class="btn btn-xs" onclick="scmpSelAll(false)">Ninguno</button>
+        </div>
+        <div id="scmp-lista" class="rlist"><div class="empty"><i class="ti ti-package-off"></i>Elegí una fecha.</div></div>
+      </div>
+      <div>
+        <button class="btn btn-primary" style="margin-bottom:12px" onclick="renderConsumoMPStockSel()"><i class="ti ti-calculator"></i> Calcular consumo de los tildados</button>
+        <div id="scmp-content"><div class="empty"><i class="ti ti-package"></i> Tildá uno o más productos y calculá.</div></div>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -3385,11 +3413,12 @@ function rRec(){
     const pr=st.Pr.find(x=>x.nombre===p);const ar=pr?st.A.find(a=>a.id===pr.area_id):null;const em=pr?st.E.find(e=>e.id===pr.empresa_id):null;
     const warn=recImportWarn.has(p);
     const noMaestro=!pr;
-    const mpSelf=mpData.find(m=>m.nombre.trim().toLowerCase()===p.trim().toLowerCase());
+    const mpSelf=mpPorProducto(pr)||mpData.find(m=>m.nombre.trim().toLowerCase()===p.trim().toLowerCase());
     const codSelf=mpSelf&&mpSelf.codigo?mpSelf.codigo:'';
+    const sinCodigo=!codSelf;
     h+=`<div class="rrow${sel?' sel':''}" onclick="selRec('${p.replace(/'/g,"\'")}')">
       <div style="min-width:0;flex:1">
-        <div style="font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;flex-wrap:nowrap;white-space:nowrap">${codSelf?`<span style="font-size:10px;color:var(--text2);font-family:monospace;flex-shrink:0">${codSelf}</span>`:''}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis" title="${p}">${p}</span>${warn?'<span class="badge badge-warn" style="font-size:10px;padding:1px 6px;flex-shrink:0" title="Revisar: cantidad o tanda sin detectar en la importacion">revisar</span>':''}${noMaestro?'<span class="badge" style="font-size:10px;padding:1px 6px;flex-shrink:0;background:var(--bg3);color:var(--text2)" title="No existe en Maestro de productos">sin maestro</span>':''}</div>
+        <div style="font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;flex-wrap:nowrap;white-space:nowrap">${codSelf?`<span style="font-size:10px;color:var(--text2);font-family:monospace;flex-shrink:0">${codSelf}</span>`:''}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis" title="${p}">${p}</span>${warn?'<span class="badge badge-warn" style="font-size:10px;padding:1px 6px;flex-shrink:0" title="Revisar: cantidad o tanda sin detectar en la importacion">revisar</span>':''}${noMaestro?'<span class="badge" style="font-size:10px;padding:1px 6px;flex-shrink:0;background:var(--bg3);color:var(--text2)" title="No existe en Maestro de productos">sin maestro</span>':''}${!noMaestro&&sinCodigo?'<span class="badge" style="font-size:10px;padding:1px 6px;flex-shrink:0;background:var(--red-bg);color:#A32D2D" title="Este producto no tiene código vinculado en Maestro > Configuración — sin código no se puede cruzar con Stock">sin código</span>':''}</div>
         <div style="font-size:12px;color:var(--text2)">${em?em.nombre:''}${ar?' / '+ar.nombre:''} - ${ings.length?ings.length+' ing.':'Sin receta'}</div>
       </div>
       <i class="ti ti-chevron-right" style="color:var(--text3);font-size:14px"></i>
@@ -3402,7 +3431,8 @@ function rRecDet(p){
   const ings=st.Rec[p]||[];const wrap=document.getElementById('rdetail');
   const k=p.replace(/[\s']/g,'_');
   const tanda=st.RecTanda&&st.RecTanda[p]?st.RecTanda[p]:1;
-  const mpSelf=mpData.find(m=>m.nombre.trim().toLowerCase()===p.trim().toLowerCase());
+  const prSelf=st.Pr.find(x=>x.nombre===p);
+  const mpSelf=mpPorProducto(prSelf)||mpData.find(m=>m.nombre.trim().toLowerCase()===p.trim().toLowerCase());
   const codSelf=mpSelf&&mpSelf.codigo?mpSelf.codigo:'';
   // Calcular cant x unidad = cant x tanda / unidades x tanda
   h_xund=(cant)=>tanda>0?`<span style="font-size:10px;color:var(--text3);margin-left:4px">= ${fn(cant/tanda)} x ud</span>`:'';
@@ -3424,6 +3454,7 @@ function rRecDet(p){
         <button class="btn btn-sm" onclick="imprimirReceta('${p.replace(/'/g,"\'")}')"><i class="ti ti-printer"></i> Imprimir receta</button>
       </div>
     </div>
+    ${!codSelf?`<div class="alert alert-info" style="margin-bottom:1rem;font-size:12px"><i class="ti ti-alert-circle"></i> "${p}" no tiene código de Maestro &gt; Configuración vinculado. Sin código no se puede cruzar con Stock (conteo, "MP en Stock de Proceso", etc.) ni distinguirlo de otro producto con el mismo nombre/sigla. ${prSelf?`Vinculalo desde Maestro &gt; Productos (${en(prSelf.empresa_id)||''}${prSelf.area_id?' / '+(st.A.find(a=>a.id===prSelf.area_id)||{}).nombre:''}) con "Vínculo MP".`:'Este nombre tampoco existe como Producto en el Maestro — creálo ahí y vinculalo, o cargá una fila en Maestro &gt; Configuración con este nombre exacto.'}</div>`:''}
     <table class="itbl"><thead><tr>
       <th style="width:90px">Código</th>
       <th>Ingrediente / MP</th>
@@ -3501,7 +3532,8 @@ function imprimirReceta(p){
     </tr>`;
   });
   const fechaHoy=new Date().toLocaleDateString('es-AR');
-  const mpSelfImp=mpData.find(m=>m.nombre.trim().toLowerCase()===p.trim().toLowerCase());
+  const prSelfImp=st.Pr.find(x=>x.nombre===p);
+  const mpSelfImp=mpPorProducto(prSelfImp)||mpData.find(m=>m.nombre.trim().toLowerCase()===p.trim().toLowerCase());
   const codSelfImp=mpSelfImp&&mpSelfImp.codigo?mpSelfImp.codigo:'';
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Receta - ${p}</title>
   <style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:10pt;padding:12mm;color:#1a1a1a}
@@ -3869,6 +3901,14 @@ function tipoMpDe(m){ return m.tipo||'mp'; } // 'mp' | 'terminado' | 'proceso' |
 // asi no hace falta re-vincular a mano lo que ya coincide por código.
 function prodPorMp(m){
   return st.Pr.find(p=>p.mp_id===m.id) || (m.codigo?st.Pr.find(p=>p.codigo_articulo===m.codigo):undefined);
+}
+// Inverso de prodPorMp: dado un producto del Maestro, su fila vinculada en Maestro>Configuración
+// (de donde sale el código). Usado en Recetas para mostrar/exigir el código de cada producto al
+// que se le carga receta, y así evitar que dos cosas distintas (ej. un Burrito y una Empanada)
+// terminen compartiendo la misma sigla sin que se note.
+function mpPorProducto(pr){
+  if(!pr)return undefined;
+  return mpData.find(m=>m.id===pr.mp_id) || (pr.codigo_articulo?mpData.find(m=>m.codigo===pr.codigo_articulo):undefined);
 }
 
 // Detecta el error de Supabase/PostgREST cuando falta una columna (incluye el mensaje "schema cache" que tira justo despues de crear la columna, antes de que se refresque el cache)
@@ -6697,7 +6737,7 @@ async function buscarCongHistorial(){
 }
 
 function showStockSubTab(t){
-  ['conteo','hist','seg','mix','cajas','dep'].forEach(id=>{
+  ['conteo','hist','seg','mix','cajas','dep','consumomp'].forEach(id=>{
     document.getElementById('stock-sub-'+id).style.display=id===t?'block':'none';
     document.getElementById('stab-'+id).classList.toggle('active',id===t);
   });
@@ -6706,6 +6746,143 @@ function showStockSubTab(t){
   if(t==='mix')renderMix();
   if(t==='cajas')renderCajas();
   if(t==='dep')initDepositos();
+  if(t==='consumomp'){
+    const fEl=document.getElementById('scmp-fecha');
+    if(!fEl.value)fEl.value=hoyLocal();
+    loadConsumoMPStock();
+  }
+}
+
+// CONSUMO MP SEGÚN STOCK (Stock > Consumo MP según stock): a diferencia de "MP en Stock de Proceso"
+// en Recetas (que suma TODOS los Productos en Proceso con stock automáticamente), acá el usuario
+// tilda a mano cuáles quiere incluir antes de calcular — útil para mirar el consumo de un
+// subconjunto puntual (ej. sólo los rellenos de una línea) en vez de todo junto.
+let scmpSelected=new Set(); // mp_id de items tildados (proceso y/o terminado)
+let scmpStockPorMp=new Map(); // mp_id -> stock, para la fecha cargada
+let scmpItemList=[]; // filas de mpData (tipo=proceso o terminado) con stock>0 para la fecha cargada
+
+async function loadConsumoMPStock(){
+  const fecha=document.getElementById('scmp-fecha').value||hoyLocal();
+  const listEl=document.getElementById('scmp-lista');
+  listEl.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando...</div>';
+  let conteo=[];
+  try{ conteo=await get('mp_conteo',`fecha=eq.${fecha}`); }catch{conteo=[]}
+  scmpStockPorMp=new Map();
+  conteo.forEach(c=>{ if(c.stock>0)scmpStockPorMp.set(c.mp_id,c.stock); });
+  scmpItemList=mpData.filter(m=>(tipoMpDe(m)==='proceso'||(tipoMpDe(m)==='terminado'&&m.unidad_tipo!=='unidad'))&&scmpStockPorMp.has(m.id))
+    .sort((a,b)=>{ const ta=tipoMpDe(a),tb=tipoMpDe(b); if(ta!==tb)return ta==='proceso'?-1:1; return a.nombre.localeCompare(b.nombre,'es'); });
+
+  if(!scmpItemList.length){
+    listEl.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin stock de Producto en Proceso ni Producto Terminado cargado para esta fecha. Cargalo primero en Conteo de stock.</div>';
+    scmpSelected=new Set();
+    document.getElementById('scmp-content').innerHTML='<div class="empty"><i class="ti ti-package"></i> Tildá uno o más productos y calculá.</div>';
+    return;
+  }
+  // Primera carga (o si quedó vacía): tildar todos por default
+  if(scmpSelected.size===0)scmpItemList.forEach(m=>scmpSelected.add(m.id));
+  else scmpSelected=new Set([...scmpSelected].filter(id=>scmpStockPorMp.has(id))); // sacar los que ya no tienen stock hoy
+  renderScmpLista();
+}
+
+function renderScmpLista(){
+  const listEl=document.getElementById('scmp-lista');
+  let h='';
+  let lastTipo=null;
+  scmpItemList.forEach(m=>{
+    const tipo=tipoMpDe(m);
+    if(tipo!==lastTipo){
+      h+=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin:${lastTipo?'12px':'0'} 0 6px">${tipo==='proceso'?'Productos en proceso':'Productos terminados'}</div>`;
+      lastTipo=tipo;
+    }
+    const checked=scmpSelected.has(m.id);
+    const recKey=Object.keys(st.Rec).find(k=>k.trim().toLowerCase()===m.nombre.trim().toLowerCase());
+    const sinReceta=!recKey||!(st.Rec[recKey]||[]).length;
+    h+=`<label class="rrow" style="cursor:pointer;gap:8px">
+      <input type="checkbox" ${checked?'checked':''} onchange="scmpToggle('${m.id}',this.checked)" style="flex-shrink:0"/>
+      <div style="min-width:0;flex:1">
+        <div style="font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;white-space:nowrap">
+          <span style="font-size:10px;color:var(--text2);font-family:monospace;flex-shrink:0">${m.codigo||''}</span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis" title="${m.nombre}">${m.nombre}</span>
+          ${sinReceta?'<span class="badge" style="font-size:10px;padding:1px 6px;flex-shrink:0;background:var(--bg3);color:var(--text2)" title="Sin receta cargada, no entra en el cálculo">sin receta</span>':''}
+        </div>
+        <div style="font-size:12px;color:var(--text2)">Stock: ${scmpStockPorMp.get(m.id)} ${m.unidad||''}</div>
+      </div>
+    </label>`;
+  });
+  listEl.innerHTML=h;
+}
+
+function scmpToggle(mpId,checked){
+  if(checked)scmpSelected.add(mpId);else scmpSelected.delete(mpId);
+}
+function scmpSelAll(all){
+  if(all)scmpItemList.forEach(m=>scmpSelected.add(m.id));
+  else scmpSelected=new Set();
+  renderScmpLista();
+}
+
+function renderConsumoMPStockSel(){
+  const el=document.getElementById('scmp-content');
+  const seleccionados=scmpItemList.filter(m=>scmpSelected.has(m.id));
+  if(!seleccionados.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-package"></i> Tildá al menos un producto.</div>';
+    return;
+  }
+  const cm={};
+  const sinReceta=[];
+  const conReceta=[];
+  seleccionados.forEach(m=>{
+    const stock=scmpStockPorMp.get(m.id);
+    const recKey=Object.keys(st.Rec).find(k=>k.trim().toLowerCase()===m.nombre.trim().toLowerCase());
+    const ings=recKey?(st.Rec[recKey]||[]):[];
+    if(!ings.length){sinReceta.push(m.nombre);return}
+    conReceta.push(m.nombre);
+    const tanda=(recKey&&st.RecTanda&&st.RecTanda[recKey])||1;
+    ings.forEach(ing=>{
+      const key=ing.ingrediente+'||'+ing.unidad;
+      if(!cm[key])cm[key]={ingrediente:ing.ingrediente,unidad:ing.unidad,total:0,det:{}};
+      const cantXUnidad=tanda>0?ing.cantidad/tanda:ing.cantidad;
+      const c=cantXUnidad*stock;
+      cm[key].total=fn(cm[key].total+c);
+      if(!cm[key].det[m.nombre])cm[key].det[m.nombre]=0;
+      cm[key].det[m.nombre]=fn(cm[key].det[m.nombre]+c);
+    });
+  });
+  const items=Object.values(cm).sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
+  if(!items.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i> Ninguno de los productos tildados tiene receta cargada, así que no se pudo calcular nada.</div>';
+    return;
+  }
+  let h=`<div class="metric-grid">
+    <div class="metric"><div class="metric-label">Productos tildados con receta</div><div class="metric-val">${conReceta.length}</div></div>
+    <div class="metric"><div class="metric-label">Materias primas</div><div class="metric-val">${items.length}</div></div>
+  </div>`;
+  if(sinReceta.length){
+    h+=`<div class="alert alert-info" style="margin:10px 0"><i class="ti ti-alert-circle"></i> ${sinReceta.length} de los tildados no tiene receta cargada, se ignoraron: <b>${sinReceta.join(', ')}</b>.</div>`;
+  }
+  h+=`<div class="grid-card"><table class="stock-tbl"><thead><tr>
+    <th>#</th><th>Materia Prima</th>
+    <th style="text-align:right">Total</th>
+    <th style="width:70px">Unidad</th>
+    <th>Detalle por producto</th>
+  </tr></thead><tbody>`;
+  const mx=Math.max(...items.map(i=>i.total));
+  items.forEach((item,idx)=>{
+    const pct=mx>0?Math.round(item.total/mx*100):0;
+    const det=Object.entries(item.det).sort((a,b)=>b[1]-a[1])
+      .map(([p,c])=>`<span style="margin-right:8px"><b>${p}</b>: ${c.toLocaleString('es-AR')} ${item.unidad}</span>`).join('');
+    h+=`<tr class="con-row">
+      <td style="color:var(--text3);font-size:12px">${idx+1}</td>
+      <td><span class="ichip">${item.ingrediente}</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
+      </td>
+      <td style="text-align:right;font-size:16px;font-weight:700">${item.total.toLocaleString('es-AR')}</td>
+      <td class="muted">${item.unidad}</td>
+      <td class="muted" style="font-size:12px">${det||'--'}</td>
+    </tr>`;
+  });
+  h+=`</tbody></table></div>`;
+  el.innerHTML=h;
 }
 
 function calcCajasDeposito(){
