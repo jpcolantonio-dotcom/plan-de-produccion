@@ -2858,6 +2858,7 @@ function rProdDetail(aid){
                 <i class="ti ti-link" style="color:var(--green)"></i>
                 <span style="font-family:monospace;color:var(--green);white-space:nowrap">${linkedMp.codigo}</span>
                 <span style="color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1" title="${linkedMp.nombre.replace(/"/g,'&quot;')}">${linkedMp.nombre}</span>
+                ${linkedMp.unidad_tipo?`<span style="font-size:10px;background:${linkedMp.unidad_tipo==='caja'?'var(--blue)18':'var(--amber)18'};color:${linkedMp.unidad_tipo==='caja'?'var(--blue)':'var(--amber)'};border-radius:4px;padding:1px 5px;white-space:nowrap;flex-shrink:0">${linkedMp.unidad_tipo==='caja'?'Caja Cerrada':'Unidad'}</span>`:''}
                 <button class="btn btn-xs" onclick="prodMpUnlink('${p.id}')" title="Quitar vínculo" style="flex-shrink:0"><i class="ti ti-x"></i></button>
               </div>
             `:`
@@ -2865,7 +2866,7 @@ function rProdDetail(aid){
                 <input type="text" placeholder="🔗 Vincular con Configuración..." oninput="prodMpAC(this,'${p.id}')" onfocus="prodMpAC(this,'${p.id}')" onblur="setTimeout(()=>mpHide(this),200)" autocomplete="off"
                   style="width:100%;padding:7px 8px;font-size:12.5px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
               </div>
-              ${sugMp?`<div style="margin-top:3px"><span style="font-size:10.5px;color:var(--amber);cursor:pointer" onclick="prodMpLink('${p.id}','${sugMp.id}')">⚠ ¿"${sugMp.nombre.replace(/"/g,'&quot;')}" (${sugMp.codigo})? · <u>vincular</u></span></div>`:''}
+              ${sugMp?`<div style="margin-top:3px"><span style="font-size:10.5px;color:var(--amber);cursor:pointer" onclick="prodMpLink('${p.id}','${sugMp.id}')">⚠ ¿"${sugMp.nombre.replace(/"/g,'&quot;')}" (${sugMp.codigo}${sugMp.unidad_tipo?', '+(sugMp.unidad_tipo==='caja'?'Caja Cerrada':'Unidad'):''})? · <u>vincular</u></span></div>`:''}
             `}
           </div>
           <button class="btn btn-xs btn-danger" onclick="delProd('${p.id}')" style="flex-shrink:0"><i class="ti ti-trash"></i></button>
@@ -3769,7 +3770,8 @@ function sugerenciaMp(m){
 }
 
 // Inversa de sugerenciaMp: dado un producto del Maestro, busca en la lista de Configuración (materias_primas)
-// una fila clasificada como Terminado/Proceso con nombre parecido, para sugerir el vínculo.
+// una fila clasificada como Terminado/Proceso con nombre parecido (o cuya sigla coincide exacto
+// con el nombre corto del producto, ej. "BCA"), para sugerir el vínculo.
 function sugerenciaProdMp(p){
   const nP=normTxt(p.nombre);
   if(!nP)return null;
@@ -3778,12 +3780,17 @@ function sugerenciaProdMp(p){
     if(!m.codigo)return;
     const t=tipoMpDe(m);
     if(t!=='terminado'&&t!=='proceso')return;
+    // Match fuerte: el nombre del producto (normalmente corto/abreviado) coincide exacto con la sigla del CSV
+    if(m.sigla&&normTxt(m.sigla)===nP){
+      if(!mejor||mejor._strength<2)mejor={mp:m,_len:nP.length,_strength:2};
+      return;
+    }
     const nMp=normTxt(m.nombre);
     if(!nMp)return;
     let match=false;
     if(nP===nMp)match=true;
     else if(nP.length>=6&&(nP.includes(nMp)||nMp.includes(nP)))match=true;
-    if(match&&(!mejor||nMp.length>mejor._len))mejor={mp:m,_len:nMp.length};
+    if(match&&(!mejor||mejor._strength<1||(mejor._strength===1&&nMp.length>mejor._len)))mejor={mp:m,_len:nMp.length,_strength:1};
   });
   return mejor?mejor.mp:null;
 }
@@ -3795,12 +3802,13 @@ function prodMpAC(input,prodId){
   let drop=wrap.querySelector('.mp-ac-drop');
   if(!drop){drop=document.createElement('div');drop.className='mp-ac-drop';wrap.style.position='relative';wrap.appendChild(drop);}
   const eligibles=mpData.filter(m=>m.codigo&&(tipoMpDe(m)==='terminado'||tipoMpDe(m)==='proceso'));
-  const results=q?eligibles.filter(m=>m.nombre.toLowerCase().includes(q)||(m.codigo||'').toLowerCase().includes(q)):eligibles;
+  const results=q?eligibles.filter(m=>m.nombre.toLowerCase().includes(q)||(m.codigo||'').toLowerCase().includes(q)||(m.sigla||'').toLowerCase().includes(q)):eligibles;
   if(!results.length){drop.innerHTML=`<div style="padding:8px 10px;font-size:12px;color:var(--text2)">Sin resultados. Clasificalo primero en Maestro &gt; Configuración.</div>`;drop.style.display='block';return}
   let h='';
   results.slice(0,10).forEach(m=>{
+    const uTag=m.unidad_tipo?`<span style="font-size:9.5px;background:${m.unidad_tipo==='caja'?'var(--blue)18':'var(--amber)18'};color:${m.unidad_tipo==='caja'?'var(--blue)':'var(--amber)'};border-radius:3px;padding:1px 4px;margin-left:4px;white-space:nowrap">${m.unidad_tipo==='caja'?'Caja':'Unid.'}</span>`:'';
     h+=`<div class="mp-ac-item" onmousedown="prodMpLink('${prodId}','${m.id}')">
-      <span>${highlight(m.nombre,q)}</span><span class="mp-ac-unit">${m.codigo}</span>
+      <span>${m.sigla?`<b>${m.sigla}</b> — `:''}${highlight(m.nombre,q)}${uTag}</span><span class="mp-ac-unit">${m.codigo}</span>
     </div>`;
   });
   drop.innerHTML=h;drop.style.display='block';
