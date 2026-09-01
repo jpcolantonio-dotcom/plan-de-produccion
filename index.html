@@ -766,7 +766,10 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div id="stock-conteo-content"></div>
     <div style="display:flex;justify-content:space-between;margin-top:1rem;flex-wrap:wrap;gap:8px">
       <div style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px"><i class="ti ti-info-circle"></i> Podes guardar varias veces durante el dia. Los valores se actualizan sin borrar el resto.</div>
-      <button class="btn btn-primary" onclick="guardarStockConteo()"><i class="ti ti-device-floppy"></i> Guardar conteo</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn" onclick="exportarTerminadoPlanetaExcel()"><i class="ti ti-file-spreadsheet"></i> Exportar Excel (migración Planeta)</button>
+        <button class="btn btn-primary" onclick="guardarStockConteo()"><i class="ti ti-device-floppy"></i> Guardar conteo</button>
+      </div>
     </div>
   </div>
   <!-- HISTORIAL -->
@@ -862,7 +865,10 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <div id="scmp-lista" class="rlist"><div class="empty"><i class="ti ti-package-off"></i>Elegí una fecha.</div></div>
       </div>
       <div>
-        <button class="btn btn-primary" style="margin-bottom:12px" onclick="renderConsumoMPStockSel()"><i class="ti ti-calculator"></i> Calcular consumo de los tildados</button>
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="renderConsumoMPStockSel()"><i class="ti ti-calculator"></i> Calcular consumo de los tildados</button>
+          <button class="btn" onclick="exportarMigracionStockExcel()"><i class="ti ti-file-spreadsheet"></i> Exportar Excel (migración)</button>
+        </div>
         <div id="scmp-content"><div class="empty"><i class="ti ti-package"></i> Tildá uno o más productos y calculá.</div></div>
       </div>
     </div>
@@ -6777,6 +6783,8 @@ function showStockSubTab(t){
 let scmpSelected=new Set(); // mp_id de items tildados (proceso y/o terminado)
 let scmpStockPorMp=new Map(); // mp_id -> stock, para la fecha cargada
 let scmpItemList=[]; // filas de mpData (tipo=proceso o terminado) con stock>0 para la fecha cargada
+let scmpLastRaw=[]; // último cálculo: materias primas puras (para exportar a Excel)
+let scmpLastSub=[]; // último cálculo: sub-productos con stock propio (para exportar a Excel)
 
 async function loadConsumoMPStock(){
   const fecha=document.getElementById('scmp-fecha').value||hoyLocal();
@@ -6958,6 +6966,106 @@ function renderConsumoMPStockSel(){
     h+=scmpTablaSubproductosHtml(subItems);
   }
   el.innerHTML=h;
+  scmpLastRaw=rawItems;
+  scmpLastSub=subItems;
+}
+
+// Arma el excel de migración combinando TODAS las Materias Primas (tipo='mp', con su stock
+// propio cargado en Conteo de stock) con lo calculado antes en pantalla (consumo dentro de las
+// recetas tildadas). Por cada fila: columna A = código, columna B = nombre del artículo,
+// columna J = cantidad total. Para una MP que además es ingrediente de alguna receta tildada,
+// la cantidad es su stock propio + lo consumido en esa(s) receta(s), sumados en un solo número
+// (para no tener que exportar y sumar a mano dos veces la misma materia prima). El resto de las
+// Materias Primas con stock propio pero que no entran en ninguna receta tildada se agregan tal
+// cual, con su stock solo. Mantiene el resto de las columnas del formato de migración vacías.
+async function exportarMigracionStockExcel(){
+  if(!scmpLastRaw.length&&!scmpLastSub.length){alert('Primero calculá el consumo de los tildados (botón "Calcular consumo de los tildados").');return}
+  if(!window.XLSX){
+    await new Promise((res,rej)=>{
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload=res;s.onerror=rej;document.head.appendChild(s);
+    });
+  }
+  const fecha=document.getElementById('scmp-fecha').value||hoyLocal();
+  let conteo=[];
+  try{ conteo=await get('mp_conteo',`fecha=eq.${fecha}`); }catch{conteo=[]}
+  const stockPorMp=new Map();
+  conteo.forEach(c=>{ if(c.stock>0)stockPorMp.set(c.mp_id,c.stock); });
+
+  const filas=[];
+  const usadosMpIds=new Set(); // para no duplicar estas MP en el paso de "el resto de las MP" de abajo
+  scmpLastRaw.forEach(item=>{
+    const m=mpData.find(x=>normTxt(x.nombre)===normTxt(item.ingrediente));
+    if(m)usadosMpIds.add(m.id);
+    const stockPropio=m&&stockPorMp.has(m.id)?stockPorMp.get(m.id):0;
+    filas.push({codigo:m?(m.codigo||''):'', nombre:m?m.nombre:item.ingrediente, cantidad:fn(item.total+stockPropio)});
+  });
+  scmpLastSub.forEach(item=>{
+    const m=mpData.find(x=>normTxt(x.nombre)===normTxt(item.ingrediente));
+    if(m)usadosMpIds.add(m.id);
+    filas.push({codigo:m?(m.codigo||''):'', nombre:m?m.nombre:item.ingrediente, cantidad:fn(item.total+item.stockPropio)});
+  });
+  // El resto de las Materias Primas con stock propio cargado que no son ingrediente de ninguna
+  // receta tildada, para que la migración de MP salga completa y no solo la parte usada arriba.
+  mpData.filter(m=>tipoMpDe(m)==='mp'&&m.codigo&&!usadosMpIds.has(m.id)&&stockPorMp.has(m.id))
+    .forEach(m=>{
+      filas.push({codigo:m.codigo||'', nombre:m.nombre, cantidad:stockPorMp.get(m.id)});
+    });
+
+  const headers=['Codigo Articulo','Lote','Codigo Deposito','Deposito','Stock','Stock Minimo','Stock Optimo','Stock Maximo','Despacho','Stock Inicial','Pais Origen','Aduana'];
+  const aoa=[headers];
+  filas.forEach(f=>{
+    const row=new Array(headers.length).fill('');
+    row[0]=f.codigo;   // columna A: código del MP
+    row[1]=f.nombre;   // columna B: nombre del artículo
+    row[9]=f.cantidad; // columna J: cantidad (Stock Inicial)
+    aoa.push(row);
+  });
+  const ws=window.XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:14},{wch:38},{wch:14},{wch:14},{wch:10},{wch:12},{wch:12},{wch:12},{wch:10},{wch:12},{wch:12},{wch:10}];
+  const wb=window.XLSX.utils.book_new();
+  window.XLSX.utils.book_append_sheet(wb,ws,'Sheet1');
+  window.XLSX.writeFile(wb,`migracion_stock_${fecha}.xlsx`);
+}
+
+// Mismo formato de migración (A=código, B=nombre, J=Stock Inicial) pero para el stock de
+// Producto Terminado de Planeta Empanada, tal cual está cargado en Conteo de stock para la
+// fecha elegida ahí — sin pasar por ninguna receta, es el stock contado directamente.
+async function exportarTerminadoPlanetaExcel(){
+  const fecha=document.getElementById('stock-conteo-fecha').value||hoyLocal();
+  const planeta=st.E.find(e=>normTxt(e.nombre).includes('PLANETA'));
+  if(!planeta){alert('No encontré la empresa "Planeta Empanada" en Maestro > Empresas.');return}
+  let conteo=[];
+  try{ conteo=await get('mp_conteo',`fecha=eq.${fecha}`); }catch{conteo=[]}
+  const stockPorMp=new Map();
+  conteo.forEach(c=>{ if(c.stock>0)stockPorMp.set(c.mp_id,c.stock); });
+  const items=mpData.filter(m=>m.codigo&&tipoMpDe(m)==='terminado'&&m.unidad_tipo!=='unidad'&&stockPorMp.has(m.id))
+    .map(m=>({m,prod:prodPorMp(m)}))
+    .filter(({prod})=>prod&&prod.empresa_id===planeta.id);
+  if(!items.length){alert(`Sin stock de Producto Terminado de ${planeta.nombre} cargado para el ${fecha}. Cargalo primero en Conteo de stock.`);return}
+  if(!window.XLSX){
+    await new Promise((res,rej)=>{
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload=res;s.onerror=rej;document.head.appendChild(s);
+    });
+  }
+  const headers=['Codigo Articulo','Lote','Codigo Deposito','Deposito','Stock','Stock Minimo','Stock Optimo','Stock Maximo','Despacho','Stock Inicial','Pais Origen','Aduana'];
+  const aoa=[headers];
+  items.sort((a,b)=>(a.prod?a.prod.nombre:a.m.nombre).localeCompare(b.prod?b.prod.nombre:b.m.nombre,'es'))
+    .forEach(({m,prod})=>{
+      const row=new Array(headers.length).fill('');
+      row[0]=m.codigo||'';           // columna A: código
+      row[1]=prod?prod.nombre:m.nombre; // columna B: nombre
+      row[9]=stockPorMp.get(m.id);   // columna J: cantidad (Stock Inicial)
+      aoa.push(row);
+    });
+  const ws=window.XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:14},{wch:38},{wch:14},{wch:14},{wch:10},{wch:12},{wch:12},{wch:12},{wch:10},{wch:12},{wch:12},{wch:10}];
+  const wb=window.XLSX.utils.book_new();
+  window.XLSX.utils.book_append_sheet(wb,ws,'Sheet1');
+  window.XLSX.writeFile(wb,`migracion_stock_terminado_planeta_${fecha}.xlsx`);
 }
 
 function calcCajasDeposito(){
