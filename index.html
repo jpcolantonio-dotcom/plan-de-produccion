@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.156</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.157</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -6703,7 +6703,7 @@ function depositoSelectHtml(m,prod){
     const etiqueta=prod?d.nombre:`${d.nombre} (${en(d.empresa_id)||'?'})`;
     optsH+=`<option value="${d.id}" ${val===d.id?'selected':''}>${etiqueta}</option>`;
   });
-  return `<select class="proy-input" style="font-size:12px;padding:4px 6px;max-width:160px" onchange="setDepositoMp('${m.id}',this.value)">${optsH}</select>`;
+  return `<select class="proy-input" style="font-size:12px;padding:4px 6px;width:100%;max-width:230px" onchange="setDepositoMp('${m.id}',this.value)">${optsH}</select>`;
 }
 
 function tablaStockConteo(entries,colLbl){
@@ -6711,7 +6711,7 @@ function tablaStockConteo(entries,colLbl){
     <th style="text-align:left;width:90px">Código</th>
     <th style="text-align:left;width:260px">${colLbl}</th>
     <th style="text-align:left;width:90px">Unidad</th>
-    <th style="text-align:left;width:210px">Depósito</th>
+    <th style="text-align:left;width:240px">Depósito</th>
     <th style="text-align:right;width:120px">Stock</th>
   </tr></thead><tbody>`;
   entries.forEach(({m,prod})=>{
