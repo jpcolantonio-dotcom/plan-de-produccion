@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.162</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.163</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1798,8 +1798,11 @@ function renderPlanEmpresa(eid, items){
     // Selector de producto: en vez de un campo de texto libre (que permitía nombres que no
     // coincidían exacto con el Maestro, causando desvinculaciones/confusión), se elige de la
     // lista de productos del Maestro para esa área — así el nombre siempre queda exacto.
-    const areaObjPlan=st.A.find(a=>a.nombre===r.area&&a.empresa_id===eid);
-    const prodOptsPlan=areaObjPlan?st.Pr.filter(p=>p.area_id===areaObjPlan.id).sort((a,b)=>(a.orden||0)-(b.orden||0)):[];
+    // Comparación normalizada (sin importar mayúsculas/acentos) y por TODOS los ids de área que
+    // matcheen el nombre — no solo el primero — por si hay áreas duplicadas con el mismo nombre
+    // (ej. una vieja y otra nueva) y el producto está vinculado a otra que no era la primera encontrada.
+    const areaIdsPlan=st.A.filter(a=>normTxt(a.nombre)===normTxt(r.area)&&a.empresa_id===eid).map(a=>a.id);
+    const prodOptsPlan=areaIdsPlan.length?st.Pr.filter(p=>areaIdsPlan.includes(p.area_id)).sort((a,b)=>(a.orden||0)-(b.orden||0)):[];
     const matchedProdPlan=prodOptsPlan.find(p=>p.nombre===r.producto);
     let selHtmlPlan='';
     if(!matchedProdPlan)selHtmlPlan+=`<option value="" selected>${r.producto||'(sin nombre)'}</option>`;
