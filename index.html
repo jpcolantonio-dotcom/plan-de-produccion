@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.158</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.159</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1768,8 +1768,10 @@ function renderPlanEmpresa(eid, items){
     const _i=all.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
     const rt=(r.days||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
     gd+=rt;(r.days||Array(7).fill(0)).forEach((v,di)=>{dt[di]+=(v||0)});
+    const prodObjCod=st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id);
+    const codPlan=prodObjCod&&prodObjCod.codigo_articulo;
     h+=`<tr>`;
-    h+=`<td class="prod-name"><input class="prod-input" value="${r.producto}" onchange="uf(${_i},'producto',this.value)"/></td>`;
+    h+=`<td class="prod-name"><input class="prod-input" value="${r.producto}" onchange="uf(${_i},'producto',this.value)"/>${codPlan?`<div style="font-size:10px;color:var(--text3);padding:0 6px;margin-top:-2px">Cód. ${codPlan}</div>`:''}</td>`;
     h+=`<td><input value="${r.unidad||''}" list="udl" onchange="uf(${_i},'unidad',this.value)" style="width:100%;padding:3px 5px;font-size:12px;border:.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`;
     for(let di=0;di<7;di++){
       const v=(r.days&&r.days[di])||0;
@@ -2013,7 +2015,8 @@ function renderRealEmpresa(k,eid,items){
     const trId=`rtot-${rk.replace(/[|]/g,'-')}`;
     const prodObj=st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id);
     const tieneDetalle=prodObj&&prodObj.detalle_proceso;
-    h+=`<tr><td style="font-weight:500">${r.producto}${tieneDetalle?'<span style="margin-left:4px;font-size:10px;background:var(--blue)18;color:var(--blue);border-radius:4px;padding:1px 4px">⏱</span>':''}</td><td style="font-size:12px;color:var(--text2)">${r.unidad}</td>`;
+    const codReal=prodObj&&prodObj.codigo_articulo;
+    h+=`<tr><td style="font-weight:500">${r.producto}${tieneDetalle?'<span style="margin-left:4px;font-size:10px;background:var(--blue)18;color:var(--blue);border-radius:4px;padding:1px 4px">⏱</span>':''}${codReal?`<div style="font-size:10px;color:var(--text3);font-weight:400">Cód. ${codReal}</div>`:''}</td><td style="font-size:12px;color:var(--text2)">${r.unidad}</td>`;
     for(let di=0;di<7;di++){
       const pv=(r.days&&r.days[di])||0;const rv=rd[di]||0;
       const desvio=pv>0&&rv>0&&rv<pv;
