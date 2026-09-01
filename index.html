@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.159</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.161</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1728,6 +1728,20 @@ function planSetEmp(eid){
   renderPlanEmpresa(eid, byE[eid]||[]);
 }
 
+// Orden manual de un producto según Maestro > Productos (mismo campo "orden" que usan las flechitas
+// ↑↓ ahí). Los items sin producto vinculado en Maestro (o sin orden asignado todavía) quedan al
+// final, respetando entre ellos el orden relativo que ya tenían (sort estable).
+function ordenPorProducto(r){
+  const p=st.Pr.find(x=>x.nombre===r.producto&&x.empresa_id===r.empresa_id);
+  return (p&&p.orden!=null)?p.orden:Infinity;
+}
+function ordenarComoMaestro(items){
+  return items.map((r,i)=>({r,i})).sort((a,b)=>{
+    const oa=ordenPorProducto(a.r),ob=ordenPorProducto(b.r);
+    return oa!==ob?oa-ob:a.i-b.i;
+  }).map(x=>x.r);
+}
+
 function renderPlanEmpresa(eid, items){
   const el=document.getElementById('plan-emp-content');
   if(!el)return;
@@ -1756,7 +1770,7 @@ function renderPlanEmpresa(eid, items){
   h+=`<button class="btn btn-sm" onclick="copiarAreaSemanaAnterior('${eid}','${activeArea.replace(/'/g,"\\'")}') " style="margin-right:4px;font-size:12px;gap:5px"><i class="ti ti-copy"></i> Copiar sem. anterior</button>`;
   h+=`</div>`;
 
-  const aItems=bA[activeArea]||[];
+  const aItems=ordenarComoMaestro(bA[activeArea]||[]);
   h+=`<div style="overflow-x:auto"><table class="plan-grid"><thead><tr>
     <th class="left" style="min-width:160px">Producto</th>
     <th class="left" style="width:80px">Unidad</th>`;
@@ -1770,8 +1784,20 @@ function renderPlanEmpresa(eid, items){
     gd+=rt;(r.days||Array(7).fill(0)).forEach((v,di)=>{dt[di]+=(v||0)});
     const prodObjCod=st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id);
     const codPlan=prodObjCod&&prodObjCod.codigo_articulo;
+    // Selector de producto: en vez de un campo de texto libre (que permitía nombres que no
+    // coincidían exacto con el Maestro, causando desvinculaciones/confusión), se elige de la
+    // lista de productos del Maestro para esa área — así el nombre siempre queda exacto.
+    const areaObjPlan=st.A.find(a=>a.nombre===r.area&&a.empresa_id===eid);
+    const prodOptsPlan=areaObjPlan?st.Pr.filter(p=>p.area_id===areaObjPlan.id).sort((a,b)=>(a.orden||0)-(b.orden||0)):[];
+    const matchedProdPlan=prodOptsPlan.find(p=>p.nombre===r.producto);
+    let selHtmlPlan='';
+    if(!matchedProdPlan)selHtmlPlan+=`<option value="" selected>${r.producto||'(sin nombre)'}</option>`;
+    selHtmlPlan+=`<option value="">— Reemplazar por... —</option>`;
+    prodOptsPlan.forEach(p=>{
+      selHtmlPlan+=`<option value="${p.id}"${matchedProdPlan&&p.id===matchedProdPlan.id?' selected':''}>${p.nombre}</option>`;
+    });
     h+=`<tr>`;
-    h+=`<td class="prod-name"><input class="prod-input" value="${r.producto}" onchange="uf(${_i},'producto',this.value)"/>${codPlan?`<div style="font-size:10px;color:var(--text3);padding:0 6px;margin-top:-2px">Cód. ${codPlan}</div>`:''}</td>`;
+    h+=`<td class="prod-name"><select class="prod-input" onchange="ufProd(${_i},this.value)">${selHtmlPlan}</select>${codPlan?`<div style="font-size:10px;color:var(--text3);padding:0 6px;margin-top:-2px">Cód. ${codPlan}</div>`:''}</td>`;
     h+=`<td><input value="${r.unidad||''}" list="udl" onchange="uf(${_i},'unidad',this.value)" style="width:100%;padding:3px 5px;font-size:12px;border:.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`;
     for(let di=0;di<7;di++){
       const v=(r.days&&r.days[di])||0;
@@ -1857,6 +1883,16 @@ function planSetArea(eid,area){
 }
 
 function uf(i,f,v){const r=gE()[i];if(r)r[f]=v}
+// Reemplaza el producto de una fila del plan eligiéndolo de la lista del Maestro (en vez de
+// escribir el nombre a mano), para que quede exacto y evitar desvinculaciones por typos.
+function ufProd(i,prodId){
+  if(!prodId)return; // opción "— Reemplazar por... —" o el placeholder con el nombre actual: no hace nada
+  const r=gE()[i];if(!r)return;
+  const p=st.Pr.find(x=>x.id===prodId);if(!p)return;
+  r.producto=p.nombre;
+  if(p.unidad)r.unidad=p.unidad;
+  udt();
+}
 function ud(i,di,v){
   const r=gE();
   if(i<0||i>=r.length)return;
@@ -1996,7 +2032,7 @@ function renderRealEmpresa(k,eid,items){
     areaTabsH+=`<button class="proy-tab${isActive?' active':''}" onclick="realSetArea('${eid}','${area.replace(/'/g,"\'")}')"><span style="background:${bg2};color:${ac2};border-radius:4px;padding:1px 6px;font-size:11px">${area}</span></button>`;
   });
   areaTabsH+=`</div>`;
-  const aItems=bA[activeArea]||[];
+  const aItems=ordenarComoMaestro(bA[activeArea]||[]);
   let h=areaTabsH;
   h+=`<div style="overflow-x:auto"><table class="plan-grid"><thead><tr><th class="left">Producto</th><th class="left" style="width:65px">Unidad</th>`;
   DAYS.forEach((d,i)=>{h+=`<th class="${i===t?'today-head':''}" colspan="2" style="font-size:11px;text-align:center">${d.slice(0,3)} ${ddate(k,i)}</th>`;});
@@ -3475,9 +3511,11 @@ async function propagarCambioNombreProducto(empresa_id, nombreViejo, nombreNuevo
       if(r.ok)actualizadas++;
     }catch{}
   }
-  // Actualizar planes (JSON con filas)
+  // Actualizar planes (JSON con filas) — incluye "semana" para poder refrescar también la copia
+  // en memoria (st.P/st.Ed) de cada semana afectada, si no, el nombre viejo sigue viéndose en
+  // Producción/Producción Real hasta que se fuerce una recarga manual (cambiar de semana, F5, etc.)
   try{
-    const planesData=await get('planes',`select=id,filas`);
+    const planesData=await get('planes','select=id,semana,filas');
     for(const plan of planesData){
       if(!plan.filas)continue;
       let modificado=false;
@@ -3495,6 +3533,12 @@ async function propagarCambioNombreProducto(empresa_id, nombreViejo, nombreNuevo
           body:JSON.stringify({filas})
         });
         actualizadas++;
+        st.P[plan.semana]=filas;
+        // st.Ed es la copia "editable" que usa la grilla de Producción (gE()) — si ya estaba
+        // cargada en esta sesión hay que renombrar ahí también, si no la rama de arriba no alcanza.
+        if(st.Ed[plan.semana]){
+          st.Ed[plan.semana]=st.Ed[plan.semana].map(f=>(f.empresa_id===empresa_id&&f.producto===nombreViejo)?{...f,producto:nombreNuevo}:f);
+        }
       }
     }
   }catch{}
@@ -3503,6 +3547,10 @@ async function propagarCambioNombreProducto(empresa_id, nombreViejo, nombreNuevo
     st.Rec[nombreNuevo]=st.Rec[nombreViejo];
     delete st.Rec[nombreViejo];
   }
+  // Refrescar la grilla de Producción si está montada, para que el cambio se vea al toque
+  // sin tener que cambiar de semana o recargar la página.
+  try{ if(typeof rG==='function')rG(); }catch{}
+  try{ if(typeof renderReal==='function')renderReal(); }catch{}
   ss('online',`Nombre propagado a ${actualizadas} tablas ✓`);
 }
 async function delProd(id){
