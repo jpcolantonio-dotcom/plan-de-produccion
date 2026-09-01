@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.157</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.158</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -3836,7 +3836,7 @@ async function renderConsumoStockProceso(){
   let conteo=[];
   try{ conteo=await get('mp_conteo',`fecha=eq.${fecha}`); }catch{conteo=[]}
   const stockPorMp=new Map();
-  conteo.forEach(c=>{ if(c.stock>0)stockPorMp.set(c.mp_id,c.stock); });
+  conteo.forEach(c=>{ if(c.stock>0)stockPorMp.set(c.mp_id,(stockPorMp.get(c.mp_id)||0)+c.stock); }); // suma entre depósitos si el mismo producto tiene más de uno
 
   const proceso=mpData.filter(m=>tipoMpDe(m)==='proceso');
   const cm={};
@@ -6554,6 +6554,12 @@ async function guardarCajas(){
 let stockSeg=[];
 let stockConteoDepositos=[]; // listado de depósitos (Maestro), para el selector al lado de cada producto en Conteo de stock
 let stockConteoDepositosCargado=false;
+// Renglones extra por producto cuando el mismo item tiene stock repartido en más de un depósito
+// (ej. parte en Camara 6, parte en otro depósito). mpId -> [{slotId, depositoId, dbId}]. El renglón
+// "principal" de cada producto sigue siendo el de siempre (depósito fijo del artículo en
+// materias_primas); estos son renglones adicionales, cada uno con su propia fila en mp_conteo
+// (columna deposito_id) y su propio valor de stock.
+let stockConteoExtra={};
 
 // ── CONTEO DE STOCK (dentro de la pestaña Stock) ─────────────────
 async function loadStockConteo(){
@@ -6565,6 +6571,12 @@ async function loadStockConteo(){
     try{ stockConteoDepositos=await get('depositos','order=nombre.asc'); }catch{stockConteoDepositos=[]}
     stockConteoDepositosCargado=true;
   }
+  stockConteoExtra={};
+  mpConteoData.forEach(x=>{
+    if(!x.deposito_id)return;
+    if(!stockConteoExtra[x.mp_id])stockConteoExtra[x.mp_id]=[];
+    stockConteoExtra[x.mp_id].push({slotId:'db_'+x.id,depositoId:x.deposito_id,dbId:x.id});
+  });
   stockConteoDraft={};
   renderStockConteo();
 }
@@ -6703,7 +6715,72 @@ function depositoSelectHtml(m,prod){
     const etiqueta=prod?d.nombre:`${d.nombre} (${en(d.empresa_id)||'?'})`;
     optsH+=`<option value="${d.id}" ${val===d.id?'selected':''}>${etiqueta}</option>`;
   });
-  return `<select class="proy-input" style="font-size:12px;padding:4px 6px;width:100%;max-width:230px" onchange="setDepositoMp('${m.id}',this.value)">${optsH}</select>`;
+  return `<select class="proy-input" style="font-size:12px;padding:4px 6px;width:100%;max-width:230px" onchange="setDepositoMp('${m.id}',this.value)">${optsH}</select>`
+    +`<div style="margin-top:4px"><button type="button" class="btn btn-xs" onclick="scAgregarDepositoExtra('${m.id}')" style="font-size:10.5px;padding:2px 6px"><i class="ti ti-plus"></i> Otro depósito</button></div>`;
+}
+
+// Agrega un renglón vacío (sin depósito todavía) debajo de un producto, para cargar stock de ese
+// mismo producto en un segundo depósito. Se guarda recién cuando se elige el depósito y se carga
+// un valor de stock (con "Guardar conteo"). Si se vuelve a poner "— Sin depósito —" el renglón se
+// borra (y si ya estaba guardado en mp_conteo, se borra también de la base).
+function scAgregarDepositoExtra(mpId){
+  if(!stockConteoExtra[mpId])stockConteoExtra[mpId]=[];
+  stockConteoExtra[mpId].push({slotId:'new_'+Date.now()+'_'+Math.random().toString(36).slice(2),depositoId:'',dbId:null});
+  renderStockConteo();
+}
+async function scExtraSetDeposito(mpId,slotId,depositoId){
+  const arr=stockConteoExtra[mpId]||[];
+  const slot=arr.find(s=>s.slotId===slotId);
+  if(!slot)return;
+  if(!depositoId){
+    if(slot.dbId){
+      ss('saving','Eliminando renglón...');
+      try{
+        await del('mp_conteo',slot.dbId);
+        mpConteoData=mpConteoData.filter(x=>x.id!==slot.dbId);
+        ss('online','Renglón eliminado');
+      }catch(e){
+        ss('error','Error: '+e.message);
+      }
+    }
+    stockConteoExtra[mpId]=arr.filter(s=>s.slotId!==slotId);
+    delete stockConteoDraft[slotId];
+    renderStockConteo();
+    return;
+  }
+  slot.depositoId=depositoId;
+  renderStockConteo();
+}
+function depositoSelectHtmlExtra(m,prod,slot){
+  const opciones=prod?stockConteoDepositos.filter(d=>d.empresa_id===prod.empresa_id):stockConteoDepositos;
+  if(!opciones.length){
+    return `<span style="font-size:11px;color:var(--text3)">Sin depósitos</span>`;
+  }
+  const val=slot.depositoId||'';
+  let optsH='<option value="">— Sin depósito —</option>';
+  opciones.forEach(d=>{
+    const etiqueta=prod?d.nombre:`${d.nombre} (${en(d.empresa_id)||'?'})`;
+    optsH+=`<option value="${d.id}" ${val===d.id?'selected':''}>${etiqueta}</option>`;
+  });
+  return `<select class="proy-input" style="font-size:12px;padding:4px 6px;width:100%;max-width:230px" onchange="scExtraSetDeposito('${m.id}','${slot.slotId}',this.value)">${optsH}</select>`;
+}
+function scExtraRowHtml(m,prod,slot,txt){
+  const draftVal=stockConteoDraft[slot.slotId];
+  const existing=slot.dbId?mpConteoData.find(x=>x.id===slot.dbId):null;
+  const val=draftVal!==undefined?draftVal:(existing&&existing.stock>0?existing.stock:'');
+  const guardado=existing&&existing.stock>0&&draftVal===undefined;
+  return `<tr class="mpc-row mpc-extra" data-txt="${txt}">
+      <td></td>
+      <td style="font-size:12px;color:var(--text3);padding-left:22px"><i class="ti ti-corner-down-right"></i> otro depósito</td>
+      <td></td>
+      <td>${depositoSelectHtmlExtra(m,prod,slot)}</td>
+      <td style="text-align:right">
+        <input class="proy-input" type="number" min="0"
+          id="mpconteo-${slot.slotId}"
+          value="${val}" placeholder="0" oninput="stockConteoDraft['${slot.slotId}']=this.value"
+          style="border-color:${guardado?'var(--green)':'var(--border2)'};width:90px"/>
+      </td>
+    </tr>`;
 }
 
 function tablaStockConteo(entries,colLbl){
@@ -6716,11 +6793,12 @@ function tablaStockConteo(entries,colLbl){
   </tr></thead><tbody>`;
   entries.forEach(({m,prod})=>{
     const draftVal=stockConteoDraft[m.id];
-    const existing=mpConteoData.find(x=>x.mp_id===m.id);
+    const existing=mpConteoData.find(x=>x.mp_id===m.id&&!x.deposito_id);
     const val=draftVal!==undefined?draftVal:(existing&&existing.stock>0?existing.stock:'');
     const guardado=existing&&existing.stock>0&&draftVal===undefined;
     const nombreMostrado=prod?prod.nombre:(m.sigla||m.nombre);
-    h+=`<tr class="mpc-row" data-txt="${((prod?prod.nombre:'')+' '+(m.sigla||'')+' '+m.nombre+' '+(m.codigo||'')).toLowerCase()}">
+    const txt=((prod?prod.nombre:'')+' '+(m.sigla||'')+' '+m.nombre+' '+(m.codigo||'')).toLowerCase();
+    h+=`<tr class="mpc-row" data-txt="${txt}">
       <td style="font-size:12px;color:var(--text2);font-family:monospace">${m.codigo||''}</td>
       <td style="font-weight:500">${nombreMostrado}${guardado?` <span style="color:var(--green);font-size:10px">✓</span>`:''}${nombreMostrado!==m.nombre?`<div style="font-size:10px;color:var(--text3);font-weight:400">${m.nombre}</div>`:''}</td>
       <td style="font-size:12px;color:var(--text2)">${m.unidad||''}</td>
@@ -6732,6 +6810,9 @@ function tablaStockConteo(entries,colLbl){
           style="border-color:${guardado?'var(--green)':'var(--border2)'};width:90px"/>
       </td>
     </tr>`;
+    (stockConteoExtra[m.id]||[]).forEach(slot=>{
+      h+=scExtraRowHtml(m,prod,slot,txt);
+    });
   });
   h+=`</tbody></table></div></div>`;
   return h;
@@ -6752,34 +6833,50 @@ async function guardarStockConteo(){
     const items=mpData.filter(m=>m.codigo&&tipoMpDe(m)===stockConteoTipo&&m.unidad_tipo!=='unidad');
     for(const m of items){
       const val=stockConteoDraft[m.id];
-      if(val===undefined||val==='')continue;
-      const stock=parseFloat(val)||0;
-      await upsertMpConteo(fecha,m.id,stock);
-      guardados++;
+      if(val!==undefined&&val!==''){
+        const stock=parseFloat(val)||0;
+        await upsertMpConteo(fecha,m.id,stock,null);
+        guardados++;
+      }
+      for(const slot of (stockConteoExtra[m.id]||[])){
+        if(!slot.depositoId)continue; // renglón agregado pero todavía sin depósito elegido: no se guarda
+        const eval_=stockConteoDraft[slot.slotId];
+        if(eval_===undefined||eval_==='')continue;
+        const stock=parseFloat(eval_)||0;
+        const row=await upsertMpConteo(fecha,m.id,stock,slot.depositoId);
+        if(row)slot.dbId=row.id;
+        guardados++;
+      }
     }
     stockConteoDraft={};
     await loadStockConteo();
     ss('online',`${guardados} items guardados`);
   }catch(e){
     const hintTabla=/relation .*mp_conteo.* does not exist/i.test(e.message||'')?' (falta crear la tabla mp_conteo en Supabase)':'';
-    ss('error','Error: '+e.message+hintTabla);
+    const hintCol=hintFaltaColumna(e.message,'deposito_id','mp_conteo');
+    const hintDup=/duplicate key value violates unique constraint/i.test(e.message||'')&&!hintCol?' (falta migrar la restricción única de mp_conteo para permitir varios depósitos por producto — pedime el SQL de nuevo si hace falta)':'';
+    ss('error','Error: '+e.message+hintTabla+hintCol+hintDup);
   }
 }
 
-async function upsertMpConteo(fecha,mpId,stock){
-  const row={fecha,mp_id:mpId,stock};
-  const res=await fetch(`${SB}/rest/v1/mp_conteo?on_conflict=fecha,mp_id`,{
-    method:'POST',
-    headers:{...H,'Prefer':'resolution=merge-duplicates,return=representation'},
-    body:JSON.stringify(row)
-  });
-  if(!res.ok)throw new Error(await res.text());
-  const data=await res.json();
-  if(data&&data[0]){
-    const idx=mpConteoData.findIndex(x=>x.mp_id===mpId&&x.fecha===fecha);
-    if(idx>=0)mpConteoData[idx]={...mpConteoData[idx],...data[0]};
-    else mpConteoData.push(data[0]);
+// depositoId=null => el renglón "principal" del producto (uno por fecha+mp_id). Un depositoId real
+// identifica un renglón adicional (mismo producto, otro depósito) — puede haber varios por fecha+mp_id
+// mientras cada uno tenga un deposito_id distinto. Busca primero en la cache local (mpConteoData) para
+// decidir INSERT vs UPDATE en vez de depender de on_conflict (que no distingue bien los NULL de deposito_id).
+async function upsertMpConteo(fecha,mpId,stock,depositoId){
+  depositoId=depositoId||null;
+  const existing=mpConteoData.find(x=>x.mp_id===mpId&&x.fecha===fecha&&(x.deposito_id||null)===depositoId);
+  if(existing){
+    await pat('mp_conteo',existing.id,{stock});
+    existing.stock=stock;
+    return existing;
   }
+  const data=await ins('mp_conteo',{fecha,mp_id:mpId,stock,deposito_id:depositoId});
+  if(data&&data[0]){
+    mpConteoData.push(data[0]);
+    return data[0];
+  }
+  return null;
 }
 
 // ── CONGELADO (carga de productos de Planeta Empanada) ──────────
@@ -6955,7 +7052,7 @@ async function loadConsumoMPStock(){
   let conteo=[];
   try{ conteo=await get('mp_conteo',`fecha=eq.${fecha}`); }catch{conteo=[]}
   scmpStockPorMp=new Map();
-  conteo.forEach(c=>{ if(c.stock>0)scmpStockPorMp.set(c.mp_id,c.stock); });
+  conteo.forEach(c=>{ if(c.stock>0)scmpStockPorMp.set(c.mp_id,(scmpStockPorMp.get(c.mp_id)||0)+c.stock); }); // suma entre depósitos si el mismo producto tiene más de uno
   scmpItemList=mpData.filter(m=>(tipoMpDe(m)==='proceso'||(tipoMpDe(m)==='terminado'&&m.unidad_tipo!=='unidad'))&&scmpStockPorMp.has(m.id))
     .sort((a,b)=>{ const ta=tipoMpDe(a),tb=tipoMpDe(b); if(ta!==tb)return ta==='proceso'?-1:1; return a.nombre.localeCompare(b.nombre,'es'); });
 
@@ -7153,7 +7250,7 @@ async function exportarMigracionStockExcel(){
   let conteo=[];
   try{ conteo=await get('mp_conteo',`fecha=eq.${fecha}`); }catch{conteo=[]}
   const stockPorMp=new Map();
-  conteo.forEach(c=>{ if(c.stock>0)stockPorMp.set(c.mp_id,c.stock); });
+  conteo.forEach(c=>{ if(c.stock>0)stockPorMp.set(c.mp_id,(stockPorMp.get(c.mp_id)||0)+c.stock); }); // suma entre depósitos si el mismo producto tiene más de uno
 
   const filas=[];
   const usadosMpIds=new Set(); // para no duplicar estas MP en el paso de "el resto de las MP" de abajo
@@ -7214,7 +7311,7 @@ async function exportarTerminadoPlanetaExcel(){
   let conteo=[];
   try{ conteo=await get('mp_conteo',`fecha=eq.${fecha}`); }catch{conteo=[]}
   const stockPorMp=new Map();
-  conteo.forEach(c=>{ if(c.stock>0)stockPorMp.set(c.mp_id,c.stock); });
+  conteo.forEach(c=>{ if(c.stock>0)stockPorMp.set(c.mp_id,(stockPorMp.get(c.mp_id)||0)+c.stock); }); // suma entre depósitos si el mismo producto tiene más de uno
   const items=mpData.filter(m=>m.codigo&&tipoMpDe(m)==='terminado'&&m.unidad_tipo!=='unidad'&&stockPorMp.has(m.id))
     .map(m=>({m,prod:prodPorMp(m)}))
     .filter(({prod})=>prod&&prod.empresa_id===planeta.id);
