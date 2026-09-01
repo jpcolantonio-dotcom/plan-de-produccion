@@ -114,7 +114,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 .emp-pill{padding:5px 14px;font-size:12px;font-weight:500;border-radius:20px;border:.5px solid var(--border2);cursor:pointer;background:transparent;color:var(--text2);display:inline-flex;align-items:center;gap:5px}
 .emp-pill:hover{background:var(--bg2)}
 /* MAESTRO */
-.maestro-cols{display:grid;grid-template-columns:215px 215px 1fr;gap:1rem;align-items:start}
+.maestro-cols{display:grid;grid-template-columns:190px 190px 190px 1fr;gap:1rem;align-items:start}
 .mc-title{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
 .m-list{border:.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:8px;min-height:48px}
 .m-row{background:var(--bg);padding:9px 12px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;border-bottom:.5px solid var(--border);gap:6px;transition:background .1s}
@@ -1229,8 +1229,18 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
           </div>
         </div>
       </div>
+      <div>
+        <div class="mc-title">3. Depósitos</div>
+        <div id="depolist" class="m-list"><div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Selecciona empresa</div></div>
+        <div id="depoadd" style="display:none;margin-top:8px">
+          <div style="display:flex;gap:6px">
+            <input type="text" id="ndepo" placeholder="Nombre del depósito" style="flex:1;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+            <button class="btn btn-primary btn-sm" onclick="addDeposito()"><i class="ti ti-plus"></i></button>
+          </div>
+        </div>
+      </div>
       <div style="min-width:0;overflow-x:auto">
-        <div class="mc-title">3. Productos</div>
+        <div class="mc-title">4. Productos</div>
         <div id="proddetail"><div style="padding:2rem;text-align:center;font-size:13px;color:var(--text2)"><i class="ti ti-arrow-left" style="display:block;font-size:24px;margin-bottom:6px;color:var(--text3)"></i>Selecciona un area</div></div>
       </div>
     </div>
@@ -1578,7 +1588,7 @@ function T(t){
   if(t==='rrhh')initRrhh();
   if(t==='rec'){if(!st.Pr.length||!Object.keys(st.Rec).length){init().then(()=>rRec());}else{rRec();}}
   if(t==='con'){pSC();renderCon()}
-  if(t==='mae')rMae();
+  if(t==='mae'){rMae();loadMaeDepositosOnce();}
   if(t==='rend')initRend();
   if(t==='ped')initPedidos();
   if(t==='etq')initEtiquetas();
@@ -2857,13 +2867,84 @@ function rMae(){
     </div>`;
   });
   list.innerHTML=h;
-  if(st.aeid)rAreaList(st.aeid);
+  if(st.aeid){rAreaList(st.aeid);rDepoList(st.aeid);}
 }
 function selEmp(id){
   st.aeid=id;st.aaid=null;
   document.getElementById('proddetail').innerHTML='<div style="padding:2rem;text-align:center;font-size:13px;color:var(--text2)"><i class="ti ti-arrow-left" style="display:block;font-size:24px;margin-bottom:6px;color:var(--text3)"></i>Selecciona un area</div>';
   rMae();
 }
+
+// Depósitos (Maestro > Productos, 3ra columna): misma tabla "depositos" que ya usa Stock > Depositos
+// y el selector de depósito en Stock > Conteo de stock — acá es donde se crean/eliminan, filtrados
+// por la empresa seleccionada a la izquierda, igual que Áreas.
+let maeDepositos=[];
+let maeDepositosCargado=false;
+async function loadMaeDepositosOnce(){
+  if(maeDepositosCargado){rDepoList(st.aeid);return}
+  try{ maeDepositos=await get('depositos','order=nombre.asc'); }catch{maeDepositos=[]}
+  maeDepositosCargado=true;
+  rDepoList(st.aeid);
+}
+function rDepoList(eid){
+  const list=document.getElementById('depolist');
+  const add=document.getElementById('depoadd');
+  if(!list)return;
+  if(!eid){
+    list.innerHTML='<div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Selecciona empresa</div>';
+    if(add)add.style.display='none';
+    return;
+  }
+  if(add)add.style.display='block';
+  if(!maeDepositosCargado){
+    list.innerHTML='<div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Cargando...</div>';
+    return;
+  }
+  const deps=maeDepositos.filter(d=>d.empresa_id===eid);
+  if(!deps.length){
+    list.innerHTML='<div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Sin depósitos.</div>';
+    return;
+  }
+  let h='';
+  deps.forEach(d=>{
+    h+=`<div class="m-row">
+      <div style="flex:1;min-width:0"><div class="m-name">${d.nombre}</div></div>
+      <button class="btn btn-xs btn-danger" onclick="event.stopPropagation();delDeposito('${d.id}')"><i class="ti ti-trash"></i></button>
+    </div>`;
+  });
+  list.innerHTML=h;
+}
+async function addDeposito(){
+  const eid=st.aeid;if(!eid)return;
+  const el=document.getElementById('ndepo');
+  const nom=el.value.trim();if(!nom)return;
+  ss('saving','Guardando...');
+  try{
+    const r=await ins('depositos',{empresa_id:eid,nombre:nom});
+    maeDepositos.push(r[0]);
+    el.value='';
+    rDepoList(eid);
+    stockConteoDepositosCargado=false; // para que Stock > Conteo de stock lo vea la próxima vez que se abra esa pestaña
+    ss('online','Guardado');fl('maemsg');
+  }catch(e){
+    ss('error','Error');document.getElementById('maeErrtxt').textContent=e.message;fl('maeerr');
+  }
+}
+async function delDeposito(id){
+  if(!confirm('¿Eliminar este depósito? Los productos que lo tengan asignado quedarán sin depósito.'))return;
+  ss('saving','...');
+  try{
+    await del('depositos',id);
+    maeDepositos=maeDepositos.filter(d=>d.id!==id);
+    mpData.forEach(m=>{ if(m.deposito_id===id)m.deposito_id=null; });
+    rDepoList(st.aeid);
+    stockConteoDepositosCargado=false;
+    ss('online','Eliminado');
+  }catch(e){
+    ss('error','Error');alert('Error: '+e.message);
+  }
+}
+
 function rAreaList(eid){
   const areas=st.A.filter(a=>a.empresa_id===eid);
   const list=document.getElementById('arealist');
