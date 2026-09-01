@@ -4139,7 +4139,11 @@ function renderMPList(){
   if(!mpData.length){el.innerHTML='<div class="empty"><i class="ti ti-packages"></i> Sin materias primas. Agregá la primera.</div>';return}
   const unOpts=u=>['Kg','Gr','Litros','CC','Unidad'].map(x=>`<option${x===u?' selected':''}>${x}</option>`).join('');
   const tipoOpts=t=>`<option value="mp"${t==='mp'?' selected':''}>MP</option><option value="terminado"${t==='terminado'?' selected':''}>P. Terminado</option><option value="proceso"${t==='proceso'?' selected':''}>P. Proceso</option><option value="insumos"${t==='insumos'?' selected':''}>Insumos</option>`;
-  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="width:34px"></th><th style="width:110px">Código</th><th>Nombre</th><th style="width:110px">Unidad</th><th style="width:120px">Tipo</th><th style="width:60px"></th></tr></thead><tbody>';
+  // Clasificación Caja Cerrada / Unidad -- hasta ahora solo se podía cargar en bloque con el
+  // importador de CSV (Stock_Flexxus_2.csv); esto agrega el control manual por fila para poder
+  // corregir un caso puntual (ej. un artículo que el CSV clasificó mal) sin tener que re-importar.
+  const cajaUnidadOpts=v=>`<option value=""${!v?' selected':''}>— Sin clasificar —</option><option value="caja"${v==='caja'?' selected':''}>Caja Cerrada</option><option value="unidad"${v==='unidad'?' selected':''}>Unidad</option>`;
+  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="width:34px"></th><th style="width:110px">Código</th><th>Nombre</th><th style="width:110px">Unidad</th><th style="width:140px">Caja/Unidad</th><th style="width:120px">Tipo</th><th style="width:60px"></th></tr></thead><tbody>';
   mpData.forEach(mp=>{
     const sug=sugerenciaMp(mp);
     const tipo=tipoMpDe(mp);
@@ -4158,6 +4162,9 @@ function renderMPList(){
       </td>
       <td><select style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
         onchange="updateMP('${mp.id}','unidad',this.value)">${unOpts(mp.unidad)}</select></td>
+      <td><select style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:${mp.unidad_tipo==='unidad'?'var(--amber)':'var(--text)'}"
+        title="Si queda en 'Unidad' este artículo NO se cuenta en Stock &gt; Conteo de stock (para no duplicar caja cerrada + unidad suelta). Dejalo 'Sin clasificar' o 'Caja Cerrada' para que sí se cuente."
+        onchange="updateMP('${mp.id}','unidad_tipo',this.value)">${cajaUnidadOpts(mp.unidad_tipo)}</select></td>
       <td><select style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:${tipo==='mp'?'var(--text)':'var(--amber)'}"
         onchange="updateMP('${mp.id}','tipo',this.value)">${tipoOpts(tipo)}</select></td>
       <td style="text-align:center"><button class="btn btn-xs btn-danger" onclick="deleteMP('${mp.id}','${mp.nombre.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button></td>
@@ -4246,7 +4253,7 @@ async function updateMP(id,field,value){
   value=value.trim();
   const mp=mpData.find(m=>m.id===id);
   if(!mp)return;
-  if(field!=='codigo' && !value)return; // codigo se puede vaciar; nombre/unidad no
+  if(field!=='codigo' && field!=='unidad_tipo' && !value)return; // codigo y unidad_tipo se pueden vaciar (unidad_tipo = "sin clasificar"); nombre/unidad no
   if((mp[field]||'')===value)return;
   ss('saving','Guardando...');
   try{
