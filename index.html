@@ -4193,6 +4193,29 @@ async function updateMP(id,field,value){
   }
 }
 
+// Asigna/cambia el depósito (Maestro > lista de Depósitos) de una fila de Maestro > Configuración
+// desde el selector que aparece al lado de cada producto en Stock > Conteo de stock. El depósito
+// es una propiedad fija del artículo (dónde vive físicamente), no algo que se vuelva a cargar en
+// cada conteo — por eso se guarda en materias_primas y no en mp_conteo.
+async function setDepositoMp(id,depositoId){
+  const mp=mpData.find(m=>m.id===id);
+  if(!mp)return;
+  if((mp.deposito_id||'')===(depositoId||''))return;
+  ss('saving','Guardando...');
+  try{
+    const res=await fetch(`${SB}/rest/v1/materias_primas?id=eq.${id}`,{
+      method:'PATCH',headers:{...H,'Content-Type':'application/json'},
+      body:JSON.stringify({deposito_id:depositoId||null})
+    });
+    if(!res.ok)throw new Error(await res.text());
+    mp.deposito_id=depositoId||null;
+    ss('online','Depósito actualizado');
+  }catch(e){
+    ss('error','Error: '+e.message+hintFaltaColumna(e.message,'deposito_id','materias_primas'));
+    renderStockConteo();
+  }
+}
+
 async function addMateriaPrima(){
   const nombre=document.getElementById('mp-new-nombre').value.trim();
   const codigo=document.getElementById('mp-new-codigo').value.trim();
@@ -6416,6 +6439,8 @@ async function guardarCajas(){
   }catch(e){ss('error','Error: '+e.message)}
 }
 let stockSeg=[];
+let stockConteoDepositos=[]; // listado de depósitos (Maestro), para el selector al lado de cada producto en Conteo de stock
+let stockConteoDepositosCargado=false;
 
 // ── CONTEO DE STOCK (dentro de la pestaña Stock) ─────────────────
 async function loadStockConteo(){
@@ -6423,6 +6448,10 @@ async function loadStockConteo(){
   try{
     mpConteoData=await get('mp_conteo',`fecha=eq.${fecha}`);
   }catch{mpConteoData=[]}
+  if(!stockConteoDepositosCargado){
+    try{ stockConteoDepositos=await get('depositos','order=nombre.asc'); }catch{stockConteoDepositos=[]}
+    stockConteoDepositosCargado=true;
+  }
   stockConteoDraft={};
   renderStockConteo();
 }
@@ -6546,11 +6575,30 @@ function renderStockConteoEmpresa(eid,entries,colLbl){
 // cargada desde el CSV de Iniciales (m.sigla) cuando todavia no hay producto vinculado, 3) el
 // nombre largo de Configuración como ultimo recurso. Siempre que se use 1) o 2), el nombre largo
 // original queda como referencia chica debajo.
+// Selector de depósito al lado de cada producto en Conteo de stock. Las opciones salen del
+// listado de Maestro (tabla "depositos", administrada en Stock > Depositos), filtradas por la
+// empresa del producto vinculado -- si el item no está vinculado a ningún producto (por lo tanto
+// no se sabe su empresa) se muestran todos los depósitos, con la empresa aclarada en cada opción.
+function depositoSelectHtml(m,prod){
+  const opciones=prod?stockConteoDepositos.filter(d=>d.empresa_id===prod.empresa_id):stockConteoDepositos;
+  if(!opciones.length){
+    return `<span style="font-size:11px;color:var(--text3)" title="Cargá depósitos en Stock &gt; Depositos${prod?` para ${en(prod.empresa_id)||''}`:''}">Sin depósitos</span>`;
+  }
+  const val=m.deposito_id||'';
+  let optsH='<option value="">— Sin depósito —</option>';
+  opciones.forEach(d=>{
+    const etiqueta=prod?d.nombre:`${d.nombre} (${en(d.empresa_id)||'?'})`;
+    optsH+=`<option value="${d.id}" ${val===d.id?'selected':''}>${etiqueta}</option>`;
+  });
+  return `<select class="proy-input" style="font-size:12px;padding:4px 6px;max-width:160px" onchange="setDepositoMp('${m.id}',this.value)">${optsH}</select>`;
+}
+
 function tablaStockConteo(entries,colLbl){
   let h=`<div class="stock-card"><div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
     <th style="text-align:left;width:100px">Código</th>
     <th style="text-align:left">${colLbl}</th>
     <th style="text-align:left;width:70px">Unidad</th>
+    <th style="text-align:left;width:170px">Depósito</th>
     <th style="text-align:right;width:110px">Stock</th>
   </tr></thead><tbody>`;
   entries.forEach(({m,prod})=>{
@@ -6563,6 +6611,7 @@ function tablaStockConteo(entries,colLbl){
       <td style="font-size:12px;color:var(--text2);font-family:monospace">${m.codigo||''}</td>
       <td style="font-weight:500">${nombreMostrado}${guardado?` <span style="color:var(--green);font-size:10px">✓</span>`:''}${nombreMostrado!==m.nombre?`<div style="font-size:10px;color:var(--text3);font-weight:400">${m.nombre}</div>`:''}</td>
       <td style="font-size:12px;color:var(--text2)">${m.unidad||''}</td>
+      <td>${depositoSelectHtml(m,prod)}</td>
       <td style="text-align:right">
         <input class="proy-input" type="number" min="0"
           id="mpconteo-${m.id}"
@@ -7013,9 +7062,22 @@ async function exportarMigracionStockExcel(){
       filas.push({codigo:m.codigo||'', nombre:m.nombre, cantidad:stockPorMp.get(m.id)});
     });
 
+  // Un mismo código puede aparecer más de una vez en "filas" (ej. el ingrediente está escrito
+  // con distinta mayúscula/minúscula en dos recetas distintas: "Sal Fina" en una y "SAL FINA"
+  // en otra, cada una arma su propia fila más arriba). Se agrupan por código (o por nombre
+  // normalizado cuando no hay código) dejando una sola fila con la cantidad sumada.
+  const porClave={};
+  const ordenClaves=[];
+  filas.forEach(f=>{
+    const clave=f.codigo?('c:'+f.codigo):('n:'+normTxt(f.nombre));
+    if(!porClave[clave]){porClave[clave]={codigo:f.codigo,nombre:f.nombre,cantidad:0};ordenClaves.push(clave)}
+    porClave[clave].cantidad=fn(porClave[clave].cantidad+f.cantidad);
+  });
+  const filasFinal=ordenClaves.map(k=>porClave[k]);
+
   const headers=['Codigo Articulo','Lote','Codigo Deposito','Deposito','Stock','Stock Minimo','Stock Optimo','Stock Maximo','Despacho','Stock Inicial','Pais Origen','Aduana'];
   const aoa=[headers];
-  filas.forEach(f=>{
+  filasFinal.forEach(f=>{
     const row=new Array(headers.length).fill('');
     row[0]=f.codigo;   // columna A: código del MP
     row[1]=f.nombre;   // columna B: nombre del artículo
