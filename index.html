@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.155</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.156</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -6707,12 +6707,12 @@ function depositoSelectHtml(m,prod){
 }
 
 function tablaStockConteo(entries,colLbl){
-  let h=`<div class="stock-card"><div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
-    <th style="text-align:left;width:100px">Código</th>
-    <th style="text-align:left">${colLbl}</th>
-    <th style="text-align:left;width:70px">Unidad</th>
-    <th style="text-align:left;width:170px">Depósito</th>
-    <th style="text-align:right;width:110px">Stock</th>
+  let h=`<div class="stock-card"><div style="overflow-x:auto"><table class="stock-tbl" style="table-layout:fixed"><thead><tr>
+    <th style="text-align:left;width:90px">Código</th>
+    <th style="text-align:left;width:260px">${colLbl}</th>
+    <th style="text-align:left;width:90px">Unidad</th>
+    <th style="text-align:left;width:210px">Depósito</th>
+    <th style="text-align:right;width:120px">Stock</th>
   </tr></thead><tbody>`;
   entries.forEach(({m,prod})=>{
     const draftVal=stockConteoDraft[m.id];
