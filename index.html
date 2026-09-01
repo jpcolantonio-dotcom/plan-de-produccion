@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.161</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.162</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1728,6 +1728,18 @@ function planSetEmp(eid){
   renderPlanEmpresa(eid, byE[eid]||[]);
 }
 
+// Código para mostrar junto al nombre en Producción/Producción Real. Primero busca el "Cód.
+// artículo" del producto en Maestro > Productos (r.producto+empresa); si ese producto no tiene
+// código cargado ahí, busca por nombre en Maestro > Configuración (materias_primas) — muchos
+// productos tienen su código cargado ahí y no en Productos, y para el usuario es "el código",
+// sin importar en qué lista esté.
+function codigoParaProducto(r){
+  const prod=st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id);
+  if(prod&&prod.codigo_articulo)return prod.codigo_articulo;
+  const mp=mpData.find(m=>normTxt(m.nombre)===normTxt(r.producto));
+  return mp&&mp.codigo?mp.codigo:null;
+}
+
 // Orden manual de un producto según Maestro > Productos (mismo campo "orden" que usan las flechitas
 // ↑↓ ahí). Los items sin producto vinculado en Maestro (o sin orden asignado todavía) quedan al
 // final, respetando entre ellos el orden relativo que ya tenían (sort estable).
@@ -1782,8 +1794,7 @@ function renderPlanEmpresa(eid, items){
     const _i=all.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
     const rt=(r.days||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
     gd+=rt;(r.days||Array(7).fill(0)).forEach((v,di)=>{dt[di]+=(v||0)});
-    const prodObjCod=st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id);
-    const codPlan=prodObjCod&&prodObjCod.codigo_articulo;
+    const codPlan=codigoParaProducto(r);
     // Selector de producto: en vez de un campo de texto libre (que permitía nombres que no
     // coincidían exacto con el Maestro, causando desvinculaciones/confusión), se elige de la
     // lista de productos del Maestro para esa área — así el nombre siempre queda exacto.
@@ -2051,7 +2062,7 @@ function renderRealEmpresa(k,eid,items){
     const trId=`rtot-${rk.replace(/[|]/g,'-')}`;
     const prodObj=st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id);
     const tieneDetalle=prodObj&&prodObj.detalle_proceso;
-    const codReal=prodObj&&prodObj.codigo_articulo;
+    const codReal=codigoParaProducto(r);
     h+=`<tr><td style="font-weight:500">${r.producto}${tieneDetalle?'<span style="margin-left:4px;font-size:10px;background:var(--blue)18;color:var(--blue);border-radius:4px;padding:1px 4px">⏱</span>':''}${codReal?`<div style="font-size:10px;color:var(--text3);font-weight:400">Cód. ${codReal}</div>`:''}</td><td style="font-size:12px;color:var(--text2)">${r.unidad}</td>`;
     for(let di=0;di<7;di++){
       const pv=(r.days&&r.days[di])||0;const rv=rd[di]||0;
