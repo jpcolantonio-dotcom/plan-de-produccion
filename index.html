@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.166</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.167</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -4174,7 +4174,7 @@ function mpSetSort(field){
   renderMPList();
 }
 
-function mpSortArrow(field){ return mpSort.field===field?(mpSort.dir==='asc'?' ▲':' ▼'):''; }
+function mpSortArrow(field){ return mpSort.field===field?(mpSort.dir==='asc'?' ▲':' ▼'):' <span style="opacity:.35">⇅</span>'; }
 
 function mpCompareVal(a,b,field){
   const va=field==='tipo'?tipoMpDe(a):(a[field]||'');
@@ -4372,7 +4372,7 @@ function renderMPList(){
       <td><input value="${mp.nombre.replace(/"/g,'&quot;')}"
         style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
         onchange="updateMP('${mp.id}','nombre',this.value)"/>
-        ${mp.sigla?`<div style="margin-top:3px"><span style="font-size:10.5px;background:var(--bg2);color:var(--text2);border-radius:4px;padding:1px 5px;font-family:monospace">${mp.sigla}</span>${mp.unidad_tipo?` <span style="font-size:10px;color:var(--text3)">(${mp.unidad_tipo==='caja'?'Caja Cerrada':'Unidad'})</span>`:''}</div>`:''}
+        ${mp.sigla?`<div style="margin-top:3px"><span style="font-size:10.5px;background:var(--bg2);color:var(--text2);border-radius:4px;padding:1px 5px;font-family:monospace">${mp.sigla}</span></div>`:''}
         ${mostrarSug?`<div style="margin-top:3px"><span style="font-size:10.5px;color:var(--amber);cursor:pointer" onclick="updateMP('${mp.id}','tipo','${sug.tipo}')" title="Hay un producto '${sug.producto.nombre.replace(/'/g,"&#39;")}' con nombre parecido en el Maestro">⚠ ¿Es "${sug.producto.nombre}" (${sugLbl})? · <u>aplicar</u></span></div>`:''}
       </td>
       <td><select style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
