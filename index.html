@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.163</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.165</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -269,6 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('rrhh')"><i class="ti ti-users-group"></i>RRHH</button>
   <button class="tab" onclick="T('ped')"><i class="ti ti-shopping-cart"></i>Pedidos</button>
   <button class="tab" onclick="T('mae')"><i class="ti ti-building-factory-2"></i>Maestro</button>
+  <button class="tab" onclick="T('mae2')"><i class="ti ti-flask"></i>Maestro 2</button>
   <button class="tab" onclick="T('etq')"><i class="ti ti-qrcode"></i>Etiquetas</button>
   <button class="tab" onclick="T('planillas')"><i class="ti ti-file-text"></i>Planillas</button>
 </div>
@@ -1249,12 +1250,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       </select>
       <button class="btn btn-primary" onclick="addMateriaPrima()"><i class="ti ti-plus"></i> Agregar MP</button>
       <span style="flex:1"></span>
-      <input type="file" id="mp-csv-input" accept=".csv" style="display:none" onchange="importarMPCsv(this)"/>
-      <button class="btn" onclick="document.getElementById('mp-csv-input').click()"><i class="ti ti-file-spreadsheet"></i> Actualizar desde CSV (Flexxus)</button>
-      <input type="file" id="mp-iniciales-csv-input" accept=".csv" style="display:none" onchange="importarMPIniciales(this)"/>
-      <button class="btn" onclick="document.getElementById('mp-iniciales-csv-input').click()"><i class="ti ti-tag"></i> Importar Iniciales/Caja-Unidad (CSV)</button>
-      <input type="file" id="mp-articulos-csv-input" accept=".csv" style="display:none" onchange="importarArticulosCsv(this)"/>
-      <button class="btn" onclick="document.getElementById('mp-articulos-csv-input').click()"><i class="ti ti-list-check"></i> Controlar y Agregar Faltantes (CSV Artículos)</button>
       <button class="btn btn-danger" onclick="borrarMPSinCodigo()"><i class="ti ti-trash"></i> Borrar sin código</button>
       <span id="mp-import-loading" style="display:none;font-size:13px;color:var(--text2);align-items:center;gap:6px"><span class="spinner spinner-dark"></span> Procesando CSV...</span>
     </div>
@@ -1293,6 +1288,35 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
           <button class="btn btn-primary btn-sm" onclick="addMaeDeposito()"><i class="ti ti-plus"></i> Agregar</button>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- MAESTRO 2 (prueba) -->
+<div id="tab-mae2" class="section">
+  <div class="toolbar">
+    <div>
+      <div style="font-size:16px;font-weight:600">Maestro 2 <span style="font-size:11px;font-weight:400;color:var(--text2)">(prueba)</span></div>
+      <div style="font-size:13px;color:var(--text2)">Empresas → Areas → lista de Configuración con alias manual</div>
+    </div>
+  </div>
+  <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Pestaña de prueba. La columna "Productos" muestra siempre TODA la lista de Maestro &gt; Configuración (no se filtra por la empresa/área elegida a la izquierda, porque esa lista no tiene ese vínculo) — Empresas y Areas quedan solo para navegar.</div>
+  <div class="maestro-cols">
+    <div>
+      <div class="mc-title">1. Empresas</div>
+      <div id="mae2-emplist" class="m-list"><div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Sin empresas.</div></div>
+    </div>
+    <div>
+      <div class="mc-title">2. Areas</div>
+      <div id="mae2-arealist" class="m-list"><div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Selecciona empresa</div></div>
+    </div>
+    <div style="min-width:0;overflow-x:auto">
+      <div class="mc-title">3. Productos (Configuración)</div>
+      <div style="margin-bottom:8px">
+        <input type="text" id="mae2-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="filtrarMae2Productos()"
+          style="width:100%;max-width:320px;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      </div>
+      <div id="mae2-productos"><div style="padding:2rem;text-align:center;font-size:13px;color:var(--text2)"><span class="spinner spinner-dark"></span></div></div>
     </div>
   </div>
 </div>
@@ -1595,6 +1619,7 @@ function T(t){
   if(t==='rec'){if(!st.Pr.length||!Object.keys(st.Rec).length){init().then(()=>rRec());}else{rRec();}}
   if(t==='con'){pSC();renderCon()}
   if(t==='mae'){rMae();loadMaeDepositosOnce();}
+  if(t==='mae2')rMae2();
   if(t==='rend')initRend();
   if(t==='ped')initPedidos();
   if(t==='etq')initEtiquetas();
@@ -2911,6 +2936,75 @@ function renderCmp(){
 }
 
 // MAESTRO
+// MAESTRO 2 (pestaña de prueba) — misma estructura de navegación Empresas → Areas que Maestro,
+// pero la columna de "Productos" no sale de Maestro > Productos: muestra siempre TODA la lista de
+// Maestro > Configuración (materias_primas), con su código a la izquierda del nombre y un campo
+// "alias" de carga manual al lado (columna nueva en materias_primas). Empresas/Areas quedan solo
+// para navegar — no filtran esa lista, porque Configuración no tiene vínculo a área/empresa.
+// Usa su propio estado (st.ae2id/st.aa2id) para no interferir con la selección de Maestro > Productos.
+function rMae2(){
+  const list=document.getElementById('mae2-emplist');
+  if(!list)return;
+  if(!st.E.length){
+    list.innerHTML='<div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Sin empresas.</div>';
+  }else{
+    let h='';
+    st.E.forEach(e=>{
+      const sel=e.id===st.ae2id;
+      h+=`<div class="m-row${sel?' sel':''}" onclick="selEmp2('${e.id}')">
+        <div style="display:flex;align-items:center;gap:7px;flex:1;min-width:0">
+          <span style="width:12px;height:12px;border-radius:50%;background:${e.color};flex-shrink:0;display:inline-block"></span>
+          <div class="m-name">${e.nombre}</div>
+        </div>
+      </div>`;
+    });
+    list.innerHTML=h;
+  }
+  rAreaList2(st.ae2id);
+  rMae2Productos();
+}
+function selEmp2(id){ st.ae2id=id; st.aa2id=null; rMae2(); }
+function rAreaList2(eid){
+  const list=document.getElementById('mae2-arealist');
+  if(!list)return;
+  if(!eid){ list.innerHTML='<div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Selecciona empresa</div>'; return; }
+  const areas=st.A.filter(a=>a.empresa_id===eid);
+  if(!areas.length){ list.innerHTML='<div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Sin areas.</div>'; return; }
+  let h='';
+  areas.forEach(a=>{
+    const sel=a.id===st.aa2id;
+    h+=`<div class="m-row${sel?' sel':''}" onclick="selArea2('${a.id}')"><div class="m-name">${a.nombre}</div></div>`;
+  });
+  list.innerHTML=h;
+}
+function selArea2(id){ st.aa2id=id; rAreaList2(st.ae2id); }
+function rMae2Productos(){
+  const el=document.getElementById('mae2-productos');
+  if(!el)return;
+  if(!mpData.length){el.innerHTML='<div class="empty"><i class="ti ti-packages"></i> Sin datos en Configuración.</div>';return}
+  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="width:100px">Código</th><th>Nombre</th><th style="width:240px">Alias</th></tr></thead><tbody>';
+  mpData.forEach(m=>{
+    const txt=(m.nombre+' '+(m.codigo||'')).toLowerCase().replace(/"/g,'&quot;');
+    h+=`<tr class="mae2-row" data-txt="${txt}">
+      <td style="font-size:12px;color:var(--text2);font-family:monospace">${m.codigo||''}</td>
+      <td style="font-weight:500">${m.nombre}</td>
+      <td><input value="${(m.alias||'').replace(/"/g,'&quot;')}" placeholder="Alias..."
+        style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
+        onchange="updateMP('${m.id}','alias',this.value)"/></td>
+    </tr>`;
+  });
+  h+='</tbody></table></div>';
+  el.innerHTML=h;
+  const filtro=document.getElementById('mae2-filtro');
+  if(filtro&&filtro.value)filtrarMae2Productos();
+}
+function filtrarMae2Productos(){
+  const flt=(document.getElementById('mae2-filtro')?.value||'').toLowerCase().trim();
+  document.querySelectorAll('#mae2-productos tr.mae2-row').forEach(tr=>{
+    tr.style.display=(!flt||tr.dataset.txt.includes(flt))?'':'none';
+  });
+}
+
 function rMae(){
   const list=document.getElementById('emplist');
   if(!st.E.length){list.innerHTML='<div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Sin empresas.</div>';return}
@@ -4233,7 +4327,7 @@ function renderMPList(){
   // importador de CSV (Stock_Flexxus_2.csv); esto agrega el control manual por fila para poder
   // corregir un caso puntual (ej. un artículo que el CSV clasificó mal) sin tener que re-importar.
   const cajaUnidadOpts=v=>`<option value=""${!v?' selected':''}>— Sin clasificar —</option><option value="caja"${v==='caja'?' selected':''}>Caja Cerrada</option><option value="unidad"${v==='unidad'?' selected':''}>Unidad</option>`;
-  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="width:34px"></th><th style="width:110px">Código</th><th>Nombre</th><th style="width:110px">Unidad</th><th style="width:140px">Caja/Unidad</th><th style="width:120px">Tipo</th><th style="width:60px"></th></tr></thead><tbody>';
+  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="width:34px"></th><th style="width:110px">Código</th><th>Nombre</th><th style="width:110px">Unidad</th><th style="width:140px">Caja/Unidad</th><th style="width:120px">Tipo</th><th style="width:130px">Alias</th><th style="width:60px"></th></tr></thead><tbody>';
   mpData.forEach(mp=>{
     const sug=sugerenciaMp(mp);
     const tipo=tipoMpDe(mp);
@@ -4257,6 +4351,9 @@ function renderMPList(){
         onchange="updateMP('${mp.id}','unidad_tipo',this.value)">${cajaUnidadOpts(mp.unidad_tipo)}</select></td>
       <td><select style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:${tipo==='mp'?'var(--text)':'var(--amber)'}"
         onchange="updateMP('${mp.id}','tipo',this.value)">${tipoOpts(tipo)}</select></td>
+      <td><input value="${(mp.alias||'').toString().replace(/"/g,'&quot;')}" placeholder="—"
+        style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
+        onchange="updateMP('${mp.id}','alias',this.value)"/></td>
       <td style="text-align:center"><button class="btn btn-xs btn-danger" onclick="deleteMP('${mp.id}','${mp.nombre.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button></td>
     </tr>`;
   });
@@ -4343,7 +4440,7 @@ async function updateMP(id,field,value){
   value=value.trim();
   const mp=mpData.find(m=>m.id===id);
   if(!mp)return;
-  if(field!=='codigo' && field!=='unidad_tipo' && !value)return; // codigo y unidad_tipo se pueden vaciar (unidad_tipo = "sin clasificar"); nombre/unidad no
+  if(field!=='codigo' && field!=='unidad_tipo' && field!=='alias' && !value)return; // codigo, unidad_tipo y alias se pueden vaciar (unidad_tipo = "sin clasificar"); nombre/unidad no
   if((mp[field]||'')===value)return;
   ss('saving','Guardando...');
   try{
@@ -4364,10 +4461,12 @@ async function updateMP(id,field,value){
       if(tocadas){rRec();ss('online',`MP renombrada, ${tocadas} ingrediente(s) actualizados en recetas — recordá "Guardar recetas"`);return}
     }
     if(field==='tipo')renderMPList();
+    if(field==='alias'&&typeof rMae2Productos==='function')rMae2Productos();
     ss('online','MP actualizada');
   }catch(e){
-    const hint=hintFaltaColumna(e.message,'codigo','materias_primas')||hintFaltaColumna(e.message,'tipo','materias_primas');
+    const hint=hintFaltaColumna(e.message,'codigo','materias_primas')||hintFaltaColumna(e.message,'tipo','materias_primas')||hintFaltaColumna(e.message,'alias','materias_primas');
     ss('error','Error: '+e.message+hint);renderMPList();
+    if(typeof rMae2Productos==='function')rMae2Productos();
   }
 }
 
@@ -5105,7 +5204,7 @@ async function importarRecetasCsvEstructura(input){
     loadingEl.style.display='none';
     const total=nuevas+actualizadas;
     if(!total){
-      const extra=sinCodigoEnSistema.length?` ${sinCodigoEnSistema.length} rellenos del CSV ni siquiera están cargados en Maestro &gt; Configuración (agregalos primero, ej. con "Controlar y Agregar Faltantes").`:'';
+      const extra=sinCodigoEnSistema.length?` ${sinCodigoEnSistema.length} rellenos del CSV ni siquiera están cargados en Maestro &gt; Configuración (agregalos primero ahí manualmente).`:'';
       throw new Error(`No se importó ninguna receta de Relleno/Producto en Proceso.${extra} Verificá que sea el CSV de "Estructura de Producto" de Flexxus.`);
     }
     const partes=[`${total} recetas importadas (${nuevas} nuevas, ${actualizadas} actualizadas)`];
