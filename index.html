@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.168</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.169</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2978,16 +2978,37 @@ function rAreaList2(eid){
   list.innerHTML=h;
 }
 function selArea2(id){ st.aa2id=id; rAreaList2(st.ae2id); }
-function rMae2Productos(){
+// Selector de depósito simple para Maestro 2: a diferencia del de Stock > Conteo de stock, acá
+// el depósito es directamente la propiedad fija del artículo (materias_primas.deposito_id) — sin
+// renglones extra por fecha, sin "+Otro depósito" (eso es un concepto de conteo diario, no aplica
+// acá). Reutiliza la misma lista/caché "stockConteoDepositos" (tabla depositos) y setDepositoMp().
+function mae2DepositoSelectHtml(m){
+  const prod=prodPorMp(m);
+  const opciones=prod?stockConteoDepositos.filter(d=>d.empresa_id===prod.empresa_id):stockConteoDepositos;
+  if(!opciones.length)return `<span style="font-size:11px;color:var(--text3)">Sin depósitos</span>`;
+  const val=m.deposito_id||'';
+  let optsH='<option value="">— Sin depósito —</option>';
+  opciones.forEach(d=>{
+    const etiqueta=prod?d.nombre:`${d.nombre} (${en(d.empresa_id)||'?'})`;
+    optsH+=`<option value="${d.id}" ${val===d.id?'selected':''}>${etiqueta}</option>`;
+  });
+  return `<select style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)" onchange="setDepositoMp('${m.id}',this.value)">${optsH}</select>`;
+}
+async function rMae2Productos(){
   const el=document.getElementById('mae2-productos');
   if(!el)return;
   if(!mpData.length){el.innerHTML='<div class="empty"><i class="ti ti-packages"></i> Sin datos en Configuración.</div>';return}
-  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="width:100px">Código</th><th>Nombre</th><th style="width:240px">Alias</th></tr></thead><tbody>';
+  if(!stockConteoDepositosCargado){
+    try{ stockConteoDepositos=await get('depositos','order=nombre.asc'); }catch{stockConteoDepositos=[]}
+    stockConteoDepositosCargado=true;
+  }
+  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="width:100px">Código</th><th>Nombre</th><th style="width:200px">Depósito</th><th style="width:240px">Alias</th></tr></thead><tbody>';
   mpData.forEach(m=>{
     const txt=(m.nombre+' '+(m.codigo||'')).toLowerCase().replace(/"/g,'&quot;');
     h+=`<tr class="mae2-row" data-txt="${txt}">
       <td style="font-size:12px;color:var(--text2);font-family:monospace">${m.codigo||''}</td>
       <td style="font-weight:500">${m.nombre}</td>
+      <td>${mae2DepositoSelectHtml(m)}</td>
       <td><input value="${(m.alias||'').replace(/"/g,'&quot;')}" placeholder="Alias..."
         style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
         onchange="updateMP('${m.id}','alias',this.value)"/></td>
@@ -4517,7 +4538,8 @@ async function setDepositoMp(id,depositoId){
     ss('online','Depósito actualizado');
   }catch(e){
     ss('error','Error: '+e.message+hintFaltaColumna(e.message,'deposito_id','materias_primas'));
-    renderStockConteo();
+    if(typeof renderStockConteo==='function')renderStockConteo();
+    if(typeof rMae2Productos==='function')rMae2Productos();
   }
 }
 
