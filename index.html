@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.169</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.170</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2978,22 +2978,64 @@ function rAreaList2(eid){
   list.innerHTML=h;
 }
 function selArea2(id){ st.aa2id=id; rAreaList2(st.ae2id); }
-// Selector de depósito simple para Maestro 2: a diferencia del de Stock > Conteo de stock, acá
-// el depósito es directamente la propiedad fija del artículo (materias_primas.deposito_id) — sin
-// renglones extra por fecha, sin "+Otro depósito" (eso es un concepto de conteo diario, no aplica
-// acá). Reutiliza la misma lista/caché "stockConteoDepositos" (tabla depositos) y setDepositoMp().
-function mae2DepositoSelectHtml(m){
+// Depósitos de Maestro 2: acá un artículo puede estar en VARIOS depósitos a la vez (no es un único
+// valor fijo como materias_primas.deposito_id que usan Stock>Conteo/Maestro>Productos). Se guarda
+// en una tabla nueva "mp_depositos" (mp_id, deposito_id) — una fila por cada depósito asignado.
+let mpDepositosData=[]; // filas de mp_depositos: {id, mp_id, deposito_id}
+let mpDepositosCargado=false;
+function depositosDeMp(mpId){ return mpDepositosData.filter(x=>x.mp_id===mpId); }
+
+function mae2DepositosHtml(m){
   const prod=prodPorMp(m);
-  const opciones=prod?stockConteoDepositos.filter(d=>d.empresa_id===prod.empresa_id):stockConteoDepositos;
-  if(!opciones.length)return `<span style="font-size:11px;color:var(--text3)">Sin depósitos</span>`;
-  const val=m.deposito_id||'';
-  let optsH='<option value="">— Sin depósito —</option>';
-  opciones.forEach(d=>{
-    const etiqueta=prod?d.nombre:`${d.nombre} (${en(d.empresa_id)||'?'})`;
-    optsH+=`<option value="${d.id}" ${val===d.id?'selected':''}>${etiqueta}</option>`;
+  const todas=prod?stockConteoDepositos.filter(d=>d.empresa_id===prod.empresa_id):stockConteoDepositos;
+  const asignados=depositosDeMp(m.id);
+  if(!todas.length && !asignados.length)return `<span style="font-size:11px;color:var(--text3)">Sin depósitos</span>`;
+  let h='';
+  asignados.forEach(a=>{
+    const d=stockConteoDepositos.find(x=>x.id===a.deposito_id);
+    h+=`<div style="display:flex;align-items:center;gap:4px;margin-bottom:3px">
+      <span style="flex:1;font-size:12px;background:var(--bg2);padding:3px 6px;border-radius:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${d?d.nombre:'?'}</span>
+      <button type="button" class="btn btn-xs btn-danger" onclick="quitarMpDeposito('${a.id}')" title="Quitar depósito"><i class="ti ti-x"></i></button>
+    </div>`;
   });
-  return `<select style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)" onchange="setDepositoMp('${m.id}',this.value)">${optsH}</select>`;
+  const disponibles=todas.filter(d=>!asignados.some(a=>a.deposito_id===d.id));
+  if(disponibles.length){
+    h+=`<select style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
+      onchange="if(this.value){agregarMpDeposito('${m.id}',this.value);} this.value=''">
+      <option value="">+ Agregar depósito...</option>
+      ${disponibles.map(d=>`<option value="${d.id}">${prod?d.nombre:`${d.nombre} (${en(d.empresa_id)||'?'})`}</option>`).join('')}
+    </select>`;
+  }
+  return h;
 }
+
+async function agregarMpDeposito(mpId,depositoId){
+  if(!depositoId)return;
+  if(mpDepositosData.some(x=>x.mp_id===mpId&&x.deposito_id===depositoId))return;
+  ss('saving','Guardando...');
+  try{
+    const res=await ins('mp_depositos',{mp_id:mpId,deposito_id:depositoId});
+    mpDepositosData.push(res[0]);
+    ss('online','Depósito agregado');
+  }catch(e){
+    ss('error','Error: '+e.message+hintFaltaTabla(e.message,'mp_depositos',
+      'create table mp_depositos (id uuid primary key default gen_random_uuid(), mp_id uuid not null references materias_primas(id) on delete cascade, deposito_id uuid not null references depositos(id) on delete cascade, unique (mp_id, deposito_id)); alter table mp_depositos disable row level security;'));
+  }
+  rMae2Productos();
+}
+
+async function quitarMpDeposito(id){
+  ss('saving','Guardando...');
+  try{
+    await del('mp_depositos',id);
+    mpDepositosData=mpDepositosData.filter(x=>x.id!==id);
+    ss('online','Depósito quitado');
+  }catch(e){
+    ss('error','Error: '+e.message);
+  }
+  rMae2Productos();
+}
+
 async function rMae2Productos(){
   const el=document.getElementById('mae2-productos');
   if(!el)return;
@@ -3002,13 +3044,17 @@ async function rMae2Productos(){
     try{ stockConteoDepositos=await get('depositos','order=nombre.asc'); }catch{stockConteoDepositos=[]}
     stockConteoDepositosCargado=true;
   }
-  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="width:100px">Código</th><th>Nombre</th><th style="width:200px">Depósito</th><th style="width:240px">Alias</th></tr></thead><tbody>';
+  if(!mpDepositosCargado){
+    try{ mpDepositosData=await get('mp_depositos','select=*'); }catch{mpDepositosData=[]}
+    mpDepositosCargado=true;
+  }
+  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="width:100px">Código</th><th>Nombre</th><th style="width:220px">Depósitos</th><th style="width:240px">Alias</th></tr></thead><tbody>';
   mpData.forEach(m=>{
     const txt=(m.nombre+' '+(m.codigo||'')).toLowerCase().replace(/"/g,'&quot;');
     h+=`<tr class="mae2-row" data-txt="${txt}">
       <td style="font-size:12px;color:var(--text2);font-family:monospace">${m.codigo||''}</td>
       <td style="font-weight:500">${m.nombre}</td>
-      <td>${mae2DepositoSelectHtml(m)}</td>
+      <td>${mae2DepositosHtml(m)}</td>
       <td><input value="${(m.alias||'').replace(/"/g,'&quot;')}" placeholder="Alias..."
         style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
         onchange="updateMP('${m.id}','alias',this.value)"/></td>
@@ -4251,6 +4297,12 @@ function hintFaltaColumna(msg,col,tabla){
   const m=String(msg||'');
   const re=new RegExp(`column .*${col}.* does not exist|${col}.*column does not exist|could not find the '${col}' column`,'i');
   return re.test(m)?` (falta la columna "${col}" en ${tabla} — agregala en Supabase. Si ya la agregaste, esperá unos segundos: a veces Supabase tarda en refrescar el cache)`:'';
+}
+
+function hintFaltaTabla(msg,tabla,sql){
+  const m=String(msg||'');
+  const re=new RegExp(`could not find the table '.*${tabla}'|relation ".*${tabla}" does not exist`,'i');
+  return re.test(m)?` (falta la tabla "${tabla}" en Supabase — creála con: ${sql} Si ya la creaste, esperá unos segundos: a veces Supabase tarda en refrescar el cache)`:'';
 }
 
 function normTxt(s){
