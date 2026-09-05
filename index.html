@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.170</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.171</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -747,6 +747,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab" id="stab-cajas" onclick="showStockSubTab('cajas')"><i class="ti ti-box"></i> Cajas</button>
     <button class="proy-tab" id="stab-dep" onclick="showStockSubTab('dep')"><i class="ti ti-temperature-snow"></i> Depositos</button>
     <button class="proy-tab" id="stab-consumomp" onclick="showStockSubTab('consumomp')"><i class="ti ti-calculator"></i> Consumo MP según stock</button>
+    <button class="proy-tab" id="stab-impresion" onclick="showStockSubTab('impresion')"><i class="ti ti-printer"></i> Impresión</button>
   </div>
   <!-- CONTEO DE STOCK -->
   <div id="stock-sub-conteo">
@@ -873,6 +874,13 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <div id="scmp-content"><div class="empty"><i class="ti ti-package"></i> Tildá uno o más productos y calculá.</div></div>
       </div>
     </div>
+  </div>
+
+  <!-- IMPRESIÓN: un botón por depósito, imprime una hoja para tomar stock físico con todos los
+       productos asignados a ese depósito (por materias_primas.deposito_id o por mp_depositos). -->
+  <div id="stock-sub-impresion" style="display:none">
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Elegí un depósito para imprimir una hoja de toma de stock físico con todos sus productos (código, nombre y una columna vacía para anotar la cantidad).</div>
+    <div id="impresion-depositos-content"></div>
   </div>
 
 </div>
@@ -3055,9 +3063,12 @@ async function rMae2Productos(){
       <td style="font-size:12px;color:var(--text2);font-family:monospace">${m.codigo||''}</td>
       <td style="font-weight:500">${m.nombre}</td>
       <td>${mae2DepositosHtml(m)}</td>
-      <td><input value="${(m.alias||'').replace(/"/g,'&quot;')}" placeholder="Alias..."
+      <td><div style="display:flex;gap:4px;align-items:center">
+        <input value="${(m.alias||'').replace(/"/g,'&quot;')}" placeholder="Alias..."
         style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
-        onchange="updateMP('${m.id}','alias',this.value)"/></td>
+        onchange="updateMP('${m.id}','alias',this.value)"/>
+        <button type="button" class="btn btn-xs" onclick="aliasCopiarNombre('${m.id}')" title="Copiar el nombre real del producto como alias"><i class="ti ti-copy"></i></button>
+      </div></td>
     </tr>`;
   });
   h+='</tbody></table></div>';
@@ -4452,9 +4463,12 @@ function renderMPList(){
         onchange="updateMP('${mp.id}','unidad',this.value)">${unOpts(mp.unidad)}</select></td>
       <td><select style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:${tipo==='mp'?'var(--text)':'var(--amber)'}"
         onchange="updateMP('${mp.id}','tipo',this.value)">${tipoOpts(tipo)}</select></td>
-      <td><input value="${(mp.alias||'').toString().replace(/"/g,'&quot;')}" placeholder="—"
+      <td><div style="display:flex;gap:4px;align-items:center">
+        <input value="${(mp.alias||'').toString().replace(/"/g,'&quot;')}" placeholder="—"
         style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
-        onchange="updateMP('${mp.id}','alias',this.value)"/></td>
+        onchange="updateMP('${mp.id}','alias',this.value)"/>
+        <button type="button" class="btn btn-xs" onclick="aliasCopiarNombre('${mp.id}')" title="Copiar el nombre real del producto como alias"><i class="ti ti-copy"></i></button>
+      </div></td>
       <td style="text-align:center"><button class="btn btn-xs btn-danger" onclick="deleteMP('${mp.id}','${mp.nombre.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button></td>
     </tr>`;
   });
@@ -4562,13 +4576,22 @@ async function updateMP(id,field,value){
       if(tocadas){rRec();ss('online',`MP renombrada, ${tocadas} ingrediente(s) actualizados en recetas — recordá "Guardar recetas"`);return}
     }
     if(field==='tipo')renderMPList();
-    if(field==='alias'&&typeof rMae2Productos==='function')rMae2Productos();
+    if(field==='alias'){renderMPList();if(typeof rMae2Productos==='function')rMae2Productos();}
     ss('online','MP actualizada');
   }catch(e){
     const hint=hintFaltaColumna(e.message,'codigo','materias_primas')||hintFaltaColumna(e.message,'tipo','materias_primas')||hintFaltaColumna(e.message,'alias','materias_primas');
     ss('error','Error: '+e.message+hint);renderMPList();
     if(typeof rMae2Productos==='function')rMae2Productos();
   }
+}
+
+// Copia el nombre real del articulo (Maestro > Configuración) como Alias, para cuando el alias
+// va a ser igual al nombre y no vale la pena tipearlo de nuevo. Usado por el botón que aparece al
+// lado del input de Alias tanto en Maestro > Configuración como en Maestro 2.
+function aliasCopiarNombre(id){
+  const mp=mpData.find(m=>m.id===id);
+  if(!mp)return;
+  updateMP(id,'alias',mp.nombre);
 }
 
 // Asigna/cambia el depósito (Maestro > lista de Depósitos) de una fila de Maestro > Configuración
@@ -7285,7 +7308,7 @@ async function buscarCongHistorial(){
 }
 
 function showStockSubTab(t){
-  ['conteo','hist','seg','mix','cajas','dep','consumomp'].forEach(id=>{
+  ['conteo','hist','seg','mix','cajas','dep','consumomp','impresion'].forEach(id=>{
     document.getElementById('stock-sub-'+id).style.display=id===t?'block':'none';
     document.getElementById('stab-'+id).classList.toggle('active',id===t);
   });
@@ -7299,6 +7322,112 @@ function showStockSubTab(t){
     if(!fEl.value)fEl.value=hoyLocal();
     loadConsumoMPStock();
   }
+  if(t==='impresion')renderImpresionDepositos();
+}
+
+// ── IMPRESIÓN (Stock > Impresión): un botón por depósito que imprime una hoja para tomar stock
+// físico. "Productos de un depósito" combina las dos formas en que un artículo queda asignado a
+// un depósito en esta app: el campo fijo materias_primas.deposito_id (Stock>Conteo/Maestro>Productos)
+// y la tabla mp_depositos (multi-depósito de Maestro 2) — así no importa por cuál de los dos se
+// haya cargado, aparece igual acá.
+function productosDeDeposito(depositoId){
+  const ids=new Set();
+  mpData.forEach(m=>{ if(m.deposito_id===depositoId)ids.add(m.id); });
+  mpDepositosData.forEach(x=>{ if(x.deposito_id===depositoId)ids.add(x.mp_id); });
+  return mpData.filter(m=>ids.has(m.id)).sort((a,b)=>normTxt(a.nombre).localeCompare(normTxt(b.nombre),'es'));
+}
+
+async function renderImpresionDepositos(){
+  const el=document.getElementById('impresion-depositos-content');
+  if(!el)return;
+  if(!stockConteoDepositosCargado){
+    try{ stockConteoDepositos=await get('depositos','order=nombre.asc'); }catch{stockConteoDepositos=[]}
+    stockConteoDepositosCargado=true;
+  }
+  if(!mpDepositosCargado){
+    try{ mpDepositosData=await get('mp_depositos','select=*'); }catch{mpDepositosData=[]}
+    mpDepositosCargado=true;
+  }
+  if(!stockConteoDepositos.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-building-warehouse"></i> No hay depósitos cargados. Agregalos en Maestro &gt; Depósitos.</div>';
+    return;
+  }
+  const botonesDeps=deps=>{
+    let h='<div style="display:flex;flex-wrap:wrap;gap:8px">';
+    deps.forEach(d=>{
+      const n=productosDeDeposito(d.id).length;
+      h+=`<button class="btn" onclick="imprimirDeposito('${d.id}')"><i class="ti ti-printer"></i> ${d.nombre} <span style="opacity:.6;margin-left:4px">(${n})</span></button>`;
+    });
+    return h+'</div>';
+  };
+  let h='';
+  st.E.forEach(e=>{
+    const deps=stockConteoDepositos.filter(d=>d.empresa_id===e.id);
+    if(!deps.length)return;
+    h+=`<div style="margin-bottom:1.2rem"><div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">${e.nombre}</div>${botonesDeps(deps)}</div>`;
+  });
+  const sinEmp=stockConteoDepositos.filter(d=>!st.E.some(e=>e.id===d.empresa_id));
+  if(sinEmp.length){
+    h+=`<div style="margin-bottom:1.2rem"><div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Sin empresa</div>${botonesDeps(sinEmp)}</div>`;
+  }
+  el.innerHTML=h||'<div class="empty"><i class="ti ti-building-warehouse"></i> No hay depósitos cargados.</div>';
+}
+
+function imprimirDeposito(depositoId){
+  const dep=stockConteoDepositos.find(d=>d.id===depositoId);
+  const nombreDep=dep?dep.nombre:'Depósito';
+  const productos=productosDeDeposito(depositoId);
+  const ahora=new Date();
+  const p2=n=>String(n).padStart(2,'0');
+  const fechaImpresion=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()} ${p2(ahora.getHours())}:${p2(ahora.getMinutes())}`;
+  let filas='';
+  if(!productos.length){
+    filas='<tr><td colspan="3" style="text-align:center;padding:20px;color:#888">Sin productos asignados a este depósito</td></tr>';
+  }else{
+    productos.forEach(p=>{
+      filas+=`<tr><td class="cod">${(p.codigo||'').toString()}</td><td class="nom">${p.nombre}</td><td class="cant"></td></tr>`;
+    });
+  }
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Toma de stock — ${nombreDep}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;padding:8mm;font-size:14pt}
+    h1{font-size:16pt;margin-bottom:2px}
+    .sub{font-size:11pt;color:#555;margin-bottom:10px}
+    table{width:100%;border-collapse:collapse}
+    th{text-align:left;padding:6px 8px;font-size:14pt;border-bottom:2px solid #333}
+    td{padding:6px 8px;font-size:14pt;border-bottom:1px solid #ccc}
+    td.cod{width:15%;font-family:monospace}
+    td.nom{width:55%}
+    td.cant{width:30%;border-left:1px solid #ccc}
+    .firmas{margin-top:14mm}
+    .firma-row{display:flex;align-items:flex-end;gap:10px;margin-bottom:9mm}
+    .firma-row.final{margin-top:10mm}
+    .firma-label{font-weight:700;white-space:nowrap;min-width:120px;font-size:14pt}
+    .firma-linea{flex:1;border-bottom:1px solid #333;height:1px;margin-bottom:3px;max-width:320px}
+    @media print{@page{size:A4 landscape;margin:8mm}body{padding:0}}
+  </style></head>
+  <body>
+    <h1>TOMA DE STOCK — ${nombreDep.toUpperCase()}</h1>
+    <div class="sub">Fecha de impresión: ${fechaImpresion} · ${productos.length} producto(s)</div>
+    <table>
+      <thead><tr><th>Código</th><th>Producto</th><th>Cantidad</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+    <div class="firmas">
+      <div class="firma-row"><span class="firma-label">Líder:</span><span class="firma-linea"></span></div>
+      <div class="firma-row"><span class="firma-label">Contador 1:</span><span class="firma-linea"></span></div>
+      <div class="firma-row"><span class="firma-label">Contador 2:</span><span class="firma-linea"></span></div>
+      <div class="firma-row final"><span class="firma-label">Firma Líder:</span><span class="firma-linea"></span></div>
+    </div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
+  </body></html>`;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para imprimir.');
 }
 
 // CONSUMO MP SEGÚN STOCK (Stock > Consumo MP según stock): a diferencia de "MP en Stock de Proceso"
