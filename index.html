@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.171</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.172</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1768,9 +1768,33 @@ function planSetEmp(eid){
 // sin importar en qué lista esté.
 function codigoParaProducto(r){
   const prod=st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id);
-  if(prod&&prod.codigo_articulo)return prod.codigo_articulo;
+  if(prod){
+    // Vínculo manual (hecho a mano desde el selector "Vincular código" en Producción, o desde
+    // "Vínculo MP" en Maestro > Productos) — es el más confiable, se respeta primero.
+    if(prod.mp_id){
+      const m=mpData.find(x=>x.id===prod.mp_id);
+      if(m&&m.codigo)return m.codigo;
+    }
+    if(prod.codigo_articulo)return prod.codigo_articulo;
+  }
   const mp=mpData.find(m=>normTxt(m.nombre)===normTxt(r.producto));
   return mp&&mp.codigo?mp.codigo:null;
+}
+
+// Opciones (todo mpData, ordenado alfabéticamente) para el selector "Vincular código" que aparece
+// en Producción > Planificación al lado de un producto sin código, para que el usuario elija a
+// mano cuál fila de Maestro > Configuración corresponde -- sin tocar el nombre del producto ni
+// borrar nada de lo ya cargado, solo fija el vínculo (productos.mp_id) para que el código
+// aparezca. Reutiliza prodMpLink, el mismo mecanismo de "Vínculo MP" de Maestro > Productos.
+function vincularCodigoOpts(){
+  return [...mpData].sort((a,b)=>normTxt(a.nombre).localeCompare(normTxt(b.nombre),'es'))
+    .map(m=>`<option value="${m.id}">${m.codigo?m.codigo+' — ':''}${m.nombre.replace(/"/g,'&quot;')}</option>`).join('');
+}
+async function vincularCodigoDesdeProduccion(prodId,mpId){
+  if(!prodId||!mpId)return;
+  await prodMpLink(prodId,mpId);
+  rG();
+  if(typeof renderReal==='function')renderReal();
 }
 
 // Orden manual de un producto según Maestro > Productos (mismo campo "orden" que usan las flechitas
@@ -1844,7 +1868,8 @@ function renderPlanEmpresa(eid, items){
       selHtmlPlan+=`<option value="${p.id}"${matchedProdPlan&&p.id===matchedProdPlan.id?' selected':''}>${p.nombre}</option>`;
     });
     h+=`<tr>`;
-    h+=`<td class="prod-name"><select class="prod-input" onchange="ufProd(${_i},this.value)">${selHtmlPlan}</select>${codPlan?`<div style="font-size:10px;color:var(--text3);padding:0 6px;margin-top:-2px">Cód. ${codPlan}</div>`:''}</td>`;
+    const vincularHtmlPlan=(!codPlan&&matchedProdPlan)?`<div style="margin-top:2px;padding:0 6px"><select style="width:100%;font-size:10px;padding:1px 2px;border:.5px solid var(--border2);border-radius:3px;background:var(--bg);color:var(--text3)" onchange="vincularCodigoDesdeProduccion('${matchedProdPlan.id}',this.value)"><option value="">Vincular código...</option>${vincularCodigoOpts()}</select></div>`:'';
+    h+=`<td class="prod-name"><select class="prod-input" onchange="ufProd(${_i},this.value)">${selHtmlPlan}</select>${codPlan?`<div style="font-size:10px;color:var(--text3);padding:0 6px;margin-top:-2px">Cód. ${codPlan}</div>`:vincularHtmlPlan}</td>`;
     h+=`<td><input value="${r.unidad||''}" list="udl" onchange="uf(${_i},'unidad',this.value)" style="width:100%;padding:3px 5px;font-size:12px;border:.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`;
     for(let di=0;di<7;di++){
       const v=(r.days&&r.days[di])||0;
