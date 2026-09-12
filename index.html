@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.172</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.173</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1781,14 +1781,27 @@ function codigoParaProducto(r){
   return mp&&mp.codigo?mp.codigo:null;
 }
 
-// Opciones (todo mpData, ordenado alfabéticamente) para el selector "Vincular código" que aparece
-// en Producción > Planificación al lado de un producto sin código, para que el usuario elija a
-// mano cuál fila de Maestro > Configuración corresponde -- sin tocar el nombre del producto ni
-// borrar nada de lo ya cargado, solo fija el vínculo (productos.mp_id) para que el código
-// aparezca. Reutiliza prodMpLink, el mismo mecanismo de "Vínculo MP" de Maestro > Productos.
-function vincularCodigoOpts(){
+// "Vincular código" (Producción > Planificación, al lado de un producto sin código): el usuario
+// busca por el NOMBRE OFICIAL tal cual está en Maestro > Configuración (la misma lista/nombre que
+// ve ahí) y elige -- sin tocar el nombre del producto ni borrar nada de lo ya cargado, solo fija
+// el vínculo (productos.mp_id). Reutiliza prodMpLink, el mismo mecanismo de "Vínculo MP" de
+// Maestro > Productos.
+// Usa un <input list="..."> + <datalist> (no un <select>) porque un <select> con ~800+ opciones
+// solo salta al escribir la PRIMERA letra de cada opción -- con el código adelante eso ni
+// funcionaba. El datalist filtra por el texto tipeado en cualquier parte del nombre, igual que el
+// buscador de Maestro > Configuración.
+function mpLabelParaVincular(m){
+  return `${m.nombre} (Cód. ${m.codigo||'sin código'})`;
+}
+function vincularDatalistHtml(){
   return [...mpData].sort((a,b)=>normTxt(a.nombre).localeCompare(normTxt(b.nombre),'es'))
-    .map(m=>`<option value="${m.id}">${m.codigo?m.codigo+' — ':''}${m.nombre.replace(/"/g,'&quot;')}</option>`).join('');
+    .map(m=>`<option value="${mpLabelParaVincular(m).replace(/"/g,'&quot;')}">`).join('');
+}
+async function vincularCodigoPorTexto(prodId,texto){
+  if(!prodId||!texto)return;
+  const m=mpData.find(x=>mpLabelParaVincular(x)===texto);
+  if(!m){ ss('error','No encontré ese nombre exacto en Maestro > Configuración. Elegilo de las sugerencias de la lista.'); return; }
+  await vincularCodigoDesdeProduccion(prodId,m.id);
 }
 async function vincularCodigoDesdeProduccion(prodId,mpId){
   if(!prodId||!mpId)return;
@@ -1868,7 +1881,7 @@ function renderPlanEmpresa(eid, items){
       selHtmlPlan+=`<option value="${p.id}"${matchedProdPlan&&p.id===matchedProdPlan.id?' selected':''}>${p.nombre}</option>`;
     });
     h+=`<tr>`;
-    const vincularHtmlPlan=(!codPlan&&matchedProdPlan)?`<div style="margin-top:2px;padding:0 6px"><select style="width:100%;font-size:10px;padding:1px 2px;border:.5px solid var(--border2);border-radius:3px;background:var(--bg);color:var(--text3)" onchange="vincularCodigoDesdeProduccion('${matchedProdPlan.id}',this.value)"><option value="">Vincular código...</option>${vincularCodigoOpts()}</select></div>`:'';
+    const vincularHtmlPlan=(!codPlan&&matchedProdPlan)?`<div style="margin-top:2px;padding:0 6px"><input list="vincdl" placeholder="🔍 Vincular código (nombre oficial)..." style="width:100%;font-size:10px;padding:2px 4px;border:.5px solid var(--border2);border-radius:3px;background:var(--bg);color:var(--text3)" onchange="vincularCodigoPorTexto('${matchedProdPlan.id}',this.value);this.value=''"/></div>`:'';
     h+=`<td class="prod-name"><select class="prod-input" onchange="ufProd(${_i},this.value)">${selHtmlPlan}</select>${codPlan?`<div style="font-size:10px;color:var(--text3);padding:0 6px;margin-top:-2px">Cód. ${codPlan}</div>`:vincularHtmlPlan}</td>`;
     h+=`<td><input value="${r.unidad||''}" list="udl" onchange="uf(${_i},'unidad',this.value)" style="width:100%;padding:3px 5px;font-size:12px;border:.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`;
     for(let di=0;di<7;di++){
@@ -1906,6 +1919,7 @@ function renderPlanEmpresa(eid, items){
   h+=`<td class="day-cell grand">${fmt(gd)}</td><td></td></tr>`;
   h+=`</tbody></table></div>`;
   h+=`<datalist id="udl">${UNITS.map(u=>`<option>${u}</option>`).join('')}</datalist>`;
+  h+=`<datalist id="vincdl">${vincularDatalistHtml()}</datalist>`;
   el.innerHTML=h;
 }
 
