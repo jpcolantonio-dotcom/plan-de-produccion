@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.178</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.180</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1810,9 +1810,17 @@ async function vincularCodigoNuevoProducto(eid,area,producto,unidad,codigoTexto)
   if(!codigo)return;
   const m=mpData.find(x=>(x.codigo||'').toString().trim()===codigo);
   if(!m){ ss('error',`No encontré en Maestro > Configuración ningún producto con el código "${codigo}".`); return; }
-  const areaObj=st.A.find(a=>normTxt(a.nombre)===normTxt(area)&&a.empresa_id===eid);
-  if(!areaObj){ ss('error',`No encontré el área "${area}" en Maestro > Productos para esta empresa — creala ahí primero.`); return; }
   try{
+    // El área del plan puede no existir todavía como fila formal en Maestro > Áreas (áreas viejas
+    // que solo estaban en el plan, nunca dadas de alta en Maestro) -- en vez de frenar acá pidiendo
+    // un paso manual aparte, se crea sola con el mismo nombre, y recién con esa área ya creada se
+    // crea el producto y se vincula, todo en un solo paso.
+    let areaObj=st.A.find(a=>normTxt(a.nombre)===normTxt(area)&&a.empresa_id===eid);
+    if(!areaObj){
+      const ra=await ins('areas',{empresa_id:eid,nombre:area});
+      areaObj=ra[0];
+      st.A.push(areaObj);
+    }
     const r=await ins('productos',{empresa_id:eid,area_id:areaObj.id,nombre:producto,unidad:unidad||'unidades',mp_id:m.id});
     st.Pr.push(r[0]);
     rG();
@@ -1884,23 +1892,30 @@ function renderPlanEmpresa(eid, items){
     const areaIdsPlan=st.A.filter(a=>normTxt(a.nombre)===normTxt(r.area)&&a.empresa_id===eid).map(a=>a.id);
     const prodOptsPlan=areaIdsPlan.length?st.Pr.filter(p=>areaIdsPlan.includes(p.area_id)).sort((a,b)=>(a.orden||0)-(b.orden||0)):[];
     const matchedProdPlan=prodOptsPlan.find(p=>p.nombre===r.producto);
+    // Para poder editar el código hace falta un producto de Maestro al que atar el vínculo: primero
+    // se prueba matchedProdPlan (mismo nombre Y misma área), pero como el vínculo (productos.mp_id)
+    // no depende del área, si no hay match ahí se busca el mismo nombre en CUALQUIER área de la
+    // empresa (reportado: en T&C12 quedaba sin caja para editar porque el producto de Maestro estaba
+    // cargado bajo otra área) — primero exacto y después ignorando mayúsculas/acentos.
+    const prodParaCodPlan=matchedProdPlan||st.Pr.find(p=>p.empresa_id===eid&&p.nombre===r.producto)||st.Pr.find(p=>p.empresa_id===eid&&normTxt(p.nombre)===normTxt(r.producto));
+    const mpVincPlan=prodParaCodPlan?mpPorProducto(prodParaCodPlan):null;
+    // Maestro 2 va a quedar como el área definitiva para configurar artículos (Maestro > Productos
+    // va a desaparecer) — así que en cuanto el producto está vinculado a un código, el nombre corto
+    // que se muestra (antes el nombre "crudo" del producto, ej. VA12) se reemplaza por el Alias
+    // cargado en Maestro 2 para ese artículo, si tiene uno. Si no tiene alias, se sigue mostrando
+    // el nombre de siempre (producto o texto del plan) sin cambios.
+    const aliasVincPlan=mpVincPlan&&mpVincPlan.alias?mpVincPlan.alias:null;
     let selHtmlPlan='';
-    if(!matchedProdPlan)selHtmlPlan+=`<option value="" selected>${r.producto||'(sin nombre)'}</option>`;
+    if(!matchedProdPlan)selHtmlPlan+=`<option value="" selected>${aliasVincPlan||r.producto||'(sin nombre)'}</option>`;
     selHtmlPlan+=`<option value="">— Reemplazar por... —</option>`;
     prodOptsPlan.forEach(p=>{
-      selHtmlPlan+=`<option value="${p.id}"${matchedProdPlan&&p.id===matchedProdPlan.id?' selected':''}>${p.nombre}</option>`;
+      const labelPlan=(matchedProdPlan&&p.id===matchedProdPlan.id&&aliasVincPlan)?aliasVincPlan:p.nombre;
+      selHtmlPlan+=`<option value="${p.id}"${matchedProdPlan&&p.id===matchedProdPlan.id?' selected':''}>${labelPlan}</option>`;
     });
     h+=`<tr>`;
     // Código siempre editable a mano (antes solo se podía tipear cuando faltaba; ahora también se
     // puede corregir un código ya vinculado/heredado) — el input queda precargado con el código
-    // actual y al cambiarlo se re-vincula vía vincularPorCodigo. Para poder editar hace falta un
-    // producto de Maestro al que atar el vínculo: primero se prueba matchedProdPlan (mismo nombre
-    // Y misma área), pero como el vínculo (productos.mp_id) no depende del área, si no hay match
-    // ahí se busca el mismo nombre en CUALQUIER área de la empresa (reportado: en T&C12 quedaba
-    // sin caja para editar porque el producto de Maestro estaba cargado bajo otra área) — primero
-    // exacto y después ignorando mayúsculas/acentos.
-    const prodParaCodPlan=matchedProdPlan||st.Pr.find(p=>p.empresa_id===eid&&p.nombre===r.producto)||st.Pr.find(p=>p.empresa_id===eid&&normTxt(p.nombre)===normTxt(r.producto));
-    const mpVincPlan=prodParaCodPlan?mpPorProducto(prodParaCodPlan):null;
+    // actual y al cambiarlo se re-vincula vía vincularPorCodigo.
     // Si NO hay ningún producto de Maestro con ese nombre (en ninguna área todavía), el input sigue
     // apareciendo igual (objetivo: poder dejar definido el ID de TODOS los productos del plan, para
     // que cambiar un nombre no arrastre el vínculo de otro que comparta el mismo número de ID) --
@@ -2177,7 +2192,10 @@ function renderRealEmpresa(k,eid,items){
     const unidadEscReal=(r.unidad||'').replace(/'/g,"\\'");
     const onchangeCodReal=prodObj?`vincularPorCodigo('${prodObj.id}',this.value)`:`vincularCodigoNuevoProducto('${r.empresa_id}','${areaEscReal}','${prodEscReal}','${unidadEscReal}',this.value)`;
     const codHtmlReal=`<div style="margin-top:2px;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">Cód.</span><input type="text" inputmode="numeric" value="${codReal||''}" placeholder="ID..." title="Código de Maestro > Configuración — editable a mano" style="width:70px;font-size:10px;padding:2px 4px;border:.5px solid var(--border2);border-radius:3px;background:var(--bg);color:var(--text3)" onchange="${onchangeCodReal}"/>${mpVincReal?`<span style="font-size:10px;color:var(--text3)">— ${mpVincReal.nombre}</span>`:''}</div>`;
-    h+=`<tr><td style="font-weight:500">${r.producto}${tieneDetalle?'<span style="margin-left:4px;font-size:10px;background:var(--blue)18;color:var(--blue);border-radius:4px;padding:1px 4px">⏱</span>':''}${codHtmlReal}</td><td style="font-size:12px;color:var(--text2)">${r.unidad}</td>`;
+    // Igual que en Planificación: una vez vinculado, el nombre mostrado se reemplaza por el Alias
+    // de Maestro 2 (si tiene uno cargado) en vez del nombre "crudo" del producto.
+    const aliasVincReal=mpVincReal&&mpVincReal.alias?mpVincReal.alias:null;
+    h+=`<tr><td style="font-weight:500">${aliasVincReal||r.producto}${tieneDetalle?'<span style="margin-left:4px;font-size:10px;background:var(--blue)18;color:var(--blue);border-radius:4px;padding:1px 4px">⏱</span>':''}${codHtmlReal}</td><td style="font-size:12px;color:var(--text2)">${r.unidad}</td>`;
     for(let di=0;di<7;di++){
       const pv=(r.days&&r.days[di])||0;const rv=rd[di]||0;
       const desvio=pv>0&&rv>0&&rv<pv;
