@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.176</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.178</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1801,6 +1801,24 @@ async function vincularCodigoDesdeProduccion(prodId,mpId){
   rG();
   if(typeof renderReal==='function')renderReal();
 }
+// Caso sin producto de Maestro todavía (ni siquiera en otra área): vincularPorCodigo necesita un
+// productId existente para patchear mp_id, pero acá no hay ninguno -- se crea la fila que falta en
+// Maestro > Productos (con el mismo nombre/unidad que ya tiene en el plan, en la misma área) y
+// recién ahí se vincula, en un solo paso para el usuario. No toca ni borra nada de lo ya cargado.
+async function vincularCodigoNuevoProducto(eid,area,producto,unidad,codigoTexto){
+  const codigo=(codigoTexto||'').toString().trim();
+  if(!codigo)return;
+  const m=mpData.find(x=>(x.codigo||'').toString().trim()===codigo);
+  if(!m){ ss('error',`No encontré en Maestro > Configuración ningún producto con el código "${codigo}".`); return; }
+  const areaObj=st.A.find(a=>normTxt(a.nombre)===normTxt(area)&&a.empresa_id===eid);
+  if(!areaObj){ ss('error',`No encontré el área "${area}" en Maestro > Productos para esta empresa — creala ahí primero.`); return; }
+  try{
+    const r=await ins('productos',{empresa_id:eid,area_id:areaObj.id,nombre:producto,unidad:unidad||'unidades',mp_id:m.id});
+    st.Pr.push(r[0]);
+    rG();
+    if(typeof renderReal==='function')renderReal();
+  }catch(e){ ss('error','No se pudo crear el vínculo: '+e.message); }
+}
 
 // Orden manual de un producto según Maestro > Productos (mismo campo "orden" que usan las flechitas
 // ↑↓ ahí). Los items sin producto vinculado en Maestro (o sin orden asignado todavía) quedan al
@@ -1875,10 +1893,24 @@ function renderPlanEmpresa(eid, items){
     h+=`<tr>`;
     // Código siempre editable a mano (antes solo se podía tipear cuando faltaba; ahora también se
     // puede corregir un código ya vinculado/heredado) — el input queda precargado con el código
-    // actual y al cambiarlo se re-vincula vía vincularPorCodigo. Solo se puede editar si hay un
-    // producto de Maestro para esa fila (matchedProdPlan) al que atar el vínculo.
-    const mpVincPlan=matchedProdPlan?mpPorProducto(matchedProdPlan):null;
-    const codHtmlPlan=matchedProdPlan?`<div style="margin-top:2px;padding:0 6px;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">Cód.</span><input type="text" inputmode="numeric" value="${codPlan||''}" placeholder="ID..." title="Código de Maestro > Configuración — editable a mano" style="width:70px;font-size:10px;padding:2px 4px;border:.5px solid var(--border2);border-radius:3px;background:var(--bg);color:var(--text3)" onchange="vincularPorCodigo('${matchedProdPlan.id}',this.value)"/>${mpVincPlan?`<span style="font-size:10px;color:var(--text3)">— ${mpVincPlan.nombre}</span>`:''}</div>`:(codPlan?`<div style="font-size:10px;color:var(--text3);padding:0 6px;margin-top:-2px">Cód. ${codPlan}</div>`:'');
+    // actual y al cambiarlo se re-vincula vía vincularPorCodigo. Para poder editar hace falta un
+    // producto de Maestro al que atar el vínculo: primero se prueba matchedProdPlan (mismo nombre
+    // Y misma área), pero como el vínculo (productos.mp_id) no depende del área, si no hay match
+    // ahí se busca el mismo nombre en CUALQUIER área de la empresa (reportado: en T&C12 quedaba
+    // sin caja para editar porque el producto de Maestro estaba cargado bajo otra área) — primero
+    // exacto y después ignorando mayúsculas/acentos.
+    const prodParaCodPlan=matchedProdPlan||st.Pr.find(p=>p.empresa_id===eid&&p.nombre===r.producto)||st.Pr.find(p=>p.empresa_id===eid&&normTxt(p.nombre)===normTxt(r.producto));
+    const mpVincPlan=prodParaCodPlan?mpPorProducto(prodParaCodPlan):null;
+    // Si NO hay ningún producto de Maestro con ese nombre (en ninguna área todavía), el input sigue
+    // apareciendo igual (objetivo: poder dejar definido el ID de TODOS los productos del plan, para
+    // que cambiar un nombre no arrastre el vínculo de otro que comparta el mismo número de ID) --
+    // solo cambia qué función se llama al confirmar: si hay producto se re-vincula (vincularPorCodigo),
+    // si no hay se crea la fila en Maestro > Productos y se vincula en el mismo paso (vincularCodigoNuevoProducto).
+    const prodEscPlan=(r.producto||'').replace(/'/g,"\\'");
+    const areaEscPlan=(r.area||'').replace(/'/g,"\\'");
+    const unidadEscPlan=(r.unidad||'').replace(/'/g,"\\'");
+    const onchangeCodPlan=prodParaCodPlan?`vincularPorCodigo('${prodParaCodPlan.id}',this.value)`:`vincularCodigoNuevoProducto('${eid}','${areaEscPlan}','${prodEscPlan}','${unidadEscPlan}',this.value)`;
+    const codHtmlPlan=`<div style="margin-top:2px;padding:0 6px;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">Cód.</span><input type="text" inputmode="numeric" value="${codPlan||''}" placeholder="ID..." title="Código de Maestro > Configuración — editable a mano" style="width:70px;font-size:10px;padding:2px 4px;border:.5px solid var(--border2);border-radius:3px;background:var(--bg);color:var(--text3)" onchange="${onchangeCodPlan}"/>${mpVincPlan?`<span style="font-size:10px;color:var(--text3)">— ${mpVincPlan.nombre}</span>`:''}</div>`;
     h+=`<td class="prod-name"><select class="prod-input" onchange="ufProd(${_i},this.value)">${selHtmlPlan}</select>${codHtmlPlan}</td>`;
     h+=`<td><input value="${r.unidad||''}" list="udl" onchange="uf(${_i},'unidad',this.value)" style="width:100%;padding:3px 5px;font-size:12px;border:.5px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`;
     for(let di=0;di<7;di++){
@@ -2131,14 +2163,20 @@ function renderRealEmpresa(k,eid,items){
     const tp=(r.days||[]).reduce((a,b)=>a+(b||0),0);
     const tr2=rd.reduce((a,b)=>a+(b||0),0);
     const trId=`rtot-${rk.replace(/[|]/g,'-')}`;
-    const prodObj=st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id);
+    const prodObj=st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id)||st.Pr.find(p=>p.empresa_id===r.empresa_id&&normTxt(p.nombre)===normTxt(r.producto));
     const tieneDetalle=prodObj&&prodObj.detalle_proceso;
     const codReal=codigoParaProducto(r);
     // Código siempre editable a mano, igual que en Planificación (ver el mismo comentario ahí):
     // el input queda precargado con el código actual (si hay uno) y al cambiarlo se re-vincula
     // vía vincularPorCodigo, mostrando el nombre real de Configuración como confirmación.
     const mpVincReal=prodObj?mpPorProducto(prodObj):null;
-    const codHtmlReal=prodObj?`<div style="margin-top:2px;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">Cód.</span><input type="text" inputmode="numeric" value="${codReal||''}" placeholder="ID..." title="Código de Maestro > Configuración — editable a mano" style="width:70px;font-size:10px;padding:2px 4px;border:.5px solid var(--border2);border-radius:3px;background:var(--bg);color:var(--text3)" onchange="vincularPorCodigo('${prodObj.id}',this.value)"/>${mpVincReal?`<span style="font-size:10px;color:var(--text3)">— ${mpVincReal.nombre}</span>`:''}</div>`:(codReal?`<div style="font-size:10px;color:var(--text3);font-weight:400">Cód. ${codReal}</div>`:'');
+    // Igual que en Planificación: si no hay producto de Maestro todavía (ninguna área), el input
+    // sigue apareciendo pero crea la fila en Maestro > Productos al confirmar el código.
+    const prodEscReal=(r.producto||'').replace(/'/g,"\\'");
+    const areaEscReal=(r.area||'').replace(/'/g,"\\'");
+    const unidadEscReal=(r.unidad||'').replace(/'/g,"\\'");
+    const onchangeCodReal=prodObj?`vincularPorCodigo('${prodObj.id}',this.value)`:`vincularCodigoNuevoProducto('${r.empresa_id}','${areaEscReal}','${prodEscReal}','${unidadEscReal}',this.value)`;
+    const codHtmlReal=`<div style="margin-top:2px;display:flex;align-items:center;gap:4px"><span style="font-size:10px;color:var(--text3)">Cód.</span><input type="text" inputmode="numeric" value="${codReal||''}" placeholder="ID..." title="Código de Maestro > Configuración — editable a mano" style="width:70px;font-size:10px;padding:2px 4px;border:.5px solid var(--border2);border-radius:3px;background:var(--bg);color:var(--text3)" onchange="${onchangeCodReal}"/>${mpVincReal?`<span style="font-size:10px;color:var(--text3)">— ${mpVincReal.nombre}</span>`:''}</div>`;
     h+=`<tr><td style="font-weight:500">${r.producto}${tieneDetalle?'<span style="margin-left:4px;font-size:10px;background:var(--blue)18;color:var(--blue);border-radius:4px;padding:1px 4px">⏱</span>':''}${codHtmlReal}</td><td style="font-size:12px;color:var(--text2)">${r.unidad}</td>`;
     for(let di=0;di<7;di++){
       const pv=(r.days&&r.days[di])||0;const rv=rd[di]||0;
