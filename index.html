@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.182</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.184</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -3228,22 +3228,21 @@ function rProdDetail(aid){
             <button class="btn btn-xs" onclick="moveProd('${p.id}','${aid}',-1)" ${idx===0?'disabled':''} style="padding:2px 6px"><i class="ti ti-chevron-up"></i></button>
             <button class="btn btn-xs" onclick="moveProd('${p.id}','${aid}',1)" ${idx===prods.length-1?'disabled':''} style="padding:2px 6px"><i class="ti ti-chevron-down"></i></button>
           </div>
-          <div style="flex:1.4;min-width:220px" title="Vínculo con la fila de Configuración > ID / Descripción / Depósito (código Flexxus). Es lo que usa Stock > Conteo de stock para este producto.">
-            ${linkedMp?`
-              <div style="display:flex;align-items:center;gap:6px;font-size:12.5px;padding:6px 8px;background:var(--bg2);border-radius:var(--radius)">
-                <i class="ti ti-link" style="color:var(--green)"></i>
-                <span style="font-family:monospace;color:var(--green);white-space:nowrap">${linkedMp.codigo}</span>
+          <div style="flex:1.4;min-width:220px" title="Vínculo con la fila de Configuración > ID / Descripción / Depósito (código Flexxus). Es lo que usa Stock > Conteo de stock para este producto. Tipeá el ID y la descripción aparece sola.">
+            <div style="display:flex;align-items:center;gap:6px;font-size:12.5px;padding:6px 8px;background:var(--bg2);border-radius:var(--radius)">
+              <i class="ti ti-link" style="color:${linkedMp?'var(--green)':'var(--text3)'};flex-shrink:0"></i>
+              <input type="text" inputmode="numeric" value="${linkedMp?linkedMp.codigo:''}" placeholder="ID..." onchange="vincularProdPorCodigo('${p.id}',this.value)"
+                style="width:80px;font-family:monospace;font-size:12.5px;padding:3px 5px;border:.5px solid var(--border2);border-radius:4px;background:var(--bg);color:${linkedMp?'var(--green)':'var(--text)'};flex-shrink:0"/>
+              ${linkedMp?`
                 <span style="color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1" title="${linkedMp.nombre.replace(/"/g,'&quot;')}">${linkedMp.nombre}</span>
                 ${linkedMp.unidad_tipo?`<span style="font-size:10px;background:${linkedMp.unidad_tipo==='caja'?'var(--blue)18':'var(--amber)18'};color:${linkedMp.unidad_tipo==='caja'?'var(--blue)':'var(--amber)'};border-radius:4px;padding:1px 5px;white-space:nowrap;flex-shrink:0">${linkedMp.unidad_tipo==='caja'?'Caja Cerrada':'Unidad'}</span>`:''}
                 <button class="btn btn-xs" onclick="prodMpUnlink('${p.id}')" title="Quitar vínculo" style="flex-shrink:0"><i class="ti ti-x"></i></button>
-              </div>
-            `:`
-              <div>
-                <input type="text" placeholder="🔗 ID de Configuración..." onchange="vincularProdPorCodigo('${p.id}',this.value)"
-                  style="width:100%;padding:7px 8px;font-size:12.5px;font-family:monospace;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-              </div>
-              ${sugMp?`<div style="margin-top:3px"><span style="font-size:10.5px;color:var(--amber);cursor:pointer" onclick="prodMpLink('${p.id}','${sugMp.id}')">⚠ ¿"${sugMp.nombre.replace(/"/g,'&quot;')}" (${sugMp.codigo}${sugMp.unidad_tipo?', '+(sugMp.unidad_tipo==='caja'?'Caja Cerrada':'Unidad'):''})? · <u>vincular</u></span></div>`:''}
-            `}
+              `:sugMp?`
+                <span style="font-size:10.5px;color:var(--amber);cursor:pointer;flex:1" onclick="prodMpLink('${p.id}','${sugMp.id}')">⚠ ¿"${sugMp.nombre.replace(/"/g,'&quot;')}" (${sugMp.codigo})? · <u>vincular</u></span>
+              `:`
+                <span style="color:var(--text3);flex:1">Sin vincular</span>
+              `}
+            </div>
           </div>
           <input value="${p.nombre}" onchange="updP('${p.id}','nombre',this.value)"
             style="flex:2;min-width:220px;padding:8px 10px;font-size:15px;font-weight:600;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
@@ -3282,12 +3281,6 @@ function rProdDetail(aid){
               <option value="caliente"${p.elaboracion==='caliente'?' selected':''}>🔥 Caliente</option>
               <option value="frio"${p.elaboracion==='frio'?' selected':''}>❄️ Frío</option>
             </select>
-          </label>
-          <label style="display:flex;align-items:center;gap:5px" title="Código del artículo en el sistema externo (ej: Joselito)">
-            <span style="font-size:11px;color:var(--text2);white-space:nowrap">Cód. artículo</span>
-            <input value="${p.codigo_articulo||''}" placeholder="—"
-              onchange="updP('${p.id}','codigo_articulo',this.value.trim()||null)"
-              style="width:90px;padding:3px 6px;font-size:12px;text-align:center;font-family:monospace;letter-spacing:0.5px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
           </label>
         </div>
       </div>`;
@@ -4217,6 +4210,27 @@ async function renderConsumoMP(){
 let mpData=[];
 let mpSelected=new Set(); // ids seleccionados para acciones en lote en la lista de MP
 let mpSort={field:'nombre',dir:'asc'}; // orden actual de la tabla Maestro > Configuración (no altera mpData, solo la vista)
+// Anchos de columna de la tabla de Configuración > ID / Descripción / Depósito, ajustables a mano
+// arrastrando el borde de cada columna (mpColResizeStart) -- se guardan acá (no en mpData) para que
+// sobrevivan a los re-renders de la tabla (que pasan seguido, en cada edición de una fila).
+let mpColWidths={codigo:110,nombre:260,unidad:100,tipo:120,depositos:190,alias:150};
+function mpColResizeStart(e,col){
+  e.preventDefault();e.stopPropagation();
+  const startX=e.clientX;
+  const startW=mpColWidths[col]||100;
+  const colEl=document.getElementById('mpcol-'+col);
+  function onMove(ev){
+    const w=Math.max(60,startW+(ev.clientX-startX));
+    mpColWidths[col]=w;
+    if(colEl)colEl.style.width=w+'px';
+  }
+  function onUp(){
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onUp);
+  }
+  document.addEventListener('mousemove',onMove);
+  document.addEventListener('mouseup',onUp);
+}
 
 function mpSetSort(field){
   if(mpSort.field===field){ mpSort.dir=mpSort.dir==='asc'?'desc':'asc'; }
@@ -4417,10 +4431,27 @@ async function renderMPList(){
   // importador de CSV (Stock_Flexxus_2.csv); esto agrega el control manual por fila para poder
   // corregir un caso puntual (ej. un artículo que el CSV clasificó mal) sin tener que re-importar.
   const cajaUnidadOpts=v=>`<option value=""${!v?' selected':''}>— Sin clasificar —</option><option value="caja"${v==='caja'?' selected':''}>Caja Cerrada</option><option value="unidad"${v==='unidad'?' selected':''}>Unidad</option>`;
-  const th=(field,label,extraStyle='')=>`<th style="cursor:pointer;user-select:none;${extraStyle}" onclick="mpSetSort('${field}')" title="Ordenar por ${label}">${label}${mpSortArrow(field)}</th>`;
-  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="width:34px"></th>'
-    +th('codigo','Código','width:110px')+th('nombre','Nombre')+th('unidad','Unidad','width:110px')
-    +th('tipo','Tipo','width:120px')+'<th style="width:190px">Depósitos</th>'+th('alias','Alias','width:130px')
+  // Columnas con ancho ajustable a mano (mpColWidths, se conserva entre re-renders): cada <th> lleva
+  // un mango invisible en el borde derecho (mpColResizeStart) que arrastra el ancho de su <col> en el
+  // colgroup. El title del mango explica el gesto; el stopPropagation evita que arrastrar dispare el
+  // sort de la columna (el <th> también ordena al hacer click).
+  const resizeHandle=col=>`<span onmousedown="mpColResizeStart(event,'${col}')" onclick="event.stopPropagation()" title="Arrastrá para ajustar el ancho" style="position:absolute;top:0;right:0;width:8px;height:100%;cursor:col-resize;border-right:2px dotted var(--border2)"></span>`;
+  const th=(field,label,col)=>`<th style="cursor:pointer;user-select:none;position:relative;padding-right:14px" onclick="mpSetSort('${field}')" title="Ordenar por ${label}">${label}${mpSortArrow(field)}${resizeHandle(col)}</th>`;
+  const thPlain=(label,col)=>`<th style="position:relative;padding-right:14px">${label}${resizeHandle(col)}</th>`;
+  let h=`<div class="stock-card"><table class="stock-tbl" style="table-layout:fixed">
+    <colgroup>
+      <col style="width:34px">
+      <col id="mpcol-codigo" style="width:${mpColWidths.codigo}px">
+      <col id="mpcol-nombre" style="width:${mpColWidths.nombre}px">
+      <col id="mpcol-unidad" style="width:${mpColWidths.unidad}px">
+      <col id="mpcol-tipo" style="width:${mpColWidths.tipo}px">
+      <col id="mpcol-depositos" style="width:${mpColWidths.depositos}px">
+      <col id="mpcol-alias" style="width:${mpColWidths.alias}px">
+      <col style="width:60px">
+    </colgroup>
+    <thead><tr><th style="width:34px"></th>`
+    +th('codigo','Código','codigo')+th('nombre','Nombre','nombre')+th('unidad','Unidad','unidad')
+    +th('tipo','Tipo','tipo')+thPlain('Depósitos','depositos')+th('alias','Alias','alias')
     +'<th style="width:60px"></th></tr></thead><tbody>';
   mpOrdenados().forEach(mp=>{
     const sug=sugerenciaMp(mp);
