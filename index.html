@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.184</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.186</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -256,9 +256,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </header>
 <div class="main"><div class="app-card">
 <div class="tabs">
-  <button class="tab active" onclick="T('plan')"><i class="ti ti-calendar-week"></i>Planificación</button>
-  <button class="tab" onclick="T('rell')"><i class="ti ti-bowl-chopsticks"></i>Rellenos</button>
-  <button class="tab" onclick="T('real')"><i class="ti ti-clipboard-check"></i>Prod. Real</button>
+  <button class="tab active" onclick="T('prod')"><i class="ti ti-calendar-week"></i>Producción</button>
   <button class="tab" onclick="T('cmp')"><i class="ti ti-chart-bar"></i>Comparación</button>
   <button class="tab" onclick="T('desv')"><i class="ti ti-alert-triangle"></i>Desvíos</button>
   <button class="tab" onclick="T('dash')"><i class="ti ti-layout-dashboard"></i>Dashboard</button>
@@ -274,73 +272,82 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </div>
 <div class="pad">
 
-<!-- RELLENOS -->
-<div id="tab-rell" class="section">
-  <div class="toolbar">
-    <div>
-      <div style="font-size:16px;font-weight:600">Planificación de Rellenos</div>
-      <div style="font-size:13px;color:var(--text2)">Kg a elaborar por día según el plan semanal</div>
-    </div>
-    <div class="btns">
-      <select id="rell-wsel" onchange="renderRellenos()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
-      <button class="btn btn-sm" onclick="renderRellenos()"><i class="ti ti-refresh"></i> Actualizar</button>
-      <button class="btn btn-sm" onclick="imprimirRellenos()"><i class="ti ti-file-type-pdf"></i> PDF</button>
-    </div>
+<!-- PRODUCCIÓN (Planificación + Rellenos + Prod. Real, unificadas en una sola pestaña) -->
+<div id="tab-prod" class="section active">
+  <div class="proy-subtabs">
+    <button class="proy-tab active" id="prodtab-plan" onclick="showProdSubTab('plan')"><i class="ti ti-calendar-week"></i> Planificación</button>
+    <button class="proy-tab" id="prodtab-rell" onclick="showProdSubTab('rell')"><i class="ti ti-bowl-chopsticks"></i> Rellenos</button>
+    <button class="proy-tab" id="prodtab-real" onclick="showProdSubTab('real')"><i class="ti ti-clipboard-check"></i> Prod. Real</button>
   </div>
-  <div class="alert alert-info" style="margin-bottom:1rem">
-    <i class="ti ti-info-circle"></i>
-    <span>🔥 <b>Caliente</b>: se elabora el día anterior al cierre (si cae domingo → sábado). &nbsp; ❄️ <b>Frío</b>: se elabora el mismo día del cierre.</span>
-  </div>
-  <div id="rell-content"></div>
-</div>
 
-<!-- PLAN -->
-<div id="tab-plan" class="section active">
-  <div class="toolbar">
+  <!-- SUB-TAB PLANIFICACIÓN -->
+  <div id="tab-plan">
+    <div class="toolbar">
+      <div class="real-sel">
+        <label>Semana:</label>
+        <select id="plan-wsel" onchange="onPlanSemana()"></select>
+        <button class="btn btn-sm" onclick="onPlanSemana()" title="Recargar"><i class="ti ti-refresh"></i></button>
+        <button class="btn btn-sm" onclick="crearNuevaSemana()" title="Crear plan para la semana siguiente" style="gap:5px"><i class="ti ti-calendar-plus"></i> Nueva semana</button>
+      </div>
+      <div class="btns">
+        <button class="btn btn-pdf" id="btnpdf" onclick="genPDF()"><i class="ti ti-file-type-pdf"></i> PDF</button>
+        <button class="btn btn-primary" id="btnsave" onclick="savePlan()"><i class="ti ti-device-floppy"></i> Guardar plan</button>
+      </div>
+    </div>
+    <div id="epills" class="emp-pills" style="display:none"></div>
+    <div class="add-bar">
+      <span style="font-size:13px;color:var(--text2);white-space:nowrap">Agregar:</span>
+      <select id="semp" onchange="onEmp()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Empresa</option></select>
+      <select id="sarea" onchange="onArea()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Area</option></select>
+      <select id="sprod" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);min-width:160px"><option value="">Producto</option></select>
+      <button class="btn btn-primary" onclick="addFromMaestro()"><i class="ti ti-plus"></i> Agregar</button>
+      <button class="btn" onclick="addAllEmp()"><i class="ti ti-packages"></i> Todos</button>
+    </div>
+    <div style="position:relative">
+      <div class="grid-card"><div class="grid-scroll" id="grid"></div></div>
+      <div id="gload" class="loading-overlay" style="display:none"><span class="spinner spinner-dark"></span> Cargando...</div>
+    </div>
+    <div id="pmsg" style="display:none" class="alert alert-ok"><i class="ti ti-check"></i> Plan guardado.</div>
+    <div id="perr" style="display:none" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="perrtxt"></span></div>
+    <div id="pdfmsg" style="display:none" class="alert alert-info"></div>
+  </div>
+
+  <!-- SUB-TAB RELLENOS -->
+  <div id="tab-rell" style="display:none">
+    <div class="toolbar">
+      <div>
+        <div style="font-size:16px;font-weight:600">Planificación de Rellenos</div>
+        <div style="font-size:13px;color:var(--text2)">Kg a elaborar por día según el plan semanal</div>
+      </div>
+      <div class="btns">
+        <select id="rell-wsel" onchange="renderRellenos()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
+        <button class="btn btn-sm" onclick="renderRellenos()"><i class="ti ti-refresh"></i> Actualizar</button>
+        <button class="btn btn-sm" onclick="imprimirRellenos()"><i class="ti ti-file-type-pdf"></i> PDF</button>
+      </div>
+    </div>
+    <div class="alert alert-info" style="margin-bottom:1rem">
+      <i class="ti ti-info-circle"></i>
+      <span>🔥 <b>Caliente</b>: se elabora el día anterior al cierre (si cae domingo → sábado). &nbsp; ❄️ <b>Frío</b>: se elabora el mismo día del cierre.</span>
+    </div>
+    <div id="rell-content"></div>
+  </div>
+
+  <!-- SUB-TAB PROD. REAL -->
+  <div id="tab-real" style="display:none">
     <div class="real-sel">
-      <label>Semana:</label>
-      <select id="plan-wsel" onchange="onPlanSemana()"></select>
-      <button class="btn btn-sm" onclick="onPlanSemana()" title="Recargar"><i class="ti ti-refresh"></i></button>
-      <button class="btn btn-sm" onclick="crearNuevaSemana()" title="Crear plan para la semana siguiente" style="gap:5px"><i class="ti ti-calendar-plus"></i> Nueva semana</button>
+      <label>Semana:</label><select id="rwsel" onchange="loadReal2()"></select>
+      <button class="btn" onclick="loadReal2()" title="Recargar"><i class="ti ti-refresh"></i></button>
+      <button class="btn btn-primary" id="btnsaver" onclick="saveReal()"><i class="ti ti-device-floppy"></i> Guardar</button>
     </div>
-    <div class="btns">
-      <button class="btn btn-pdf" id="btnpdf" onclick="genPDF()"><i class="ti ti-file-type-pdf"></i> PDF</button>
-      <button class="btn btn-primary" id="btnsave" onclick="savePlan()"><i class="ti ti-device-floppy"></i> Guardar plan</button>
-    </div>
+    <div id="rnop" class="alert alert-info" style="display:none"><i class="ti ti-info-circle"></i> No hay plan para esta semana.</div>
+    <!-- Tabs por empresa -->
+    <div id="real-emp-tabs" style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:0;flex-wrap:wrap"></div>
+    <!-- Contenido empresa activa -->
+    <div id="real-emp-content"></div>
+    <div id="rload" class="loading-overlay" style="display:none"><span class="spinner spinner-dark"></span> Cargando...</div>
+    <div id="rmsg" style="display:none;margin-top:8px" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
+    <div id="rerr" style="display:none;margin-top:8px" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="rerrtxt"></span></div>
   </div>
-  <div id="epills" class="emp-pills" style="display:none"></div>
-  <div class="add-bar">
-    <span style="font-size:13px;color:var(--text2);white-space:nowrap">Agregar:</span>
-    <select id="semp" onchange="onEmp()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Empresa</option></select>
-    <select id="sarea" onchange="onArea()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Area</option></select>
-    <select id="sprod" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);min-width:160px"><option value="">Producto</option></select>
-    <button class="btn btn-primary" onclick="addFromMaestro()"><i class="ti ti-plus"></i> Agregar</button>
-    <button class="btn" onclick="addAllEmp()"><i class="ti ti-packages"></i> Todos</button>
-  </div>
-  <div style="position:relative">
-    <div class="grid-card"><div class="grid-scroll" id="grid"></div></div>
-    <div id="gload" class="loading-overlay" style="display:none"><span class="spinner spinner-dark"></span> Cargando...</div>
-  </div>
-  <div id="pmsg" style="display:none" class="alert alert-ok"><i class="ti ti-check"></i> Plan guardado.</div>
-  <div id="perr" style="display:none" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="perrtxt"></span></div>
-  <div id="pdfmsg" style="display:none" class="alert alert-info"></div>
-</div>
-
-<!-- REAL -->
-<div id="tab-real" class="section">
-  <div class="real-sel">
-    <label>Semana:</label><select id="rwsel" onchange="loadReal2()"></select>
-    <button class="btn" onclick="loadReal2()" title="Recargar"><i class="ti ti-refresh"></i></button>
-    <button class="btn btn-primary" id="btnsaver" onclick="saveReal()"><i class="ti ti-device-floppy"></i> Guardar</button>
-  </div>
-  <div id="rnop" class="alert alert-info" style="display:none"><i class="ti ti-info-circle"></i> No hay plan para esta semana.</div>
-  <!-- Tabs por empresa -->
-  <div id="real-emp-tabs" style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:0;flex-wrap:wrap"></div>
-  <!-- Contenido empresa activa -->
-  <div id="real-emp-content"></div>
-  <div id="rload" class="loading-overlay" style="display:none"><span class="spinner spinner-dark"></span> Cargando...</div>
-  <div id="rmsg" style="display:none;margin-top:8px" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
-  <div id="rerr" style="display:none;margin-top:8px" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="rerrtxt"></span></div>
 </div>
 
 <!-- COMPARACION -->
@@ -1584,7 +1591,20 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['plan','rell','real','cmp','desv','dash','stock','cong','rec','rend','rrhh','ped','cfg','etq'];
+const TABS=['prod','cmp','desv','dash','stock','cong','rec','rend','rrhh','ped','cfg','etq'];
+// Sub-pestaña activa dentro de Producción (Planificación/Rellenos/Prod. Real, unificadas en una sola
+// pestaña) -- se recuerda para que volver a "Producción" desde otra pestaña principal reabra la misma
+// sub-pestaña en la que el usuario estaba, en vez de resetear siempre a Planificación.
+let prodActiveSubTab='plan';
+function showProdSubTab(t){
+  prodActiveSubTab=t;
+  ['plan','rell','real'].forEach(x=>{
+    document.getElementById('tab-'+x).style.display=x===t?'':'none';
+    document.getElementById('prodtab-'+x).classList.toggle('active',x===t);
+  });
+  if(t==='real'){poblarPlanWsel();pS('rwsel');loadReal2()}
+  if(t==='rell')initRellenos();
+}
 function T(t){
   document.querySelectorAll('.tab').forEach(el=>{
     const m=el.getAttribute('onclick')||'';
@@ -1592,7 +1612,7 @@ function T(t){
   });
   document.querySelectorAll('.section').forEach(el=>el.classList.remove('active'));
   document.getElementById('tab-'+t).classList.add('active');
-  if(t==='real'){poblarPlanWsel();pS('rwsel');loadReal2()}
+  if(t==='prod')showProdSubTab(prodActiveSubTab);
   if(t==='cmp'){pS('cwsel');loadCmp()}
   if(t==='desv'){pS('desv-wsel');loadDesv()}
   if(t==='dash'){pS('dash-wsel');initDash()}
@@ -1606,7 +1626,6 @@ function T(t){
   if(t==='rend')initRend();
   if(t==='ped')initPedidos();
   if(t==='etq')initEtiquetas();
-  if(t==='rell')initRellenos();
 }
 function pS(id){
   const s=document.getElementById(id);const c=s.value||st.w;
@@ -3228,7 +3247,7 @@ function rProdDetail(aid){
             <button class="btn btn-xs" onclick="moveProd('${p.id}','${aid}',-1)" ${idx===0?'disabled':''} style="padding:2px 6px"><i class="ti ti-chevron-up"></i></button>
             <button class="btn btn-xs" onclick="moveProd('${p.id}','${aid}',1)" ${idx===prods.length-1?'disabled':''} style="padding:2px 6px"><i class="ti ti-chevron-down"></i></button>
           </div>
-          <div style="flex:1.4;min-width:220px" title="Vínculo con la fila de Configuración > ID / Descripción / Depósito (código Flexxus). Es lo que usa Stock > Conteo de stock para este producto. Tipeá el ID y la descripción aparece sola.">
+          <div style="flex:1;min-width:220px" title="Vínculo con la fila de Configuración > ID / Descripción / Depósito (código Flexxus). Es lo que usa Stock > Conteo de stock para este producto. Tipeá el ID y la descripción aparece sola.">
             <div style="display:flex;align-items:center;gap:6px;font-size:12.5px;padding:6px 8px;background:var(--bg2);border-radius:var(--radius)">
               <i class="ti ti-link" style="color:${linkedMp?'var(--green)':'var(--text3)'};flex-shrink:0"></i>
               <input type="text" inputmode="numeric" value="${linkedMp?linkedMp.codigo:''}" placeholder="ID..." onchange="vincularProdPorCodigo('${p.id}',this.value)"
@@ -3244,9 +3263,6 @@ function rProdDetail(aid){
               `}
             </div>
           </div>
-          <input value="${p.nombre}" onchange="updP('${p.id}','nombre',this.value)"
-            style="flex:2;min-width:220px;padding:8px 10px;font-size:15px;font-weight:600;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-          <select onchange="updP('${p.id}','unidad',this.value)" style="width:100px;padding:7px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">${UNITS.map(u=>`<option${u===p.unidad?' selected':''}>${u}</option>`).join('')}</select>
           <button class="btn btn-xs btn-danger" onclick="delProd('${p.id}')" style="flex-shrink:0"><i class="ti ti-trash"></i></button>
         </div>
         <!-- Línea 2: configuración secundaria -->
