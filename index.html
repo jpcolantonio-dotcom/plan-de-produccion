@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.186</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.187</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2168,13 +2168,16 @@ function renderRealEmpresa(k,eid,items){
   aItems.forEach(r=>{
     const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
     const rk=rKey(r);
-    const rd=st.R[k]?.[rk]||st.R[k]?.[oi]||Array(7).fill(0);
+    const rd=realArr(st.R[k],r,oi);
     const tp=(r.days||[]).reduce((a,b)=>a+(b||0),0);
     const tr2=rd.reduce((a,b)=>a+(b||0),0);
     const trId=`rtot-${rk.replace(/[|]/g,'-')}`;
     const prodObj=st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id)||st.Pr.find(p=>p.empresa_id===r.empresa_id&&normTxt(p.nombre)===normTxt(r.producto));
     const tieneDetalle=prodObj&&prodObj.detalle_proceso;
     const codReal=codigoParaProducto(r);
+    // A partir de hoy, lo que se cargue acá se guarda bajo la clave por ID (rkSave) cuando el producto
+    // ya está vinculado a un código; si todavía no tiene ID, sigue guardando por nombre como antes.
+    const rkSave=rKeyId(r)||rk;
     // Código siempre editable a mano, igual que en Planificación (ver el mismo comentario ahí):
     // el input queda precargado con el código actual (si hay uno) y al cambiarlo se re-vincula
     // vía vincularPorCodigo, mostrando el nombre real de Configuración como confirmación.
@@ -2199,7 +2202,7 @@ function renderRealEmpresa(k,eid,items){
       h+=`<td class="day-cell${di===t?' today-col':''}" style="font-size:12px;color:var(--text2)">${pv>0?pv:'--'}</td>`;
       h+=`<td class="day-cell${di===t?' today-col':''}" style="position:relative">
         <input class="day-input${rv>0?' has-val':''}" type="number" min="0" value="${rv||''}" placeholder="--"
-          onchange="uR('${k}','${rk}',${di},this.value);this.classList.toggle('has-val',this.value!='');updRealTot('${trId}','${rk}','${k}')"
+          onchange="uR('${k}','${rkSave}',${di},this.value);this.classList.toggle('has-val',this.value!='');updRealTot('${trId}','${k}','${r.empresa_id}','${areaEscReal}','${prodEscReal}',${oi})"
           style="border-color:rgba(29,158,117,.3)"/>
         ${desvio?`<button onclick="showCausaModal('${k}',${oi},${di},${pv},${rv},'${r.empresa_id}','${r.area}','${r.producto.replace(/'/g,"\'")}','${r.unidad}')" style="position:absolute;right:2px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--amber);font-size:14px" title="Registrar causa"><i class="ti ti-alert-triangle"></i></button>`:''}
         ${tieneDetalle?`<button onclick="showDetalleModal('${k}','${rk}',${di},'${r.producto.replace(/'/g,"\'")}','${r.unidad}')" style="position:absolute;left:2px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:${hasDP?'var(--blue)':'var(--text3)'};font-size:13px" title="Detalle proceso"><i class="ti ti-clock-hour-4"></i>${hasDP?`<span style="position:absolute;top:-4px;right:-4px;background:var(--blue);color:#fff;border-radius:50%;width:8px;height:8px;font-size:8px;display:flex;align-items:center;justify-content:center">${dpros.length}</span>`:''}  </button>`:''}
@@ -2208,11 +2211,11 @@ function renderRealEmpresa(k,eid,items){
     h+=`<td class="total-cell" style="font-size:12px">${fmt(tp)}</td><td class="total-cell" style="color:var(--green)" id="${trId}">${tr2>0?fmt(tr2):'--'}</td></tr>`;
   });
   const totPlan=aItems.reduce((s,r)=>(r.days||[]).reduce((a,b)=>a+(b||0),s),0);
-  const totReal=aItems.reduce((s,r)=>{const rk=rKey(r);const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);const rd=st.R[k]?.[rk]||st.R[k]?.[oi]||Array(7).fill(0);return s+rd.reduce((a,b)=>a+(b||0),0);},0);
+  const totReal=aItems.reduce((s,r)=>{const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);const rd=realArr(st.R[k],r,oi);return s+rd.reduce((a,b)=>a+(b||0),0);},0);
   h+=`<tr style="background:var(--bg2);font-weight:700"><td colspan="2">Total ${activeArea}</td>`;
   for(let di=0;di<7;di++){
     const dP=aItems.reduce((s,r)=>s+((r.days&&r.days[di])||0),0);
-    const dR=aItems.reduce((s,r)=>{const rk=rKey(r);const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);const rd=st.R[k]?.[rk]||st.R[k]?.[oi]||Array(7).fill(0);return s+(rd[di]||0);},0);
+    const dR=aItems.reduce((s,r)=>{const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);const rd=realArr(st.R[k],r,oi);return s+(rd[di]||0);},0);
     h+=`<td class="total-cell${di===t?' today-col':''}" style="font-size:12px">${dP>0?dP:'--'}</td><td class="total-cell${di===t?' today-col':''}" style="color:var(--green)">${dR>0?dR:'--'}</td>`;
   }
   h+=`<td class="total-cell">${fmt(totPlan)}</td><td class="total-cell" style="color:var(--green)">${totReal>0?fmt(totReal):'--'}</td></tr>`;
@@ -2487,13 +2490,39 @@ async function dpGuardar(key,k,rk,di){
   renderReal();
 }
 
-function updRealTot(trId,rk,k){
-  const days=st.R[k]?.[rk]||Array(7).fill(0);
+function updRealTot(trId,k,eid,area,producto,oi){
+  const days=realArr(st.R[k],{empresa_id:eid,area,producto},oi);
   const tot=days.reduce((a,b)=>a+(b||0),0);
   const el=document.getElementById(trId);
   if(el)el.textContent=tot>0?tot.toLocaleString('es-AR'):'--';
 }
 function rKey(r){return`${r.empresa_id}||${r.area}||${r.producto}`}
+// Clave de guardado de Producción Real basada en el ID (código Flexxus) del producto, cuando ya está
+// vinculado en Configuración. A partir de esta versión, cada valor que se tipea en Producción Real se
+// guarda bajo esta clave en vez de la clave por nombre (rKey) — así queda identificado por el ID y no
+// depende de que el nombre del producto no cambie nunca.
+function rKeyId(r){
+  const cod=codigoParaProducto(r);
+  return cod?`ID:${cod}`:null;
+}
+// Lee el array de 7 días de Producción Real combinando, día por día, la clave nueva por ID, la clave
+// vieja por nombre (rKey) y el índice numérico legacy (oi) — así los datos cargados antes de este
+// cambio se siguen viendo con normalidad, y lo que se carga de hoy en más (bajo la clave por ID) no
+// tapa al resto de los días ya guardados bajo la clave vieja.
+function realArr(re,r,oi){
+  re=re||{};
+  const idk=rKeyId(r);
+  const idArr=idk?re[idk]:null;
+  const nameArr=re[rKey(r)];
+  const oiArr=(oi!==undefined&&oi!==null)?re[oi]:null;
+  const out=Array(7).fill(0);
+  for(let i=0;i<7;i++){
+    const vi=idArr&&idArr[i],vn=nameArr&&nameArr[i],vo=oiArr&&oiArr[i];
+    out[i]=vi?vi:(vn?vn:(vo||0));
+  }
+  return out;
+}
+function realDia(re,r,di,oi){ return realArr(re,r,oi)[di]||0; }
 if(!st.RDirty)st.RDirty={};
 function uR(k,rkey,di,v){
   if(!st.R[k])st.R[k]={};
@@ -2570,8 +2599,7 @@ async function actualizarStockDesdeReal(semKey){
     try{stockData=await get('stock','order=area.asc,producto.asc');}catch{return}
   }
   for(const r of plan){
-    const rk=rKey(r);
-    const rv=(real[rk]||[])[diHoy]||0;
+    const rv=realDia(real,r,diHoy);
     if(!rv)continue; // si no hay produccion hoy, saltar
     // Buscar si ya existe movimiento de entrada para hoy para este producto
     const movExisting=await get('stock_movimientos',
@@ -2685,8 +2713,7 @@ async function renderCmpMensual(){
     if(ef!=='all')plan=plan.filter(r=>r.empresa_id===ef);
     const real=st.R[semKey]||{};
     plan.forEach(r=>{
-      const rk=rKey(r);
-      const rdReal=real[rk]||Array(7).fill(0);
+      const rdReal=realArr(real,r);
       const pk=r.empresa_id+'||'+r.area+'||'+r.producto;
       if(!prodMap[pk])prodMap[pk]={nombre:r.producto,area:r.area,empresa_id:r.empresa_id,
         totalPlan:0,totalReal:0,dias:{}};
@@ -2840,7 +2867,7 @@ async function generarInformePDF(){
       let aap=0,aar=0;const productos=[];
       aItems.forEach((r,ri)=>{
         const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
-        const rk=rKey(r);const rdReal=re[rk]||re[oi]||Array(7).fill(0);
+        const rdReal=realArr(re,r,oi);
         const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);
         const rv=rdReal.reduce((a,b)=>a+(b||0),0);
         if(!pv&&!rv)return;
@@ -2879,7 +2906,7 @@ async function generarInformePDF(){
   let kgPlanTotal=0, kgRealTotal=0;
   plan.forEach(r=>{
     const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
-    const rk=rKey(r);const rdReal=re[rk]||re[oi]||Array(7).fill(0);
+    const rdReal=realArr(re,r,oi);
     const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);
     const rv=rdReal.reduce((a,b)=>a+(b||0),0);
     const prodM=st.Pr.find(px=>px.nombre===r.producto&&String(px.empresa_id)===String(r.empresa_id)&&(st.A.find(a=>a.id===px.area_id)?.nombre||'')===(r.area||''))||st.Pr.find(px=>px.nombre===r.producto&&String(px.empresa_id)===String(r.empresa_id))||st.Pr.find(px=>px.nombre===r.producto);
@@ -2937,15 +2964,14 @@ function renderCmp(){
   let plan=ef==='all'?ap:ap.filter(r=>r.empresa_id===ef);
   const re=st.R[k]||{};
   let tp=0,tr2=0,cu=0;
-  plan.forEach((r,i)=>{const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);const rk=rKey(r);const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);const rv=(re[rk]||re[oi]||[]).reduce((a,b)=>a+(b||0),0);tp+=pv;tr2+=rv;if(rv>=pv&&pv>0)cu++});
+  plan.forEach((r,i)=>{const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);const pv=(r.days||[]).reduce((a,b)=>a+(b||0),0);const rv=realArr(re,r,oi).reduce((a,b)=>a+(b||0),0);tp+=pv;tr2+=rv;if(rv>=pv&&pv>0)cu++});
   const pct=tp>0?Math.round(tr2/tp*100):0;const cls=pct>=90?'good':pct>=70?'warn':'bad';
   // Calcular cumplimiento del dia actual — solo items con real > 0
   const dHoy=tc(k);
   let tpHoy=0,trHoy=0,itemsConReal=0;
   plan.forEach(r=>{
     const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
-    const rk=rKey(r);
-    const rdReal=re[rk]||re[oi]||Array(7).fill(0);
+    const rdReal=realArr(re,r,oi);
     const pvHoy=(r.days&&r.days[dHoy])||0;
     const rvHoy=rdReal[dHoy]||0;
     if(rvHoy>0){tpHoy+=pvHoy;trHoy+=rvHoy;itemsConReal++;}
@@ -2979,8 +3005,7 @@ function renderCmp(){
       let aap=0,aar=0;
       aIt.forEach((r,ri)=>{
         const oi=ap.findIndex(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
-        const rk=rKey(r);
-        const rdReal=re[rk]||re[oi]||Array(7).fill(0);
+        const rdReal=realArr(re,r,oi);
         const t2=(r.days||Array(7).fill(0)).reduce((a,b)=>a+(b||0),0);
         const t3=rdReal.reduce((a,b)=>a+(b||0),0);
         aap+=t2;aar+=t3;
@@ -5695,9 +5720,8 @@ function renderCumplimientoEmpresas(k){
   plan.forEach(r=>{
     const eid=r.empresa_id||'_';
     if(ef!=='all'&&eid!==ef)return;
-    const rk=rKey(r);
     const pv=(r.days&&r.days[dia])||0;
-    const _rv=real[rk]?.[dia];const rv=(_rv!==undefined&&_rv!==null)?_rv:0;
+    const rv=realDia(real,r,dia);
     if(pv>0&&rv>0){
       if(!byEmp[eid])byEmp[eid]={plan:0,real:0,nm:en(eid)||'SE',clr:ec(eid)};
       byEmp[eid].plan+=pv;
@@ -5765,9 +5789,8 @@ function buildDashItems(k,ef){
   const byArea={};
   let filtered=ef==='all'?plan:plan.filter(r=>r.empresa_id===ef);
   filtered.forEach(r=>{
-    const rk=rKey(r);
     const pv=(r.days&&r.days[dia])||0;
-    const _rv2=real[rk]?.[dia];const rv=(_rv2!==undefined&&_rv2!==null)?_rv2:0;
+    const rv=realDia(real,r,dia);
     if(pv>0){
       if(!byArea[r.area])byArea[r.area]={empresa_id:r.empresa_id,items:[]};
       byArea[r.area].items.push({produto:r.producto,area:r.area,unidad:r.unidad,empresa_id:r.empresa_id,pv,rv});
@@ -8314,8 +8337,7 @@ async function showCerrarDiaModal(){
   const diaIdx=new Date().getDay();const di=(diaIdx+6)%7; // convertir a lunes=0
   const items=[];
   plan.forEach((r,oi)=>{
-    const rk=rKey(r);
-    const _rv3=real[rk]?.[di];const rv=(_rv3!==undefined&&_rv3!==null)?_rv3:0;
+    const rv=realDia(real,r,di,oi);
     if(rv>0)items.push({oi,producto:r.producto,area:r.area,unidad:r.unidad,empresa_id:r.empresa_id,cantidad:rv});
   });
   if(!items.length){alert('No hay produccion real cargada para hoy.');return}
@@ -9088,21 +9110,19 @@ function renderResumen(){
     const aElab=(planRow&&planRow.days&&planRow.days[diIdx])||0;
     // Buscar produccion real del dia
     const oi=plan.findIndex(r=>r.producto===p.nombre&&r.empresa_id===eid&&r.area===area);
-    const rk=`${eid}||${area}||${p.nombre}`;
-    const _rkVal=real[rk]?.[diIdx];
-    const realDia=(_rkVal!==undefined&&_rkVal!==null)?_rkVal:0;
+    const realDiaVal=realDia(real,{empresa_id:eid,area,producto:p.nombre},diIdx,oi);
     const proy=getProyItem(eid,area,p.nombre);
     const toN=v=>isNaN(parseFloat(v))?0:parseFloat(v);
     const stock=proy?toN(proy.stock):0;
     const vend=proy?toN(proy.vendedores):0;
     const tyc=proy?toN(proy.tyc):0;
     // Saldo usa real si está disponible, sino plan
-    const elaborado=realDia>0?realDia:aElab;
+    const elaborado=realDiaVal>0?realDiaVal:aElab;
     const saldo=stock+elaborado-vend-tyc;
-    if(!stock&&!aElab&&!realDia&&!vend&&!tyc)return;
+    if(!stock&&!aElab&&!realDiaVal&&!vend&&!tyc)return;
     if(!byE[eid])byE[eid]={nm:en(eid)||'SE',clr:ec(eid),areas:{}};
     if(!byE[eid].areas[area])byE[eid].areas[area]=[];
-    byE[eid].areas[area].push({nombre:p.nombre,unidad:p.unidad,stock,aElab,realDia,vend,tyc,saldo});
+    byE[eid].areas[area].push({nombre:p.nombre,unidad:p.unidad,stock,aElab,realDia:realDiaVal,vend,tyc,saldo});
   });
 
   const totalItems=Object.values(byE).reduce((s,e)=>s+Object.values(e.areas).reduce((s2,a)=>s2+a.length,0),0);
