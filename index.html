@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.180</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.181</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -268,8 +268,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('rec')"><i class="ti ti-notebook"></i>Recetas</button>
   <button class="tab" onclick="T('rrhh')"><i class="ti ti-users-group"></i>RRHH</button>
   <button class="tab" onclick="T('ped')"><i class="ti ti-shopping-cart"></i>Pedidos</button>
-  <button class="tab" onclick="T('mae')"><i class="ti ti-building-factory-2"></i>Maestro</button>
-  <button class="tab" onclick="T('mae2')"><i class="ti ti-flask"></i>Maestro 2</button>
+  <button class="tab" onclick="T('cfg')"><i class="ti ti-settings"></i>Configuración</button>
   <button class="tab" onclick="T('etq')"><i class="ti ti-qrcode"></i>Etiquetas</button>
   <button class="tab" onclick="T('planillas')"><i class="ti ti-file-text"></i>Planillas</button>
 </div>
@@ -405,7 +404,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <div>
         <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Productos</div>
         <input type="text" id="rec-buscar" placeholder="🔍 Buscar producto..." oninput="rRec()" style="width:100%;padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);margin-bottom:8px"/>
-        <div id="rplist" class="rlist"><div class="empty"><i class="ti ti-package-off"></i>Agrega productos en Maestro.</div></div>
+        <div id="rplist" class="rlist"><div class="empty"><i class="ti ti-package-off"></i>Agrega productos en Configuración.</div></div>
       </div>
       <div id="rdetail"><div class="empty"><i class="ti ti-arrow-left"></i>Selecciona un producto.</div></div>
     </div>
@@ -1173,23 +1172,80 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 </div>
 
 <!-- MAESTRO -->
-<div id="tab-mae" class="section">
+<div id="tab-cfg" class="section">
   <div class="toolbar">
-    <div><div style="font-size:16px;font-weight:600">Maestro</div><div style="font-size:13px;color:var(--text2)">Empresas &rarr; Areas &rarr; Productos</div></div>
-    <div class="btns">
-      <button class="btn btn-sm" onclick="exportarMaestroExcel()"><i class="ti ti-file-spreadsheet"></i> Exportar Excel</button>
-      <button class="btn btn-sm" onclick="toggleMapeoJoselito()"><i class="ti ti-link"></i> Mapeo Joselito</button>
-    </div>
+    <div><div style="font-size:16px;font-weight:600">Configuración</div><div style="font-size:13px;color:var(--text2)">Artículos (ID, descripción y depósito) y Producción (Empresas &rarr; Areas &rarr; Productos)</div></div>
   </div>
 
   <div class="proy-subtabs">
-    <button class="proy-tab active" id="maetab-prod" onclick="showMaeSubTab('prod')"><i class="ti ti-package"></i> Productos</button>
-    <button class="proy-tab" id="maetab-config" onclick="showMaeSubTab('config')"><i class="ti ti-settings"></i> Configuración</button>
-    <button class="proy-tab" id="maetab-depositos" onclick="showMaeSubTab('depositos')"><i class="ti ti-building-warehouse"></i> Depósitos</button>
+    <button class="proy-tab active" id="cfgtab-ids" onclick="showCfgSubTab('ids')"><i class="ti ti-id"></i> ID / Descripción / Depósito</button>
+    <button class="proy-tab" id="cfgtab-prod" onclick="showCfgSubTab('prod')"><i class="ti ti-package"></i> Producción</button>
   </div>
 
-  <!-- SUB-TAB PRODUCTOS -->
-  <div id="mae-sub-prod">
+  <!-- SUB-TAB ID / DESCRIPCIÓN / DEPÓSITO (ex Maestro > Configuración + Maestro > Depósitos + Maestro 2) -->
+  <div id="cfg-sub-ids">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <input type="text" id="mp-new-codigo" placeholder="Código (opcional)" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);width:120px"/>
+      <input type="text" id="mp-new-nombre" placeholder="Nombre MP (ej: Harina 000)" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);width:220px"/>
+      <select id="mp-new-unidad" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)">
+        <option>Kg</option><option>Gr</option><option>Litros</option><option>CC</option><option>Unidad</option>
+      </select>
+      <button class="btn btn-primary" onclick="addMateriaPrima()"><i class="ti ti-plus"></i> Agregar ID</button>
+      <span style="flex:1"></span>
+      <button class="btn btn-sm" onclick="toggleCfgDepositos()"><i class="ti ti-building-warehouse"></i> Gestionar depósitos</button>
+      <button class="btn btn-danger" onclick="borrarMPSinCodigo()"><i class="ti ti-trash"></i> Borrar sin código</button>
+      <span id="mp-import-loading" style="display:none;font-size:13px;color:var(--text2);align-items:center;gap:6px"><span class="spinner spinner-dark"></span> Procesando CSV...</span>
+    </div>
+    <div id="mp-import-msg" style="display:none;margin-bottom:12px" class="alert alert-ok"></div>
+    <div id="mp-import-err" style="display:none;margin-bottom:12px" class="alert alert-err"></div>
+
+    <!-- PANEL DEPÓSITOS (colapsable) -->
+    <div id="cfg-depositos-panel" style="display:none;margin-bottom:1.5rem">
+      <div class="grid-card">
+        <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Los depósitos que crees acá aparecen en Stock &gt; Conteo de stock (para asignarle un depósito a cada producto), en Stock &gt; Depositos, y en la columna "Depósitos" de la lista de abajo.</div>
+        <div id="depo-emp-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem"></div>
+        <div style="max-width:360px">
+          <div id="depolist" class="m-list"><div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Selecciona empresa</div></div>
+          <div id="depoadd" style="display:none;margin-top:8px">
+            <div style="display:flex;gap:6px">
+              <input type="text" id="ndepo" placeholder="Nombre del depósito" style="flex:1;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+              <button class="btn btn-primary btn-sm" onclick="addMaeDeposito()"><i class="ti ti-plus"></i> Agregar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="alert alert-info" style="margin-bottom:10px"><i class="ti ti-info-circle"></i> La columna "Tipo" clasifica cada fila: <b>MP</b> es materia prima real (aparece en Stock &gt; Materias Primas para el conteo). <b>P. Terminado</b>/<b>P. Proceso</b> son en realidad productos que se colaron acá (por ejemplo al importar el CSV) — vinculalos desde Configuración &gt; Producción. <b>Insumos</b> es para lo que no es materia prima de receta (packaging, limpieza, etc.). Ninguna de estas tres últimas se cuenta como MP en el conteo de Stock.</div>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+      <input type="text" id="mp-list-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="filtrarMPList()"
+        style="flex:1;min-width:200px;max-width:320px;padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <span id="mp-list-resumen" style="font-size:12px;color:var(--text2)"></span>
+    </div>
+    <div id="mp-bulk-bar" style="display:none;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;padding:8px 10px;background:var(--bg2);border-radius:var(--radius);border:.5px solid var(--border2)">
+      <span id="mp-bulk-count" style="font-size:12px;font-weight:600"></span>
+      <span style="font-size:12px;color:var(--text2)">Marcar como:</span>
+      <button class="btn btn-xs" onclick="mpBulkSetTipo('mp')">Materia Prima</button>
+      <button class="btn btn-xs" onclick="mpBulkSetTipo('terminado')">Producto Terminado</button>
+      <button class="btn btn-xs" onclick="mpBulkSetTipo('proceso')">Producto en Proceso</button>
+      <button class="btn btn-xs" onclick="mpBulkSetTipo('insumos')">Insumos</button>
+      <button class="btn btn-xs" onclick="mpDeselAll()">Deseleccionar</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button class="btn btn-xs" onclick="mpSelAllVisible()"><i class="ti ti-checkbox"></i> Seleccionar visibles</button>
+    </div>
+    <div id="mp-list-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
+  </div>
+
+  <!-- SUB-TAB PRODUCCIÓN (ex Maestro > Productos) -->
+  <div id="cfg-sub-prod" style="display:none">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap">
+      <span style="font-size:13px;color:var(--text2)">Familia de empresas &rarr; familia de areas por empresa &rarr; productos que se elaboran en cada area (con su ID vinculado).</span>
+      <div class="btns" style="margin-left:auto">
+        <button class="btn btn-sm" onclick="exportarMaestroExcel()"><i class="ti ti-file-spreadsheet"></i> Exportar Excel</button>
+        <button class="btn btn-sm" onclick="toggleMapeoJoselito()"><i class="ti ti-link"></i> Mapeo Joselito</button>
+      </div>
+    </div>
     <!-- PANEL MAPEO JOSELITO -->
     <div id="mapeo-joselito-panel" style="display:none;margin-bottom:1.5rem">
       <div class="grid-card">
@@ -1246,86 +1302,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     </div>
     <div id="maemsg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
     <div id="maeerr" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="maeErrtxt"></span></div>
-  </div>
-
-  <!-- SUB-TAB CONFIGURACIÓN (Materias Primas) -->
-  <div id="mae-sub-config" style="display:none">
-    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-      <input type="text" id="mp-new-codigo" placeholder="Código (opcional)" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);width:120px"/>
-      <input type="text" id="mp-new-nombre" placeholder="Nombre MP (ej: Harina 000)" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);width:220px"/>
-      <select id="mp-new-unidad" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)">
-        <option>Kg</option><option>Gr</option><option>Litros</option><option>CC</option><option>Unidad</option>
-      </select>
-      <button class="btn btn-primary" onclick="addMateriaPrima()"><i class="ti ti-plus"></i> Agregar MP</button>
-      <span style="flex:1"></span>
-      <button class="btn btn-danger" onclick="borrarMPSinCodigo()"><i class="ti ti-trash"></i> Borrar sin código</button>
-      <span id="mp-import-loading" style="display:none;font-size:13px;color:var(--text2);align-items:center;gap:6px"><span class="spinner spinner-dark"></span> Procesando CSV...</span>
-    </div>
-    <div id="mp-import-msg" style="display:none;margin-bottom:12px" class="alert alert-ok"></div>
-    <div id="mp-import-err" style="display:none;margin-bottom:12px" class="alert alert-err"></div>
-    <div class="alert alert-info" style="margin-bottom:10px"><i class="ti ti-info-circle"></i> La columna "Tipo" clasifica cada fila: <b>MP</b> es materia prima real (aparece en Stock &gt; Materias Primas para el conteo). <b>P. Terminado</b>/<b>P. Proceso</b> son en realidad productos que se colaron acá (por ejemplo al importar el CSV) — vinculalos desde Maestro &gt; Productos. <b>Insumos</b> es para lo que no es materia prima de receta (packaging, limpieza, etc.). Ninguna de estas tres últimas se cuenta como MP en el conteo de Stock.</div>
-    <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
-      <input type="text" id="mp-list-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="filtrarMPList()"
-        style="flex:1;min-width:200px;max-width:320px;padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-      <span id="mp-list-resumen" style="font-size:12px;color:var(--text2)"></span>
-    </div>
-    <div id="mp-bulk-bar" style="display:none;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;padding:8px 10px;background:var(--bg2);border-radius:var(--radius);border:.5px solid var(--border2)">
-      <span id="mp-bulk-count" style="font-size:12px;font-weight:600"></span>
-      <span style="font-size:12px;color:var(--text2)">Marcar como:</span>
-      <button class="btn btn-xs" onclick="mpBulkSetTipo('mp')">Materia Prima</button>
-      <button class="btn btn-xs" onclick="mpBulkSetTipo('terminado')">Producto Terminado</button>
-      <button class="btn btn-xs" onclick="mpBulkSetTipo('proceso')">Producto en Proceso</button>
-      <button class="btn btn-xs" onclick="mpBulkSetTipo('insumos')">Insumos</button>
-      <button class="btn btn-xs" onclick="mpDeselAll()">Deseleccionar</button>
-    </div>
-    <div style="display:flex;gap:8px;margin-bottom:8px">
-      <button class="btn btn-xs" onclick="mpSelAllVisible()"><i class="ti ti-checkbox"></i> Seleccionar visibles</button>
-    </div>
-    <div id="mp-list-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
-  </div>
-
-  <!-- SUB-TAB DEPÓSITOS -->
-  <div id="mae-sub-depositos" style="display:none">
-    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Los depósitos que crees acá aparecen en Stock &gt; Conteo de stock (para asignarle un depósito a cada producto) y en Stock &gt; Depositos.</div>
-    <div id="depo-emp-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:1rem"></div>
-    <div style="max-width:360px">
-      <div id="depolist" class="m-list"><div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Selecciona empresa</div></div>
-      <div id="depoadd" style="display:none;margin-top:8px">
-        <div style="display:flex;gap:6px">
-          <input type="text" id="ndepo" placeholder="Nombre del depósito" style="flex:1;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-          <button class="btn btn-primary btn-sm" onclick="addMaeDeposito()"><i class="ti ti-plus"></i> Agregar</button>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- MAESTRO 2 (prueba) -->
-<div id="tab-mae2" class="section">
-  <div class="toolbar">
-    <div>
-      <div style="font-size:16px;font-weight:600">Maestro 2 <span style="font-size:11px;font-weight:400;color:var(--text2)">(prueba)</span></div>
-      <div style="font-size:13px;color:var(--text2)">Empresas → Areas → lista de Configuración con alias manual</div>
-    </div>
-  </div>
-  <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Pestaña de prueba. La columna "Productos" muestra siempre TODA la lista de Maestro &gt; Configuración (no se filtra por la empresa/área elegida a la izquierda, porque esa lista no tiene ese vínculo) — Empresas y Areas quedan solo para navegar.</div>
-  <div class="maestro-cols">
-    <div>
-      <div class="mc-title">1. Empresas</div>
-      <div id="mae2-emplist" class="m-list"><div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Sin empresas.</div></div>
-    </div>
-    <div>
-      <div class="mc-title">2. Areas</div>
-      <div id="mae2-arealist" class="m-list"><div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Selecciona empresa</div></div>
-    </div>
-    <div style="min-width:0;overflow-x:auto">
-      <div class="mc-title">3. Productos (Configuración)</div>
-      <div style="margin-bottom:8px">
-        <input type="text" id="mae2-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="filtrarMae2Productos()"
-          style="width:100%;max-width:320px;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-      </div>
-      <div id="mae2-productos"><div style="padding:2rem;text-align:center;font-size:13px;color:var(--text2)"><span class="spinner spinner-dark"></span></div></div>
-    </div>
   </div>
 </div>
 
@@ -1608,7 +1584,7 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['plan','rell','real','cmp','desv','dash','stock','cong','rec','rend','rrhh','ped','mae','etq'];
+const TABS=['plan','rell','real','cmp','desv','dash','stock','cong','rec','rend','rrhh','ped','cfg','etq'];
 function T(t){
   document.querySelectorAll('.tab').forEach(el=>{
     const m=el.getAttribute('onclick')||'';
@@ -1626,8 +1602,7 @@ function T(t){
   if(t==='rrhh')initRrhh();
   if(t==='rec'){if(!st.Pr.length||!Object.keys(st.Rec).length){init().then(()=>rRec());}else{rRec();}}
   if(t==='con'){pSC();renderCon()}
-  if(t==='mae'){rMae();loadMaeDepositosOnce();}
-  if(t==='mae2')rMae2();
+  if(t==='cfg'){renderMPList();rMae();loadMaeDepositosOnce();}
   if(t==='rend')initRend();
   if(t==='ped')initPedidos();
   if(t==='etq')initEtiquetas();
@@ -1792,7 +1767,7 @@ async function vincularPorCodigo(prodId,codigoTexto){
   const codigo=(codigoTexto||'').toString().trim();
   if(!prodId||!codigo)return;
   const m=mpData.find(x=>(x.codigo||'').toString().trim()===codigo);
-  if(!m){ ss('error',`No encontré en Maestro > Configuración ningún producto con el código "${codigo}".`); return; }
+  if(!m){ ss('error',`No encontré en Configuración ningún producto con el código "${codigo}".`); return; }
   await vincularCodigoDesdeProduccion(prodId,m.id);
 }
 async function vincularCodigoDesdeProduccion(prodId,mpId){
@@ -1809,7 +1784,7 @@ async function vincularCodigoNuevoProducto(eid,area,producto,unidad,codigoTexto)
   const codigo=(codigoTexto||'').toString().trim();
   if(!codigo)return;
   const m=mpData.find(x=>(x.codigo||'').toString().trim()===codigo);
-  if(!m){ ss('error',`No encontré en Maestro > Configuración ningún producto con el código "${codigo}".`); return; }
+  if(!m){ ss('error',`No encontré en Configuración ningún producto con el código "${codigo}".`); return; }
   try{
     // El área del plan puede no existir todavía como fila formal en Maestro > Áreas (áreas viejas
     // que solo estaban en el plan, nunca dadas de alta en Maestro) -- en vez de frenar acá pidiendo
@@ -3040,56 +3015,15 @@ function renderCmp(){
 }
 
 // MAESTRO
-// MAESTRO 2 (pestaña de prueba) — misma estructura de navegación Empresas → Areas que Maestro,
-// pero la columna de "Productos" no sale de Maestro > Productos: muestra siempre TODA la lista de
-// Maestro > Configuración (materias_primas), con su código a la izquierda del nombre y un campo
-// "alias" de carga manual al lado (columna nueva en materias_primas). Empresas/Areas quedan solo
-// para navegar — no filtran esa lista, porque Configuración no tiene vínculo a área/empresa.
-// Usa su propio estado (st.ae2id/st.aa2id) para no interferir con la selección de Maestro > Productos.
-function rMae2(){
-  const list=document.getElementById('mae2-emplist');
-  if(!list)return;
-  if(!st.E.length){
-    list.innerHTML='<div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Sin empresas.</div>';
-  }else{
-    let h='';
-    st.E.forEach(e=>{
-      const sel=e.id===st.ae2id;
-      h+=`<div class="m-row${sel?' sel':''}" onclick="selEmp2('${e.id}')">
-        <div style="display:flex;align-items:center;gap:7px;flex:1;min-width:0">
-          <span style="width:12px;height:12px;border-radius:50%;background:${e.color};flex-shrink:0;display:inline-block"></span>
-          <div class="m-name">${e.nombre}</div>
-        </div>
-      </div>`;
-    });
-    list.innerHTML=h;
-  }
-  rAreaList2(st.ae2id);
-  rMae2Productos();
-}
-function selEmp2(id){ st.ae2id=id; st.aa2id=null; rMae2(); }
-function rAreaList2(eid){
-  const list=document.getElementById('mae2-arealist');
-  if(!list)return;
-  if(!eid){ list.innerHTML='<div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Selecciona empresa</div>'; return; }
-  const areas=st.A.filter(a=>a.empresa_id===eid);
-  if(!areas.length){ list.innerHTML='<div style="padding:1rem;text-align:center;font-size:13px;color:var(--text2)">Sin areas.</div>'; return; }
-  let h='';
-  areas.forEach(a=>{
-    const sel=a.id===st.aa2id;
-    h+=`<div class="m-row${sel?' sel':''}" onclick="selArea2('${a.id}')"><div class="m-name">${a.nombre}</div></div>`;
-  });
-  list.innerHTML=h;
-}
-function selArea2(id){ st.aa2id=id; rAreaList2(st.ae2id); }
-// Depósitos de Maestro 2: acá un artículo puede estar en VARIOS depósitos a la vez (no es un único
-// valor fijo como materias_primas.deposito_id que usan Stock>Conteo/Maestro>Productos). Se guarda
-// en una tabla nueva "mp_depositos" (mp_id, deposito_id) — una fila por cada depósito asignado.
+// Depósitos por artículo (Configuración > ID / Descripción / Depósito): acá un artículo puede estar
+// en VARIOS depósitos a la vez (no es un único valor fijo como materias_primas.deposito_id que usan
+// Stock>Conteo/Configuración>Producción). Se guarda en una tabla nueva "mp_depositos" (mp_id,
+// deposito_id) — una fila por cada depósito asignado.
 let mpDepositosData=[]; // filas de mp_depositos: {id, mp_id, deposito_id}
 let mpDepositosCargado=false;
 function depositosDeMp(mpId){ return mpDepositosData.filter(x=>x.mp_id===mpId); }
 
-function mae2DepositosHtml(m){
+function depositosMpHtml(m){
   const prod=prodPorMp(m);
   const todas=prod?stockConteoDepositos.filter(d=>d.empresa_id===prod.empresa_id):stockConteoDepositos;
   const asignados=depositosDeMp(m.id);
@@ -3125,7 +3059,7 @@ async function agregarMpDeposito(mpId,depositoId){
     ss('error','Error: '+e.message+hintFaltaTabla(e.message,'mp_depositos',
       'create table mp_depositos (id uuid primary key default gen_random_uuid(), mp_id uuid not null references materias_primas(id) on delete cascade, deposito_id uuid not null references depositos(id) on delete cascade, unique (mp_id, deposito_id)); alter table mp_depositos disable row level security;'));
   }
-  rMae2Productos();
+  renderMPList();
 }
 
 async function quitarMpDeposito(id){
@@ -3137,46 +3071,7 @@ async function quitarMpDeposito(id){
   }catch(e){
     ss('error','Error: '+e.message);
   }
-  rMae2Productos();
-}
-
-async function rMae2Productos(){
-  const el=document.getElementById('mae2-productos');
-  if(!el)return;
-  if(!mpData.length){el.innerHTML='<div class="empty"><i class="ti ti-packages"></i> Sin datos en Configuración.</div>';return}
-  if(!stockConteoDepositosCargado){
-    try{ stockConteoDepositos=await get('depositos','order=nombre.asc'); }catch{stockConteoDepositos=[]}
-    stockConteoDepositosCargado=true;
-  }
-  if(!mpDepositosCargado){
-    try{ mpDepositosData=await get('mp_depositos','select=*'); }catch{mpDepositosData=[]}
-    mpDepositosCargado=true;
-  }
-  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="width:100px">Código</th><th>Nombre</th><th style="width:220px">Depósitos</th><th style="width:240px">Alias</th></tr></thead><tbody>';
-  mpData.forEach(m=>{
-    const txt=(m.nombre+' '+(m.codigo||'')).toLowerCase().replace(/"/g,'&quot;');
-    h+=`<tr class="mae2-row" data-txt="${txt}">
-      <td style="font-size:12px;color:var(--text2);font-family:monospace">${m.codigo||''}</td>
-      <td style="font-weight:500">${m.nombre}</td>
-      <td>${mae2DepositosHtml(m)}</td>
-      <td><div style="display:flex;gap:4px;align-items:center">
-        <input value="${(m.alias||'').replace(/"/g,'&quot;')}" placeholder="Alias..."
-        style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
-        onchange="updateMP('${m.id}','alias',this.value)"/>
-        <button type="button" class="btn btn-xs" onclick="aliasCopiarNombre('${m.id}')" title="Copiar el nombre real del producto como alias"><i class="ti ti-copy"></i></button>
-      </div></td>
-    </tr>`;
-  });
-  h+='</tbody></table></div>';
-  el.innerHTML=h;
-  const filtro=document.getElementById('mae2-filtro');
-  if(filtro&&filtro.value)filtrarMae2Productos();
-}
-function filtrarMae2Productos(){
-  const flt=(document.getElementById('mae2-filtro')?.value||'').toLowerCase().trim();
-  document.querySelectorAll('#mae2-productos tr.mae2-row').forEach(tr=>{
-    tr.style.display=(!flt||tr.dataset.txt.includes(flt))?'':'none';
-  });
+  renderMPList();
 }
 
 function rMae(){
@@ -3333,10 +3228,7 @@ function rProdDetail(aid){
             <button class="btn btn-xs" onclick="moveProd('${p.id}','${aid}',-1)" ${idx===0?'disabled':''} style="padding:2px 6px"><i class="ti ti-chevron-up"></i></button>
             <button class="btn btn-xs" onclick="moveProd('${p.id}','${aid}',1)" ${idx===prods.length-1?'disabled':''} style="padding:2px 6px"><i class="ti ti-chevron-down"></i></button>
           </div>
-          <input value="${p.nombre}" onchange="updP('${p.id}','nombre',this.value)"
-            style="flex:2;min-width:220px;padding:8px 10px;font-size:15px;font-weight:600;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-          <select onchange="updP('${p.id}','unidad',this.value)" style="width:100px;padding:7px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">${UNITS.map(u=>`<option${u===p.unidad?' selected':''}>${u}</option>`).join('')}</select>
-          <div style="flex:1.4;min-width:220px" title="Vínculo con la fila de Maestro > Configuración (código Flexxus). Es lo que usa Stock > Conteo de stock para este producto.">
+          <div style="flex:1.4;min-width:220px" title="Vínculo con la fila de Configuración > ID / Descripción / Depósito (código Flexxus). Es lo que usa Stock > Conteo de stock para este producto.">
             ${linkedMp?`
               <div style="display:flex;align-items:center;gap:6px;font-size:12.5px;padding:6px 8px;background:var(--bg2);border-radius:var(--radius)">
                 <i class="ti ti-link" style="color:var(--green)"></i>
@@ -3353,6 +3245,9 @@ function rProdDetail(aid){
               ${sugMp?`<div style="margin-top:3px"><span style="font-size:10.5px;color:var(--amber);cursor:pointer" onclick="prodMpLink('${p.id}','${sugMp.id}')">⚠ ¿"${sugMp.nombre.replace(/"/g,'&quot;')}" (${sugMp.codigo}${sugMp.unidad_tipo?', '+(sugMp.unidad_tipo==='caja'?'Caja Cerrada':'Unidad'):''})? · <u>vincular</u></span></div>`:''}
             `}
           </div>
+          <input value="${p.nombre}" onchange="updP('${p.id}','nombre',this.value)"
+            style="flex:2;min-width:220px;padding:8px 10px;font-size:15px;font-weight:600;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+          <select onchange="updP('${p.id}','unidad',this.value)" style="width:100px;padding:7px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">${UNITS.map(u=>`<option${u===p.unidad?' selected':''}>${u}</option>`).join('')}</select>
           <button class="btn btn-xs btn-danger" onclick="delProd('${p.id}')" style="flex-shrink:0"><i class="ti ti-trash"></i></button>
         </div>
         <!-- Línea 2: configuración secundaria -->
@@ -3404,7 +3299,7 @@ function rProdDetail(aid){
               onchange="updP('${p.id}','codigo_articulo',this.value.trim()||null)"
               style="width:90px;padding:3px 6px;font-size:12px;text-align:center;font-family:monospace;letter-spacing:0.5px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
           </label>
-          <label style="display:flex;align-items:center;gap:5px" title="Usado solo como ayuda: cuando un nombre de Materia Prima se parece a este producto, Maestro > Configuración sugiere clasificarlo con este mismo tipo (Terminado/Proceso)">
+          <label style="display:flex;align-items:center;gap:5px" title="Usado solo como ayuda: cuando un nombre de Materia Prima se parece a este producto, Configuración sugiere clasificarlo con este mismo tipo (Terminado/Proceso)">
             <span style="font-size:11px;color:var(--text2);white-space:nowrap">Tipo stock (ref.)</span>
             <select onchange="updP('${p.id}','tipo_stock',this.value||null)"
               style="padding:3px 5px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
@@ -3883,7 +3778,7 @@ function rRecDet(p){
   let h=`<div class="rdetail">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:10px">
       <div style="font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px">
-        <i class="ti ti-notebook" style="color:var(--purple)"></i>${p}${codSelf?`<span style="font-size:11px;font-weight:400;color:var(--text2);font-family:monospace;background:var(--bg2);border-radius:4px;padding:2px 7px" title="Código de Maestro > Configuración">${codSelf}</span>`:''}
+        <i class="ti ti-notebook" style="color:var(--purple)"></i>${p}${codSelf?`<span style="font-size:11px;font-weight:400;color:var(--text2);font-family:monospace;background:var(--bg2);border-radius:4px;padding:2px 7px" title="Código de Configuración">${codSelf}</span>`:''}
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <div style="display:flex;align-items:center;gap:8px;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);padding:6px 12px">
@@ -4467,7 +4362,7 @@ function prodMpAC(input,prodId){
   if(!drop){drop=document.createElement('div');drop.className='mp-ac-drop';wrap.style.position='relative';wrap.appendChild(drop);}
   const eligibles=mpData.filter(m=>m.codigo&&(tipoMpDe(m)==='terminado'||tipoMpDe(m)==='proceso'));
   const results=q?eligibles.filter(m=>m.nombre.toLowerCase().includes(q)||(m.codigo||'').toLowerCase().includes(q)||(m.sigla||'').toLowerCase().includes(q)):eligibles;
-  if(!results.length){drop.innerHTML=`<div style="padding:8px 10px;font-size:12px;color:var(--text2)">Sin resultados. Clasificalo primero en Maestro &gt; Configuración.</div>`;drop.style.display='block';return}
+  if(!results.length){drop.innerHTML=`<div style="padding:8px 10px;font-size:12px;color:var(--text2)">Sin resultados. Clasificalo primero en Configuración.</div>`;drop.style.display='block';return}
   let h='';
   results.slice(0,10).forEach(m=>{
     const uTag=m.unidad_tipo?`<span style="font-size:9.5px;background:${m.unidad_tipo==='caja'?'var(--blue)18':'var(--amber)18'};color:${m.unidad_tipo==='caja'?'var(--blue)':'var(--amber)'};border-radius:3px;padding:1px 4px;margin-left:4px;white-space:nowrap">${m.unidad_tipo==='caja'?'Caja':'Unid.'}</span>`:'';
@@ -4488,13 +4383,19 @@ async function prodMpUnlink(prodId){
   if(st.aaid)rProdDetail(st.aaid);
 }
 
-function showMaeSubTab(t){
-  ['prod','config','depositos'].forEach(x=>{
-    document.getElementById('mae-sub-'+x).style.display=x===t?'':'none';
-    document.getElementById('maetab-'+x).classList.toggle('active',x===t);
+function showCfgSubTab(t){
+  ['ids','prod'].forEach(x=>{
+    document.getElementById('cfg-sub-'+x).style.display=x===t?'':'none';
+    document.getElementById('cfgtab-'+x).classList.toggle('active',x===t);
   });
-  if(t==='config')renderMPList();
-  if(t==='depositos'){renderDepoEmpTabs();loadMaeDepositosOnce();}
+  if(t==='ids')renderMPList();
+  if(t==='prod')rMae();
+}
+function toggleCfgDepositos(){
+  const p=document.getElementById('cfg-depositos-panel');
+  const show=p.style.display==='none';
+  p.style.display=show?'':'none';
+  if(show){renderDepoEmpTabs();loadMaeDepositosOnce();}
 }
 
 function showRecTab(t){
@@ -4525,9 +4426,17 @@ async function loadMateriasPrimas(){
   try{mpData=await get('materias_primas','order=nombre.asc');}catch{mpData=[];}
 }
 
-function renderMPList(){
+async function renderMPList(){
   const el=document.getElementById('mp-list-content');
   if(!mpData.length){el.innerHTML='<div class="empty"><i class="ti ti-packages"></i> Sin materias primas. Agregá la primera.</div>';return}
+  if(!stockConteoDepositosCargado){
+    try{ stockConteoDepositos=await get('depositos','order=nombre.asc'); }catch{stockConteoDepositos=[]}
+    stockConteoDepositosCargado=true;
+  }
+  if(!mpDepositosCargado){
+    try{ mpDepositosData=await get('mp_depositos','select=*'); }catch{mpDepositosData=[]}
+    mpDepositosCargado=true;
+  }
   const unOpts=u=>['Kg','Gr','Litros','CC','Unidad'].map(x=>`<option${x===u?' selected':''}>${x}</option>`).join('');
   const tipoOpts=t=>`<option value="mp"${t==='mp'?' selected':''}>MP</option><option value="terminado"${t==='terminado'?' selected':''}>P. Terminado</option><option value="proceso"${t==='proceso'?' selected':''}>P. Proceso</option><option value="insumos"${t==='insumos'?' selected':''}>Insumos</option>`;
   // Clasificación Caja Cerrada / Unidad -- hasta ahora solo se podía cargar en bloque con el
@@ -4537,7 +4446,7 @@ function renderMPList(){
   const th=(field,label,extraStyle='')=>`<th style="cursor:pointer;user-select:none;${extraStyle}" onclick="mpSetSort('${field}')" title="Ordenar por ${label}">${label}${mpSortArrow(field)}</th>`;
   let h='<div class="stock-card"><table class="stock-tbl"><thead><tr><th style="width:34px"></th>'
     +th('codigo','Código','width:110px')+th('nombre','Nombre')+th('unidad','Unidad','width:110px')
-    +th('tipo','Tipo','width:120px')+th('alias','Alias','width:130px')
+    +th('tipo','Tipo','width:120px')+'<th style="width:190px">Depósitos</th>'+th('alias','Alias','width:130px')
     +'<th style="width:60px"></th></tr></thead><tbody>';
   mpOrdenados().forEach(mp=>{
     const sug=sugerenciaMp(mp);
@@ -4559,6 +4468,7 @@ function renderMPList(){
         onchange="updateMP('${mp.id}','unidad',this.value)">${unOpts(mp.unidad)}</select></td>
       <td><select style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:${tipo==='mp'?'var(--text)':'var(--amber)'}"
         onchange="updateMP('${mp.id}','tipo',this.value)">${tipoOpts(tipo)}</select></td>
+      <td>${depositosMpHtml(mp)}</td>
       <td><div style="display:flex;gap:4px;align-items:center">
         <input value="${(mp.alias||'').toString().replace(/"/g,'&quot;')}" placeholder="—"
         style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
@@ -4672,18 +4582,17 @@ async function updateMP(id,field,value){
       if(tocadas){rRec();ss('online',`MP renombrada, ${tocadas} ingrediente(s) actualizados en recetas — recordá "Guardar recetas"`);return}
     }
     if(field==='tipo')renderMPList();
-    if(field==='alias'){renderMPList();if(typeof rMae2Productos==='function')rMae2Productos();}
+    if(field==='alias')renderMPList();
     ss('online','MP actualizada');
   }catch(e){
     const hint=hintFaltaColumna(e.message,'codigo','materias_primas')||hintFaltaColumna(e.message,'tipo','materias_primas')||hintFaltaColumna(e.message,'alias','materias_primas');
     ss('error','Error: '+e.message+hint);renderMPList();
-    if(typeof rMae2Productos==='function')rMae2Productos();
   }
 }
 
-// Copia el nombre real del articulo (Maestro > Configuración) como Alias, para cuando el alias
-// va a ser igual al nombre y no vale la pena tipearlo de nuevo. Usado por el botón que aparece al
-// lado del input de Alias tanto en Maestro > Configuración como en Maestro 2.
+// Copia el nombre real del articulo (Configuración > ID / Descripción / Depósito) como Alias, para
+// cuando el alias va a ser igual al nombre y no vale la pena tipearlo de nuevo. Usado por el botón
+// que aparece al lado del input de Alias.
 function aliasCopiarNombre(id){
   const mp=mpData.find(m=>m.id===id);
   if(!mp)return;
@@ -4710,7 +4619,6 @@ async function setDepositoMp(id,depositoId){
   }catch(e){
     ss('error','Error: '+e.message+hintFaltaColumna(e.message,'deposito_id','materias_primas'));
     if(typeof renderStockConteo==='function')renderStockConteo();
-    if(typeof rMae2Productos==='function')rMae2Productos();
   }
 }
 
@@ -4891,7 +4799,7 @@ async function importarMPIniciales(input){
     }
     const partes=[`${actualizadas} filas actualizadas con sigla + caja/unidad`];
     if(sinCambio)partes.push(`${sinCambio} ya estaban al día`);
-    if(sinMatch)partes.push(`${sinMatch} códigos del CSV no existen todavía en Maestro &gt; Configuración`);
+    if(sinMatch)partes.push(`${sinMatch} códigos del CSV no existen todavía en Configuración`);
     if(ignoradas)partes.push(`${ignoradas} filas con sigla pero sin Tipo (CAJA/UNIDAD) se ignoraron por seguridad`);
     if(errores.length)partes.push(`${errores.length} filas no se pudieron guardar`);
     msgEl.innerHTML=`<i class="ti ti-check"></i> ${partes.join('. ')}.`;
@@ -4981,10 +4889,10 @@ async function importarArticulosCsv(input){
     if(errores.length && !agregadas){
       throw new Error(`No se pudo agregar ninguna materia prima nueva. Detalle: ${errores[0]}`);
     }
-    const partes=[`${agregadas} artículos nuevos agregados a Maestro &gt; Configuración`,`${yaExistian} ya existían (mismo código)`];
+    const partes=[`${agregadas} artículos nuevos agregados a Configuración`,`${yaExistian} ya existían (mismo código)`];
     if(ignoradas)partes.push(`${ignoradas} filas sin código o descripción se ignoraron`);
     if(errores.length)partes.push(`${errores.length} filas no se pudieron agregar`);
-    msgEl.innerHTML=`<i class="ti ti-check"></i> ${partes.join('. ')}. Los agregados quedan sin clasificar (columna "Tipo") — clasificalos como MP, Producto Terminado, Producto en Proceso o Insumos, y vinculalos en Maestro &gt; Productos si corresponde.`;
+    msgEl.innerHTML=`<i class="ti ti-check"></i> ${partes.join('. ')}. Los agregados quedan sin clasificar (columna "Tipo") — clasificalos como MP, Producto Terminado, Producto en Proceso o Insumos, y vinculalos en Configuración &gt; Producción si corresponde.`;
     msgEl.style.display='';
     input.value='';
   }catch(e){
@@ -5425,14 +5333,14 @@ async function importarRecetasCsvEstructura(input){
     loadingEl.style.display='none';
     const total=nuevas+actualizadas;
     if(!total){
-      const extra=sinCodigoEnSistema.length?` ${sinCodigoEnSistema.length} rellenos del CSV ni siquiera están cargados en Maestro &gt; Configuración (agregalos primero ahí manualmente).`:'';
+      const extra=sinCodigoEnSistema.length?` ${sinCodigoEnSistema.length} rellenos del CSV ni siquiera están cargados en Configuración (agregalos primero ahí manualmente).`:'';
       throw new Error(`No se importó ninguna receta de Relleno/Producto en Proceso.${extra} Verificá que sea el CSV de "Estructura de Producto" de Flexxus.`);
     }
     const partes=[`${total} recetas importadas (${nuevas} nuevas, ${actualizadas} actualizadas)`];
     if(reclasificadas)partes.push(`${reclasificadas} productos reclasificados a "Producto en Proceso" por empezar su nombre con "RELLENO"`);
     if(mpCreadas)partes.push(`${mpCreadas} materias primas nuevas agregadas al maestro (con su código de Flexxus)`);
     if(sinIngredientes.length)partes.push(`${sinIngredientes.length} sin ingredientes de Nivel 1 en el CSV, se dejaron sin tocar (${sinIngredientes.join(', ')})`);
-    if(sinCodigoEnSistema.length)partes.push(`${sinCodigoEnSistema.length} rellenos del CSV no están cargados en Maestro &gt; Configuración y se omitieron (${sinCodigoEnSistema.join(', ')})`);
+    if(sinCodigoEnSistema.length)partes.push(`${sinCodigoEnSistema.length} rellenos del CSV no están cargados en Configuración y se omitieron (${sinCodigoEnSistema.join(', ')})`);
     msgEl.innerHTML=`<i class="ti ti-check"></i> ${partes.join('. ')}. Todavía no se guardó nada: revisá las recetas y después hacé click en "Guardar recetas".`;
     msgEl.style.display='';
     input.value='';
@@ -6996,7 +6904,7 @@ function renderStockConteo(){
 
   if(!items.length){
     if(empTabsEl)empTabsEl.innerHTML='';
-    el.innerHTML=`<div class="empty"><i class="ti ti-package-off"></i>Sin ${etiqueta} con código asignado. Clasificalas en Maestro &gt; Configuración (columna "Tipo").</div>`;
+    el.innerHTML=`<div class="empty"><i class="ti ti-package-off"></i>Sin ${etiqueta} con código asignado. Clasificalas en Configuración (columna "Tipo").</div>`;
     return;
   }
 
@@ -7050,7 +6958,7 @@ function renderStockConteoEmpresa(eid,entries,colLbl){
     return;
   }
   if(eid==='_sinvinc'){
-    el.innerHTML=`<div class="alert alert-info" style="margin-bottom:1rem;font-size:12px"><i class="ti ti-link-off"></i> Estos items de Maestro &gt; Configuración todavía no están vinculados a un producto del Maestro, por eso no se puede saber su empresa/área ni mostrar el nombre abreviado. Vinculalos en Maestro &gt; Productos ("Vínculo MP").</div>`
+    el.innerHTML=`<div class="alert alert-info" style="margin-bottom:1rem;font-size:12px"><i class="ti ti-link-off"></i> Estos items de Configuración todavía no están vinculados a un producto de Configuración &gt; Producción, por eso no se puede saber su empresa/área ni mostrar el nombre abreviado. Vinculalos ahí ("Vínculo MP").</div>`
       +tablaStockConteo(entries,colLbl);
     return;
   }
@@ -7445,7 +7353,7 @@ async function renderImpresionDepositos(){
     mpDepositosCargado=true;
   }
   if(!stockConteoDepositos.length){
-    el.innerHTML='<div class="empty"><i class="ti ti-building-warehouse"></i> No hay depósitos cargados. Agregalos en Maestro &gt; Depósitos.</div>';
+    el.innerHTML='<div class="empty"><i class="ti ti-building-warehouse"></i> No hay depósitos cargados. Agregalos en Configuración ("Gestionar depósitos").</div>';
     return;
   }
   const botonesDeps=deps=>{
@@ -7798,7 +7706,7 @@ async function exportarMigracionStockExcel(){
 async function exportarTerminadoPlanetaExcel(){
   const fecha=document.getElementById('stock-conteo-fecha').value||hoyLocal();
   const planeta=st.E.find(e=>normTxt(e.nombre).includes('PLANETA'));
-  if(!planeta){alert('No encontré la empresa "Planeta Empanada" en Maestro > Empresas.');return}
+  if(!planeta){alert('No encontré la empresa "Planeta Empanada" en Configuración > Producción.');return}
   let conteo=[];
   try{ conteo=await get('mp_conteo',`fecha=eq.${fecha}`); }catch{conteo=[]}
   const stockPorMp=new Map();
@@ -11642,7 +11550,7 @@ async function importarExcelAConteo(input){
     }
     await loadProy(); // refresca la tabla de Conteo de stock con los valores importados
     loadingEl.style.display='none';
-    document.getElementById('conteo-import-msg-txt').textContent=`${cargados} productos cargados desde el Excel para el ${fecha}.${sinMapeo?` (${sinMapeo} códigos sin mapeo en PAPO — revisá Mapeo Joselito en Maestro)`:''} Podés ajustar cualquier valor a mano y guardar.`;
+    document.getElementById('conteo-import-msg-txt').textContent=`${cargados} productos cargados desde el Excel para el ${fecha}.${sinMapeo?` (${sinMapeo} códigos sin mapeo en PAPO — revisá Mapeo Joselito en Configuración &gt; Producción)`:''} Podés ajustar cualquier valor a mano y guardar.`;
     msgEl.style.display='';
     setTimeout(()=>msgEl.style.display='none',7000);
     input.value='';
