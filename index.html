@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.181</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.182</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -3238,9 +3238,9 @@ function rProdDetail(aid){
                 <button class="btn btn-xs" onclick="prodMpUnlink('${p.id}')" title="Quitar vínculo" style="flex-shrink:0"><i class="ti ti-x"></i></button>
               </div>
             `:`
-              <div style="position:relative">
-                <input type="text" placeholder="🔗 Vincular con Configuración..." oninput="prodMpAC(this,'${p.id}')" onfocus="prodMpAC(this,'${p.id}')" onblur="setTimeout(()=>mpHide(this),200)" autocomplete="off"
-                  style="width:100%;padding:7px 8px;font-size:12.5px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+              <div>
+                <input type="text" placeholder="🔗 ID de Configuración..." onchange="vincularProdPorCodigo('${p.id}',this.value)"
+                  style="width:100%;padding:7px 8px;font-size:12.5px;font-family:monospace;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
               </div>
               ${sugMp?`<div style="margin-top:3px"><span style="font-size:10.5px;color:var(--amber);cursor:pointer" onclick="prodMpLink('${p.id}','${sugMp.id}')">⚠ ¿"${sugMp.nombre.replace(/"/g,'&quot;')}" (${sugMp.codigo}${sugMp.unidad_tipo?', '+(sugMp.unidad_tipo==='caja'?'Caja Cerrada':'Unidad'):''})? · <u>vincular</u></span></div>`:''}
             `}
@@ -3274,16 +3274,6 @@ function rProdDetail(aid){
               onchange="updP('${p.id}','peso_gramos',this.value?parseFloat(this.value):null)"
               style="width:64px;padding:3px 6px;font-size:12px;text-align:right;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
           </label>
-          <label style="display:flex;align-items:center;gap:5px;cursor:pointer" title="¿Este producto lleva relleno?">
-            <span style="font-size:11px;color:var(--text2)">Relleno</span>
-            <input type="checkbox" ${p.tiene_relleno?'checked':''} onchange="updP('${p.id}','tiene_relleno',this.checked)" style="width:14px;height:14px;cursor:pointer"/>
-          </label>
-          ${p.tiene_relleno?`
-          <label style="display:flex;align-items:center;gap:5px" title="Nombre del relleno (ej: Carne, Jamón, Pollo)">
-            <span style="font-size:11px;color:var(--text2);white-space:nowrap">Tipo relleno</span>
-            <input value="${p.tipo_relleno||''}" placeholder="ej: Carne" onchange="updP('${p.id}','tipo_relleno',this.value)"
-              style="width:100px;padding:3px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-          </label>`:''}
           <label style="display:flex;align-items:center;gap:5px" title="Caliente = se elabora un día antes del pedido. Frío = mismo día.">
             <span style="font-size:11px;color:var(--text2);white-space:nowrap">Elaboración</span>
             <select onchange="updP('${p.id}','elaboracion',this.value)"
@@ -3298,15 +3288,6 @@ function rProdDetail(aid){
             <input value="${p.codigo_articulo||''}" placeholder="—"
               onchange="updP('${p.id}','codigo_articulo',this.value.trim()||null)"
               style="width:90px;padding:3px 6px;font-size:12px;text-align:center;font-family:monospace;letter-spacing:0.5px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-          </label>
-          <label style="display:flex;align-items:center;gap:5px" title="Usado solo como ayuda: cuando un nombre de Materia Prima se parece a este producto, Configuración sugiere clasificarlo con este mismo tipo (Terminado/Proceso)">
-            <span style="font-size:11px;color:var(--text2);white-space:nowrap">Tipo stock (ref.)</span>
-            <select onchange="updP('${p.id}','tipo_stock',this.value||null)"
-              style="padding:3px 5px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
-              <option value=""${!p.tipo_stock?' selected':''}>Auto (${tipoStockDe(p)==='proceso'?'Proceso':'Terminado'})</option>
-              <option value="terminado"${p.tipo_stock==='terminado'?' selected':''}>Terminado</option>
-              <option value="proceso"${p.tipo_stock==='proceso'?' selected':''}>Proceso</option>
-            </select>
           </label>
         </div>
       </div>`;
@@ -4354,23 +4335,16 @@ function sugerenciaProdMp(p){
   return mejor?mejor.mp:null;
 }
 
-// Autocomplete para vincular un producto del Maestro con una fila de Configuración (MP Terminado/Proceso con código)
-function prodMpAC(input,prodId){
-  const q=(input.value||'').toLowerCase().trim();
-  const wrap=input.parentElement;
-  let drop=wrap.querySelector('.mp-ac-drop');
-  if(!drop){drop=document.createElement('div');drop.className='mp-ac-drop';wrap.style.position='relative';wrap.appendChild(drop);}
-  const eligibles=mpData.filter(m=>m.codigo&&(tipoMpDe(m)==='terminado'||tipoMpDe(m)==='proceso'));
-  const results=q?eligibles.filter(m=>m.nombre.toLowerCase().includes(q)||(m.codigo||'').toLowerCase().includes(q)||(m.sigla||'').toLowerCase().includes(q)):eligibles;
-  if(!results.length){drop.innerHTML=`<div style="padding:8px 10px;font-size:12px;color:var(--text2)">Sin resultados. Clasificalo primero en Configuración.</div>`;drop.style.display='block';return}
-  let h='';
-  results.slice(0,10).forEach(m=>{
-    const uTag=m.unidad_tipo?`<span style="font-size:9.5px;background:${m.unidad_tipo==='caja'?'var(--blue)18':'var(--amber)18'};color:${m.unidad_tipo==='caja'?'var(--blue)':'var(--amber)'};border-radius:3px;padding:1px 4px;margin-left:4px;white-space:nowrap">${m.unidad_tipo==='caja'?'Caja':'Unid.'}</span>`:'';
-    h+=`<div class="mp-ac-item" onmousedown="prodMpLink('${prodId}','${m.id}')">
-      <span>${m.sigla?`<b>${m.sigla}</b> — `:''}${highlight(m.nombre,q)}${uTag}</span><span class="mp-ac-unit">${m.codigo}</span>
-    </div>`;
-  });
-  drop.innerHTML=h;drop.style.display='block';
+// Vincular un producto de Configuración > Producción con su fila de Configuración > ID / Descripción /
+// Depósito tipeando directamente el ID (mismo mecanismo que "Vincular código" en Planificación/Producción
+// Real): lo que manda es el ID -- al encontrar el código, la descripción real aparece sola como confirmación,
+// en vez de tener que buscarlo por nombre.
+async function vincularProdPorCodigo(prodId,codigoTexto){
+  const codigo=(codigoTexto||'').toString().trim();
+  if(!codigo)return;
+  const m=mpData.find(x=>(x.codigo||'').toString().trim()===codigo);
+  if(!m){ ss('error',`No encontré en Configuración ningún producto con el código "${codigo}".`); if(st.aaid)rProdDetail(st.aaid); return; }
+  await prodMpLink(prodId,m.id);
 }
 
 async function prodMpLink(prodId,mpId){
