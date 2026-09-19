@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.193</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.194</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1995,6 +1995,41 @@ function ordenarComoMaestro(items){
   }).map(x=>x.r);
 }
 
+// Orden alfabético por Descripción (misma idea que Configuración > Producción): ordena las filas del
+// plan/producción real por la descripción vinculada en Configuración (vía mpParaProducto), no por el
+// orden manual del Maestro. Las filas sin descripción resuelta quedan siempre al final.
+let planProdSort={field:null,dir:'asc'}; // null = orden Maestro (ordenarComoMaestro)
+let realProdSort={field:null,dir:'asc'};
+function ordenarPorDescripcion(items,dir){
+  return items.map((r,i)=>({r,i})).sort((a,b)=>{
+    const ma=mpParaProducto(a.r),mb=mpParaProducto(b.r);
+    const na=normTxt(ma?ma.nombre:''),nb=normTxt(mb?mb.nombre:'');
+    if(!na&&nb)return 1;
+    if(na&&!nb)return -1;
+    if(na&&nb){
+      const c=na.localeCompare(nb,'es',{numeric:true});
+      return dir==='desc'?-c:c;
+    }
+    return a.i-b.i;
+  }).map(x=>x.r);
+}
+function prodSortArrowFor(sortSt,field){ return sortSt.field===field?(sortSt.dir==='asc'?' ▲':' ▼'):' <span style="opacity:.35">⇅</span>'; }
+function planSetProdSort(field){
+  if(field===null){ planProdSort={field:null,dir:'asc'}; }
+  else if(planProdSort.field===field){ planProdSort.dir=planProdSort.dir==='asc'?'desc':'asc'; }
+  else{ planProdSort={field,dir:'asc'}; }
+  if(planActiveEmp)renderPlanEmpresa(planActiveEmp, gE().filter(r=>r.empresa_id===planActiveEmp));
+}
+function realSetProdSort(field){
+  if(field===null){ realProdSort={field:null,dir:'asc'}; }
+  else if(realProdSort.field===field){ realProdSort.dir=realProdSort.dir==='asc'?'desc':'asc'; }
+  else{ realProdSort={field,dir:'asc'}; }
+  const k=document.getElementById('rwsel').value;
+  const ap=st.P[k]||[];
+  const bE={};ap.forEach(r=>{const e=r.empresa_id||'_';if(!bE[e])bE[e]=[];bE[e].push(r)});
+  renderRealEmpresa(k,realActiveEmp,bE[realActiveEmp]||[]);
+}
+
 function renderPlanEmpresa(eid, items){
   const el=document.getElementById('plan-emp-content');
   if(!el)return;
@@ -2023,9 +2058,9 @@ function renderPlanEmpresa(eid, items){
   h+=`<button class="btn btn-sm" onclick="copiarAreaSemanaAnterior('${eid}','${activeArea.replace(/'/g,"\\'")}') " style="margin-right:4px;font-size:12px;gap:5px"><i class="ti ti-copy"></i> Copiar sem. anterior</button>`;
   h+=`</div>`;
 
-  const aItems=ordenarComoMaestro(bA[activeArea]||[]);
+  const aItems=planProdSort.field==='descripcion'?ordenarPorDescripcion(bA[activeArea]||[],planProdSort.dir):ordenarComoMaestro(bA[activeArea]||[]);
   h+=`<div style="overflow-x:auto"><table class="plan-grid"><thead><tr>
-    <th class="left" style="min-width:160px">Producto</th>
+    <th class="left" style="min-width:160px;cursor:pointer;user-select:none" onclick="planSetProdSort('descripcion')" title="Ordenar alfabéticamente por la descripción vinculada">Producto${prodSortArrowFor(planProdSort,'descripcion')}${planProdSort.field?` <span style="font-size:10px;font-weight:400;color:var(--accent);cursor:pointer" onclick="event.stopPropagation();planSetProdSort(null)" title="Volver al orden manual del Maestro">· Orden manual</span>`:''}</th>
     <th class="left" style="width:80px">Unidad</th>`;
   DAYS.forEach((d,i)=>{h+=`<th class="${i===t?'today-head':''}" style="width:92px">${d.slice(0,3)}<br><span style="font-size:10px;font-weight:400">${ddate(st.w,i)}</span></th>`;});
   h+=`<th style="width:64px">Total</th><th style="width:32px"></th></tr></thead><tbody>`;
@@ -2314,9 +2349,9 @@ function renderRealEmpresa(k,eid,items){
     areaTabsH+=`<button class="proy-tab${isActive?' active':''}" onclick="realSetArea('${eid}','${area.replace(/'/g,"\'")}')"><span style="background:${bg2};color:${ac2};border-radius:4px;padding:1px 6px;font-size:11px">${area}</span></button>`;
   });
   areaTabsH+=`</div>`;
-  const aItems=ordenarComoMaestro(bA[activeArea]||[]);
+  const aItems=realProdSort.field==='descripcion'?ordenarPorDescripcion(bA[activeArea]||[],realProdSort.dir):ordenarComoMaestro(bA[activeArea]||[]);
   let h=areaTabsH;
-  h+=`<div style="overflow-x:auto"><table class="plan-grid"><thead><tr><th class="left">Producto</th><th class="left" style="width:65px">Unidad</th>`;
+  h+=`<div style="overflow-x:auto"><table class="plan-grid"><thead><tr><th class="left" style="cursor:pointer;user-select:none" onclick="realSetProdSort('descripcion')" title="Ordenar alfabéticamente por la descripción vinculada">Producto${prodSortArrowFor(realProdSort,'descripcion')}${realProdSort.field?` <span style="font-size:10px;font-weight:400;color:var(--accent);cursor:pointer" onclick="event.stopPropagation();realSetProdSort(null)" title="Volver al orden manual del Maestro">· Orden manual</span>`:''}</th><th class="left" style="width:65px">Unidad</th>`;
   DAYS.forEach((d,i)=>{h+=`<th class="${i===t?'today-head':''}" colspan="2" style="font-size:11px;text-align:center">${d.slice(0,3)} ${ddate(k,i)}</th>`;});
   h+=`<th>Plan</th><th>Real</th></tr><tr style="background:var(--bg2)"><th></th><th></th>`;
   DAYS.forEach((_,i)=>{
