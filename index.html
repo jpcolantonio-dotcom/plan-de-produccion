@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.187</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.192</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -258,9 +258,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <div class="tabs">
   <button class="tab active" onclick="T('prod')"><i class="ti ti-calendar-week"></i>Producción</button>
   <button class="tab" onclick="T('cmp')"><i class="ti ti-chart-bar"></i>Comparación</button>
-  <button class="tab" onclick="T('desv')"><i class="ti ti-alert-triangle"></i>Desvíos</button>
-  <button class="tab" onclick="T('dash')"><i class="ti ti-layout-dashboard"></i>Dashboard</button>
-  <button class="tab" onclick="T('rend')"><i class="ti ti-speedometer"></i>Rendimiento</button>
+  <button class="tab" onclick="T('inf')"><i class="ti ti-report"></i>Informes</button>
   <button class="tab" onclick="T('stock')"><i class="ti ti-building-warehouse"></i>Stock</button>
   <button class="tab" onclick="T('cong')"><i class="ti ti-snowflake"></i>Congelado</button>
   <button class="tab" onclick="T('rec')"><i class="ti ti-notebook"></i>Recetas</button>
@@ -462,28 +460,118 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <div id="recmsg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Recetas guardadas.</div>
 </div>
 
-<!-- RENDIMIENTO -->
-<div id="tab-rend" class="section">
-  <div class="toolbar">
-    <div><div style="font-size:16px;font-weight:600">Rendimiento de proceso</div>
-    <div style="font-size:13px;color:var(--text2)">Tiempo de máquina, productividad y desperdicio por producto</div></div>
+<!-- INFORMES (Desvíos + Dashboard + Rendimiento + Producción del Día, unificados en una sola pestaña) -->
+<div id="tab-inf" class="section">
+  <div class="proy-subtabs">
+    <button class="proy-tab active" id="inftab-desv" onclick="showInfSubTab('desv')"><i class="ti ti-alert-triangle"></i> Desvíos</button>
+    <button class="proy-tab" id="inftab-dash" onclick="showInfSubTab('dash')"><i class="ti ti-layout-dashboard"></i> Dashboard</button>
+    <button class="proy-tab" id="inftab-rend" onclick="showInfSubTab('rend')"><i class="ti ti-speedometer"></i> Rendimiento</button>
+    <button class="proy-tab" id="inftab-diario" onclick="showInfSubTab('diario')"><i class="ti ti-list-check"></i> Producción del Día</button>
   </div>
-  <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
-    <label style="font-size:13px;color:var(--text2)">Empresa:</label>
-    <select id="rend-esel" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"><option value="all">Todas</option></select>
-    <label style="font-size:13px;color:var(--text2)">Desde:</label>
-    <input type="date" id="rend-desde" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
-    <label style="font-size:13px;color:var(--text2)">Hasta:</label>
-    <input type="date" id="rend-hasta" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
-    <button class="btn btn-primary" onclick="buscarRendimiento()"><i class="ti ti-search"></i> Buscar</button>
+
+  <!-- SUB-TAB DESVIOS -->
+  <div id="tab-desv">
+    <div class="toolbar">
+      <div>
+        <div style="font-size:16px;font-weight:600">Desvios de Produccion</div>
+        <div style="font-size:13px;color:var(--text2)">Causas registradas cuando la produccion fue menor a lo planificado</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--text2)">Semana:</label>
+      <select id="desv-wsel" onchange="loadDesv()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
+      <label style="font-size:13px;color:var(--text2)">Empresa:</label>
+      <select id="desv-esel" onchange="renderDesv()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas</option></select>
+    </div>
+    <div id="desv-content"></div>
   </div>
-  <!-- Subtabs -->
-  <div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1.25rem">
-    <button class="proy-tab active" id="rtab-detalle" onclick="showRendTab('detalle')"><i class="ti ti-list"></i> Detalle</button>
-    <button class="proy-tab" id="rtab-promedio" onclick="showRendTab('promedio')"><i class="ti ti-chart-bar"></i> Promedios</button>
+
+  <!-- SUB-TAB DASHBOARD -->
+  <div id="tab-dash" style="display:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="font-size:16px;font-weight:600">Dashboard de produccion</div>
+        <div style="font-size:13px;color:var(--text2)">Vista en tiempo real — se actualiza cada 45 seg.</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <select id="dash-wsel" onchange="initDash()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
+        <select id="dash-dsel" onchange="initDash()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+          <option value="">Dia de hoy</option>
+          <option value="0">Lunes</option>
+          <option value="1">Martes</option>
+          <option value="2">Miercoles</option>
+          <option value="3">Jueves</option>
+          <option value="4">Viernes</option>
+          <option value="5">Sabado</option>
+          <option value="6">Domingo</option>
+        </select>
+        <select id="dash-esel" onchange="initDash()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
+      </div>
+    </div>
+    <!-- PANEL FIJO CUMPLIMIENTO POR EMPRESA -->
+    <div id="dash-cumplimiento" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:var(--bg2);border-radius:var(--radius-lg);border:.5px solid var(--border)"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn btn-sm" onclick="navDash(-1)" id="dash-prev"><i class="ti ti-chevron-left"></i></button>
+        <button class="btn btn-sm" onclick="navDash(1)" id="dash-next"><i class="ti ti-chevron-right"></i></button>
+        <span id="dash-page-info" style="font-size:12px;color:var(--text2)"></span>
+      </div>
+      <div class="dash-ticker">
+        <span class="dash-ticker-dot"></span>
+        <span id="dash-ticker-txt">Actualizando...</span>
+        <span id="dash-countdown" style="font-weight:500;color:var(--text);min-width:28px;text-align:right"></span>
+      </div>
+    </div>
+    <div id="dash-grid" class="dash-grid"></div>
+    <div style="display:flex;gap:16px;margin-top:.75rem;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:#1D9E75;display:inline-block"></span> 100% o mas</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:#FAC775;display:inline-block"></span> 90–99%</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:#F7C1C1;display:inline-block"></span> Menos de 90%</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:var(--bg2);border:.5px solid var(--border);display:inline-block"></span> Sin produccion registrada</div>
+    </div>
   </div>
-  <div id="rend-sub-detalle"><div class="empty"><i class="ti ti-speedometer"></i> Seleccioná un rango de fechas.</div></div>
-  <div id="rend-sub-promedio" style="display:none"><div class="empty"><i class="ti ti-chart-bar"></i> Seleccioná un rango de fechas.</div></div>
+
+  <!-- SUB-TAB RENDIMIENTO -->
+  <div id="tab-rend" style="display:none">
+    <div class="toolbar">
+      <div><div style="font-size:16px;font-weight:600">Rendimiento de proceso</div>
+      <div style="font-size:13px;color:var(--text2)">Tiempo de máquina, productividad y desperdicio por producto</div></div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+      <label style="font-size:13px;color:var(--text2)">Empresa:</label>
+      <select id="rend-esel" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"><option value="all">Todas</option></select>
+      <label style="font-size:13px;color:var(--text2)">Desde:</label>
+      <input type="date" id="rend-desde" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+      <label style="font-size:13px;color:var(--text2)">Hasta:</label>
+      <input type="date" id="rend-hasta" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
+      <button class="btn btn-primary" onclick="buscarRendimiento()"><i class="ti ti-search"></i> Buscar</button>
+    </div>
+    <!-- Subtabs -->
+    <div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1.25rem">
+      <button class="proy-tab active" id="rtab-detalle" onclick="showRendTab('detalle')"><i class="ti ti-list"></i> Detalle</button>
+      <button class="proy-tab" id="rtab-promedio" onclick="showRendTab('promedio')"><i class="ti ti-chart-bar"></i> Promedios</button>
+    </div>
+    <div id="rend-sub-detalle"><div class="empty"><i class="ti ti-speedometer"></i> Seleccioná un rango de fechas.</div></div>
+    <div id="rend-sub-promedio" style="display:none"><div class="empty"><i class="ti ti-chart-bar"></i> Seleccioná un rango de fechas.</div></div>
+  </div>
+
+  <!-- SUB-TAB PRODUCCIÓN DEL DÍA (nueva) -->
+  <div id="tab-diario" style="display:none">
+    <div class="toolbar">
+      <div>
+        <div style="font-size:16px;font-weight:600">Producción del día</div>
+        <div style="font-size:13px;color:var(--text2)">Todos los productos con producción real cargada ese día, con la cantidad producida</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--text2)">Día:</label>
+      <input type="date" id="inf-diario-fecha" onchange="renderInformeDiario()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <label style="font-size:13px;color:var(--text2)">Empresa:</label>
+      <select id="inf-diario-esel" onchange="renderInformeDiario()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas</option></select>
+      <button class="btn btn-sm" id="btnImprimirInfDiario" onclick="imprimirInformeDiario()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
+    </div>
+    <div id="inf-diario-content"></div>
+  </div>
 </div>
 
 <!-- CONSUMO -->
@@ -505,68 +593,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     </div>
   </div>
   <div id="ccon2"></div>
-</div>
-
-<!-- DESVIOS -->
-<div id="tab-desv" class="section">
-  <div class="toolbar">
-    <div>
-      <div style="font-size:16px;font-weight:600">Desvios de Produccion</div>
-      <div style="font-size:13px;color:var(--text2)">Causas registradas cuando la produccion fue menor a lo planificado</div>
-    </div>
-  </div>
-  <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
-    <label style="font-size:13px;color:var(--text2)">Semana:</label>
-    <select id="desv-wsel" onchange="loadDesv()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
-    <label style="font-size:13px;color:var(--text2)">Empresa:</label>
-    <select id="desv-esel" onchange="renderDesv()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas</option></select>
-  </div>
-  <div id="desv-content"></div>
-</div>
-
-<!-- DASHBOARD -->
-<div id="tab-dash" class="section">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
-    <div>
-      <div style="font-size:16px;font-weight:600">Dashboard de produccion</div>
-      <div style="font-size:13px;color:var(--text2)">Vista en tiempo real — se actualiza cada 45 seg.</div>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <select id="dash-wsel" onchange="initDash()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
-      <select id="dash-dsel" onchange="initDash()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
-        <option value="">Dia de hoy</option>
-        <option value="0">Lunes</option>
-        <option value="1">Martes</option>
-        <option value="2">Miercoles</option>
-        <option value="3">Jueves</option>
-        <option value="4">Viernes</option>
-        <option value="5">Sabado</option>
-        <option value="6">Domingo</option>
-      </select>
-      <select id="dash-esel" onchange="initDash()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
-    </div>
-  </div>
-  <!-- PANEL FIJO CUMPLIMIENTO POR EMPRESA -->
-  <div id="dash-cumplimiento" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:var(--bg2);border-radius:var(--radius-lg);border:.5px solid var(--border)"></div>
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
-    <div style="display:flex;align-items:center;gap:8px">
-      <button class="btn btn-sm" onclick="navDash(-1)" id="dash-prev"><i class="ti ti-chevron-left"></i></button>
-      <button class="btn btn-sm" onclick="navDash(1)" id="dash-next"><i class="ti ti-chevron-right"></i></button>
-      <span id="dash-page-info" style="font-size:12px;color:var(--text2)"></span>
-    </div>
-    <div class="dash-ticker">
-      <span class="dash-ticker-dot"></span>
-      <span id="dash-ticker-txt">Actualizando...</span>
-      <span id="dash-countdown" style="font-weight:500;color:var(--text);min-width:28px;text-align:right"></span>
-    </div>
-  </div>
-  <div id="dash-grid" class="dash-grid"></div>
-  <div style="display:flex;gap:16px;margin-top:.75rem;flex-wrap:wrap">
-    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:#1D9E75;display:inline-block"></span> 100% o mas</div>
-    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:#FAC775;display:inline-block"></span> 90–99%</div>
-    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:#F7C1C1;display:inline-block"></span> Menos de 90%</div>
-    <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:var(--bg2);border:.5px solid var(--border);display:inline-block"></span> Sin produccion registrada</div>
-  </div>
 </div>
 
 <!-- PROYECCION -->
@@ -1249,6 +1275,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap">
       <span style="font-size:13px;color:var(--text2)">Familia de empresas &rarr; familia de areas por empresa &rarr; productos que se elaboran en cada area (con su ID vinculado).</span>
       <div class="btns" style="margin-left:auto">
+        <button class="btn btn-sm" id="btnSyncIds" onclick="sincronizarIdsDesdePlan()" title="Recorre el plan de la semana actual y, para cada producto que el plan ya identifica con un código, confirma ese vínculo acá en Configuración."><i class="ti ti-refresh"></i> Sincronizar IDs desde el plan</button>
         <button class="btn btn-sm" onclick="exportarMaestroExcel()"><i class="ti ti-file-spreadsheet"></i> Exportar Excel</button>
         <button class="btn btn-sm" onclick="toggleMapeoJoselito()"><i class="ti ti-link"></i> Mapeo Joselito</button>
       </div>
@@ -1591,7 +1618,7 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['prod','cmp','desv','dash','stock','cong','rec','rend','rrhh','ped','cfg','etq'];
+const TABS=['prod','cmp','inf','stock','cong','rec','rrhh','ped','cfg','etq'];
 // Sub-pestaña activa dentro de Producción (Planificación/Rellenos/Prod. Real, unificadas en una sola
 // pestaña) -- se recuerda para que volver a "Producción" desde otra pestaña principal reabra la misma
 // sub-pestaña en la que el usuario estaba, en vez de resetear siempre a Planificación.
@@ -1614,8 +1641,7 @@ function T(t){
   document.getElementById('tab-'+t).classList.add('active');
   if(t==='prod')showProdSubTab(prodActiveSubTab);
   if(t==='cmp'){pS('cwsel');loadCmp()}
-  if(t==='desv'){pS('desv-wsel');loadDesv()}
-  if(t==='dash'){pS('dash-wsel');initDash()}
+  if(t==='inf')showInfSubTab(infActiveSubTab);
   if(t==='stock')initStock();
   if(t==='cong')initCongelado();
   if(t==='proy')initProy();
@@ -1623,9 +1649,124 @@ function T(t){
   if(t==='rec'){if(!st.Pr.length||!Object.keys(st.Rec).length){init().then(()=>rRec());}else{rRec();}}
   if(t==='con'){pSC();renderCon()}
   if(t==='cfg'){renderMPList();rMae();loadMaeDepositosOnce();}
-  if(t==='rend')initRend();
   if(t==='ped')initPedidos();
   if(t==='etq')initEtiquetas();
+}
+// Sub-pestaña activa dentro de Informes (Desvíos/Dashboard/Rendimiento/Producción del Día, unificadas
+// en una sola pestaña) -- se recuerda para que volver a "Informes" desde otra pestaña principal
+// reabra la misma sub-pestaña en la que se estaba, igual que en Producción.
+let infActiveSubTab='desv';
+function showInfSubTab(t){
+  infActiveSubTab=t;
+  ['desv','dash','rend','diario'].forEach(x=>{
+    document.getElementById('tab-'+x).style.display=x===t?'':'none';
+    document.getElementById('inftab-'+x).classList.toggle('active',x===t);
+  });
+  if(t==='desv'){pS('desv-wsel');loadDesv()}
+  if(t==='dash'){pS('dash-wsel');initDash()}
+  if(t==='rend')initRend();
+  if(t==='diario')initInformeDiario();
+}
+
+// "Producción del Día" (Informes): lista plana de todos los productos con producción real cargada en
+// un día puntual (elegido con un date picker, no semana+día), con la cantidad producida. Reutiliza
+// realDia (que ya combina la clave nueva por ID y la vieja por nombre) y codigoParaProducto, igual que
+// el resto de la app, así queda consistente con Producción Real/Dashboard/Proyección.
+function initInformeDiario(){
+  const f=document.getElementById('inf-diario-fecha');
+  if(!f.value)f.value=hoyLocal();
+  renderInformeDiario();
+}
+
+let infDiarioItems=[];
+let infDiarioMeta={fecha:'',empresaLabel:''};
+
+async function renderInformeDiario(){
+  const el=document.getElementById('inf-diario-content');
+  const fecha=document.getElementById('inf-diario-fecha').value;
+  const ef=document.getElementById('inf-diario-esel').value;
+  const btnImp=document.getElementById('btnImprimirInfDiario');
+  if(!fecha){el.innerHTML='';infDiarioItems=[];if(btnImp)btnImp.disabled=true;return}
+  const semKey=wk(new Date(fecha+'T00:00:00'));
+  const diIdx=(new Date(fecha+'T00:00:00').getDay()+6)%7;
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando...</div>';
+  await Promise.all([lp(semKey),lr(semKey)]);
+  const plan=st.P[semKey]||[];
+  const real=st.R[semKey]||{};
+  let items=[];
+  plan.forEach((r,oi)=>{
+    const rv=realDia(real,r,diIdx,oi);
+    if(rv>0){
+      const mp=mpParaProducto(r);
+      const codigo=(mp&&mp.codigo)?mp.codigo:codigoParaProducto(r);
+      const alias=(mp&&(mp.alias||mp.nombre))||r.producto;
+      items.push({...r,cantidad:rv,codigo,alias});
+    }
+  });
+  if(ef!=='all')items=items.filter(it=>it.empresa_id===ef);
+  items.sort((a,b)=>b.cantidad-a.cantidad);
+  infDiarioItems=items;
+  const empSel=st.E.find(e=>e.id===ef);
+  infDiarioMeta={fecha,empresaLabel:ef==='all'?'Todas las empresas':(empSel?empSel.nombre:'')};
+  if(!items.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-list-check"></i> No hay producción real cargada para ese día.</div>';
+    if(btnImp)btnImp.disabled=true;
+    return;
+  }
+  if(btnImp)btnImp.disabled=false;
+  el.innerHTML=`<div style="font-size:12px;color:var(--text2);margin-bottom:10px">${items.length} producto${items.length!==1?'s':''} producido${items.length!==1?'s':''}</div>
+  <div style="display:grid;grid-template-columns:max-content max-content max-content max-content;column-gap:22px;row-gap:0;font-size:13px">
+    <div style="font-size:11px;color:var(--text2);padding:6px 4px;border-bottom:1px solid var(--border)">ID</div>
+    <div style="font-size:11px;color:var(--text2);padding:6px 4px;border-bottom:1px solid var(--border)">Alias</div>
+    <div style="font-size:11px;color:var(--text2);padding:6px 4px;border-bottom:1px solid var(--border);text-align:right">Cantidad</div>
+    <div style="font-size:11px;color:var(--text2);padding:6px 4px;border-bottom:1px solid var(--border)">Unidad</div>
+    ${items.map(it=>`
+      <div style="padding:8px 4px;font-size:12px;color:var(--text2);white-space:nowrap;border-bottom:.5px solid var(--border)">${it.codigo||'—'}</div>
+      <div style="padding:8px 4px;font-weight:600;font-size:13.5px;white-space:nowrap;border-bottom:.5px solid var(--border)">${it.alias}</div>
+      <div style="padding:8px 4px;font-weight:700;font-size:14px;color:var(--green);text-align:right;white-space:nowrap;border-bottom:.5px solid var(--border)">${it.cantidad.toLocaleString('es-AR')}</div>
+      <div style="padding:8px 4px;font-size:12px;color:var(--text2);white-space:nowrap;border-bottom:.5px solid var(--border)">${it.unidad}</div>
+    `).join('')}
+  </div>`;
+}
+
+function imprimirInformeDiario(){
+  if(!infDiarioItems.length)return;
+  const [y,m,d]=(infDiarioMeta.fecha||'').split('-');
+  const fechaFmt=(y&&m&&d)?`${d}/${m}/${y}`:(infDiarioMeta.fecha||'');
+  const ahora=new Date();
+  const p2=n=>String(n).padStart(2,'0');
+  const fechaImpresion=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()} ${p2(ahora.getHours())}:${p2(ahora.getMinutes())}`;
+  const filas=infDiarioItems.map(it=>`<tr><td class="cod">${it.codigo||'—'}</td><td class="ali">${it.alias}</td><td class="cant">${it.cantidad.toLocaleString('es-AR')}</td><td class="uni">${it.unidad||''}</td></tr>`).join('');
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Producción del día — ${fechaFmt}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;padding:8mm;font-size:14pt}
+    h1{font-size:16pt;margin-bottom:2px}
+    .sub{font-size:11pt;color:#555;margin-bottom:10px}
+    table{width:100%;border-collapse:collapse}
+    th{text-align:left;padding:6px 8px;font-size:14pt;border-bottom:2px solid #333}
+    td{padding:6px 8px;font-size:14pt;border-bottom:1px solid #ccc}
+    td.cod{width:15%;font-family:monospace}
+    td.ali{width:40%}
+    td.cant{width:25%;border-left:1px solid #ccc;font-weight:700;text-align:right}
+    td.uni{width:20%}
+    @media print{@page{size:A4;margin:10mm}body{padding:0}}
+  </style></head>
+  <body>
+    <h1>PRODUCCIÓN DEL DÍA — ${fechaFmt}</h1>
+    <div class="sub">${infDiarioMeta.empresaLabel} · Impreso ${fechaImpresion} · ${infDiarioItems.length} producto(s)</div>
+    <table>
+      <thead><tr><th>ID</th><th>Alias</th><th>Cantidad</th><th>Unidad</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
+  </body></html>`;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para imprimir.');
 }
 function pS(id){
   const s=document.getElementById(id);const c=s.value||st.w;
@@ -1773,6 +1914,24 @@ function codigoParaProducto(r){
   }
   const mp=mpData.find(m=>normTxt(m.nombre)===normTxt(r.producto));
   return mp&&mp.codigo?mp.codigo:null;
+}
+
+// Igual que codigoParaProducto pero devuelve la fila completa de Maestro>Configuración (no solo el
+// código), para poder mostrar también su alias. Misma prioridad de resolución: vínculo manual
+// (mp_id) primero, después codigo_articulo, y por último match de nombre exacto normalizado.
+function mpParaProducto(r){
+  const prod=st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id);
+  if(prod){
+    if(prod.mp_id){
+      const m=mpData.find(x=>x.id===prod.mp_id);
+      if(m)return m;
+    }
+    if(prod.codigo_articulo){
+      const m=mpData.find(x=>x.codigo===prod.codigo_articulo);
+      if(m)return m;
+    }
+  }
+  return mpData.find(m=>normTxt(m.nombre)===normTxt(r.producto))||null;
 }
 
 // "Vincular código" (Producción > Planificación, al lado de un producto sin código): el usuario
@@ -2576,8 +2735,8 @@ async function saveReal(){
     ss('online','Guardado');fl('rmsg');
     await actualizarStockDesdeReal(k);
     stockData=await get('stock','order=area.asc,producto.asc').catch(()=>stockData);
-    // Si el dashboard está activo y es la misma semana, refrescarlo
-    if(document.getElementById('tab-dash')?.classList.contains('active')){
+    // Si el dashboard está activo (dentro de Informes) y es la misma semana, refrescarlo
+    if(document.getElementById('tab-inf')?.classList.contains('active') && infActiveSubTab==='dash'){
       const dk=document.getElementById('dash-wsel')?.value||st.w;
       if(dk===k){buildDashItems(dk,document.getElementById('dash-esel')?.value||'all');renderDashPage(false);}
     }
@@ -3279,6 +3438,8 @@ function rProdDetail(aid){
                 style="width:80px;font-family:monospace;font-size:12.5px;padding:3px 5px;border:.5px solid var(--border2);border-radius:4px;background:var(--bg);color:${linkedMp?'var(--green)':'var(--text)'};flex-shrink:0"/>
               ${linkedMp?`
                 <span style="color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1" title="${linkedMp.nombre.replace(/"/g,'&quot;')}">${linkedMp.nombre}</span>
+                ${linkedMp.alias?`<span style="font-size:11px;color:var(--text3);white-space:nowrap;flex-shrink:0" title="Alias">· ${linkedMp.alias}</span>`:''}
+                <span style="font-size:11px;color:var(--text3);white-space:nowrap;flex-shrink:0" title="Unidad de medida">· ${p.unidad||''}</span>
                 ${linkedMp.unidad_tipo?`<span style="font-size:10px;background:${linkedMp.unidad_tipo==='caja'?'var(--blue)18':'var(--amber)18'};color:${linkedMp.unidad_tipo==='caja'?'var(--blue)':'var(--amber)'};border-radius:4px;padding:1px 5px;white-space:nowrap;flex-shrink:0">${linkedMp.unidad_tipo==='caja'?'Caja Cerrada':'Unidad'}</span>`:''}
                 <button class="btn btn-xs" onclick="prodMpUnlink('${p.id}')" title="Quitar vínculo" style="flex-shrink:0"><i class="ti ti-x"></i></button>
               `:sugMp?`
@@ -4410,6 +4571,86 @@ async function prodMpLink(prodId,mpId){
 async function prodMpUnlink(prodId){
   await updP(prodId,'mp_id',null);
   if(st.aaid)rProdDetail(st.aaid);
+}
+
+// "Sincronizar IDs desde el plan": recorre el plan de la semana actual (misma que ve Planificación) y,
+// para cada fila cuyo código ya se resuelve ahí (codigoParaProducto — vía mp_id, código de artículo, o
+// coincidencia de nombre con Configuración > ID/Descripción/Depósito), confirma ese mismo vínculo en
+// la tarjeta de Configuración > Producción si todavía no lo tiene. No inventa códigos nuevos ni toca
+// nada que el plan no tenga ya resuelto — las filas sin código quedan igual, para decidir a mano.
+async function sincronizarIdsDesdePlan(){
+  const btn=document.getElementById('btnSyncIds');
+  const btnHtmlOrig=btn?btn.innerHTML:'';
+  if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Sincronizando...';}
+  try{
+    await lp(st.w);
+    const plan=st.P[st.w]||[];
+    const prodDeConfig=r=>st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id&&(st.A.find(a=>a.id===p.area_id)?.nombre)===r.area)
+      ||st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id);
+    const aLinkar=[],sinCodigo=[],sinProducto=[];
+    plan.forEach(r=>{
+      const prod=prodDeConfig(r);
+      if(!prod){sinProducto.push(r);return}
+      const cod=codigoParaProducto(r);
+      if(!cod){sinCodigo.push(r);return}
+      if(prod.mp_id){
+        const m=mpData.find(x=>x.id===prod.mp_id);
+        if(m&&m.codigo===cod)return; // ya esta bien vinculado, no hay nada que hacer
+      }
+      const mpDestino=mpData.find(m=>m.codigo===cod);
+      if(!mpDestino)return;
+      aLinkar.push({prodId:prod.id,mpId:mpDestino.id,producto:r.producto,area:r.area,empresa_id:r.empresa_id,codigo:cod,mpNombre:mpDestino.nombre});
+    });
+    for(const it of aLinkar){
+      await updP(it.prodId,'mp_id',it.mpId);
+    }
+    if(st.aaid)rProdDetail(st.aaid);
+    mostrarResultadoSyncIds(aLinkar,sinCodigo,sinProducto,plan.length);
+  }catch(e){
+    ss('error','Error al sincronizar: '+e.message);
+  }
+  if(btn){btn.disabled=false;btn.innerHTML=btnHtmlOrig||'<i class="ti ti-refresh"></i> Sincronizar IDs desde el plan';}
+}
+
+function mostrarResultadoSyncIds(linkados,sinCodigo,sinProducto,totalFilas){
+  const en2=eid=>{const e=st.E.find(x=>x.id===eid);return e?e.nombre:''};
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay';overlay.id='sync-ids-modal';
+  const filasLink=linkados.map(it=>`<tr>
+    <td style="font-weight:500">${it.producto}</td>
+    <td style="font-size:12px;color:var(--text2)">${en2(it.empresa_id)} / ${it.area}</td>
+    <td style="font-family:monospace;color:var(--green)">${it.codigo}</td>
+    <td style="font-size:12px;color:var(--text2)">${it.mpNombre}</td>
+  </tr>`).join('');
+  const pendientes=[...sinCodigo,...sinProducto];
+  const filasPend=pendientes.map(r=>`<tr>
+    <td style="font-weight:500">${r.producto}</td>
+    <td style="font-size:12px;color:var(--text2)">${en2(r.empresa_id)} / ${r.area}</td>
+  </tr>`).join('');
+  overlay.innerHTML=`<div class="modal" style="width:640px;max-width:95vw">
+    <div class="modal-title"><i class="ti ti-refresh" style="color:var(--blue)"></i> Sincronizar IDs desde el plan — ${wlb(st.w)}</div>
+    <div class="modal-sub" style="margin-bottom:1rem">${totalFilas} filas revisadas en el plan de esta semana.</div>
+    ${linkados.length?`
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px;color:var(--green)"><i class="ti ti-check"></i> ${linkados.length} producto${linkados.length!==1?'s':''} vinculado${linkados.length!==1?'s':''} ahora en Configuración</div>
+      <div style="overflow:auto;max-height:260px;margin-bottom:1rem">
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead><tr><th style="text-align:left;padding:5px;border-bottom:.5px solid var(--border);color:var(--text2)">Producto</th><th style="text-align:left;padding:5px;border-bottom:.5px solid var(--border);color:var(--text2)">Empresa / Área</th><th style="text-align:left;padding:5px;border-bottom:.5px solid var(--border);color:var(--text2)">Código</th><th style="text-align:left;padding:5px;border-bottom:.5px solid var(--border);color:var(--text2)">Descripción</th></tr></thead>
+          <tbody>${filasLink}</tbody>
+        </table>
+      </div>`:`<div class="alert alert-info" style="margin-bottom:1rem">Ningún producto necesitaba corrección — el plan y Configuración ya coincidían.</div>`}
+    ${pendientes.length?`
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> ${pendientes.length} fila${pendientes.length!==1?'s':''} del plan sin ningún código todavía (no se tocaron)</div>
+      <div style="overflow:auto;max-height:180px">
+        <table style="width:100%;border-collapse:collapse;font-size:12.5px">
+          <thead><tr><th style="text-align:left;padding:5px;border-bottom:.5px solid var(--border);color:var(--text2)">Producto</th><th style="text-align:left;padding:5px;border-bottom:.5px solid var(--border);color:var(--text2)">Empresa / Área</th></tr></thead>
+          <tbody>${filasPend}</tbody>
+        </table>
+      </div>`:''}
+    <div class="modal-btns" style="margin-top:1rem">
+      <button class="btn btn-primary" onclick="document.getElementById('sync-ids-modal').remove()">Cerrar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
 }
 
 function showCfgSubTab(t){
@@ -5898,7 +6139,7 @@ function clearDashTimer(){
 }
 
 function uES(){
-  ['resel','cesel','ceesel','desv-esel','dash-esel'].forEach(id=>{
+  ['resel','cesel','ceesel','desv-esel','dash-esel','inf-diario-esel'].forEach(id=>{
     const s=document.getElementById(id);if(!s)return;
     const c=s.value;s.innerHTML='<option value="all">Todas</option>';
     if(id==='dash-esel')s.options[0].text='Todas las empresas';
