@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.195</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.196</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1510,6 +1510,7 @@ async function init(){
     mpData=mp||[];
     st.E=em||[];st.A=ar||[];st.Pr=pr||[];
     st.P[W0]=planActual.length?planActual[0].filas:[];
+    completarProductosDesdeConfig(W0,st.P[W0]);
     ss('online','Conectado');
     uES();
   }catch(e){ss('error','Sin conexion');console.error(e)}
@@ -1540,11 +1541,14 @@ async function crearNuevaSemana(){
     const planBase=st.P[ultima]||[];
     // Copiar limpiando los valores diarios
     const nuevoPlan=JSON.parse(JSON.stringify(planBase)).map(r=>({...r,days:Array(7).fill(0)}));
+    completarProductosDesdeConfig(siguiente,nuevoPlan);
     st.P[siguiente]=nuevoPlan;
     st.Ed[siguiente]=JSON.parse(JSON.stringify(nuevoPlan));
   } else {
-    st.P[siguiente]=[];
-    st.Ed[siguiente]=[];
+    const nuevoPlan=[];
+    completarProductosDesdeConfig(siguiente,nuevoPlan);
+    st.P[siguiente]=nuevoPlan;
+    st.Ed[siguiente]=JSON.parse(JSON.stringify(nuevoPlan));
   }
   if(!st.Sem.includes(siguiente)){st.Sem.push(siguiente);st.Sem.sort();}
   st.w=siguiente;
@@ -1589,7 +1593,7 @@ function poblarPlanWsel(){
   sel.value=cur||st.w;
 }
 
-async function lp(k){if(st.P[k]!==undefined)return;try{const d=await get('planes',`semana=eq.${k}&select=filas`);st.P[k]=d.length?d[0].filas:[];}catch{st.P[k]=[]}}
+async function lp(k){if(st.P[k]!==undefined)return;try{const d=await get('planes',`semana=eq.${k}&select=filas`);st.P[k]=d.length?d[0].filas:[];}catch{st.P[k]=[]}completarProductosDesdeConfig(k,st.P[k]);}
 async function lr(k){
   if(st.R[k]!==undefined)return;
   try{
@@ -1993,6 +1997,31 @@ async function vincularCodigoNuevoProducto(eid,area,producto,unidad,codigoTexto)
 function areaCanon(eid,areaTxt){
   const a=st.A.find(x=>x.empresa_id===eid&&normTxt(x.nombre)===normTxt(areaTxt));
   return a?a.nombre:(areaTxt||'SA');
+}
+
+// A partir de esta semana (Sem 39, la del 21/9/2026) el plan de cada semana se completa SOLO con
+// todos los productos que Maestro > Configuración > Producción tenga cargados para cada área —
+// para que nunca falte en Planificación/Producción Real un producto que ya está dado de alta ahí,
+// sin depender de que alguien se acuerde de agregarlo a mano con "+Agregar" o "Todos". No aplica a
+// semanas anteriores a esa fecha (quedan tal cual estaban). Nunca borra ni modifica filas existentes
+// -- solo agrega, en cantidad cero, las que falten. Se llama desde lp() (así alcanza a Planificación,
+// Producción Real e Informes por igual) y desde crearNuevaSemana() (para que una semana nueva nazca
+// completa, se copie o no la anterior).
+const AUTOFILL_PRODUCTOS_DESDE='2026-09-21';
+function completarProductosDesdeConfig(weekKey,rows){
+  if(!weekKey||weekKey<AUTOFILL_PRODUCTOS_DESDE)return 0;
+  const existentes=new Set(rows.map(r=>r.empresa_id+'||'+normTxt(areaCanon(r.empresa_id,r.area))+'||'+normTxt(r.producto)));
+  let agregados=0;
+  st.Pr.forEach(p=>{
+    const a=st.A.find(x=>x.id===p.area_id);
+    if(!a)return;
+    const key=p.empresa_id+'||'+normTxt(a.nombre)+'||'+normTxt(p.nombre);
+    if(existentes.has(key))return;
+    existentes.add(key);
+    rows.push({empresa_id:p.empresa_id,area:a.nombre,producto:p.nombre,unidad:p.unidad||'',days:Array(7).fill(0)});
+    agregados++;
+  });
+  return agregados;
 }
 
 // Botón "Corregir áreas" (Planificación): reescribe, en el plan de la semana actual, el nombre de área
