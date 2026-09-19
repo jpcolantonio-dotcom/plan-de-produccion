@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.194</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.195</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -286,6 +286,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <select id="plan-wsel" onchange="onPlanSemana()"></select>
         <button class="btn btn-sm" onclick="onPlanSemana()" title="Recargar"><i class="ti ti-refresh"></i></button>
         <button class="btn btn-sm" onclick="crearNuevaSemana()" title="Crear plan para la semana siguiente" style="gap:5px"><i class="ti ti-calendar-plus"></i> Nueva semana</button>
+        <button class="btn btn-sm" onclick="corregirAreasSemana()" title="Si algún producto quedó guardado con el nombre de área escrito distinto al de Maestro > Áreas (ej. otra mayúscula/minúscula), esto lo corrige para que se agrupe bien en la pestaña de esa área" style="gap:5px"><i class="ti ti-wand"></i> Corregir áreas</button>
       </div>
       <div class="btns">
         <button class="btn btn-pdf" id="btnpdf" onclick="genPDF()"><i class="ti ti-file-type-pdf"></i> PDF</button>
@@ -1984,6 +1985,36 @@ async function vincularCodigoNuevoProducto(eid,area,producto,unidad,codigoTexto)
 // Orden manual de un producto según Maestro > Productos (mismo campo "orden" que usan las flechitas
 // ↑↓ ahí). Los items sin producto vinculado en Maestro (o sin orden asignado todavía) quedan al
 // final, respetando entre ellos el orden relativo que ya tenían (sort estable).
+// Resuelve el texto de área de una fila del plan al nombre EXACTO tal como está hoy en Maestro > Áreas
+// (comparación sin distinguir mayúsculas/acentos) -- evita que una fila guardada en algún momento con
+// otro casing (ej. "Envase" en vez de "ENVASE") aparezca como una pestaña de área aparte y "duplicada"
+// en Planificación/Producción Real, dando la falsa sensación de que faltan productos que en realidad
+// están cargados, solo que agrupados bajo el nombre viejo.
+function areaCanon(eid,areaTxt){
+  const a=st.A.find(x=>x.empresa_id===eid&&normTxt(x.nombre)===normTxt(areaTxt));
+  return a?a.nombre:(areaTxt||'SA');
+}
+
+// Botón "Corregir áreas" (Planificación): reescribe, en el plan de la semana actual, el nombre de área
+// de cada fila al que tiene hoy en Maestro > Áreas cuando difiere solo en mayúsculas/acentos (deja el
+// cambio en st.Ed sin guardar todavía -- el usuario confirma con "Guardar plan", igual que cualquier
+// otra edición de la grilla).
+function corregirAreasSemana(){
+  const rows=gE();
+  let corregidos=0;
+  rows.forEach(r=>{
+    const canon=areaCanon(r.empresa_id,r.area);
+    if(canon!==r.area){ r.area=canon; corregidos++; }
+  });
+  st.Ed[st.w]=rows;
+  if(corregidos){
+    ss('online',`${corregidos} fila${corregidos!==1?'s':''} de área corregida${corregidos!==1?'s':''} ✓ — acordate de "Guardar plan"`);
+    rG();
+  } else {
+    ss('online','No había ninguna fila con el área mal escrita');
+  }
+}
+
 function ordenPorProducto(r){
   const p=st.Pr.find(x=>x.nombre===r.producto&&x.empresa_id===r.empresa_id);
   return (p&&p.orden!=null)?p.orden:Infinity;
@@ -2037,9 +2068,9 @@ function renderPlanEmpresa(eid, items){
   const t=tc(st.w);
   const as=gas(all);
 
-  // Agrupar por área
+  // Agrupar por área (normalizando el nombre al de Maestro > Áreas actual, ver areaCanon)
   const bA={};
-  items.forEach(r=>{const a=r.area||'SA';if(!bA[a])bA[a]=[];bA[a].push(r)});
+  items.forEach(r=>{const a=areaCanon(eid,r.area||'SA');if(!bA[a])bA[a]=[];bA[a].push(r)});
   const areas=Object.keys(bA);
   if(!planActiveArea[eid]||!bA[planActiveArea[eid]])planActiveArea[eid]=areas[0];
   const activeArea=planActiveArea[eid];
@@ -2161,7 +2192,9 @@ async function copiarAreaSemanaAnterior(eid, area){
   ss('saving','Cargando semana anterior...');
   await lp(semAnterior);
   const planAnterior=st.P[semAnterior]||[];
-  const itemsArea=planAnterior.filter(r=>r.empresa_id===eid&&r.area===area);
+  // Comparación por nombre de área normalizada (ver areaCanon): una fila vieja guardada con otro
+  // casing (ej. "Envase" en vez de "ENVASE") tiene que encontrarse igual al copiar el área actual.
+  const itemsArea=planAnterior.filter(r=>r.empresa_id===eid&&areaCanon(eid,r.area)===area);
   if(!itemsArea.length){
     ss('online','Sin datos');
     alert(`No hay plan para "${area}" en la semana anterior.`);
@@ -2170,16 +2203,17 @@ async function copiarAreaSemanaAnterior(eid, area){
   const rows=gE();
   let copiados=0;
   itemsArea.forEach(r=>{
-    const existe=rows.find(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
+    const existe=rows.find(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&areaCanon(eid,x.area)===area);
     if(existe){
-      // Actualizar cantidades
+      // Actualizar cantidades y de paso corregir el nombre de área al actual, si venía con otro casing
       existe.days=confirmar?[...(r.days||Array(7).fill(0))]:Array(7).fill(0);
+      existe.area=area;
       copiados++;
     } else {
-      // Agregar producto nuevo
+      // Agregar producto nuevo, ya con el nombre de área actual (no el viejo casing de r.area)
       rows.push({
         empresa_id:r.empresa_id,
-        area:r.area,
+        area,
         producto:r.producto,
         unidad:r.unidad,
         days:confirmar?[...(r.days||Array(7).fill(0))]:Array(7).fill(0)
@@ -2338,7 +2372,7 @@ function renderRealEmpresa(k,eid,items){
   const empContent=document.getElementById('real-emp-content');
   const ap=st.P[k]||[];const as=gas(ap);const t=tc(k);
   const bA={};
-  items.forEach(r=>{const a=r.area||'SA';if(!bA[a])bA[a]=[];bA[a].push(r)});
+  items.forEach(r=>{const a=areaCanon(eid,r.area||'SA');if(!bA[a])bA[a]=[];bA[a].push(r)});
   const areas=Object.keys(bA);
   if(!realActiveArea[eid]||!bA[realActiveArea[eid]])realActiveArea[eid]=areas[0];
   const activeArea=realActiveArea[eid];
