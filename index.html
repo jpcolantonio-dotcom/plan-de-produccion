@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.197</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.199</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1438,6 +1438,15 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       </div>
       <div style="font-size:12px;color:var(--text2)">Hoja para cortar al medio: fechas de envase y vencimiento a la izquierda, lo que hay que hacer hoy de Pastas Especiales a la derecha.</div>
       <button class="btn btn-primary" onclick="imprimirPlanillaEnvasePastas()"><i class="ti ti-printer"></i> Imprimir</button>
+    </div>
+    <div class="grid-card" style="padding:1.25rem;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <i class="ti ti-truck-delivery" style="font-size:20px;color:var(--green)"></i>
+        <div style="font-size:14px;font-weight:600;flex:1">Distribución Planeta</div>
+        <button class="btn btn-xs" onclick="abrirEditarDistribucionPlaneta()" title="Agregar o quitar productos de la lista"><i class="ti ti-pencil"></i></button>
+      </div>
+      <div style="font-size:12px;color:var(--text2)">Lista de productos (ID y Alias) para repartir a mano entre LAMADRID / VILLA / DONADO / UNI / PATAGONIA. Editable con el lápiz.</div>
+      <button class="btn btn-primary" onclick="imprimirPlanillaDistribucionPlaneta()"><i class="ti ti-printer"></i> Imprimir</button>
     </div>
   </div>
 </div>
@@ -13164,6 +13173,169 @@ function imprimirPlanillaRecortes(){
         <tbody>${filas}</tbody>
       </table>
       <div class="footer-nota">El cajón blanco pesa 2 kg — descontar del peso total</div>
+    </div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},350)};<\/script>
+  </body></html>`;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para imprimir.');
+}
+
+// Planilla "Distribución Planeta" (Planillas): lista EDITABLE de productos (ID+Alias) para repartir
+// a mano entre las sucursales LAMADRID / VILLA / DONADO / UNI / PATAGONIA. Arrancó (v4.198) como un
+// filtro automático de "todos los sabores Criolla 15" -- ahora (v4.199) es una lista libre que se
+// arma a mano con el lápiz de la tarjeta (agregar por código/ID, quitar con la X), guardada en la
+// tabla planilla_distribucion (mp_id -> materias_primas.id, con `unique` en mp_id para no duplicar)
+// para que se vea igual desde cualquier compu, no solo en este navegador. La primera vez que se abre
+// el editor, si la tabla está vacía, se la precarga con la lista de Criolla 15 (unidad) que ya
+// armaba automáticamente la versión anterior, para no tener que volver a tipear ~30 códigos a mano.
+let distPlanetaCache=[]; // [{rowId, mp}] -- fila de planilla_distribucion + su materia prima ya resuelta
+
+function distPlanetaOrdenados(){
+  return [...distPlanetaCache].sort((a,b)=>normTxt(a.mp.alias||a.mp.nombre).localeCompare(normTxt(b.mp.alias||b.mp.nombre),'es',{numeric:true}));
+}
+
+async function cargarDistribucionPlaneta(){
+  const filas=await get('planilla_distribucion','select=id,mp_id');
+  distPlanetaCache=filas.map(f=>({rowId:f.id,mp:mpData.find(m=>m.id===f.mp_id)})).filter(x=>x.mp);
+  return distPlanetaCache;
+}
+
+function distPlanetaErrorTabla(e){
+  alert('No pude leer la lista de "Distribución Planeta". Si todavía no creaste la tabla "planilla_distribucion" en Supabase, corré el SQL que te pasé y volvé a intentar.\n\n'+e.message);
+}
+
+async function abrirEditarDistribucionPlaneta(){
+  ss('saving','Cargando...');
+  try{
+    await cargarDistribucionPlaneta();
+    if(!distPlanetaCache.length){
+      // Primera vez que se abre (tabla recién creada, vacía): precargar con la lista Criolla 15
+      // (unidad) que armaba solo la v4.198, en vez de arrancar de cero.
+      const seed=mpData.filter(m=>{const n=normTxt(m.nombre);return n.includes('CRIOLLA 15')&&!n.includes('CAJA');});
+      if(seed.length)await ins('planilla_distribucion',seed.map(m=>({mp_id:m.id})));
+      await cargarDistribucionPlaneta();
+    }
+    ss('online','Listo');
+  }catch(e){
+    ss('error','Error');
+    distPlanetaErrorTabla(e);
+    return;
+  }
+  renderModalDistribucionPlaneta();
+}
+
+function renderModalDistribucionPlaneta(){
+  let overlay=document.getElementById('modal-dist-planeta');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.className='modal-overlay';overlay.id='modal-dist-planeta';
+    overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove();});
+    document.body.appendChild(overlay);
+  }
+  const items=distPlanetaOrdenados();
+  const rows=items.map(x=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:.5px solid var(--border)">
+    <span style="font-size:10px;color:var(--text3);width:60px;flex-shrink:0">${x.mp.codigo||''}</span>
+    <span style="font-size:13px;flex:1">${(x.mp.alias||x.mp.nombre||'').toString().replace(/</g,'&lt;')}</span>
+    <button class="btn btn-xs" onclick="quitarDeDistribucionPlaneta('${x.rowId}')" title="Quitar de la lista"><i class="ti ti-x"></i></button>
+  </div>`).join('');
+  overlay.innerHTML=`<div class="modal" style="width:420px;max-height:80vh;overflow-y:auto;display:flex;flex-direction:column">
+    <div class="modal-title"><i class="ti ti-truck-delivery"></i> Distribución Planeta</div>
+    <div class="modal-sub">${items.length} producto${items.length!==1?'s':''} en la lista. Agregá por código (ID) o quitá con la X.</div>
+    <div style="display:flex;gap:6px;margin:10px 0">
+      <input type="text" id="dist-planeta-add-cod" inputmode="numeric" placeholder="Código (ID)..." style="flex:1;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)" onkeydown="if(event.key==='Enter')agregarADistribucionPlaneta()"/>
+      <button class="btn btn-primary btn-sm" onclick="agregarADistribucionPlaneta()"><i class="ti ti-plus"></i> Agregar</button>
+    </div>
+    <div id="dist-planeta-lista">${rows||'<div style="padding:1rem;text-align:center;font-size:12px;color:var(--text2)">Sin productos todavía.</div>'}</div>
+    <div class="modal-btns" style="margin-top:16px">
+      <button class="btn" onclick="document.getElementById('modal-dist-planeta').remove()">Cerrar</button>
+    </div>
+  </div>`;
+}
+
+async function agregarADistribucionPlaneta(){
+  const inp=document.getElementById('dist-planeta-add-cod');
+  const codigo=(inp&&inp.value||'').toString().trim();
+  if(!codigo)return;
+  const m=mpData.find(x=>(x.codigo||'').toString().trim()===codigo);
+  if(!m){alert(`No encontré en Configuración ningún producto con el código "${codigo}".`);return}
+  if(distPlanetaCache.some(x=>x.mp.id===m.id)){alert('Ese producto ya está en la lista.');if(inp)inp.value='';return}
+  try{
+    await ins('planilla_distribucion',{mp_id:m.id});
+    await cargarDistribucionPlaneta();
+    renderModalDistribucionPlaneta();
+  }catch(e){alert('Error al agregar: '+e.message)}
+}
+
+async function quitarDeDistribucionPlaneta(rowId){
+  try{
+    await del('planilla_distribucion',rowId);
+    distPlanetaCache=distPlanetaCache.filter(x=>x.rowId!==rowId);
+    renderModalDistribucionPlaneta();
+  }catch(e){alert('Error al quitar: '+e.message)}
+}
+
+async function imprimirPlanillaDistribucionPlaneta(){
+  ss('saving','Cargando...');
+  try{
+    await cargarDistribucionPlaneta();
+    ss('online','Listo');
+  }catch(e){
+    ss('error','Error');
+    distPlanetaErrorTabla(e);
+    return;
+  }
+  const items=distPlanetaOrdenados().map(x=>x.mp);
+  if(!items.length){alert('La lista de Distribución Planeta está vacía. Agregá productos con el lápiz de la tarjeta antes de imprimir.');return}
+  const COLS=['LAMADRID','VILLA','DONADO','UNI','PATAGONIA'];
+  const filas=items.map(m=>`<tr>
+    <td class="c-id">${m.codigo||''}</td>
+    <td class="c-alias">${(m.alias||m.nombre||'').toString().replace(/</g,'&lt;')}</td>
+    ${COLS.map(()=>'<td class="c-suc"></td>').join('')}
+  </tr>`).join('');
+  const ahora=new Date();
+  const p2=n=>String(n).padStart(2,'0');
+  const fechaImpresion=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()}`;
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Distribución Planeta</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;color:#111}
+    .hoja{width:190mm;margin:0 auto;padding:6mm}
+    h1{font-size:13pt;text-align:center;margin-bottom:1mm;text-transform:uppercase;letter-spacing:1px}
+    .sub{font-size:9pt;text-align:center;color:#444;margin-bottom:4mm}
+    table{width:100%;border-collapse:collapse}
+    thead{display:table-header-group}
+    tr{page-break-inside:avoid}
+    th{background:#1B3A6B;color:#fff;padding:4px 6px;font-size:8pt;text-align:left;border:1px solid #1B3A6B}
+    th.th-id{width:18mm}
+    th.th-alias{width:55mm}
+    th.th-suc{width:23.4mm;text-align:center}
+    td{border:1px solid #999;height:8mm;font-size:9pt;padding:0 5px}
+    td.c-id{width:18mm;font-size:8pt;color:#555}
+    td.c-alias{width:55mm;font-weight:600}
+    td.c-suc{width:23.4mm}
+    tr:nth-child(even) td{background:#fafafa}
+    @media print{
+      @page{size:A4;margin:8mm}
+      body{margin:0}
+      .hoja{width:100%;padding:0}
+    }
+  </style></head>
+  <body>
+    <div class="hoja">
+      <h1>Distribución Planeta</h1>
+      <div class="sub">${items.length} artículo${items.length!==1?'s':''} · Impreso ${fechaImpresion}</div>
+      <table>
+        <thead><tr>
+          <th class="th-id">ID</th>
+          <th class="th-alias">Alias</th>
+          ${COLS.map(c=>`<th class="th-suc">${c}</th>`).join('')}
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
     </div>
   <script>window.onload=function(){setTimeout(function(){window.print()},350)};<\/script>
   </body></html>`;
