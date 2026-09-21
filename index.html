@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.201</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.202</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1454,7 +1454,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <div style="font-size:14px;font-weight:600;flex:1">Consumo de MP Semanal</div>
         <button class="btn btn-xs" onclick="abrirEditarConsumoMpSemanal()" title="Agregar o quitar productos de la lista"><i class="ti ti-pencil"></i></button>
       </div>
-      <div style="font-size:12px;color:var(--text2)">Cuánta materia prima se va a consumir cada día de la semana, calculado solo según receta y el plan de la semana abierta en Planificación. Elegís los productos con el lápiz.</div>
+      <div style="font-size:12px;color:var(--text2)">Por cada producto: cuánto de cada materia prima hace falta y el total de kilos de relleno, calculado solo según receta y el plan de la semana abierta en Planificación. Elegís los productos con el lápiz.</div>
       <button class="btn btn-primary" onclick="imprimirPlanillaConsumoMpSemanal()"><i class="ti ti-printer"></i> Imprimir</button>
     </div>
   </div>
@@ -13457,36 +13457,48 @@ async function quitarDeConsumoMpSemanal(rowId){
 // recetas, sumando SOLO los renglones de plan cuyo producto vinculado (mpParaProducto) está en la
 // lista consumoMpCache. Devuelve también qué productos de la lista no tienen receta cargada (para
 // avisar, no para bloquear) y cuáles no aparecen con cantidad en el plan de esta semana.
+// v4.202: reorganizado de "una fila por MP con columnas por día" a "una sección por PRODUCTO" (a
+// pedido, para que se parezca a la planilla en papel que ya usan para Rellenos: producto arriba,
+// abajo la lista de MP con la cantidad que corresponde, y un total de kilos de relleno al pie). La
+// cantidad a producir de cada producto sigue saliendo SOLA del plan de la semana abierta (st.w) --
+// acá se usa el total semanal (suma de los 7 días), no desglosado por día como en la v4.201.
 function calcularConsumoMpSemana(){
   const plan=st.P[st.w]||[];
   const trackedIds=new Set(consumoMpCache.map(x=>x.mp.id));
-  const cm={}; // key ingrediente||unidad -> {ingrediente,unidad,dias:[7],total}
-  const productosConDatos=new Set();
+  const porProducto={}; // mp.id -> {mp,cantidadSemana,ingredientes:[],totalKg}
   plan.forEach(r=>{
     const mp=mpParaProducto(r);
     if(!mp||!trackedIds.has(mp.id))return;
     const dias=r.days||[];
-    if(!dias.some(v=>v>0))return;
+    const cantidadSemana=dias.reduce((a,v)=>a+(v||0),0);
+    if(!cantidadSemana)return;
     const ings=st.Rec[r.producto]||[];
     if(!ings.length)return;
-    productosConDatos.add(mp.id);
     const tanda=(st.RecTanda&&st.RecTanda[r.producto])||1;
+    if(!porProducto[mp.id])porProducto[mp.id]={mp,cantidadSemana:0,ingMap:{}};
+    const pp=porProducto[mp.id];
+    pp.cantidadSemana=fn(pp.cantidadSemana+cantidadSemana);
     ings.forEach(ing=>{
       const key=ing.ingrediente+'||'+ing.unidad;
-      if(!cm[key])cm[key]={ingrediente:ing.ingrediente,unidad:ing.unidad,dias:[0,0,0,0,0,0,0],total:0};
       const cantXUnidad=tanda>0?ing.cantidad/tanda:ing.cantidad;
-      for(let di=0;di<7;di++){
-        const cant=dias[di]||0;
-        if(!cant)continue;
-        const c=cantXUnidad*cant;
-        cm[key].dias[di]=fn(cm[key].dias[di]+c);
-        cm[key].total=fn(cm[key].total+c);
-      }
+      const c=cantXUnidad*cantidadSemana;
+      if(!pp.ingMap[key])pp.ingMap[key]={ingrediente:ing.ingrediente,unidad:ing.unidad,cantidad:0};
+      pp.ingMap[key].cantidad=fn(pp.ingMap[key].cantidad+c);
     });
   });
+  const productos=Object.values(porProducto).map(pp=>{
+    const ingredientes=Object.values(pp.ingMap).sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
+    const totalKg=fn(ingredientes.reduce((a,ing)=>{
+      const u=(ing.unidad||'').toString().trim().toLowerCase();
+      if(u==='kg')return a+ing.cantidad;
+      if(u==='gr'||u==='g')return a+ing.cantidad/1000;
+      return a;
+    },0));
+    return{mp:pp.mp,cantidadSemana:pp.cantidadSemana,ingredientes,totalKg};
+  }).sort((a,b)=>normTxt(a.mp.alias||a.mp.nombre).localeCompare(normTxt(b.mp.alias||b.mp.nombre),'es',{numeric:true}));
+  const productosConDatos=new Set(productos.map(p=>p.mp.id));
   const sinReceta=consumoMpCache.filter(x=>!(st.Rec[recKeyForMp(x.mp)||x.mp.nombre]||[]).length && !productosConDatos.has(x.mp.id));
-  const items=Object.values(cm).sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
-  return{items,sinReceta};
+  return{productos,sinReceta};
 }
 
 async function imprimirPlanillaConsumoMpSemanal(){
@@ -13501,24 +13513,33 @@ async function imprimirPlanillaConsumoMpSemanal(){
     return;
   }
   if(!consumoMpCache.length){alert('La lista de Consumo de MP Semanal está vacía. Agregá productos con el lápiz de la tarjeta antes de imprimir.');return}
-  const{items,sinReceta}=calcularConsumoMpSemana();
-  if(!items.length){
+  const{productos,sinReceta}=calcularConsumoMpSemana();
+  if(!productos.length){
     let msg='No hay consumo de MP para calcular en '+wlb(st.w)+'. Verificá que los productos elegidos tengan cantidad planificada esa semana y receta cargada.';
     if(sinReceta.length)msg+='\n\nSin receta cargada: '+sinReceta.map(x=>x.mp.alias||x.mp.nombre).join(', ');
     alert(msg);
     return;
   }
-  const DIAS=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
-  const filas=items.map(it=>`<tr>
-    <td class="c-ing">${(it.ingrediente||'').toString().replace(/</g,'&lt;')}</td>
-    <td class="c-un">${it.unidad||''}</td>
-    ${it.dias.map(v=>`<td class="c-dia">${v?v.toLocaleString('es-AR'):''}</td>`).join('')}
-    <td class="c-tot">${it.total.toLocaleString('es-AR')}</td>
-  </tr>`).join('');
   const ahora=new Date();
   const p2=n=>String(n).padStart(2,'0');
   const fechaImpresion=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()}`;
-  const avisoSinReceta=sinReceta.length?`<div class="aviso">Sin receta o sin cantidad planificada esta semana (no aparecen en la tabla): ${sinReceta.map(x=>(x.mp.alias||x.mp.nombre).toString().replace(/</g,'&lt;')).join(', ')}</div>`:'';
+  const avisoSinReceta=sinReceta.length?`<div class="aviso">Sin receta o sin cantidad planificada esta semana (no aparecen abajo): ${sinReceta.map(x=>(x.mp.alias||x.mp.nombre).toString().replace(/</g,'&lt;')).join(', ')}</div>`:'';
+  const seccionesHtml=productos.map(p=>{
+    const filas=p.ingredientes.map(ing=>`<tr>
+      <td class="c-ing">${(ing.ingrediente||'').toString().replace(/</g,'&lt;')}</td>
+      <td class="c-un">${ing.unidad||''}</td>
+      <td class="c-cant">${ing.cantidad.toLocaleString('es-AR')}</td>
+    </tr>`).join('');
+    const nombreProd=(p.mp.alias||p.mp.nombre||'').toString().replace(/</g,'&lt;');
+    return `<div class="prod-sec">
+      <div class="prod-head">${nombreProd}<span class="prod-cant">${p.cantidadSemana.toLocaleString('es-AR')} unid. esta semana</span></div>
+      <table>
+        <thead><tr><th class="th-ing">Materia Prima</th><th class="th-un">Unidad</th><th class="th-cant">Cantidad</th></tr></thead>
+        <tbody>${filas}</tbody>
+        <tfoot><tr><td colspan="2" class="c-totlbl">Total kilos de relleno</td><td class="c-tot">${p.totalKg.toLocaleString('es-AR')} kg</td></tr></tfoot>
+      </table>
+    </div>`;
+  }).join('');
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
   <title>Consumo de MP Semanal</title>
   <style>
@@ -13528,21 +13549,23 @@ async function imprimirPlanillaConsumoMpSemanal(){
     h1{font-size:13pt;text-align:center;margin-bottom:1mm;text-transform:uppercase;letter-spacing:1px}
     .sub{font-size:9pt;text-align:center;color:#444;margin-bottom:4mm}
     .aviso{font-size:8pt;color:#A32D2D;background:#FCEBEB;border-radius:4px;padding:4px 6px;margin-bottom:4mm}
+    .prod-sec{page-break-inside:avoid;margin-bottom:6mm}
+    .prod-head{background:#DCEAF7;border:1px solid #1B3A6B;border-bottom:none;padding:5px 8px;font-size:10.5pt;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+    .prod-cant{font-size:8.5pt;font-weight:400;color:#333}
     table{width:100%;border-collapse:collapse}
-    thead{display:table-header-group}
-    tr{page-break-inside:avoid}
-    th{background:#1B3A6B;color:#fff;padding:4px 5px;font-size:8pt;text-align:center;border:1px solid #1B3A6B}
-    th.th-ing{text-align:left;width:48mm}
-    th.th-un{width:14mm}
-    td{border:1px solid #999;height:7mm;font-size:8.5pt;padding:0 4px}
-    td.c-ing{font-weight:600}
+    th{background:#1B3A6B;color:#fff;padding:4px 6px;font-size:8pt;text-align:left;border:1px solid #1B3A6B}
+    th.th-un{width:20mm;text-align:center}
+    th.th-cant{width:28mm;text-align:right}
+    td{border:1px solid #999;height:7mm;font-size:9pt;padding:0 6px}
+    td.c-ing{font-weight:500}
     td.c-un{color:#555;text-align:center}
-    td.c-dia{text-align:right}
-    td.c-tot{text-align:right;font-weight:700;background:#f1f5f9}
-    tr:nth-child(even) td{background:#fafafa}
-    tr:nth-child(even) td.c-tot{background:#e2e8f0}
+    td.c-cant{text-align:right}
+    tfoot td{background:#eef2f6;font-weight:700}
+    td.c-totlbl{text-align:right}
+    td.c-tot{text-align:right;color:#1B3A6B}
+    tbody tr:nth-child(even) td{background:#fafafa}
     @media print{
-      @page{size:A4 landscape;margin:8mm}
+      @page{size:A4;margin:8mm}
       body{margin:0}
       .hoja{width:100%;padding:0}
     }
@@ -13550,17 +13573,9 @@ async function imprimirPlanillaConsumoMpSemanal(){
   <body>
     <div class="hoja">
       <h1>Consumo de MP Semanal</h1>
-      <div class="sub">${wlb(st.w)} · ${items.length} materia${items.length!==1?'s':''} prima${items.length!==1?'s':''} · Impreso ${fechaImpresion}</div>
+      <div class="sub">${wlb(st.w)} · ${productos.length} producto${productos.length!==1?'s':''} · Impreso ${fechaImpresion}</div>
       ${avisoSinReceta}
-      <table>
-        <thead><tr>
-          <th class="th-ing">Materia Prima</th>
-          <th class="th-un">Unidad</th>
-          ${DIAS.map(d=>`<th>${d}</th>`).join('')}
-          <th>Total</th>
-        </tr></thead>
-        <tbody>${filas}</tbody>
-      </table>
+      ${seccionesHtml}
     </div>
   <script>window.onload=function(){setTimeout(function(){window.print()},350)};<\/script>
   </body></html>`;
