@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.199</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.200</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -13290,20 +13290,41 @@ async function imprimirPlanillaDistribucionPlaneta(){
   const items=distPlanetaOrdenados().map(x=>x.mp);
   if(!items.length){alert('La lista de Distribución Planeta está vacía. Agregá productos con el lápiz de la tarjeta antes de imprimir.');return}
   const COLS=['LAMADRID','VILLA','DONADO','UNI','PATAGONIA'];
-  const filas=items.map(m=>`<tr>
-    <td class="c-id">${m.codigo||''}</td>
-    <td class="c-alias">${(m.alias||m.nombre||'').toString().replace(/</g,'&lt;')}</td>
-    ${COLS.map(()=>'<td class="c-suc"></td>').join('')}
-  </tr>`).join('');
+  const esEmpanada=m=>normTxt(m.nombre||'').includes('EMPANADA');
+  const grupos=[
+    {titulo:'Distribución Planeta — Empanadas',items:items.filter(esEmpanada)},
+    {titulo:'Distribución Planeta — Burritos / Pizzetas / Salsas',items:items.filter(m=>!esEmpanada(m))}
+  ].filter(g=>g.items.length);
   const ahora=new Date();
   const p2=n=>String(n).padStart(2,'0');
   const fechaImpresion=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()}`;
+  const hojaHtml=(g,esUltima)=>{
+    const filas=g.items.map(m=>`<tr>
+      <td class="c-id">${m.codigo||''}</td>
+      <td class="c-alias">${(m.alias||m.nombre||'').toString().replace(/</g,'&lt;')}</td>
+      ${COLS.map(()=>'<td class="c-suc"></td>').join('')}
+    </tr>`).join('');
+    return `<div class="hoja${esUltima?'':' hoja-brk'}">
+      <h1>${g.titulo}</h1>
+      <div class="sub">${g.items.length} artículo${g.items.length!==1?'s':''} · Impreso ${fechaImpresion}</div>
+      <table>
+        <thead><tr>
+          <th class="th-id">ID</th>
+          <th class="th-alias">Alias</th>
+          ${COLS.map(c=>`<th class="th-suc">${c}</th>`).join('')}
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>`;
+  };
+  const hojasHtml=grupos.map((g,i)=>hojaHtml(g,i===grupos.length-1)).join('');
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
   <title>Distribución Planeta</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:Arial,sans-serif;color:#111}
     .hoja{width:190mm;margin:0 auto;padding:6mm}
+    .hoja-brk{page-break-after:always}
     h1{font-size:13pt;text-align:center;margin-bottom:1mm;text-transform:uppercase;letter-spacing:1px}
     .sub{font-size:9pt;text-align:center;color:#444;margin-bottom:4mm}
     table{width:100%;border-collapse:collapse}
@@ -13325,18 +13346,7 @@ async function imprimirPlanillaDistribucionPlaneta(){
     }
   </style></head>
   <body>
-    <div class="hoja">
-      <h1>Distribución Planeta</h1>
-      <div class="sub">${items.length} artículo${items.length!==1?'s':''} · Impreso ${fechaImpresion}</div>
-      <table>
-        <thead><tr>
-          <th class="th-id">ID</th>
-          <th class="th-alias">Alias</th>
-          ${COLS.map(c=>`<th class="th-suc">${c}</th>`).join('')}
-        </tr></thead>
-        <tbody>${filas}</tbody>
-      </table>
-    </div>
+    ${hojasHtml}
   <script>window.onload=function(){setTimeout(function(){window.print()},350)};<\/script>
   </body></html>`;
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
