@@ -248,7 +248,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.200</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.201</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1447,6 +1447,15 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       </div>
       <div style="font-size:12px;color:var(--text2)">Lista de productos (ID y Alias) para repartir a mano entre LAMADRID / VILLA / DONADO / UNI / PATAGONIA. Editable con el lápiz.</div>
       <button class="btn btn-primary" onclick="imprimirPlanillaDistribucionPlaneta()"><i class="ti ti-printer"></i> Imprimir</button>
+    </div>
+    <div class="grid-card" style="padding:1.25rem;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <i class="ti ti-chart-bar" style="font-size:20px;color:var(--red)"></i>
+        <div style="font-size:14px;font-weight:600;flex:1">Consumo de MP Semanal</div>
+        <button class="btn btn-xs" onclick="abrirEditarConsumoMpSemanal()" title="Agregar o quitar productos de la lista"><i class="ti ti-pencil"></i></button>
+      </div>
+      <div style="font-size:12px;color:var(--text2)">Cuánta materia prima se va a consumir cada día de la semana, calculado solo según receta y el plan de la semana abierta en Planificación. Elegís los productos con el lápiz.</div>
+      <button class="btn btn-primary" onclick="imprimirPlanillaConsumoMpSemanal()"><i class="ti ti-printer"></i> Imprimir</button>
     </div>
   </div>
 </div>
@@ -13347,6 +13356,212 @@ async function imprimirPlanillaDistribucionPlaneta(){
   </style></head>
   <body>
     ${hojasHtml}
+  <script>window.onload=function(){setTimeout(function(){window.print()},350)};<\/script>
+  </body></html>`;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para imprimir.');
+}
+
+// Consumo de MP Semanal (Planillas, v4.201): planilla que muestra cuánta materia prima se va a
+// consumir CADA DÍA de la semana, calculado solo (no se edita a mano) a partir del plan de la
+// semana que esté abierta en Planificación (st.w) y las recetas ya cargadas (st.Rec/st.RecTanda) --
+// mismo cálculo cantidad×unidad = ing.cantidad/tanda que ya usa Stock > Consumo MP, pero desglosado
+// por día en vez de sumado en un rango de fechas. Lo único editable es la LISTA DE PRODUCTOS que
+// entran en el cálculo (lápiz de la tarjeta, agregar por código / quitar con X -- mismo patrón que
+// Distribución Planeta), guardada en su propia tabla planilla_consumo_mp (mp_id -> materias_primas).
+// A diferencia de Distribución Planeta, acá NO hay auto-seed al abrir por primera vez (no hay una
+// lista previa de la que partir) -- arranca vacía y el usuario elige los productos a mano.
+let consumoMpCache=[]; // [{rowId, mp}]
+
+function consumoMpOrdenados(){
+  return [...consumoMpCache].sort((a,b)=>normTxt(a.mp.alias||a.mp.nombre).localeCompare(normTxt(b.mp.alias||b.mp.nombre),'es',{numeric:true}));
+}
+
+async function cargarConsumoMpLista(){
+  const filas=await get('planilla_consumo_mp','select=id,mp_id');
+  consumoMpCache=filas.map(f=>({rowId:f.id,mp:mpData.find(m=>m.id===f.mp_id)})).filter(x=>x.mp);
+  return consumoMpCache;
+}
+
+function consumoMpErrorTabla(e){
+  alert('No pude leer la lista de "Consumo de MP Semanal". Si todavía no creaste la tabla "planilla_consumo_mp" en Supabase, corré el SQL que te pasé y volvé a intentar.\n\n'+e.message);
+}
+
+async function abrirEditarConsumoMpSemanal(){
+  ss('saving','Cargando...');
+  try{
+    await cargarConsumoMpLista();
+    ss('online','Listo');
+  }catch(e){
+    ss('error','Error');
+    consumoMpErrorTabla(e);
+    return;
+  }
+  renderModalConsumoMpSemanal();
+}
+
+function renderModalConsumoMpSemanal(){
+  let overlay=document.getElementById('modal-consumo-mp');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.className='modal-overlay';overlay.id='modal-consumo-mp';
+    overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove();});
+    document.body.appendChild(overlay);
+  }
+  const items=consumoMpOrdenados();
+  const rows=items.map(x=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:.5px solid var(--border)">
+    <span style="font-size:10px;color:var(--text3);width:60px;flex-shrink:0">${x.mp.codigo||''}</span>
+    <span style="font-size:13px;flex:1">${(x.mp.alias||x.mp.nombre||'').toString().replace(/</g,'&lt;')}</span>
+    <button class="btn btn-xs" onclick="quitarDeConsumoMpSemanal('${x.rowId}')" title="Quitar de la lista"><i class="ti ti-x"></i></button>
+  </div>`).join('');
+  overlay.innerHTML=`<div class="modal" style="width:420px;max-height:80vh;overflow-y:auto;display:flex;flex-direction:column">
+    <div class="modal-title"><i class="ti ti-chart-bar"></i> Consumo de MP Semanal</div>
+    <div class="modal-sub">${items.length} producto${items.length!==1?'s':''} en la lista. El consumo de materia prima se calcula solo por receta y plan -- acá solo elegís QUÉ productos entran. Agregá por código (ID) o quitá con la X.</div>
+    <div style="display:flex;gap:6px;margin:10px 0">
+      <input type="text" id="consumo-mp-add-cod" inputmode="numeric" placeholder="Código (ID)..." style="flex:1;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)" onkeydown="if(event.key==='Enter')agregarAConsumoMpSemanal()"/>
+      <button class="btn btn-primary btn-sm" onclick="agregarAConsumoMpSemanal()"><i class="ti ti-plus"></i> Agregar</button>
+    </div>
+    <div id="consumo-mp-lista">${rows||'<div style="padding:1rem;text-align:center;font-size:12px;color:var(--text2)">Sin productos todavía.</div>'}</div>
+    <div class="modal-btns" style="margin-top:16px">
+      <button class="btn" onclick="document.getElementById('modal-consumo-mp').remove()">Cerrar</button>
+    </div>
+  </div>`;
+}
+
+async function agregarAConsumoMpSemanal(){
+  const inp=document.getElementById('consumo-mp-add-cod');
+  const codigo=(inp&&inp.value||'').toString().trim();
+  if(!codigo)return;
+  const m=mpData.find(x=>(x.codigo||'').toString().trim()===codigo);
+  if(!m){alert(`No encontré en Configuración ningún producto con el código "${codigo}".`);return}
+  if(consumoMpCache.some(x=>x.mp.id===m.id)){alert('Ese producto ya está en la lista.');if(inp)inp.value='';return}
+  try{
+    await ins('planilla_consumo_mp',{mp_id:m.id});
+    await cargarConsumoMpLista();
+    renderModalConsumoMpSemanal();
+  }catch(e){alert('Error al agregar: '+e.message)}
+}
+
+async function quitarDeConsumoMpSemanal(rowId){
+  try{
+    await del('planilla_consumo_mp',rowId);
+    consumoMpCache=consumoMpCache.filter(x=>x.rowId!==rowId);
+    renderModalConsumoMpSemanal();
+  }catch(e){alert('Error al quitar: '+e.message)}
+}
+
+// Calcula, para la semana st.w, cuánta MP se consume cada día (0=Lun...6=Dom) según el plan y las
+// recetas, sumando SOLO los renglones de plan cuyo producto vinculado (mpParaProducto) está en la
+// lista consumoMpCache. Devuelve también qué productos de la lista no tienen receta cargada (para
+// avisar, no para bloquear) y cuáles no aparecen con cantidad en el plan de esta semana.
+function calcularConsumoMpSemana(){
+  const plan=st.P[st.w]||[];
+  const trackedIds=new Set(consumoMpCache.map(x=>x.mp.id));
+  const cm={}; // key ingrediente||unidad -> {ingrediente,unidad,dias:[7],total}
+  const productosConDatos=new Set();
+  plan.forEach(r=>{
+    const mp=mpParaProducto(r);
+    if(!mp||!trackedIds.has(mp.id))return;
+    const dias=r.days||[];
+    if(!dias.some(v=>v>0))return;
+    const ings=st.Rec[r.producto]||[];
+    if(!ings.length)return;
+    productosConDatos.add(mp.id);
+    const tanda=(st.RecTanda&&st.RecTanda[r.producto])||1;
+    ings.forEach(ing=>{
+      const key=ing.ingrediente+'||'+ing.unidad;
+      if(!cm[key])cm[key]={ingrediente:ing.ingrediente,unidad:ing.unidad,dias:[0,0,0,0,0,0,0],total:0};
+      const cantXUnidad=tanda>0?ing.cantidad/tanda:ing.cantidad;
+      for(let di=0;di<7;di++){
+        const cant=dias[di]||0;
+        if(!cant)continue;
+        const c=cantXUnidad*cant;
+        cm[key].dias[di]=fn(cm[key].dias[di]+c);
+        cm[key].total=fn(cm[key].total+c);
+      }
+    });
+  });
+  const sinReceta=consumoMpCache.filter(x=>!(st.Rec[recKeyForMp(x.mp)||x.mp.nombre]||[]).length && !productosConDatos.has(x.mp.id));
+  const items=Object.values(cm).sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
+  return{items,sinReceta};
+}
+
+async function imprimirPlanillaConsumoMpSemanal(){
+  ss('saving','Cargando...');
+  try{
+    await cargarConsumoMpLista();
+    await lp(st.w);
+    ss('online','Listo');
+  }catch(e){
+    ss('error','Error');
+    consumoMpErrorTabla(e);
+    return;
+  }
+  if(!consumoMpCache.length){alert('La lista de Consumo de MP Semanal está vacía. Agregá productos con el lápiz de la tarjeta antes de imprimir.');return}
+  const{items,sinReceta}=calcularConsumoMpSemana();
+  if(!items.length){
+    let msg='No hay consumo de MP para calcular en '+wlb(st.w)+'. Verificá que los productos elegidos tengan cantidad planificada esa semana y receta cargada.';
+    if(sinReceta.length)msg+='\n\nSin receta cargada: '+sinReceta.map(x=>x.mp.alias||x.mp.nombre).join(', ');
+    alert(msg);
+    return;
+  }
+  const DIAS=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  const filas=items.map(it=>`<tr>
+    <td class="c-ing">${(it.ingrediente||'').toString().replace(/</g,'&lt;')}</td>
+    <td class="c-un">${it.unidad||''}</td>
+    ${it.dias.map(v=>`<td class="c-dia">${v?v.toLocaleString('es-AR'):''}</td>`).join('')}
+    <td class="c-tot">${it.total.toLocaleString('es-AR')}</td>
+  </tr>`).join('');
+  const ahora=new Date();
+  const p2=n=>String(n).padStart(2,'0');
+  const fechaImpresion=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()}`;
+  const avisoSinReceta=sinReceta.length?`<div class="aviso">Sin receta o sin cantidad planificada esta semana (no aparecen en la tabla): ${sinReceta.map(x=>(x.mp.alias||x.mp.nombre).toString().replace(/</g,'&lt;')).join(', ')}</div>`:'';
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Consumo de MP Semanal</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;color:#111}
+    .hoja{width:190mm;margin:0 auto;padding:6mm}
+    h1{font-size:13pt;text-align:center;margin-bottom:1mm;text-transform:uppercase;letter-spacing:1px}
+    .sub{font-size:9pt;text-align:center;color:#444;margin-bottom:4mm}
+    .aviso{font-size:8pt;color:#A32D2D;background:#FCEBEB;border-radius:4px;padding:4px 6px;margin-bottom:4mm}
+    table{width:100%;border-collapse:collapse}
+    thead{display:table-header-group}
+    tr{page-break-inside:avoid}
+    th{background:#1B3A6B;color:#fff;padding:4px 5px;font-size:8pt;text-align:center;border:1px solid #1B3A6B}
+    th.th-ing{text-align:left;width:48mm}
+    th.th-un{width:14mm}
+    td{border:1px solid #999;height:7mm;font-size:8.5pt;padding:0 4px}
+    td.c-ing{font-weight:600}
+    td.c-un{color:#555;text-align:center}
+    td.c-dia{text-align:right}
+    td.c-tot{text-align:right;font-weight:700;background:#f1f5f9}
+    tr:nth-child(even) td{background:#fafafa}
+    tr:nth-child(even) td.c-tot{background:#e2e8f0}
+    @media print{
+      @page{size:A4 landscape;margin:8mm}
+      body{margin:0}
+      .hoja{width:100%;padding:0}
+    }
+  </style></head>
+  <body>
+    <div class="hoja">
+      <h1>Consumo de MP Semanal</h1>
+      <div class="sub">${wlb(st.w)} · ${items.length} materia${items.length!==1?'s':''} prima${items.length!==1?'s':''} · Impreso ${fechaImpresion}</div>
+      ${avisoSinReceta}
+      <table>
+        <thead><tr>
+          <th class="th-ing">Materia Prima</th>
+          <th class="th-un">Unidad</th>
+          ${DIAS.map(d=>`<th>${d}</th>`).join('')}
+          <th>Total</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>
   <script>window.onload=function(){setTimeout(function(){window.print()},350)};<\/script>
   </body></html>`;
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
