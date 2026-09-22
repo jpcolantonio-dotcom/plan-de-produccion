@@ -63,6 +63,9 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 .add-bar input,.add-bar select{padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)}
 .add-bar input{width:150px}.add-bar input.wide{width:190px}
 .grid-card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1rem}
+.planilla-title{font-size:14px;font-weight:600;flex:1;cursor:pointer;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.planilla-title:hover{text-decoration:underline dotted}
+.planilla-info{font-size:12px;color:var(--text2)}
 .grid-scroll{overflow-x:auto}
 .plan-grid{border-collapse:collapse;width:100%;min-width:820px;font-size:13px}
 .plan-grid th{padding:9px 10px;font-weight:500;font-size:12px;color:var(--text2);white-space:nowrap;border-bottom:.5px solid var(--border);background:var(--bg2);text-align:center}
@@ -248,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.203</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.204</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1426,36 +1429,40 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div class="grid-card" style="padding:1.25rem;display:flex;flex-direction:column;gap:10px">
       <div style="display:flex;align-items:center;gap:8px">
         <i class="ti ti-scissors" style="font-size:20px;color:var(--amber)"></i>
-        <div style="font-size:14px;font-weight:600">Recortes</div>
+        <div class="planilla-title" id="pt-recortes" onclick="renombrarPlanilla('recortes','Recortes')" title="Click para cambiar el nombre">Recortes</div>
+        <button class="btn btn-xs" onclick="togglePlanillaInfo('recortes')" title="Ver descripción"><i class="ti ti-help"></i></button>
       </div>
-      <div style="font-size:12px;color:var(--text2)">Fecha, operario, tipo de recorte y kg — para completar a mano.</div>
-      <button class="btn btn-primary" onclick="imprimirPlanillaRecortes()"><i class="ti ti-printer"></i> Imprimir</button>
+      <div class="planilla-info" id="pi-recortes" style="display:none">Fecha, operario, tipo de recorte y kg — para completar a mano.</div>
+      <button class="btn btn-primary" style="width:100%" onclick="imprimirPlanillaRecortes()"><i class="ti ti-printer"></i> Imprimir</button>
     </div>
     <div class="grid-card" style="padding:1.25rem;display:flex;flex-direction:column;gap:10px">
       <div style="display:flex;align-items:center;gap:8px">
         <i class="ti ti-cut" style="font-size:20px;color:var(--blue)"></i>
-        <div style="font-size:14px;font-weight:600">Envase / Pastas Especiales</div>
+        <div class="planilla-title" id="pt-envase_pastas" onclick="renombrarPlanilla('envase_pastas','Envase / Pastas Especiales')" title="Click para cambiar el nombre">Envase / Pastas Especiales</div>
+        <button class="btn btn-xs" onclick="togglePlanillaInfo('envase_pastas')" title="Ver descripción"><i class="ti ti-help"></i></button>
       </div>
-      <div style="font-size:12px;color:var(--text2)">Hoja para cortar al medio: fechas de envase y vencimiento a la izquierda, lo que hay que hacer hoy de Pastas Especiales a la derecha.</div>
-      <button class="btn btn-primary" onclick="imprimirPlanillaEnvasePastas()"><i class="ti ti-printer"></i> Imprimir</button>
+      <div class="planilla-info" id="pi-envase_pastas" style="display:none">Hoja para cortar al medio: fechas de envase y vencimiento a la izquierda, lo que hay que hacer hoy de Pastas Especiales a la derecha.</div>
+      <button class="btn btn-primary" style="width:100%" onclick="imprimirPlanillaEnvasePastas()"><i class="ti ti-printer"></i> Imprimir</button>
     </div>
     <div class="grid-card" style="padding:1.25rem;display:flex;flex-direction:column;gap:10px">
       <div style="display:flex;align-items:center;gap:8px">
         <i class="ti ti-truck-delivery" style="font-size:20px;color:var(--green)"></i>
-        <div style="font-size:14px;font-weight:600;flex:1">Distribución Planeta</div>
+        <div class="planilla-title" id="pt-distribucion_planeta" onclick="renombrarPlanilla('distribucion_planeta','Distribución Planeta')" title="Click para cambiar el nombre">Distribución Planeta</div>
+        <button class="btn btn-xs" onclick="togglePlanillaInfo('distribucion_planeta')" title="Ver descripción"><i class="ti ti-help"></i></button>
         <button class="btn btn-xs" onclick="abrirEditarDistribucionPlaneta()" title="Agregar o quitar productos de la lista"><i class="ti ti-pencil"></i></button>
       </div>
-      <div style="font-size:12px;color:var(--text2)">Lista de productos (ID y Alias) para repartir a mano entre LAMADRID / VILLA / DONADO / UNI / PATAGONIA. Editable con el lápiz.</div>
-      <button class="btn btn-primary" onclick="imprimirPlanillaDistribucionPlaneta()"><i class="ti ti-printer"></i> Imprimir</button>
+      <div class="planilla-info" id="pi-distribucion_planeta" style="display:none">Lista de productos (ID y Alias) para repartir a mano entre LAMADRID / VILLA / DONADO / UNI / PATAGONIA. Editable con el lápiz.</div>
+      <button class="btn btn-primary" style="width:100%" onclick="imprimirPlanillaDistribucionPlaneta()"><i class="ti ti-printer"></i> Imprimir</button>
     </div>
     <div class="grid-card" style="padding:1.25rem;display:flex;flex-direction:column;gap:10px">
       <div style="display:flex;align-items:center;gap:8px">
         <i class="ti ti-chart-bar" style="font-size:20px;color:var(--red)"></i>
-        <div style="font-size:14px;font-weight:600;flex:1">Consumo de MP Semanal</div>
+        <div class="planilla-title" id="pt-consumo_mp" onclick="renombrarPlanilla('consumo_mp','Consumo de MP Semanal')" title="Click para cambiar el nombre">Consumo de MP Semanal</div>
+        <button class="btn btn-xs" onclick="togglePlanillaInfo('consumo_mp')" title="Ver descripción"><i class="ti ti-help"></i></button>
         <button class="btn btn-xs" onclick="abrirEditarConsumoMpSemanal()" title="Agregar o quitar productos de la lista"><i class="ti ti-pencil"></i></button>
       </div>
-      <div style="font-size:12px;color:var(--text2)">Por cada producto, desglosado por día (solo los días con producción) y el total de kilos de relleno, calculado solo según receta y el plan de la semana abierta en Planificación. Elegís los productos con el lápiz.</div>
-      <button class="btn btn-primary" onclick="imprimirPlanillaConsumoMpSemanal()"><i class="ti ti-printer"></i> Imprimir</button>
+      <div class="planilla-info" id="pi-consumo_mp" style="display:none">Por cada producto, desglosado por día (solo los días con producción) y el total de kilos de relleno, calculado solo según receta y el plan de la semana abierta en Planificación. Elegís los productos con el lápiz.</div>
+      <button class="btn btn-primary" style="width:100%" onclick="imprimirPlanillaConsumoMpSemanal()"><i class="ti ti-printer"></i> Imprimir</button>
     </div>
   </div>
 </div>
@@ -1674,6 +1681,7 @@ function T(t){
   if(t==='cfg'){renderMPList();rMae();loadMaeDepositosOnce();}
   if(t==='ped')initPedidos();
   if(t==='etq')initEtiquetas();
+  if(t==='planillas')initPlanillas();
 }
 // Sub-pestaña activa dentro de Informes (Desvíos/Dashboard/Rendimiento/Producción del Día, unificadas
 // en una sola pestaña) -- se recuerda para que volver a "Informes" desde otra pestaña principal
@@ -13615,6 +13623,65 @@ async function imprimirPlanillaConsumoMpSemanal(){
   const w=window.open(url,'_blank');
   setTimeout(()=>URL.revokeObjectURL(url),15000);
   if(!w)alert('Habilitá popups para este sitio para imprimir.');
+}
+
+// Nombres editables + descripción colapsable de las tarjetas de Planillas (v4.204, a pedido: "quiero
+// que todos los botones sean del mismo tamaño, que tenga un pequeño ícono de signo de pregunta a
+// donde aparezca la descripción, y que me deje editar el nombre"). El nombre que se ve en cada
+// tarjeta se guarda en planilla_config (slug -> nombre) para que se vea igual desde cualquier compu,
+// igual que el resto de la app -- pero esto es solo el RÓTULO de la tarjeta en pantalla, no el
+// título de la hoja impresa (que sigue siendo el de siempre: "Recortes", "Distribución Planeta",
+// etc. -- Envase/Pastas Especiales en particular imprime DOS títulos separados, "Envase" y "Pastas
+// Especiales", uno por mitad de hoja, así que no hay un único título de tarjeta para renombrar ahí).
+const PLANILLA_SLUGS=[
+  {slug:'recortes',defecto:'Recortes'},
+  {slug:'envase_pastas',defecto:'Envase / Pastas Especiales'},
+  {slug:'distribucion_planeta',defecto:'Distribución Planeta'},
+  {slug:'consumo_mp',defecto:'Consumo de MP Semanal'},
+];
+let planillaNombres={}; // slug -> nombre custom (solo los que el usuario cambió)
+let planillaNombresCargados=false;
+async function cargarPlanillaNombres(){
+  if(planillaNombresCargados)return;
+  try{
+    const filas=await get('planilla_config','select=slug,nombre');
+    planillaNombres={};
+    filas.forEach(f=>{if(f.nombre)planillaNombres[f.slug]=f.nombre;});
+    planillaNombresCargados=true;
+  }catch(e){
+    console.error('No pude cargar los nombres de Planillas (¿falta correr el SQL de planilla_config?):',e);
+  }
+}
+function nombrePlanilla(slug,porDefecto){
+  return planillaNombres[slug]||porDefecto;
+}
+function renderPlanillaTitles(){
+  PLANILLA_SLUGS.forEach(({slug,defecto})=>{
+    const el=document.getElementById('pt-'+slug);
+    if(el)el.textContent=nombrePlanilla(slug,defecto);
+  });
+}
+async function initPlanillas(){
+  await cargarPlanillaNombres();
+  renderPlanillaTitles();
+}
+async function renombrarPlanilla(slug,porDefecto){
+  const actual=nombrePlanilla(slug,porDefecto);
+  const nuevo=prompt('Nuevo nombre para esta planilla:',actual);
+  if(nuevo===null)return; // cancelado
+  const limpio=nuevo.toString().trim();
+  if(!limpio||limpio===actual)return;
+  try{
+    await upsert('planilla_config',{slug,nombre:limpio,updated_at:new Date().toISOString()});
+    planillaNombres[slug]=limpio;
+    renderPlanillaTitles();
+  }catch(e){
+    alert('No pude guardar el nombre nuevo. Si todavía no creaste la tabla "planilla_config" en Supabase, corré el SQL que te pasé y volvé a intentar.\n\n'+e.message);
+  }
+}
+function togglePlanillaInfo(slug){
+  const el=document.getElementById('pi-'+slug);
+  if(el)el.style.display=el.style.display==='none'?'block':'none';
 }
 </script>
 </body>
