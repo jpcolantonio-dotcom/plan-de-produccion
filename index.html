@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.207</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.208</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1472,7 +1472,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <button class="btn btn-xs" onclick="togglePlanillaInfo('distribucion_planeta')" title="Ver descripción"><i class="ti ti-help"></i></button>
         <button class="btn btn-xs" onclick="abrirEditarDistribucionPlaneta()" title="Agregar o quitar productos de la lista"><i class="ti ti-pencil"></i></button>
       </div>
-      <div class="planilla-info" id="pi-distribucion_planeta" style="display:none">Lista de productos (ID y Alias) para repartir a mano entre LAMADRID / DONADO / PATAGONIA / VILLA MITRE. Editable con el lápiz.</div>
+      <div class="planilla-info" id="pi-distribucion_planeta" style="display:none">Lista de productos (ID y Alias) para repartir a mano entre LAMADRID / DONADO / PATAGONIA / VILLA MITRE / UNI. Editable con el lápiz.</div>
       <button class="btn btn-primary" style="width:100%" onclick="imprimirPlanillaDistribucionPlaneta()"><i class="ti ti-printer"></i> Imprimir</button>
     </div>
     <div class="grid-card" style="padding:1.25rem;display:flex;flex-direction:column;gap:10px">
@@ -13362,8 +13362,9 @@ function imprimirPlanillaRecortes(){
 }
 
 // Planilla "Distribución Planeta" (Planillas): lista EDITABLE de productos (ID+Alias) para repartir
-// a mano entre las sucursales LAMADRID / DONADO / PATAGONIA / VILLA MITRE (columnas fijas en COLS,
-// más abajo -- ajustadas en v4.207 a pedido, antes eran LAMADRID/VILLA/DONADO/UNI/PATAGONIA). Arrancó (v4.198) como un
+// a mano entre las sucursales LAMADRID / DONADO / PATAGONIA / VILLA MITRE / UNI (columnas fijas en
+// COLS, más abajo -- ajustadas en v4.207/v4.208 a pedido, antes eran LAMADRID/VILLA/DONADO/UNI/PATAGONIA).
+// Arrancó (v4.198) como un
 // filtro automático de "todos los sabores Criolla 15" -- ahora (v4.199) es una lista libre que se
 // arma a mano con el lápiz de la tarjeta (agregar por código/ID, quitar con la X), guardada en la
 // tabla planilla_distribucion (mp_id -> materias_primas.id, con `unique` en mp_id para no duplicar)
@@ -13468,7 +13469,7 @@ async function imprimirPlanillaDistribucionPlaneta(){
   }
   const items=distPlanetaOrdenados().map(x=>x.mp);
   if(!items.length){alert('La lista de Distribución Planeta está vacía. Agregá productos con el lápiz de la tarjeta antes de imprimir.');return}
-  const COLS=['LAMADRID','DONADO','PATAGONIA','VILLA MITRE'];
+  const COLS=['LAMADRID','DONADO','PATAGONIA','VILLA MITRE','UNI'];
   const esEmpanada=m=>normTxt(m.nombre||'').includes('EMPANADA');
   const grupos=[
     {titulo:'Distribución Planeta — Empanadas',items:items.filter(esEmpanada)},
