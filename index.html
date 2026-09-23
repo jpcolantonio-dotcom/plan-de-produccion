@@ -63,7 +63,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 .add-bar input,.add-bar select{padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)}
 .add-bar input{width:150px}.add-bar input.wide{width:190px}
 .grid-card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1rem}
-.planilla-title{font-size:14px;font-weight:600;flex:1;cursor:pointer;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.planilla-title{font-size:14px;font-weight:600;flex:1;cursor:pointer;min-width:0;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .planilla-title:hover{text-decoration:underline dotted}
 .planilla-info{font-size:12px;color:var(--text2)}
 .grid-scroll{overflow-x:auto}
@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.204</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.206</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -471,6 +471,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab" id="inftab-dash" onclick="showInfSubTab('dash')"><i class="ti ti-layout-dashboard"></i> Dashboard</button>
     <button class="proy-tab" id="inftab-rend" onclick="showInfSubTab('rend')"><i class="ti ti-speedometer"></i> Rendimiento</button>
     <button class="proy-tab" id="inftab-diario" onclick="showInfSubTab('diario')"><i class="ti ti-list-check"></i> Producción del Día</button>
+    <button class="proy-tab" id="inftab-rango" onclick="showInfSubTab('rango')"><i class="ti ti-calendar-stats"></i> Producción por Rango</button>
   </div>
 
   <!-- SUB-TAB DESVIOS -->
@@ -575,6 +576,26 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <button class="btn btn-sm" id="btnImprimirInfDiario" onclick="imprimirInformeDiario()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
     </div>
     <div id="inf-diario-content"></div>
+  </div>
+
+  <!-- SUB-TAB PRODUCCIÓN POR RANGO (nueva) -->
+  <div id="tab-rango" style="display:none">
+    <div class="toolbar">
+      <div>
+        <div style="font-size:16px;font-weight:600">Producción por rango de fechas</div>
+        <div style="font-size:13px;color:var(--text2)">Un producto por fila, una columna por cada día del rango elegido, con la cantidad real producida</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--text2)">Desde:</label>
+      <input type="date" id="inf-rango-desde" onchange="renderInformeRango()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <label style="font-size:13px;color:var(--text2)">Hasta:</label>
+      <input type="date" id="inf-rango-hasta" onchange="renderInformeRango()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <label style="font-size:13px;color:var(--text2)">Empresa:</label>
+      <select id="inf-rango-esel" onchange="renderInformeRango()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas</option></select>
+      <button class="btn btn-sm" id="btnImprimirInfRango" onclick="imprimirInformeRango()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
+    </div>
+    <div id="inf-rango-content"></div>
   </div>
 </div>
 
@@ -1425,7 +1446,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <div style="font-size:13px;color:var(--text2)">Planillas para imprimir y completar a mano en fábrica</div>
     </div>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px">
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px">
     <div class="grid-card" style="padding:1.25rem;display:flex;flex-direction:column;gap:10px">
       <div style="display:flex;align-items:center;gap:8px">
         <i class="ti ti-scissors" style="font-size:20px;color:var(--amber)"></i>
@@ -1689,7 +1710,7 @@ function T(t){
 let infActiveSubTab='desv';
 function showInfSubTab(t){
   infActiveSubTab=t;
-  ['desv','dash','rend','diario'].forEach(x=>{
+  ['desv','dash','rend','diario','rango'].forEach(x=>{
     document.getElementById('tab-'+x).style.display=x===t?'':'none';
     document.getElementById('inftab-'+x).classList.toggle('active',x===t);
   });
@@ -1697,6 +1718,7 @@ function showInfSubTab(t){
   if(t==='dash'){pS('dash-wsel');initDash()}
   if(t==='rend')initRend();
   if(t==='diario')initInformeDiario();
+  if(t==='rango')initInformeRango();
 }
 
 // "Producción del Día" (Informes): lista plana de todos los productos con producción real cargada en
@@ -1799,6 +1821,145 @@ function imprimirInformeDiario(){
   setTimeout(()=>URL.revokeObjectURL(url),15000);
   if(!w)alert('Habilitá popups para este sitio para imprimir.');
 }
+
+// "Producción por Rango" (Informes): matriz producto × día para un rango de fechas elegido a mano
+// (desde/hasta), a pedido de "buscar por un conjunto de fechas la producción diaria". A diferencia de
+// "Producción del Día" (un solo día, lista plana), acá cada producto es UNA fila que puede abarcar
+// varias semanas del plan, así que se agrupa por código (o por nombre normalizado si no tiene código,
+// igual criterio que el resto de la app) en vez de por posición dentro del array de una sola semana.
+// Tope de 62 días (~2 meses) para que la tabla no se vuelva impracticable ni en pantalla ni al imprimir.
+const INF_RANGO_MAX_DIAS=62;
+function initInformeRango(){
+  const df=document.getElementById('inf-rango-desde');
+  const dt=document.getElementById('inf-rango-hasta');
+  if(!df.value){const h=hoyLocal();df.value=h;dt.value=h;}
+  renderInformeRango();
+}
+
+let infRangoItems=[];
+let infRangoMeta={desde:'',hasta:'',empresaLabel:'',fechas:[]};
+
+function fechasEnRango(desde,hasta){
+  const fechas=[];
+  let cur=new Date(desde+'T00:00:00');
+  const fin=new Date(hasta+'T00:00:00');
+  while(cur<=fin){fechas.push(cur.toISOString().slice(0,10));cur.setDate(cur.getDate()+1);}
+  return fechas;
+}
+function fmtDiaCorto(f){const [y,m,d]=f.split('-');return `${d}/${m}`;}
+
+async function renderInformeRango(){
+  const el=document.getElementById('inf-rango-content');
+  const desde=document.getElementById('inf-rango-desde').value;
+  const hasta=document.getElementById('inf-rango-hasta').value;
+  const ef=document.getElementById('inf-rango-esel').value;
+  const btnImp=document.getElementById('btnImprimirInfRango');
+  if(!desde||!hasta){el.innerHTML='';infRangoItems=[];if(btnImp)btnImp.disabled=true;return}
+  if(hasta<desde){
+    el.innerHTML='<div class="empty"><i class="ti ti-alert-triangle"></i> "Hasta" no puede ser anterior a "Desde".</div>';
+    infRangoItems=[];if(btnImp)btnImp.disabled=true;return;
+  }
+  const fechas=fechasEnRango(desde,hasta);
+  if(fechas.length>INF_RANGO_MAX_DIAS){
+    el.innerHTML=`<div class="empty"><i class="ti ti-alert-triangle"></i> El rango elegido es de ${fechas.length} días — el máximo es ${INF_RANGO_MAX_DIAS}. Elegí un rango más corto.</div>`;
+    infRangoItems=[];if(btnImp)btnImp.disabled=true;return;
+  }
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando...</div>';
+  const semKeys=[...new Set(fechas.map(f=>wk(new Date(f+'T00:00:00'))))];
+  await Promise.all(semKeys.flatMap(k=>[lp(k),lr(k)]));
+  const porProducto={};
+  fechas.forEach(fecha=>{
+    const semKey=wk(new Date(fecha+'T00:00:00'));
+    const diIdx=(new Date(fecha+'T00:00:00').getDay()+6)%7;
+    const plan=st.P[semKey]||[];
+    const real=st.R[semKey]||{};
+    plan.forEach((r,oi)=>{
+      if(ef!=='all'&&r.empresa_id!==ef)return;
+      const rv=realDia(real,r,diIdx,oi);
+      if(rv>0){
+        const mp=mpParaProducto(r);
+        const codigo=(mp&&mp.codigo)?mp.codigo:codigoParaProducto(r);
+        const alias=(mp&&(mp.alias||mp.nombre))||r.producto;
+        const key=codigo||('_'+normTxt(alias));
+        if(!porProducto[key])porProducto[key]={codigo,alias,unidad:r.unidad,porDia:{}};
+        porProducto[key].porDia[fecha]=(porProducto[key].porDia[fecha]||0)+rv;
+      }
+    });
+  });
+  const items=Object.values(porProducto).map(it=>({...it,total:fechas.reduce((s,f)=>s+(it.porDia[f]||0),0)}));
+  items.sort((a,b)=>b.total-a.total);
+  infRangoItems=items;
+  const empSel=st.E.find(e=>e.id===ef);
+  infRangoMeta={desde,hasta,empresaLabel:ef==='all'?'Todas las empresas':(empSel?empSel.nombre:''),fechas};
+  if(!items.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-list-check"></i> No hay producción real cargada en ese rango.</div>';
+    if(btnImp)btnImp.disabled=true;
+    return;
+  }
+  if(btnImp)btnImp.disabled=false;
+  el.innerHTML=`<div style="font-size:12px;color:var(--text2);margin-bottom:10px">${items.length} producto${items.length!==1?'s':''} · ${fechas.length} día${fechas.length!==1?'s':''}</div>
+  <div class="grid-scroll">
+  <table class="plan-grid" style="min-width:${Math.max(820,300+fechas.length*64)}px">
+    <thead><tr>
+      <th class="left">ID</th><th class="left">Alias</th><th class="left">Unidad</th>
+      ${fechas.map(f=>`<th>${fmtDiaCorto(f)}</th>`).join('')}
+      <th>Total</th>
+    </tr></thead>
+    <tbody>
+      ${items.map(it=>`<tr>
+        <td>${it.codigo||'—'}</td>
+        <td class="prod-name" style="font-weight:600">${it.alias}</td>
+        <td>${it.unidad||''}</td>
+        ${fechas.map(f=>`<td class="day-cell">${it.porDia[f]?it.porDia[f].toLocaleString('es-AR'):'—'}</td>`).join('')}
+        <td class="total-cell" style="color:var(--green)">${it.total.toLocaleString('es-AR')}</td>
+      </tr>`).join('')}
+    </tbody>
+  </table>
+  </div>`;
+}
+
+function imprimirInformeRango(){
+  if(!infRangoItems.length)return;
+  const fmtFull=f=>{const [y,m,d]=f.split('-');return `${d}/${m}/${y}`;};
+  const ahora=new Date();
+  const p2=n=>String(n).padStart(2,'0');
+  const fechaImpresion=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()} ${p2(ahora.getHours())}:${p2(ahora.getMinutes())}`;
+  const fechas=infRangoMeta.fechas;
+  const thDias=fechas.map(f=>`<th>${fmtDiaCorto(f)}</th>`).join('');
+  const filas=infRangoItems.map(it=>`<tr><td class="cod">${it.codigo||'—'}</td><td class="ali">${it.alias}</td><td class="uni">${it.unidad||''}</td>${fechas.map(f=>`<td class="dia">${it.porDia[f]?it.porDia[f].toLocaleString('es-AR'):'—'}</td>`).join('')}<td class="tot">${it.total.toLocaleString('es-AR')}</td></tr>`).join('');
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Producción por rango — ${fmtFull(infRangoMeta.desde)} al ${fmtFull(infRangoMeta.hasta)}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;padding:8mm;font-size:10pt}
+    h1{font-size:15pt;margin-bottom:2px}
+    .sub{font-size:10pt;color:#555;margin-bottom:10px}
+    table{width:100%;border-collapse:collapse}
+    th{text-align:center;padding:5px 6px;font-size:9pt;border-bottom:2px solid #333;white-space:nowrap}
+    th:nth-child(1),th:nth-child(2),th:nth-child(3){text-align:left}
+    td{padding:5px 6px;font-size:9.5pt;border-bottom:1px solid #ccc;text-align:center;white-space:nowrap}
+    td.cod{font-family:monospace}
+    td.ali,td.uni{text-align:left}
+    td.ali{font-weight:700}
+    td.tot{font-weight:700;border-left:1px solid #ccc}
+    @media print{@page{size:A4 landscape;margin:8mm}body{padding:0}}
+  </style></head>
+  <body>
+    <h1>PRODUCCIÓN POR RANGO — ${fmtFull(infRangoMeta.desde)} al ${fmtFull(infRangoMeta.hasta)}</h1>
+    <div class="sub">${infRangoMeta.empresaLabel} · Impreso ${fechaImpresion} · ${infRangoItems.length} producto(s) · ${fechas.length} día(s)</div>
+    <table>
+      <thead><tr><th>ID</th><th>Alias</th><th>Unidad</th>${thDias}<th>Total</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
+  </body></html>`;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para imprimir.');
+}
+
 function pS(id){
   const s=document.getElementById(id);const c=s.value||st.w;
   const ws=new Set([...st.Sem,st.w]);
@@ -6295,7 +6456,7 @@ function clearDashTimer(){
 }
 
 function uES(){
-  ['resel','cesel','ceesel','desv-esel','dash-esel','inf-diario-esel'].forEach(id=>{
+  ['resel','cesel','ceesel','desv-esel','dash-esel','inf-diario-esel','inf-rango-esel'].forEach(id=>{
     const s=document.getElementById(id);if(!s)return;
     const c=s.value;s.innerHTML='<option value="all">Todas</option>';
     if(id==='dash-esel')s.options[0].text='Todas las empresas';
