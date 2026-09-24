@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.208</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.210</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1208,11 +1208,13 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Suma de todos los pedidos del día por producto.</div>
     <div id="ped-consolidado-content"></div>
     <div style="display:flex;justify-content:flex-end;margin-top:1rem;gap:8px">
+      <button class="btn" id="btnExportarPedidosExcel" onclick="exportarPedidosExcel()"><i class="ti ti-file-spreadsheet"></i> Exportar Excel</button>
       <button class="btn btn-primary" onclick="importarAlPlan()"><i class="ti ti-calendar-plus"></i> Importar al plan semanal</button>
     </div>
   </div>
   <!-- Sucursales config -->
   <div id="psub-sucursales" style="display:none">
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Cada sucursal pide sola desde "Pedidos Sucursales.html" (la web aparte para los locales), con el usuario y clave que le cargues acá con el botón <i class="ti ti-key"></i>.</div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
       <input type="text" id="nsuc-nombre" placeholder="Nombre sucursal" style="width:200px;padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
       <select id="nsuc-empresa" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Empresa...</option></select>
@@ -1482,7 +1484,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <button class="btn btn-xs" onclick="togglePlanillaInfo('consumo_mp')" title="Ver descripción"><i class="ti ti-help"></i></button>
         <button class="btn btn-xs" onclick="abrirEditarConsumoMpSemanal()" title="Agregar o quitar productos de la lista"><i class="ti ti-pencil"></i></button>
       </div>
-      <div class="planilla-info" id="pi-consumo_mp" style="display:none">Por cada producto, desglosado por día (solo los días con producción) y el total de kilos de relleno, calculado solo según receta y el plan de la semana abierta en Planificación. Elegís los productos con el lápiz.</div>
+      <div class="planilla-info" id="pi-consumo_mp" style="display:none">Por cada relleno elegido: primero cuántos kilos hacen falta esa semana (según la cantidad planificada de los productos que lo usan y el vínculo relleno→producto de Maestro &gt; Cocina), desglosado por día; y abajo, la materia prima que corresponde a esos kilos según la receta propia del relleno. Elegís los rellenos con el lápiz.</div>
       <button class="btn btn-primary" style="width:100%" onclick="imprimirPlanillaConsumoMpSemanal()"><i class="ti ti-printer"></i> Imprimir</button>
     </div>
   </div>
@@ -11354,6 +11356,67 @@ async function importarAlPlan(){
   }
 }
 
+// Exportar a Excel los pedidos del día elegido (pestaña Pedidos > Consolidado) -- a pedido, para poder
+// "descargar" el pedido además de verlo en pantalla. Dos hojas: "Consolidado" (lo mismo que se ve
+// arriba, sumado por producto) y "Detalle" (un renglón por sucursal+producto, para tener el respaldo
+// de quién pidió qué). Usa los mismos pedidosData/sucursalesData ya cargados por la pestaña, no
+// vuelve a pedirle nada a Supabase.
+async function exportarPedidosExcel(){
+  const fecha=document.getElementById('ped-fecha').value;
+  const ef=document.getElementById('ped-esel').value;
+  let peds=pedidosData.filter(p=>p.estado!=='rechazado');
+  if(ef!=='all'){
+    const sucEmp=sucursalesData.filter(s=>s.empresa_id===ef).map(s=>s.id);
+    peds=peds.filter(p=>sucEmp.includes(p.sucursal_id));
+  }
+  if(!peds.length){alert('No hay pedidos para exportar en esta fecha (o quedaron todos rechazados).');return}
+  if(!window.XLSX){
+    await new Promise((res,rej)=>{
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload=res;s.onerror=rej;document.head.appendChild(s);
+    });
+  }
+  // Hoja 1: Consolidado (mismo cálculo que renderConsolidado)
+  const porTipo={refrigerado:{},congelado:{}};
+  const detalle=[];
+  peds.forEach(p=>{
+    const suc=sucursalesData.find(x=>x.id===p.sucursal_id);
+    const tipo=suc?suc.tipo:'refrigerado';
+    const emp=suc?st.E.find(e=>e.id===suc.empresa_id):null;
+    (p.items||[]).filter(it=>it.cantidad>0).forEach(it=>{
+      if(!porTipo[tipo][it.producto])porTipo[tipo][it.producto]=0;
+      porTipo[tipo][it.producto]+=it.cantidad;
+      detalle.push({
+        fecha,
+        sucursal:suc?suc.nombre:'—',
+        empresa:emp?emp.nombre:'—',
+        tipo:tipo==='refrigerado'?'Refrigerado':'Congelado',
+        producto:it.producto,
+        cantidad:it.cantidad,
+        estado:p.estado==='confirmado'?'Confirmado':'Pendiente'
+      });
+    });
+  });
+  const aoaCons=[['Tipo','Producto','Total']];
+  ['refrigerado','congelado'].forEach(tipo=>{
+    Object.entries(porTipo[tipo]).sort((a,b)=>b[1]-a[1]).forEach(([prod,cant])=>{
+      aoaCons.push([tipo==='refrigerado'?'Refrigerado':'Congelado',prod,cant]);
+    });
+  });
+  const aoaDet=[['Fecha','Sucursal','Empresa','Tipo','Producto','Cantidad','Estado']];
+  detalle.forEach(d=>aoaDet.push([d.fecha,d.sucursal,d.empresa,d.tipo,d.producto,d.cantidad,d.estado]));
+
+  const wsCons=window.XLSX.utils.aoa_to_sheet(aoaCons);
+  wsCons['!cols']=[{wch:12},{wch:38},{wch:10}];
+  const wsDet=window.XLSX.utils.aoa_to_sheet(aoaDet);
+  wsDet['!cols']=[{wch:12},{wch:18},{wch:16},{wch:12},{wch:38},{wch:10},{wch:12}];
+  const wb=window.XLSX.utils.book_new();
+  window.XLSX.utils.book_append_sheet(wb,wsCons,'Consolidado');
+  window.XLSX.utils.book_append_sheet(wb,wsDet,'Detalle');
+  window.XLSX.writeFile(wb,`pedidos_sucursales_${fecha}.xlsx`);
+}
+
 function renderSucursalesList(){
   const el=document.getElementById('suc-list-content');
   if(!sucursalesData.length){
@@ -11371,6 +11434,7 @@ function renderSucursalesList(){
       <th style="text-align:left">Nombre</th>
       <th style="text-align:left">Empresa</th>
       <th style="text-align:center">Estado</th>
+      <th style="text-align:center">Acceso web</th>
       <th style="text-align:center">Productos</th>
       <th style="width:40px"></th>
     </tr></thead><tbody>`;
@@ -11384,6 +11448,11 @@ function renderSucursalesList(){
             <input type="checkbox" ${s.activa?'checked':''} onchange="toggleSucursal('${s.id}',this.checked)" style="cursor:pointer"/>
             <span style="color:${s.activa?'var(--green)':'var(--text3)'}">${s.activa?'Activa':'Inactiva'}</span>
           </label>
+        </td>
+        <td style="text-align:center">
+          <button class="btn btn-xs" onclick="abrirAccesoSucursal('${s.id}','${s.nombre.replace(/'/g,"\\'")}')" title="Usuario y clave para pedir desde Pedidos Sucursales.html">
+            <i class="ti ti-key"></i> ${s.usuario?s.usuario:'Sin acceso'}
+          </button>
         </td>
         <td style="text-align:center">
           <button class="btn btn-xs" onclick="abrirConfigProductos('${s.id}','${s.nombre.replace(/'/g,"\\'")}','${s.empresa_id}')">
@@ -11511,6 +11580,60 @@ async function toggleSucursal(id,activa){
   }catch(e){ss('error','Error')}
 }
 
+// Usuario/clave con los que la sucursal entra a "Pedidos Sucursales.html" (la web aparte donde cada
+// local carga su pedido). Nivel de seguridad simple a propósito, igual que el resto de PAPO (guardado
+// tal cual en la tabla sucursales, sin hashear) -- consultado con el usuario, eligió esta opción en vez
+// de armar autenticación real (Supabase Auth), que hubiera sido bastante más trabajo de mantener.
+function abrirAccesoSucursal(id,nombre){
+  const s=sucursalesData.find(x=>x.id===id);
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay';overlay.id='modal-acceso-suc';
+  overlay.innerHTML=`<div class="modal" style="width:360px">
+    <div class="modal-title"><i class="ti ti-key"></i> Acceso web — ${nombre}</div>
+    <div class="modal-sub">Usuario y clave para entrar a "Pedidos Sucursales.html". Dejalo vacío para que esta sucursal no pueda entrar.</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin:14px 0">
+      <div>
+        <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Usuario</label>
+        <input type="text" id="acc-usuario" value="${(s&&s.usuario||'').toString().replace(/"/g,'&quot;')}" style="width:100%;padding:8px 10px;font-size:14px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      </div>
+      <div>
+        <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Clave</label>
+        <input type="text" id="acc-clave" value="${(s&&s.clave||'').toString().replace(/"/g,'&quot;')}" style="width:100%;padding:8px 10px;font-size:14px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn" onclick="document.getElementById('modal-acceso-suc').remove()">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarAccesoSucursal('${id}')"><i class="ti ti-device-floppy"></i> Guardar</button>
+    </div>
+  </div>`;
+  overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove();});
+  document.body.appendChild(overlay);
+}
+
+async function guardarAccesoSucursal(id){
+  const usuario=document.getElementById('acc-usuario').value.trim();
+  const clave=document.getElementById('acc-clave').value.trim();
+  ss('saving','Guardando...');
+  try{
+    const res=await fetch(`${SB}/rest/v1/sucursales?id=eq.${id}`,{
+      method:'PATCH',headers:{...H,'Prefer':'return=representation'},
+      body:JSON.stringify({usuario:usuario||null,clave:clave||null})
+    });
+    if(!res.ok){
+      const err=await res.json().catch(()=>({message:res.statusText}));
+      throw new Error(err.message||'Error');
+    }
+    const s=sucursalesData.find(x=>x.id===id);
+    if(s){s.usuario=usuario||null;s.clave=clave||null;}
+    document.getElementById('modal-acceso-suc')?.remove();
+    renderSucursalesList();
+    ss('online','Acceso guardado');
+  }catch(e){
+    ss('error','Error');
+    alert('No pude guardar el acceso. Si todavía no agregaste las columnas "usuario"/"clave" a la tabla sucursales, corré el SQL que te pasé y volvé a intentar.\n\n'+e.message);
+  }
+}
+
 async function delSucursal(id,nombre){
   if(!confirm(`¿Eliminar "${nombre}"? Se borrarán todos sus pedidos.`))return;
   try{
@@ -11534,6 +11657,64 @@ if('serviceWorker' in navigator){
 
 
 // ===== RELLENOS =====
+// Extraído de renderRellenos (v4.210, para reutilizar el mismo cálculo también en la planilla
+// "Consumo de MP Semanal"): para una semana dada, cuántos KG de cada RELLENO hacen falta cada día
+// (0=Lun...6=Dom), según el plan de esa semana y los vínculos relleno→producto (Maestro > Cocina,
+// gramos por unidad). Si el producto vinculado es de elaboración "caliente", el kg se contabiliza el
+// día ANTERIOR (el relleno se prepara un día antes); "frío" = mismo día. Devuelve un objeto
+// {nombreRelleno: {prod, elaboracion, kgPorDia:[7], empresa, area}}.
+function calcularKgRellenoSemana(sem){
+  const plan=st.P[sem]||[];
+  const rellenoMap={}; // key = nombre relleno
+
+  plan.forEach(row=>{
+    const prod=st.Pr.find(p=>p.nombre===row.producto&&p.empresa_id===row.empresa_id);
+    if(!prod)return;
+    const elaboracion=prod.elaboracion||'frio'; // default frio si no está seteado
+
+    // Buscar todos los rellenos de Cocina que vinculan este producto
+    const rellenosDeEsteProducto=st.Pr.filter(r=>{
+      if(!r.vinculo_productos)return false;
+      try{
+        const v=JSON.parse(r.vinculo_productos);
+        return v.some(x=>x.producto_id===prod.id);
+      }catch{return false}
+    });
+
+    rellenosDeEsteProducto.forEach(relleno=>{
+      let vinculos=[];
+      try{vinculos=JSON.parse(relleno.vinculo_productos);}catch{}
+      const vinc=vinculos.find(x=>x.producto_id===prod.id);
+      if(!vinc)return;
+      const gramosPorUnidad=parseFloat(vinc.gramos_por_unidad)||0;
+      if(!gramosPorUnidad)return;
+
+      const key=relleno.nombre;
+      if(!rellenoMap[key]){
+        const area=st.A.find(a=>a.id===prod.area_id);
+        rellenoMap[key]={prod:relleno,elaboracion,kgPorDia:Array(7).fill(0),empresa:relleno.empresa_id,area:area?.nombre||'Sin área'};
+      }
+
+      // Asignar kg al día de elaboración según frío/caliente
+      (row.days||[]).forEach((unidades,di)=>{
+        if(!unidades)return;
+        const kg=(unidades*gramosPorUnidad)/1000;
+        let diaElab=di;
+        if(elaboracion==='caliente'){
+          diaElab=di-1;
+          // Si cae domingo (índice 6) → sábado (índice 5)
+          if(diaElab<0)diaElab=0; // si el lunes necesita elaboración previa, queda el lunes mismo
+          if(di===0)diaElab=0;    // lunes caliente → elaborar el lunes (no hay domingo anterior en la semana)
+        }
+        // Si el día calculado es domingo (di===6) para caliente, ya viene di-1=5 (sábado), ok
+        rellenoMap[key].kgPorDia[diaElab]+=kg;
+      });
+    });
+  });
+
+  return rellenoMap;
+}
+
 async function initRellenos(){
   if(!st.E.length||!st.Pr.length)await init();
   // Sincronizar selector de semanas con todas las semanas disponibles
@@ -11572,54 +11753,8 @@ async function renderRellenos(){
     return d;
   });
 
-  // Construir mapa: relleno → { elaboracion, dias: [kg × 7] }
-  // Para cada producto en el plan, buscar su vínculo con rellenos
-  const rellenoMap={}; // key = nombre relleno
-
-  plan.forEach(row=>{
-    const prod=st.Pr.find(p=>p.nombre===row.producto&&p.empresa_id===row.empresa_id);
-    if(!prod)return;
-    const elaboracion=prod.elaboracion||'frio'; // default frio si no está seteado
-
-    // Buscar todos los rellenos de Cocina que vinculan este producto
-    const rellenosDeEsteProducto=st.Pr.filter(r=>{
-      if(!r.vinculo_productos)return false;
-      try{
-        const v=JSON.parse(r.vinculo_productos);
-        return v.some(x=>x.producto_id===prod.id);
-      }catch{return false}
-    });
-
-    rellenosDeEsteProducto.forEach(relleno=>{
-      let vinculos=[];
-      try{vinculos=JSON.parse(relleno.vinculo_productos);}catch{}
-      const vinc=vinculos.find(x=>x.producto_id===prod.id);
-      if(!vinc)return;
-      const gramosPorUnidad=parseFloat(vinc.gramos_por_unidad)||0;
-      if(!gramosPorUnidad)return;
-
-      const key=relleno.nombre;
-      if(!rellenoMap[key]){
-        const area=st.A.find(a=>a.id===prod.area_id);
-        rellenoMap[key]={elaboracion,kgPorDia:Array(7).fill(0),empresa:relleno.empresa_id,area:area?.nombre||'Sin área'};
-      }
-
-      // Asignar kg al día de elaboración según frío/caliente
-      (row.days||[]).forEach((unidades,di)=>{
-        if(!unidades)return;
-        const kg=(unidades*gramosPorUnidad)/1000;
-        let diaElab=di;
-        if(elaboracion==='caliente'){
-          diaElab=di-1;
-          // Si cae domingo (índice 6) → sábado (índice 5)
-          if(diaElab<0)diaElab=0; // si el lunes necesita elaboración previa, queda el lunes mismo
-          if(di===0)diaElab=0;    // lunes caliente → elaborar el lunes (no hay domingo anterior en la semana)
-        }
-        // Si el día calculado es domingo (di===6) para caliente, ya viene di-1=5 (sábado), ok
-        rellenoMap[key].kgPorDia[diaElab]+=kg;
-      });
-    });
-  });
+  // Construir mapa: relleno → { elaboracion, dias: [kg × 7] } (helper compartido con "Consumo de MP Semanal")
+  const rellenoMap=calcularKgRellenoSemana(sem);
 
   const rellenos=Object.entries(rellenoMap);
   if(!rellenos.length){
@@ -13590,7 +13725,7 @@ function renderModalConsumoMpSemanal(){
   </div>`).join('');
   overlay.innerHTML=`<div class="modal" style="width:420px;max-height:80vh;overflow-y:auto;display:flex;flex-direction:column">
     <div class="modal-title"><i class="ti ti-chart-bar"></i> Consumo de MP Semanal</div>
-    <div class="modal-sub">${items.length} producto${items.length!==1?'s':''} en la lista. El consumo de materia prima se calcula solo por receta y plan -- acá solo elegís QUÉ productos entran. Agregá por código (ID) o quitá con la X.</div>
+    <div class="modal-sub">${items.length} relleno${items.length!==1?'s':''} en la lista. El kilaje y la materia prima se calculan solos (kg por vínculo relleno→producto + receta propia del relleno) -- acá solo elegís QUÉ rellenos entran. Agregá por código (ID) o quitá con la X.</div>
     <div style="display:flex;gap:6px;margin:10px 0">
       <input type="text" id="consumo-mp-add-cod" inputmode="numeric" placeholder="Código (ID)..." style="flex:1;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)" onkeydown="if(event.key==='Enter')agregarAConsumoMpSemanal()"/>
       <button class="btn btn-primary btn-sm" onclick="agregarAConsumoMpSemanal()"><i class="ti ti-plus"></i> Agregar</button>
@@ -13624,74 +13759,57 @@ async function quitarDeConsumoMpSemanal(rowId){
   }catch(e){alert('Error al quitar: '+e.message)}
 }
 
-// Calcula, para la semana st.w, cuánta MP se consume cada día (0=Lun...6=Dom) según el plan y las
-// recetas, sumando SOLO los renglones de plan cuyo producto vinculado (mpParaProducto) está en la
-// lista consumoMpCache. Devuelve también qué productos de la lista no tienen receta cargada (para
-// avisar, no para bloquear) y cuáles no aparecen con cantidad en el plan de esta semana.
-// v4.202: reorganizado de "una fila por MP con columnas por día" a "una sección por PRODUCTO" (a
-// pedido, para que se parezca a la planilla en papel que ya usan para Rellenos: producto arriba,
-// abajo la lista de MP con la cantidad que corresponde, y un total de kilos de relleno al pie).
-// v4.203: dentro de cada sección de producto, se vuelve a desglosar por DÍA de la semana -- pero
-// solo se agrega una columna por cada día que realmente tiene producción planificada para ESE
-// producto (si un producto no se hace un día, ese día no le agranda la tabla). Si un producto tiene
-// más de un día activo se suma una columna "Total semana" al final; si tiene uno solo, no hace
-// falta (sería la misma columna repetida). La cantidad a producir sigue saliendo SOLA del plan de
-// la semana abierta (st.w), nunca a mano.
+// Calcula, para la semana st.w, cuánta MP hace falta cada día (0=Lun...6=Dom) para cada RELLENO de
+// la lista (consumoMpCache). v4.210 (a pedido, para que coincida con la planilla en papel que ya
+// usan): antes esto tomaba la receta y la cantidad planificada del PRODUCTO TERMINADO directamente
+// (ravioles, sorrentinos...); ahora lo hace en dos pasos, como en la planilla de papel:
+//  1) cuántos KG de cada relleno hacen falta, calculado a partir de la cantidad PLANIFICADA de los
+//     productos terminados que lo usan (ravioles, sorrentinos, etc.) y el vínculo relleno→producto
+//     (gramos por unidad) cargado en Maestro > Cocina -- mismo cálculo que Producción > Rellenos
+//     (calcularKgRellenoSemana), reutilizado acá.
+//  2) para esos kg de relleno, la materia prima que hace falta según la RECETA PROPIA del relleno
+//     (Maestro > Recetas, cargada por código con "Importar Rellenos/Proceso"): cantidad de cada
+//     ingrediente / tanda (kg que rinde una tanda) × kg de relleno necesarios.
+// Devuelve, además de los productos con datos, dos listas de aviso (no bloquean, solo informan):
+// sinVinculo (el relleno elegido no tiene vínculo con ningún producto en Maestro > Cocina, así que
+// no se puede calcular cuántos kg hacen falta) y sinReceta (tiene vínculo y kg necesarios, pero no
+// tiene receta propia cargada, así que no se puede desglosar en materia prima).
 function calcularConsumoMpSemana(){
-  const plan=st.P[st.w]||[];
-  const trackedIds=new Set(consumoMpCache.map(x=>x.mp.id));
-  const porProducto={}; // mp.id -> {mp,diasQty:[7],ingMap:{key:{ingrediente,unidad,dias:[7]}}}
-  plan.forEach(r=>{
-    const mp=mpParaProducto(r);
-    if(!mp||!trackedIds.has(mp.id))return;
-    const dias=r.days||[];
-    if(!dias.some(v=>v>0))return;
-    const ings=st.Rec[r.producto]||[];
-    if(!ings.length)return;
-    const tanda=(st.RecTanda&&st.RecTanda[r.producto])||1;
-    if(!porProducto[mp.id])porProducto[mp.id]={mp,diasQty:[0,0,0,0,0,0,0],ingMap:{}};
-    const pp=porProducto[mp.id];
-    for(let di=0;di<7;di++){
-      const cant=dias[di]||0;
-      if(!cant)continue;
-      pp.diasQty[di]=fn(pp.diasQty[di]+cant);
-    }
-    ings.forEach(ing=>{
-      const key=ing.ingrediente+'||'+ing.unidad;
-      if(!pp.ingMap[key])pp.ingMap[key]={ingrediente:ing.ingrediente,unidad:ing.unidad,dias:[0,0,0,0,0,0,0]};
-      const cantXUnidad=tanda>0?ing.cantidad/tanda:ing.cantidad;
-      for(let di=0;di<7;di++){
-        const cant=dias[di]||0;
-        if(!cant)continue;
-        const c=cantXUnidad*cant;
-        pp.ingMap[key].dias[di]=fn(pp.ingMap[key].dias[di]+c);
-      }
-    });
-  });
-  const productos=Object.values(porProducto).map(pp=>{
+  const rellenoMap=calcularKgRellenoSemana(st.w);
+  const sinVinculo=[], sinReceta=[];
+  const productos=consumoMpCache.map(x=>{
+    const prodRelleno=prodPorMp(x.mp);
+    if(!prodRelleno||!prodRelleno.vinculo_productos){ sinVinculo.push(x); return null; }
+    const entry=rellenoMap[prodRelleno.nombre];
+    const kgPorDiaFull=entry?entry.kgPorDia:[0,0,0,0,0,0,0];
     const diasActivos=[];
-    for(let di=0;di<7;di++)if(pp.diasQty[di]>0)diasActivos.push(di);
-    const ingredientes=Object.values(pp.ingMap).sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es')).map(ing=>({
-      ingrediente:ing.ingrediente,
-      unidad:ing.unidad,
-      porDia:diasActivos.map(di=>ing.dias[di]),
-      total:fn(diasActivos.reduce((a,di)=>a+ing.dias[di],0))
-    }));
+    for(let di=0;di<7;di++)if(kgPorDiaFull[di]>0)diasActivos.push(di);
+    if(!diasActivos.length)return null; // sin producción planificada esta semana para lo que usa este relleno
+
+    const recKey=recKeyForMp(x.mp)||x.mp.nombre;
+    const ings=st.Rec[recKey]||[];
+    if(!ings.length){ sinReceta.push(x); return null; }
+    const tanda=(st.RecTanda&&st.RecTanda[recKey])||1;
+
+    const ingredientes=ings.map(ing=>{
+      const cantXKg=tanda>0?ing.cantidad/tanda:ing.cantidad;
+      const porDia=diasActivos.map(di=>fn(cantXKg*kgPorDiaFull[di]));
+      return{ingrediente:ing.ingrediente,unidad:ing.unidad,porDia,total:fn(porDia.reduce((a,v)=>a+v,0))};
+    }).sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
+
     const kgDeIng=(ing,cant)=>{
       const u=(ing.unidad||'').toString().trim().toLowerCase();
       if(u==='kg')return cant;
       if(u==='gr'||u==='g')return cant/1000;
       return 0;
     };
-    const kgPorDia=diasActivos.map((di,idx)=>fn(ingredientes.reduce((a,ing)=>a+kgDeIng(ing,ing.porDia[idx]||0),0)));
-    const totalKgSemana=fn(kgPorDia.reduce((a,v)=>a+v,0));
-    const diasQty=diasActivos.map(di=>pp.diasQty[di]);
-    const cantidadSemana=fn(diasQty.reduce((a,v)=>a+v,0));
-    return{mp:pp.mp,diasActivos,diasQty,cantidadSemana,ingredientes,kgPorDia,totalKgSemana};
-  }).sort((a,b)=>normTxt(a.mp.alias||a.mp.nombre).localeCompare(normTxt(b.mp.alias||b.mp.nombre),'es',{numeric:true}));
-  const productosConDatos=new Set(productos.map(p=>p.mp.id));
-  const sinReceta=consumoMpCache.filter(x=>!(st.Rec[recKeyForMp(x.mp)||x.mp.nombre]||[]).length && !productosConDatos.has(x.mp.id));
-  return{productos,sinReceta};
+    const kgMpPorDia=diasActivos.map((di,idx)=>fn(ingredientes.reduce((a,ing)=>a+kgDeIng(ing,ing.porDia[idx]||0),0)));
+    const totalKgMpSemana=fn(kgMpPorDia.reduce((a,v)=>a+v,0));
+    const kgRellenoPorDia=diasActivos.map(di=>kgPorDiaFull[di]);
+    const totalKgRellenoSemana=fn(kgRellenoPorDia.reduce((a,v)=>a+v,0));
+    return{mp:x.mp,diasActivos,kgRellenoPorDia,totalKgRellenoSemana,ingredientes,kgMpPorDia,totalKgMpSemana};
+  }).filter(Boolean).sort((a,b)=>normTxt(a.mp.alias||a.mp.nombre).localeCompare(normTxt(b.mp.alias||b.mp.nombre),'es',{numeric:true}));
+  return{productos,sinReceta,sinVinculo};
 }
 
 async function imprimirPlanillaConsumoMpSemanal(){
@@ -13706,10 +13824,11 @@ async function imprimirPlanillaConsumoMpSemanal(){
     return;
   }
   if(!consumoMpCache.length){alert('La lista de Consumo de MP Semanal está vacía. Agregá productos con el lápiz de la tarjeta antes de imprimir.');return}
-  const{productos,sinReceta}=calcularConsumoMpSemana();
+  const{productos,sinReceta,sinVinculo}=calcularConsumoMpSemana();
   if(!productos.length){
-    let msg='No hay consumo de MP para calcular en '+wlb(st.w)+'. Verificá que los productos elegidos tengan cantidad planificada esa semana y receta cargada.';
-    if(sinReceta.length)msg+='\n\nSin receta cargada: '+sinReceta.map(x=>x.mp.alias||x.mp.nombre).join(', ');
+    let msg='No hay consumo de MP para calcular en '+wlb(st.w)+'. Verificá que los rellenos elegidos tengan vínculo con algún producto (Maestro > Cocina), que esos productos tengan cantidad planificada esta semana, y que el relleno tenga receta propia cargada.';
+    if(sinVinculo.length)msg+='\n\nSin vínculo con ningún producto: '+sinVinculo.map(x=>x.mp.alias||x.mp.nombre).join(', ');
+    if(sinReceta.length)msg+='\n\nSin receta propia cargada: '+sinReceta.map(x=>x.mp.alias||x.mp.nombre).join(', ');
     alert(msg);
     return;
   }
@@ -13717,10 +13836,13 @@ async function imprimirPlanillaConsumoMpSemanal(){
   const ahora=new Date();
   const p2=n=>String(n).padStart(2,'0');
   const fechaImpresion=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()}`;
-  const avisoSinReceta=sinReceta.length?`<div class="aviso">Sin receta o sin cantidad planificada esta semana (no aparecen abajo): ${sinReceta.map(x=>(x.mp.alias||x.mp.nombre).toString().replace(/</g,'&lt;')).join(', ')}</div>`:'';
+  const avisos=[];
+  if(sinVinculo.length)avisos.push(`Sin vínculo con ningún producto (Maestro &gt; Cocina), no se pudo calcular: ${sinVinculo.map(x=>(x.mp.alias||x.mp.nombre).toString().replace(/</g,'&lt;')).join(', ')}`);
+  if(sinReceta.length)avisos.push(`Sin receta propia cargada (no aparecen abajo): ${sinReceta.map(x=>(x.mp.alias||x.mp.nombre).toString().replace(/</g,'&lt;')).join(', ')}`);
+  const avisoSinReceta=avisos.length?`<div class="aviso">${avisos.join('<br/>')}</div>`:'';
   const seccionesHtml=productos.map(p=>{
     const multiDia=p.diasActivos.length>1;
-    const colsDia=p.diasActivos.map((di,idx)=>`<th class="th-dia">${DIAS[di]}<span class="th-dia-sub">${p.diasQty[idx].toLocaleString('es-AR')} u.</span></th>`).join('');
+    const colsDia=p.diasActivos.map((di,idx)=>`<th class="th-dia">${DIAS[di]}<span class="th-dia-sub">${p.kgRellenoPorDia[idx].toLocaleString('es-AR')} kg</span></th>`).join('');
     const colTotSem=multiDia?'<th class="th-dia th-tot-sem">Total<span class="th-dia-sub">semana</span></th>':'';
     const filas=p.ingredientes.map(ing=>`<tr>
       <td class="c-ing">${(ing.ingrediente||'').toString().replace(/</g,'&lt;')}</td>
@@ -13728,15 +13850,15 @@ async function imprimirPlanillaConsumoMpSemanal(){
       ${ing.porDia.map(v=>`<td class="c-cant">${v?v.toLocaleString('es-AR'):''}</td>`).join('')}
       ${multiDia?`<td class="c-cant c-tot-sem">${ing.total.toLocaleString('es-AR')}</td>`:''}
     </tr>`).join('');
-    const footDia=p.kgPorDia.map(v=>`<td class="c-cant">${v.toLocaleString('es-AR')} kg</td>`).join('');
-    const footTotSem=multiDia?`<td class="c-cant c-tot-sem">${p.totalKgSemana.toLocaleString('es-AR')} kg</td>`:'';
+    const footDia=p.kgMpPorDia.map(v=>`<td class="c-cant">${v.toLocaleString('es-AR')} kg</td>`).join('');
+    const footTotSem=multiDia?`<td class="c-cant c-tot-sem">${p.totalKgMpSemana.toLocaleString('es-AR')} kg</td>`:'';
     const nombreProd=(p.mp.alias||p.mp.nombre||'').toString().replace(/</g,'&lt;');
     return `<div class="prod-sec">
-      <div class="prod-head">${nombreProd}<span class="prod-cant">${p.cantidadSemana.toLocaleString('es-AR')} unid. esta semana</span></div>
+      <div class="prod-head">${nombreProd}<span class="prod-cant">${p.totalKgRellenoSemana.toLocaleString('es-AR')} kg de relleno esta semana</span></div>
       <table>
         <thead><tr><th class="th-ing">Materia Prima</th><th class="th-un">Unidad</th>${colsDia}${colTotSem}</tr></thead>
         <tbody>${filas}</tbody>
-        <tfoot><tr><td colspan="2" class="c-totlbl">Total kilos de relleno</td>${footDia}${footTotSem}</tr></tfoot>
+        <tfoot><tr><td colspan="2" class="c-totlbl">Total materia prima (kg)</td>${footDia}${footTotSem}</tr></tfoot>
       </table>
     </div>`;
   }).join('');
