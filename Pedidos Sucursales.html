@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1"/>
+<title>Pedido a Fábrica</title>
+<meta name="theme-color" content="#1a1a1a"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#fff;--bg2:#f5f5f4;--bg3:#eeede9;--text:#1a1a1a;--text2:#6b6b6b;--text3:#bbb;--border:rgba(0,0,0,.10);--border2:rgba(0,0,0,.20);--radius:10px;--radius-lg:14px;--green:#1D9E75;--green-bg:#E1F5EE;--blue:#378ADD;--blue-bg:#E6F1FB;--amber:#BA7517;--amber-bg:#FAEEDA;--red:#E24B4A;--red-bg:#FCEBEB}
+@media(prefers-color-scheme:dark){:root{--bg:#1c1c1b;--bg2:#262624;--bg3:#2e2e2c;--text:#f0efec;--text2:#999;--text3:#555;--border:rgba(255,255,255,.10);--border2:rgba(255,255,255,.20)}}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg2);color:var(--text);-webkit-font-smoothing:antialiased}
+.wrap{max-width:560px;margin:0 auto;padding:16px 16px 90px}
+.card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-lg);padding:1.1rem;margin-bottom:1rem}
+h1{font-size:19px;font-weight:700}
+h2{font-size:15px;font-weight:700;margin-bottom:.6rem}
+.sub{font-size:13px;color:var(--text2)}
+label{font-size:13px;color:var(--text2);display:block;margin-bottom:5px}
+input[type=text],input[type=password],textarea{width:100%;padding:11px 12px;font-size:16px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);font-family:inherit}
+textarea{resize:vertical;min-height:60px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 16px;font-size:15px;font-weight:600;border-radius:var(--radius);border:.5px solid var(--border2);background:var(--bg);color:var(--text);cursor:pointer}
+.btn-primary{background:var(--text);color:var(--bg);border-color:var(--text)}
+.btn-primary:disabled{opacity:.45;cursor:default}
+.btn-block{width:100%}
+.btn-ghost{border:none;background:transparent;color:var(--text2);font-size:13px;padding:6px 8px}
+.alert{padding:10px 12px;border-radius:var(--radius);font-size:13px;display:flex;gap:8px;align-items:flex-start;margin-bottom:.8rem}
+.alert-err{background:var(--red-bg);color:var(--red)}
+.alert-ok{background:var(--green-bg);color:var(--green)}
+.alert-info{background:var(--blue-bg);color:var(--blue)}
+.area-title{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:12px 0 6px;border-top:.5px solid var(--border);margin-top:4px}
+.area-title:first-child{border-top:none;margin-top:0}
+.prod-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:.5px solid var(--border)}
+.prod-row:last-child{border-bottom:none}
+.prod-nom{font-size:14px;font-weight:500;flex:1;min-width:0}
+.prod-uni{font-size:11px;color:var(--text2);display:block}
+.qty-input{width:78px;padding:9px 8px;font-size:16px;text-align:center;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg2);color:var(--text)}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:var(--bg);border-bottom:.5px solid var(--border);position:sticky;top:0;z-index:5}
+.topbar .suc{font-size:15px;font-weight:700}
+.topbar .emp{font-size:12px;color:var(--text2)}
+.badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
+.badge-pendiente{background:var(--amber-bg);color:var(--amber)}
+.badge-confirmado{background:var(--green-bg);color:var(--green)}
+.badge-rechazado{background:var(--red-bg);color:var(--red)}
+.hist-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:.5px solid var(--border);font-size:13px}
+.hist-row:last-child{border-bottom:none}
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--text2);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{padding:1.2rem;text-align:center;font-size:13px;color:var(--text2)}
+#pantalla-login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+.login-box{max-width:340px;width:100%}
+.login-logo{text-align:center;margin-bottom:1.2rem;font-size:32px;color:var(--text2)}
+.footer-bar{position:fixed;left:0;right:0;bottom:0;background:var(--bg);border-top:.5px solid var(--border);padding:10px 16px;box-shadow:0 -2px 12px rgba(0,0,0,.06)}
+.footer-inner{max-width:560px;margin:0 auto}
+</style>
+</head>
+<body>
+
+<div id="pantalla-login">
+  <div class="login-box">
+    <div class="login-logo"><i class="ti ti-building-factory-2"></i></div>
+    <div class="card">
+      <h1 style="margin-bottom:4px">Pedido a Fábrica</h1>
+      <div class="sub" style="margin-bottom:1rem">Ingresá con el usuario y clave de tu sucursal.</div>
+      <div id="login-err" style="display:none" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="login-err-txt"></span></div>
+      <div style="margin-bottom:12px">
+        <label>Usuario</label>
+        <input type="text" id="li-usuario" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('li-clave').focus()"/>
+      </div>
+      <div style="margin-bottom:16px">
+        <label>Clave</label>
+        <input type="password" id="li-clave" autocomplete="current-password" onkeydown="if(event.key==='Enter')login()"/>
+      </div>
+      <button class="btn btn-primary btn-block" id="btn-login" onclick="login()"><i class="ti ti-login"></i> Ingresar</button>
+    </div>
+  </div>
+</div>
+
+<div id="pantalla-pedido" style="display:none">
+  <div class="topbar">
+    <div>
+      <div class="suc" id="tb-suc"></div>
+      <div class="emp" id="tb-emp"></div>
+    </div>
+    <button class="btn-ghost" onclick="logout()"><i class="ti ti-logout"></i> Salir</button>
+  </div>
+
+  <div class="wrap">
+    <div class="alert alert-info"><i class="ti ti-calendar-event"></i> Pedido para <b id="fecha-pedido-txt">&nbsp;</b></div>
+
+    <div id="msg-envio" style="display:none"></div>
+
+    <div class="card">
+      <h2>Productos habilitados</h2>
+      <div id="lista-productos"><div class="empty"><span class="spinner"></span></div></div>
+    </div>
+
+    <div class="card">
+      <label>Observaciones (opcional)</label>
+      <textarea id="observaciones" placeholder="Algo que necesitemos saber sobre este pedido..."></textarea>
+    </div>
+
+    <div class="card">
+      <h2>Pedidos anteriores</h2>
+      <div id="lista-historial"><div class="empty"><span class="spinner"></span></div></div>
+    </div>
+  </div>
+
+  <div class="footer-bar">
+    <div class="footer-inner">
+      <button class="btn btn-primary btn-block" id="btn-enviar" onclick="enviarPedido()"><i class="ti ti-send"></i> Enviar pedido</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Conexión (mismo proyecto de Supabase que PAPO — Plan de Producción Online.html) ──────
+const SB='https://ugmjfvgjumpnvbfskcgl.supabase.co';
+const SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnbWpmdmdqdW1wbnZiZnNrY2dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MjU4OTIsImV4cCI6MjA5NDEwMTg5Mn0.fmf7Isp5rDi10mq0VjahWRCgl6J4mD8-ib89DKWtPLs';
+const H={'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK};
+async function get(t,f){const r=await fetch(`${SB}/rest/v1/${t}?${f||''}`,{headers:H});if(!r.ok)throw new Error((await r.json().catch(()=>({message:r.statusText}))).message||r.statusText);return r.json();}
+async function ins(t,d){const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:{...H,'Prefer':'return=representation'},body:JSON.stringify(d)});if(!r.ok)throw new Error((await r.json().catch(()=>({message:r.statusText}))).message||r.statusText);return r.json();}
+
+// ── Estado de sesión (sessionStorage: se pierde al cerrar la pestaña, no queda guardado para
+// siempre en un dispositivo compartido del local) ─────────────────────────────────────────
+let sesion=null; // {id, nombre, empresa_id, empresa_nombre, tipo}
+
+function guardarSesion(s){ sesion=s; try{sessionStorage.setItem('papo_suc_sesion',JSON.stringify(s));}catch{} }
+function leerSesionGuardada(){ try{const raw=sessionStorage.getItem('papo_suc_sesion');return raw?JSON.parse(raw):null;}catch{return null;} }
+function borrarSesion(){ sesion=null; try{sessionStorage.removeItem('papo_suc_sesion');}catch{} }
+
+// ── Login ──────────────────────────────────────────────────────────────────────────────
+async function login(){
+  const usuario=document.getElementById('li-usuario').value.trim();
+  const clave=document.getElementById('li-clave').value;
+  const errEl=document.getElementById('login-err');
+  errEl.style.display='none';
+  if(!usuario||!clave){ mostrarErrorLogin('Completá usuario y clave.'); return; }
+  const btn=document.getElementById('btn-login');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Ingresando...';
+  try{
+    const filas=await get('sucursales',`usuario=eq.${encodeURIComponent(usuario)}&clave=eq.${encodeURIComponent(clave)}&activa=eq.true&select=id,nombre,empresa_id,tipo`);
+    if(!filas.length){ mostrarErrorLogin('Usuario o clave incorrectos (o la sucursal está desactivada). Consultá a fábrica.'); return; }
+    const s=filas[0];
+    let empresaNombre='';
+    try{ const emps=await get('empresas',`id=eq.${s.empresa_id}&select=nombre`); empresaNombre=emps[0]?emps[0].nombre:''; }catch{}
+    guardarSesion({id:s.id,nombre:s.nombre,empresa_id:s.empresa_id,empresa_nombre:empresaNombre,tipo:s.tipo});
+    await mostrarPantallaPedido();
+  }catch(e){
+    mostrarErrorLogin('No pude conectar para validar el usuario. Probá de nuevo en un rato. ('+e.message+')');
+  }finally{
+    btn.disabled=false; btn.innerHTML='<i class="ti ti-login"></i> Ingresar';
+  }
+}
+function mostrarErrorLogin(msg){
+  const errEl=document.getElementById('login-err');
+  document.getElementById('login-err-txt').textContent=msg;
+  errEl.style.display='flex';
+}
+function logout(){
+  borrarSesion();
+  document.getElementById('pantalla-pedido').style.display='none';
+  document.getElementById('pantalla-login').style.display='flex';
+  document.getElementById('li-clave').value='';
+}
+
+// ── Fecha del pedido: siempre el día siguiente al de hoy, no se elige ────────────────────
+function fechaPedido(hoy){
+  const base=hoy?new Date(hoy):new Date();
+  const d=new Date(base.getFullYear(),base.getMonth(),base.getDate()+1);
+  const p2=n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
+}
+function fechaPedidoLabel(fechaStr){
+  const d=new Date(fechaStr+'T00:00:00');
+  return d.toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long'});
+}
+
+// ── Qué productos puede pedir esta sucursal: si sucursal_productos no tiene NINGUNA fila para
+// ella, están TODOS los de su empresa habilitados (mismo criterio que usa PAPO en el modal de
+// Configurar de Pedidos > Sucursales); si tiene filas, solo esos (por producto_id o, si no lo
+// tiene, por nombre) ────────────────────────────────────────────────────────────────────────
+function resolverProductosHabilitados(productosEmpresa,asignaciones){
+  if(!asignaciones||!asignaciones.length)return [...productosEmpresa];
+  const idsAsig=new Set(asignaciones.filter(a=>a.activo!==false).map(a=>a.producto_id).filter(Boolean));
+  const nombresAsig=new Set(asignaciones.filter(a=>a.activo!==false&&!a.producto_id).map(a=>a.producto));
+  return productosEmpresa.filter(p=>idsAsig.has(p.id)||nombresAsig.has(p.nombre));
+}
+
+// ── Agrupa una lista de productos por el nombre de su área, en el orden en que aparece cada
+// área por primera vez (no alfabético) ───────────────────────────────────────────────────────
+function agruparPorArea(productos,areas){
+  const nombreArea=id=>{const a=areas.find(x=>x.id===id);return a?a.nombre:'General';};
+  const grupos={};
+  const orden=[];
+  productos.forEach(p=>{
+    const nom=nombreArea(p.area_id);
+    if(!grupos[nom]){grupos[nom]=[];orden.push(nom);}
+    grupos[nom].push(p);
+  });
+  return orden.map(nom=>({area:nom,productos:grupos[nom]}));
+}
+
+// ── A partir de los productos mostrados y lo tipeado en cada input, arma el array de items
+// del pedido -- descarta cantidades vacías, en cero o inválidas ────────────────────────────
+function armarItemsPedido(productos,cantidadesPorId){
+  const items=[];
+  productos.forEach(p=>{
+    const raw=cantidadesPorId[p.id];
+    const cant=parseFloat((raw||'').toString().replace(',','.'));
+    if(!isNaN(cant)&&cant>0)items.push({producto_id:p.id,producto:p.nombre,cantidad:cant});
+  });
+  return items;
+}
+
+// ── Estado en memoria de la pantalla de pedido ──────────────────────────────────────────
+let productosHabilitados=[];
+
+async function mostrarPantallaPedido(){
+  document.getElementById('pantalla-login').style.display='none';
+  document.getElementById('pantalla-pedido').style.display='block';
+  document.getElementById('tb-suc').textContent=sesion.nombre;
+  document.getElementById('tb-emp').textContent=sesion.empresa_nombre||'';
+  document.getElementById('fecha-pedido-txt').textContent=fechaPedidoLabel(fechaPedido());
+  await Promise.all([cargarProductosHabilitados(),cargarHistorial()]);
+}
+
+async function cargarProductosHabilitados(){
+  const el=document.getElementById('lista-productos');
+  el.innerHTML='<div class="empty"><span class="spinner"></span></div>';
+  try{
+    const[productosEmpresa,areas,asignaciones]=await Promise.all([
+      get('productos',`empresa_id=eq.${sesion.empresa_id}&order=orden.asc,nombre.asc`),
+      get('areas',`empresa_id=eq.${sesion.empresa_id}`),
+      get('sucursal_productos',`sucursal_id=eq.${sesion.id}`)
+    ]);
+    productosHabilitados=resolverProductosHabilitados(productosEmpresa,asignaciones);
+    if(!productosHabilitados.length){
+      el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i> Todavía no tenés productos habilitados para pedir. Consultá a fábrica.</div>';
+      document.getElementById('btn-enviar').disabled=true;
+      return;
+    }
+    const grupos=agruparPorArea(productosHabilitados,areas);
+    el.innerHTML=grupos.map(g=>`
+      <div class="area-title">${g.area}</div>
+      ${g.productos.map(p=>`
+        <div class="prod-row">
+          <div class="prod-nom">${p.nombre}<span class="prod-uni">${p.unidad||''}</span></div>
+          <input type="text" inputmode="decimal" class="qty-input" id="qty-${p.id}" placeholder="0"/>
+        </div>
+      `).join('')}
+    `).join('');
+    document.getElementById('btn-enviar').disabled=false;
+  }catch(e){
+    el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> No pude cargar los productos. ${e.message}</div>`;
+  }
+}
+
+async function enviarPedido(){
+  const cantidades={};
+  productosHabilitados.forEach(p=>{
+    const inp=document.getElementById('qty-'+p.id);
+    if(inp)cantidades[p.id]=inp.value;
+  });
+  const items=armarItemsPedido(productosHabilitados,cantidades);
+  const msgEl=document.getElementById('msg-envio');
+  if(!items.length){
+    msgEl.innerHTML='<div class="alert alert-err"><i class="ti ti-alert-circle"></i> Cargá una cantidad para al menos un producto antes de enviar.</div>';
+    msgEl.style.display='block';
+    return;
+  }
+  const btn=document.getElementById('btn-enviar');
+  btn.disabled=true; btn.innerHTML='<span class="spinner"></span> Enviando...';
+  try{
+    await ins('pedidos_sucursal',{
+      sucursal_id:sesion.id,
+      fecha:fechaPedido(),
+      items,
+      observaciones:document.getElementById('observaciones').value.trim()||null,
+      estado:'pendiente',
+      created_at:new Date().toISOString()
+    });
+    msgEl.innerHTML=`<div class="alert alert-ok"><i class="ti ti-check"></i> Pedido enviado para el ${fechaPedidoLabel(fechaPedido())}. Si te equivocaste, mandá un pedido nuevo y avisá a fábrica -- cada envío queda como un pedido aparte.</div>`;
+    msgEl.style.display='block';
+    productosHabilitados.forEach(p=>{const inp=document.getElementById('qty-'+p.id);if(inp)inp.value='';});
+    document.getElementById('observaciones').value='';
+    await cargarHistorial();
+  }catch(e){
+    msgEl.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> No pude enviar el pedido. ${e.message}</div>`;
+    msgEl.style.display='block';
+  }finally{
+    btn.disabled=false; btn.innerHTML='<i class="ti ti-send"></i> Enviar pedido';
+  }
+}
+
+function etiquetaEstado(estado){
+  if(estado==='confirmado')return {label:'Confirmado',cls:'badge-confirmado'};
+  if(estado==='rechazado')return {label:'Rechazado',cls:'badge-rechazado'};
+  return {label:'Pendiente',cls:'badge-pendiente'};
+}
+
+async function cargarHistorial(){
+  const el=document.getElementById('lista-historial');
+  el.innerHTML='<div class="empty"><span class="spinner"></span></div>';
+  try{
+    const peds=await get('pedidos_sucursal',`sucursal_id=eq.${sesion.id}&order=fecha.desc,created_at.desc&limit=20`);
+    if(!peds.length){ el.innerHTML='<div class="empty"><i class="ti ti-inbox"></i> Todavía no hiciste ningún pedido.</div>'; return; }
+    el.innerHTML=peds.map(p=>{
+      const est=etiquetaEstado(p.estado);
+      const items=(p.items||[]).filter(it=>it.cantidad>0);
+      const cantTotal=items.reduce((s,it)=>s+(it.cantidad||0),0);
+      const [y,m,d]=(p.fecha||'').split('-');
+      const fechaFmt=(y&&m&&d)?`${d}/${m}/${y}`:p.fecha;
+      return `<div class="hist-row">
+        <span>${fechaFmt} · ${items.length} producto${items.length!==1?'s':''} (${cantTotal.toLocaleString('es-AR')})</span>
+        <span class="badge ${est.cls}">${est.label}</span>
+      </div>`;
+    }).join('');
+  }catch(e){
+    el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> No pude cargar el historial. ${e.message}</div>`;
+  }
+}
+
+// ── Al abrir la página: si ya había una sesión de este local en esta pestaña, re-validar que
+// la sucursal siga activa (pudo haberla desactivado fábrica) y saltar directo al pedido ──────
+(async function init(){
+  const guardada=leerSesionGuardada();
+  if(!guardada){ return; }
+  try{
+    const filas=await get('sucursales',`id=eq.${guardada.id}&activa=eq.true&select=id`);
+    if(!filas.length){ borrarSesion(); return; }
+    sesion=guardada;
+    await mostrarPantallaPedido();
+  }catch{
+    // sin conexión al abrir: dejamos la pantalla de login, el usuario puede reintentar
+  }
+})();
+</script>
+</body>
+</html>
