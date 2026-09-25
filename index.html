@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.210</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.215</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -290,6 +290,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <button class="btn btn-sm" onclick="onPlanSemana()" title="Recargar"><i class="ti ti-refresh"></i></button>
         <button class="btn btn-sm" onclick="crearNuevaSemana()" title="Crear plan para la semana siguiente" style="gap:5px"><i class="ti ti-calendar-plus"></i> Nueva semana</button>
         <button class="btn btn-sm" onclick="corregirAreasSemana()" title="Si algún producto quedó guardado con el nombre de área escrito distinto al de Maestro > Áreas (ej. otra mayúscula/minúscula), esto lo corrige para que se agrupe bien en la pestaña de esa área" style="gap:5px"><i class="ti ti-wand"></i> Corregir áreas</button>
+        <button class="btn btn-sm" onclick="quitarAreasNoConfiguradasSemana()" title="Elimina de esta semana las filas de áreas que ya no existen en Configuración > Producción (ej. quedaron de una reorganización vieja). Sólo quita filas en 0 -- si alguna tiene cantidad cargada, la deja sin tocar y te avisa." style="gap:5px"><i class="ti ti-eraser"></i> Quitar áreas viejas</button>
       </div>
       <div class="btns">
         <button class="btn btn-pdf" id="btnpdf" onclick="genPDF()"><i class="ti ti-file-type-pdf"></i> PDF</button>
@@ -1358,6 +1359,12 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       </div>
       <div style="min-width:0;overflow-x:auto">
         <div class="mc-title">3. Productos</div>
+        <div style="margin-bottom:8px;position:relative;max-width:320px">
+          <input type="text" id="prod-filtro" placeholder="🔍 Buscar producto..." oninput="filtrarProdDetail()"
+            style="width:100%;padding:6px 28px 6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+          <i class="ti ti-x" id="prod-filtro-clear" onclick="document.getElementById('prod-filtro').value='';filtrarProdDetail()"
+            style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text3);font-size:13px"></i>
+        </div>
         <div id="proddetail"><div style="padding:2rem;text-align:center;font-size:13px;color:var(--text2)"><i class="ti ti-arrow-left" style="display:block;font-size:24px;margin-bottom:6px;color:var(--text3)"></i>Selecciona un area</div></div>
       </div>
     </div>
@@ -1484,7 +1491,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <button class="btn btn-xs" onclick="togglePlanillaInfo('consumo_mp')" title="Ver descripción"><i class="ti ti-help"></i></button>
         <button class="btn btn-xs" onclick="abrirEditarConsumoMpSemanal()" title="Agregar o quitar productos de la lista"><i class="ti ti-pencil"></i></button>
       </div>
-      <div class="planilla-info" id="pi-consumo_mp" style="display:none">Por cada relleno elegido: primero cuántos kilos hacen falta esa semana (según la cantidad planificada de los productos que lo usan y el vínculo relleno→producto de Maestro &gt; Cocina), desglosado por día; y abajo, la materia prima que corresponde a esos kilos según la receta propia del relleno. Elegís los rellenos con el lápiz.</div>
+      <div class="planilla-info" id="pi-consumo_mp" style="display:none">Por cada producto elegido: primero cuántos kilos de relleno hacen falta esa semana (calculado solo con la receta propia del producto y lo planificado, sin configurar nada aparte), desglosado por día; y abajo, la materia prima que corresponde a esos kilos según la receta propia del relleno. Elegís los productos con el lápiz.</div>
       <button class="btn btn-primary" style="width:100%" onclick="imprimirPlanillaConsumoMpSemanal()"><i class="ti ti-printer"></i> Imprimir</button>
     </div>
   </div>
@@ -1590,6 +1597,7 @@ async function crearNuevaSemana(){
     // Copiar limpiando los valores diarios
     const nuevoPlan=JSON.parse(JSON.stringify(planBase)).map(r=>({...r,days:Array(7).fill(0)}));
     completarProductosDesdeConfig(siguiente,nuevoPlan);
+    quitarFilasAreaNoConfigurada(siguiente,nuevoPlan); // no arrastrar áreas viejas a la semana nueva (ver v4.214)
     st.P[siguiente]=nuevoPlan;
     st.Ed[siguiente]=JSON.parse(JSON.stringify(nuevoPlan));
   } else {
@@ -1641,7 +1649,7 @@ function poblarPlanWsel(){
   sel.value=cur||st.w;
 }
 
-async function lp(k){if(st.P[k]!==undefined)return;try{const d=await get('planes',`semana=eq.${k}&select=filas`);st.P[k]=d.length?d[0].filas:[];}catch{st.P[k]=[]}completarProductosDesdeConfig(k,st.P[k]);}
+async function lp(k){if(st.P[k]!==undefined)return;try{const d=await get('planes',`semana=eq.${k}&select=filas`);st.P[k]=d.length?d[0].filas:[];}catch{st.P[k]=[]}completarProductosDesdeConfig(k,st.P[k]);quitarFilasAreaNoConfigurada(k,st.P[k]);}
 async function lr(k){
   if(st.R[k]!==undefined)return;
   try{
@@ -2186,6 +2194,58 @@ async function vincularCodigoNuevoProducto(eid,area,producto,unidad,codigoTexto)
 function areaCanon(eid,areaTxt){
   const a=st.A.find(x=>x.empresa_id===eid&&normTxt(x.nombre)===normTxt(areaTxt));
   return a?a.nombre:(areaTxt||'SA');
+}
+function areaConfigurada(eid,areaTxt){
+  return st.A.some(x=>x.empresa_id===eid&&normTxt(x.nombre)===normTxt(areaTxt));
+}
+
+// v4.214: filas "huérfanas" -- de un área que en algún momento existió pero ya no está en
+// Configuración > Producción > Áreas (ej. una reorganización vieja que renombró/fusionó áreas,
+// como pasó con "T&C12"/"T&C15" en Planeta Empanada), que "Nueva semana > copiar semana anterior"
+// venía arrastrando indefinidamente porque copia el plan entero sin distinguir áreas vigentes de
+// viejas. Quita SOLO filas en cero (nunca una con cantidad cargada -- esa se deja intacta, no hay
+// forma segura de saber a qué área vigente debería pasar) y sólo desde AUTOFILL_PRODUCTOS_DESDE en
+// adelante (nunca toca semanas anteriores a ese corte, que quedan como registro histórico). Se llama
+// automáticamente desde lp() (así el área vieja deja de aparecer como pestaña en cuanto se abre esa
+// semana, sin que haga falta guardar) y desde crearNuevaSemana() al copiar (para que una semana nueva
+// no vuelva a nacer con las áreas viejas). También hay un botón "Quitar áreas viejas" en Planificación
+// para forzar la limpieza (y el guardado) de la semana actual a pedido.
+function quitarFilasAreaNoConfigurada(weekKey,rows){
+  if(!weekKey||weekKey<AUTOFILL_PRODUCTOS_DESDE)return 0;
+  let quitadas=0;
+  for(let i=rows.length-1;i>=0;i--){
+    const r=rows[i];
+    if(areaConfigurada(r.empresa_id,r.area))continue;
+    if((r.days||[]).some(v=>v>0))continue; // tiene cantidad cargada -- no se toca sola
+    rows.splice(i,1);
+    quitadas++;
+  }
+  return quitadas;
+}
+
+// Botón "Quitar áreas viejas" (Planificación): igual que quitarFilasAreaNoConfigurada, pero sobre la
+// semana actual en pantalla (gE()/st.Ed), dejando el cambio pendiente de "Guardar plan" -- mismo patrón
+// que corregirAreasSemana(). Avisa aparte si dejó alguna fila sin tocar por tener cantidad cargada.
+function quitarAreasNoConfiguradasSemana(){
+  const rows=gE();
+  const aConservar=[];
+  let quitadas=0,conservadasPorDatos=0;
+  const areasQuitadas=new Set(),areasConDatos=new Set();
+  rows.forEach(r=>{
+    if(areaConfigurada(r.empresa_id,r.area)){ aConservar.push(r); return; }
+    if((r.days||[]).some(v=>v>0)){ aConservar.push(r); conservadasPorDatos++; areasConDatos.add(r.area); return; }
+    quitadas++; areasQuitadas.add(r.area);
+  });
+  st.Ed[st.w]=aConservar;
+  if(quitadas||conservadasPorDatos){
+    let msg=quitadas?`${quitadas} fila${quitadas!==1?'s':''} de área${areasQuitadas.size!==1?'s':''} sin configurar (${[...areasQuitadas].join(', ')}) eliminada${quitadas!==1?'s':''} ✓`:'Ninguna fila en cero para quitar';
+    if(conservadasPorDatos)msg+=` — ${conservadasPorDatos} fila${conservadasPorDatos!==1?'s':''} de ${[...areasConDatos].join(', ')} con cantidad cargada NO se tocó, revisala a mano`;
+    msg+=' — acordate de "Guardar plan"';
+    ss('online',msg);
+    rG();
+  } else {
+    ss('online','No había filas de áreas sin configurar en esta semana');
+  }
 }
 
 // A partir de esta semana (Sem 39, la del 21/9/2026) el plan de cada semana se completa SOLO con
@@ -3701,6 +3761,14 @@ function rAreaList(eid){
   if(st.aaid)rProdDetail(st.aaid);
 }
 function selArea(id){st.aaid=id;rAreaList(st.aeid);}
+// v4.213: buscador de producto en Configuración > Producción > "3. Productos" (a pedido, áreas con 70+
+// productos eran difíciles de recorrer a mano). El input #prod-filtro vive FUERA del innerHTML que
+// rProdDetail() reemplaza en cada render (cambio de área, orden, alta/baja de producto), así que no
+// pierde foco ni valor al re-renderizar -- filtrarProdDetail() sólo muestra/oculta (display:none) las
+// tarjetas ya generadas dentro de #prod-items-list, comparando su atributo data-txt (nombre del producto +
+// código/nombre/alias vinculado de Maestro > Configuración, todo pasado por normTxt) contra el término
+// buscado. rProdDetail() llama filtrarProdDetail() al final de cada render para reaplicar el término
+// vigente (incluido al cambiar de área, a propósito -- deja seguir buscando lo mismo en otra área).
 let prodSort={field:null,dir:'asc'}; // null = orden manual (↑↓, campo `orden`); 'descripcion' = alfabético por
 // la descripción vinculada (Configuración) -- es solo una vista, no toca el campo `orden` de cada producto.
 function prodSetSort(field){
@@ -3738,12 +3806,13 @@ function rProdDetail(aid){
       <span style="font-size:11px;color:var(--text2);cursor:pointer;user-select:none" onclick="prodSetSort('descripcion')" title="Ordenar alfabéticamente por la descripción vinculada">Descripción${prodSortArrow('descripcion')}</span>
       ${prodSort.field?`<span style="font-size:11px;color:var(--accent);cursor:pointer;user-select:none" onclick="prodSetSort(null)" title="Volver al orden manual (↑↓)">· Orden manual</span>`:''}
     </div>`;
-    h+=`<div style="margin-bottom:1rem;display:flex;flex-direction:column;gap:8px">`;
+    h+=`<div id="prod-items-list" style="margin-bottom:1rem;display:flex;flex-direction:column;gap:8px">`;
     prods.forEach((p,idx)=>{
       const linkedMp=p.mp_id?mpData.find(m=>m.id===p.mp_id):null;
       const sugMp=!linkedMp?sugerenciaProdMp(p):null;
       const ordenManual=!prodSort.field;
-      h+=`<div class="grid-card" style="padding:0;overflow:hidden">
+      const txtBusqueda=normTxt([p.nombre,linkedMp?linkedMp.codigo:'',linkedMp?linkedMp.nombre:'',linkedMp?linkedMp.alias:''].filter(Boolean).join(' '));
+      h+=`<div class="grid-card" data-txt="${txtBusqueda}" style="padding:0;overflow:hidden">
         <!-- Línea 1: lo principal -->
         <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;flex-wrap:wrap">
           <div style="display:flex;flex-direction:column;gap:2px">
@@ -3807,6 +3876,7 @@ function rProdDetail(aid){
       </div>`;
     });
     h+=`</div>`;
+    h+=`<div id="prod-filtro-noresult" style="display:none;padding:1.25rem;text-align:center;font-size:13px;color:var(--text2);border:.5px solid var(--border);border-radius:var(--radius-lg);margin:-0.5rem 0 1rem">Ningún producto coincide con la búsqueda.</div>`;
   } else {
     h+=`<div style="padding:1.25rem;text-align:center;font-size:13px;color:var(--text2);border:.5px solid var(--border);border-radius:var(--radius-lg);margin-bottom:1rem">Sin productos aun.</div>`;
   }
@@ -3823,6 +3893,22 @@ function rProdDetail(aid){
   }
 
   wrap.innerHTML=h;
+  filtrarProdDetail();
+}
+function filtrarProdDetail(){
+  const cont=document.getElementById('prod-items-list');
+  const clearBtn=document.getElementById('prod-filtro-clear');
+  const flt=normTxt((document.getElementById('prod-filtro')?.value||'').trim());
+  if(clearBtn)clearBtn.style.display=flt?'':'none';
+  if(!cont)return;
+  let visibles=0;
+  cont.querySelectorAll(':scope > div[data-txt]').forEach(el=>{
+    const show=!flt||el.dataset.txt.includes(flt);
+    el.style.display=show?'':'none';
+    if(show)visibles++;
+  });
+  const noRes=document.getElementById('prod-filtro-noresult');
+  if(noRes)noRes.style.display=(flt&&visibles===0)?'':'none';
 }
 function rRellenoVinculos(eid, rellenosProds){
   // Todos los productos de esta empresa que NO son de Cocina (candidatos a ser vinculados)
@@ -4274,12 +4360,13 @@ function rRecDet(p){
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:10px">
       <div style="font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px">
         <i class="ti ti-notebook" style="color:var(--purple)"></i>${p}${codSelf?`<span style="font-size:11px;font-weight:400;color:var(--text2);font-family:monospace;background:var(--bg2);border-radius:4px;padding:2px 7px" title="Código de Configuración">${codSelf}</span>`:''}
+        <button class="btn btn-xs" onclick="renombrarReceta('${p.replace(/'/g,"\'")}')" title="Cambiar el nombre con el que se guardó esta receta (ej. para que coincida EXACTO con el nombre del producto en Maestro y así se vinculen)"><i class="ti ti-pencil"></i></button>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
         <div style="display:flex;align-items:center;gap:8px;background:var(--bg2);border:.5px solid var(--border);border-radius:var(--radius);padding:6px 12px">
           <i class="ti ti-stack-2" style="color:var(--blue)"></i>
           <label style="font-size:12px;color:var(--text2)">Unidades por tanda:</label>
-          <input type="number" min="1" step="1" value="${tanda}" 
+          <input type="number" min="1" step="1" value="${tanda}"
             style="width:70px;padding:4px 8px;font-size:13px;font-weight:700;text-align:center;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg)"
             onchange="setTanda('${p.replace(/'/g,"\'")}',this.value)"
             title="Cuántas unidades del producto produce una tanda completa"/>
@@ -4340,6 +4427,26 @@ function setTanda(p,v){
   if(!st.RecTanda)st.RecTanda={};
   st.RecTanda[p]=parseInt(v)||1;
   rRecDet(p);
+}
+// v4.215: a veces una receta queda guardada con un nombre distinto al del producto de Maestro al
+// que en realidad corresponde (ej. importada como "Relleno de Ravioles de Pollo" cuando el producto
+// vinculado en Maestro > Configuración/Producción se llama "RELLENO RAVIOLES POLLO") -- recKeyForMp()
+// sólo encuentra la receta cuando los nombres coinciden EXACTO (sin importar mayúsculas), así que
+// quedaba mostrando "sin maestro"/"Sin receta" en vez de vincularse, y silenciosamente afuera de
+// Consumo MP Semanal. Este botón (lápiz, al lado del nombre en el detalle de la receta) deja
+// renombrar la clave de la receta a mano, mismo patrón que "Guardar recetas" -- no guarda solo, el
+// cambio queda pendiente hasta que el usuario apriete "Guardar recetas".
+async function renombrarReceta(pViejo){
+  const nuevo=(prompt(`Nuevo nombre para esta receta:\n\n(Tiene que coincidir EXACTO con el nombre del producto en Maestro > Configuración/Producción para que se vinculen)`,pViejo)||'').trim();
+  if(!nuevo||nuevo===pViejo)return;
+  if(st.Rec[nuevo]!==undefined){alert(`Ya existe una receta con el nombre "${nuevo}". Elegí otro nombre, o primero borrá/renombrá la existente.`);return;}
+  st.Rec[nuevo]=st.Rec[pViejo];
+  delete st.Rec[pViejo];
+  if(st.RecTanda&&st.RecTanda[pViejo]!==undefined){st.RecTanda[nuevo]=st.RecTanda[pViejo];delete st.RecTanda[pViejo];}
+  if(recImportWarn.has(pViejo)){recImportWarn.delete(pViejo);recImportWarn.add(nuevo);}
+  arec=nuevo;
+  rRec();
+  ss('online',`Receta renombrada a "${nuevo}" — acordate de "Guardar recetas"`);
 }
 function imprimirReceta(p){
   const ings=st.Rec[p]||[];
@@ -13725,7 +13832,7 @@ function renderModalConsumoMpSemanal(){
   </div>`).join('');
   overlay.innerHTML=`<div class="modal" style="width:420px;max-height:80vh;overflow-y:auto;display:flex;flex-direction:column">
     <div class="modal-title"><i class="ti ti-chart-bar"></i> Consumo de MP Semanal</div>
-    <div class="modal-sub">${items.length} relleno${items.length!==1?'s':''} en la lista. El kilaje y la materia prima se calculan solos (kg por vínculo relleno→producto + receta propia del relleno) -- acá solo elegís QUÉ rellenos entran. Agregá por código (ID) o quitá con la X.</div>
+    <div class="modal-sub">${items.length} producto${items.length!==1?'s':''} en la lista. El kilaje de relleno y la materia prima se calculan solos, a partir de la receta propia del producto y del relleno (sin configurar nada aparte) -- acá solo elegís QUÉ productos entran. Agregá por código (ID) o quitá con la X.</div>
     <div style="display:flex;gap:6px;margin:10px 0">
       <input type="text" id="consumo-mp-add-cod" inputmode="numeric" placeholder="Código (ID)..." style="flex:1;padding:6px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)" onkeydown="if(event.key==='Enter')agregarAConsumoMpSemanal()"/>
       <button class="btn btn-primary btn-sm" onclick="agregarAConsumoMpSemanal()"><i class="ti ti-plus"></i> Agregar</button>
@@ -13759,57 +13866,110 @@ async function quitarDeConsumoMpSemanal(rowId){
   }catch(e){alert('Error al quitar: '+e.message)}
 }
 
-// Calcula, para la semana st.w, cuánta MP hace falta cada día (0=Lun...6=Dom) para cada RELLENO de
-// la lista (consumoMpCache). v4.210 (a pedido, para que coincida con la planilla en papel que ya
-// usan): antes esto tomaba la receta y la cantidad planificada del PRODUCTO TERMINADO directamente
-// (ravioles, sorrentinos...); ahora lo hace en dos pasos, como en la planilla de papel:
-//  1) cuántos KG de cada relleno hacen falta, calculado a partir de la cantidad PLANIFICADA de los
-//     productos terminados que lo usan (ravioles, sorrentinos, etc.) y el vínculo relleno→producto
-//     (gramos por unidad) cargado en Maestro > Cocina -- mismo cálculo que Producción > Rellenos
-//     (calcularKgRellenoSemana), reutilizado acá.
-//  2) para esos kg de relleno, la materia prima que hace falta según la RECETA PROPIA del relleno
-//     (Maestro > Recetas, cargada por código con "Importar Rellenos/Proceso"): cantidad de cada
-//     ingrediente / tanda (kg que rinde una tanda) × kg de relleno necesarios.
+// Calcula, para la semana st.w, cuánta MP hace falta cada día (0=Lun...6=Dom) para cada producto
+// trackeado (consumoMpCache -- productos terminados como ravioles/sorrentinos, agregados por código).
+// v4.211 (a pedido, corrigiendo v4.210: "mi pide que lo asigne de maestro pero esta desde la receta,
+// si te fijas en la receta dice que por cada caja de ravioles lleva una cantidad de rellenos" --
+// v4.210 exigía un vínculo relleno→producto configurado a mano en Maestro > Cocina, pero para
+// ravioles/sorrentinos esa cantidad YA está en la receta propia del producto, no hace falta
+// configurar nada aparte). Para cada producto de la lista:
+//  1) toma SU PROPIA receta (Maestro > Recetas: harina, huevo, agua... y una línea que es el
+//     relleno, ej. "RELLENO RAVIOLES RICOTA" en kg por tanda);
+//  2) identifica AUTOMÁTICAMENTE cuál ingrediente de esa receta es en realidad un relleno: cualquier
+//     ingrediente cuyo nombre coincide con una fila de Maestro > Configuración que a su vez tiene SU
+//     PROPIA receta cargada (ej. "RELLENO RAVIOLES RICOTA" tiene su propia receta con ricota, paleta
+//     cocida, etc.) -- los demás ingredientes (harina, huevo, agua) no tienen receta propia, así que
+//     quedan afuera de este cálculo (son la masa, no el relleno);
+//  3) multiplica la cantidad de relleno de la receta (por unidad/tanda) por lo planificado cada día;
+//  4) desglosa esos kg de relleno en SU PROPIA materia prima, con la receta propia del relleno.
+// v4.212: además de los kg de relleno, cada columna de día también expone la cantidad planificada
+// del PRODUCTO (en su propia unidad de Maestro > Productos, ej. "cajas" o "unidades") para ese
+// mismo día -- a pedido, para que se vea junto al kilaje de dónde sale ("Mar - 54 KG" arriba, la
+// cantidad del plan abajo).
+// Si un producto tiene más de un ingrediente-relleno en su receta, genera una sección por cada uno.
 // Devuelve, además de los productos con datos, dos listas de aviso (no bloquean, solo informan):
-// sinVinculo (el relleno elegido no tiene vínculo con ningún producto en Maestro > Cocina, así que
-// no se puede calcular cuántos kg hacen falta) y sinReceta (tiene vínculo y kg necesarios, pero no
-// tiene receta propia cargada, así que no se puede desglosar en materia prima).
+// sinReceta (el producto no tiene ninguna receta propia cargada) y sinRellenoEnReceta (tiene receta,
+// pero ningún ingrediente de esa receta resultó ser, a su vez, un producto con receta propia --
+// incluye, cuando los hay, los nombres de ingredientes que sí coinciden con Configuración pero a los
+// que todavía les falta cargar su propia receta, para saber exactamente qué falta cargar).
 function calcularConsumoMpSemana(){
-  const rellenoMap=calcularKgRellenoSemana(st.w);
-  const sinVinculo=[], sinReceta=[];
-  const productos=consumoMpCache.map(x=>{
-    const prodRelleno=prodPorMp(x.mp);
-    if(!prodRelleno||!prodRelleno.vinculo_productos){ sinVinculo.push(x); return null; }
-    const entry=rellenoMap[prodRelleno.nombre];
-    const kgPorDiaFull=entry?entry.kgPorDia:[0,0,0,0,0,0,0];
-    const diasActivos=[];
-    for(let di=0;di<7;di++)if(kgPorDiaFull[di]>0)diasActivos.push(di);
-    if(!diasActivos.length)return null; // sin producción planificada esta semana para lo que usa este relleno
+  const plan=st.P[st.w]||[];
+  const trackedIds=new Set(consumoMpCache.map(x=>x.mp.id));
+  const porProducto={}; // mp.id -> {mp,producto,unidad,diasQty:[7]}
+  plan.forEach(r=>{
+    const mp=mpParaProducto(r);
+    if(!mp||!trackedIds.has(mp.id))return;
+    const dias=r.days||[];
+    if(!dias.some(v=>v>0))return;
+    if(!porProducto[mp.id]){
+      const prodPlan=st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id);
+      porProducto[mp.id]={mp,producto:r.producto,unidad:(prodPlan&&prodPlan.unidad)||'u.',diasQty:[0,0,0,0,0,0,0]};
+    }
+    const pp=porProducto[mp.id];
+    for(let di=0;di<7;di++){
+      const cant=dias[di]||0;
+      if(!cant)continue;
+      pp.diasQty[di]=fn(pp.diasQty[di]+cant);
+    }
+  });
 
+  const kgDeIng=(ing,cant)=>{
+    const u=(ing.unidad||'').toString().trim().toLowerCase();
+    if(u==='kg')return cant;
+    if(u==='gr'||u==='g')return cant/1000;
+    return 0;
+  };
+
+  const sinReceta=[], sinRellenoEnReceta=[];
+  const productos=[];
+  consumoMpCache.forEach(x=>{
     const recKey=recKeyForMp(x.mp)||x.mp.nombre;
-    const ings=st.Rec[recKey]||[];
-    if(!ings.length){ sinReceta.push(x); return null; }
-    const tanda=(st.RecTanda&&st.RecTanda[recKey])||1;
+    const ingsProducto=st.Rec[recKey]||[];
+    if(!ingsProducto.length){ sinReceta.push(x); return; }
 
-    const ingredientes=ings.map(ing=>{
-      const cantXKg=tanda>0?ing.cantidad/tanda:ing.cantidad;
-      const porDia=diasActivos.map(di=>fn(cantXKg*kgPorDiaFull[di]));
-      return{ingrediente:ing.ingrediente,unidad:ing.unidad,porDia,total:fn(porDia.reduce((a,v)=>a+v,0))};
-    }).sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
+    // Dentro de la receta del producto, separar los ingredientes que son en realidad un relleno
+    // (coinciden con una fila de Configuración que tiene su propia receta) de los que son un
+    // ingrediente crudo de la masa (no tienen receta propia, así que quedan afuera).
+    const candidatosSinReceta=[];
+    const rellenosEnReceta=ingsProducto.map(ing=>{
+      const cand=mpData.find(m=>normTxt(m.nombre)===normTxt(ing.ingrediente));
+      if(!cand)return null;
+      const subKey=recKeyForMp(cand);
+      const subIngs=subKey?(st.Rec[subKey]||[]):[];
+      if(!subIngs.length){ candidatosSinReceta.push(cand.alias||cand.nombre); return null; }
+      return{ing,cand,subKey,subIngs};
+    }).filter(Boolean);
 
-    const kgDeIng=(ing,cant)=>{
-      const u=(ing.unidad||'').toString().trim().toLowerCase();
-      if(u==='kg')return cant;
-      if(u==='gr'||u==='g')return cant/1000;
-      return 0;
-    };
-    const kgMpPorDia=diasActivos.map((di,idx)=>fn(ingredientes.reduce((a,ing)=>a+kgDeIng(ing,ing.porDia[idx]||0),0)));
-    const totalKgMpSemana=fn(kgMpPorDia.reduce((a,v)=>a+v,0));
-    const kgRellenoPorDia=diasActivos.map(di=>kgPorDiaFull[di]);
-    const totalKgRellenoSemana=fn(kgRellenoPorDia.reduce((a,v)=>a+v,0));
-    return{mp:x.mp,diasActivos,kgRellenoPorDia,totalKgRellenoSemana,ingredientes,kgMpPorDia,totalKgMpSemana};
-  }).filter(Boolean).sort((a,b)=>normTxt(a.mp.alias||a.mp.nombre).localeCompare(normTxt(b.mp.alias||b.mp.nombre),'es',{numeric:true}));
-  return{productos,sinReceta,sinVinculo};
+    if(!rellenosEnReceta.length){ sinRellenoEnReceta.push({x,candidatos:candidatosSinReceta}); return; }
+
+    const pp=porProducto[x.mp.id];
+    if(!pp)return; // sin producción planificada esta semana para este producto (no es un error)
+    const diasActivos=[];
+    for(let di=0;di<7;di++)if(pp.diasQty[di]>0)diasActivos.push(di);
+    if(!diasActivos.length)return;
+    const tandaProducto=(st.RecTanda&&st.RecTanda[pp.producto])||1;
+
+    rellenosEnReceta.forEach(({ing,cand,subKey,subIngs})=>{
+      const cantXUnidad=tandaProducto>0?ing.cantidad/tandaProducto:ing.cantidad;
+      const kgRellenoPorDia=diasActivos.map(di=>fn(cantXUnidad*pp.diasQty[di]));
+      const totalKgRellenoSemana=fn(kgRellenoPorDia.reduce((a,v)=>a+v,0));
+
+      const subTanda=(st.RecTanda&&st.RecTanda[subKey])||1;
+      const ingredientes=subIngs.map(si=>{
+        const cantXKg=subTanda>0?si.cantidad/subTanda:si.cantidad;
+        const porDia=kgRellenoPorDia.map(kg=>fn(cantXKg*kg));
+        return{ingrediente:si.ingrediente,unidad:si.unidad,porDia,total:fn(porDia.reduce((a,v)=>a+v,0))};
+      }).sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
+
+      const kgMpPorDia=diasActivos.map((di,idx)=>fn(ingredientes.reduce((a,ii)=>a+kgDeIng(ii,ii.porDia[idx]||0),0)));
+      const totalKgMpSemana=fn(kgMpPorDia.reduce((a,v)=>a+v,0));
+
+      const diasQtyProducto=diasActivos.map(di=>pp.diasQty[di]);
+      productos.push({mp:x.mp, rellenoNombre:(cand.alias||cand.nombre), diasActivos, kgRellenoPorDia, totalKgRellenoSemana, diasQtyProducto, unidadProducto:pp.unidad, ingredientes, kgMpPorDia, totalKgMpSemana});
+    });
+  });
+  productos.sort((a,b)=>normTxt(a.mp.alias||a.mp.nombre).localeCompare(normTxt(b.mp.alias||b.mp.nombre),'es',{numeric:true})||a.rellenoNombre.localeCompare(b.rellenoNombre,'es'));
+  return{productos,sinReceta,sinRellenoEnReceta};
 }
 
 async function imprimirPlanillaConsumoMpSemanal(){
@@ -13824,11 +13984,11 @@ async function imprimirPlanillaConsumoMpSemanal(){
     return;
   }
   if(!consumoMpCache.length){alert('La lista de Consumo de MP Semanal está vacía. Agregá productos con el lápiz de la tarjeta antes de imprimir.');return}
-  const{productos,sinReceta,sinVinculo}=calcularConsumoMpSemana();
+  const{productos,sinReceta,sinRellenoEnReceta}=calcularConsumoMpSemana();
   if(!productos.length){
-    let msg='No hay consumo de MP para calcular en '+wlb(st.w)+'. Verificá que los rellenos elegidos tengan vínculo con algún producto (Maestro > Cocina), que esos productos tengan cantidad planificada esta semana, y que el relleno tenga receta propia cargada.';
-    if(sinVinculo.length)msg+='\n\nSin vínculo con ningún producto: '+sinVinculo.map(x=>x.mp.alias||x.mp.nombre).join(', ');
+    let msg='No hay consumo de MP para calcular en '+wlb(st.w)+'. Verificá que los productos elegidos tengan receta propia cargada (con el relleno como uno de sus ingredientes), que ese relleno tenga a su vez su propia receta cargada, y que el producto tenga cantidad planificada esta semana.';
     if(sinReceta.length)msg+='\n\nSin receta propia cargada: '+sinReceta.map(x=>x.mp.alias||x.mp.nombre).join(', ');
+    if(sinRellenoEnReceta.length)msg+='\n\nSin ningún relleno con receta propia detectado en su receta: '+sinRellenoEnReceta.map(({x,candidatos})=>(x.mp.alias||x.mp.nombre)+(candidatos.length?' (le falta la receta de: '+candidatos.join(', ')+')':'')).join(' · ');
     alert(msg);
     return;
   }
@@ -13837,12 +13997,15 @@ async function imprimirPlanillaConsumoMpSemanal(){
   const p2=n=>String(n).padStart(2,'0');
   const fechaImpresion=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()}`;
   const avisos=[];
-  if(sinVinculo.length)avisos.push(`Sin vínculo con ningún producto (Maestro &gt; Cocina), no se pudo calcular: ${sinVinculo.map(x=>(x.mp.alias||x.mp.nombre).toString().replace(/</g,'&lt;')).join(', ')}`);
   if(sinReceta.length)avisos.push(`Sin receta propia cargada (no aparecen abajo): ${sinReceta.map(x=>(x.mp.alias||x.mp.nombre).toString().replace(/</g,'&lt;')).join(', ')}`);
+  if(sinRellenoEnReceta.length)avisos.push(`Con receta, pero sin ningún relleno con receta propia detectado (no aparecen abajo): ${sinRellenoEnReceta.map(({x,candidatos})=>{
+    const nombre=(x.mp.alias||x.mp.nombre).toString().replace(/</g,'&lt;');
+    return candidatos.length?`${nombre} (le falta cargar la receta de: ${candidatos.map(c=>c.toString().replace(/</g,'&lt;')).join(', ')})`:nombre;
+  }).join(' · ')}`);
   const avisoSinReceta=avisos.length?`<div class="aviso">${avisos.join('<br/>')}</div>`:'';
   const seccionesHtml=productos.map(p=>{
     const multiDia=p.diasActivos.length>1;
-    const colsDia=p.diasActivos.map((di,idx)=>`<th class="th-dia">${DIAS[di]}<span class="th-dia-sub">${p.kgRellenoPorDia[idx].toLocaleString('es-AR')} kg</span></th>`).join('');
+    const colsDia=p.diasActivos.map((di,idx)=>`<th class="th-dia">${DIAS[di]}<span class="th-dia-sub">${p.kgRellenoPorDia[idx].toLocaleString('es-AR')} kg</span><span class="th-dia-sub2">${p.diasQtyProducto[idx].toLocaleString('es-AR')} ${p.unidadProducto}</span></th>`).join('');
     const colTotSem=multiDia?'<th class="th-dia th-tot-sem">Total<span class="th-dia-sub">semana</span></th>':'';
     const filas=p.ingredientes.map(ing=>`<tr>
       <td class="c-ing">${(ing.ingrediente||'').toString().replace(/</g,'&lt;')}</td>
@@ -13853,8 +14016,9 @@ async function imprimirPlanillaConsumoMpSemanal(){
     const footDia=p.kgMpPorDia.map(v=>`<td class="c-cant">${v.toLocaleString('es-AR')} kg</td>`).join('');
     const footTotSem=multiDia?`<td class="c-cant c-tot-sem">${p.totalKgMpSemana.toLocaleString('es-AR')} kg</td>`:'';
     const nombreProd=(p.mp.alias||p.mp.nombre||'').toString().replace(/</g,'&lt;');
+    const nombreRelleno=(p.rellenoNombre||'').toString().replace(/</g,'&lt;');
     return `<div class="prod-sec">
-      <div class="prod-head">${nombreProd}<span class="prod-cant">${p.totalKgRellenoSemana.toLocaleString('es-AR')} kg de relleno esta semana</span></div>
+      <div class="prod-head">${nombreProd}<span class="prod-cant">${p.totalKgRellenoSemana.toLocaleString('es-AR')} kg de ${nombreRelleno} esta semana</span></div>
       <table>
         <thead><tr><th class="th-ing">Materia Prima</th><th class="th-un">Unidad</th>${colsDia}${colTotSem}</tr></thead>
         <tbody>${filas}</tbody>
@@ -13878,7 +14042,8 @@ async function imprimirPlanillaConsumoMpSemanal(){
     th{background:#1B3A6B;color:#fff;padding:4px 6px;font-size:8pt;text-align:left;border:1px solid #1B3A6B}
     th.th-un{width:20mm;text-align:center}
     th.th-dia{width:24mm;text-align:center}
-    th.th-dia-sub{display:block;font-size:7pt;font-weight:400;opacity:.85}
+    .th-dia-sub{display:block;font-size:7pt;font-weight:400;opacity:.85}
+    .th-dia-sub2{display:block;font-size:6.5pt;font-weight:400;opacity:.65;font-style:italic}
     th.th-tot-sem{background:#122a4d}
     td{border:1px solid #999;height:7mm;font-size:9pt;padding:0 6px}
     td.c-ing{font-weight:500}
