@@ -251,9 +251,9 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.215</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.216</span></div>
   <div style="display:flex;align-items:center;gap:16px">
-    <div class="status-label"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
+    <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
   </div>
 </header>
@@ -1546,19 +1546,41 @@ const st={w:W0,P:{},R:{},Rec:{},Ed:{},Sem:[],E:[],A:[],Pr:[],ef:'all',aeid:null,
 
 document.getElementById('hdate').textContent=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
+// v4.216: init() usaba fetch() sin ningún timeout -- si UNA sola de las 8 consultas en paralelo se
+// colgaba (wifi inestable, VPN, un momento flojo de Supabase, etc.), Promise.all nunca se resolvía
+// y toda la app quedaba trabada para siempre en "Conectando..." sin ningún error ni forma de
+// reintentar (reportado como "me queda en conectando... y no me baja la info"). `conTimeout()` pone
+// un límite de tiempo a cada consulta individual -- si una tarda más de la cuenta, esa consulta en
+// particular sigue el mismo camino que ya existía para un error de red (se resuelve como lista vacía,
+// nunca bloquea a las demás), pero ahora se marca `huboTimeout` para avisar en vez de mostrar
+// "Conectado" como si nada hubiera pasado. El indicador de arriba a la derecha ahora es clickeable
+// (reintentarConexion()) para forzar una reconexión manual sin tener que recargar la página entera.
+// `initGen` evita que una llamada vieja que finalmente responde tarde pise con datos atrasados los de
+// una llamada más nueva (ej. si el usuario tocó "reintentar" mientras la original seguía colgada).
+let initGen=0;
+const INIT_TIMEOUT_MS=15000;
+function conTimeout(p,ms){
+  let to;
+  const timeout=new Promise((_,rej)=>{to=setTimeout(()=>rej(new Error('TIMEOUT')),ms)});
+  return Promise.race([p,timeout]).finally(()=>clearTimeout(to));
+}
 async function init(){
+  const myGen=++initGen;
   ss('saving','Conectando...');
+  let huboTimeout=false;
+  const safeGet=(t,f)=>conTimeout(get(t,f),INIT_TIMEOUT_MS).catch(e=>{if(e&&e.message==='TIMEOUT')huboTimeout=true;return[];});
   try{
     const[pl,re,rr,mp,em,ar,pr,planActual]=await Promise.all([
-      get('planes','select=semana&order=semana.desc').catch(()=>[]),
-      get('produccion_real','select=semana&order=semana.desc').catch(()=>[]),
-      get('recetas','select=datos,tandas').catch(()=>[]),
-      get('materias_primas','order=nombre.asc').catch(()=>[]),
-      get('empresas','order=nombre.asc').catch(()=>[]),
-      get('areas','order=nombre.asc').catch(()=>[]),
-      get('productos','order=orden.asc,nombre.asc').catch(()=>[]),
-      get('planes',`semana=eq.${W0}&select=filas`).catch(()=>[])
+      safeGet('planes','select=semana&order=semana.desc'),
+      safeGet('produccion_real','select=semana&order=semana.desc'),
+      safeGet('recetas','select=datos,tandas'),
+      safeGet('materias_primas','order=nombre.asc'),
+      safeGet('empresas','order=nombre.asc'),
+      safeGet('areas','order=nombre.asc'),
+      safeGet('productos','order=orden.asc,nombre.asc'),
+      safeGet('planes',`semana=eq.${W0}&select=filas`)
     ]);
+    if(myGen!==initGen)return; // una llamada más nueva (ej. "reintentar") ya está en curso o terminó -- no pisar sus datos con estos, más viejos
     const ss2=new Set([...pl.map(p=>p.semana),...re.map(r=>r.semana),W0]);
     st.Sem=[...ss2].sort();
     if(rr.length){st.Rec=rr[0].datos||{};st.RecTanda=rr[0].tandas||{};}
@@ -1566,13 +1588,16 @@ async function init(){
     st.E=em||[];st.A=ar||[];st.Pr=pr||[];
     st.P[W0]=planActual.length?planActual[0].filas:[];
     completarProductosDesdeConfig(W0,st.P[W0]);
-    ss('online','Conectado');
+    if(huboTimeout)ss('error','Conectado con datos incompletos — tocá para reintentar');
+    else ss('online','Conectado');
     uES();
-  }catch(e){ss('error','Sin conexion');console.error(e)}
+  }catch(e){if(myGen===initGen){ss('error','Sin conexión — tocá para reintentar');console.error(e);}}
+  if(myGen!==initGen)return;
   // Popular selector SIEMPRE después del try/catch
   poblarPlanWsel();
   rG();rP();
 }
+function reintentarConexion(){init();}
 
 async function crearNuevaSemana(){
   // Encontrar la semana más reciente en st.Sem y crear la siguiente
@@ -14133,6 +14158,19 @@ function togglePlanillaInfo(slug){
   const el=document.getElementById('pi-'+slug);
   if(el)el.style.display=el.style.display==='none'?'block':'none';
 }
+
+// v4.216: acá estaba el verdadero problema de fondo detrás de "me queda en conectando... y no me baja
+// la info" -- buscando en todo el archivo, init() NUNCA se llamaba solo al abrir la página. Sólo se
+// dispara como efecto secundario de entrar a otras pestañas (Stock, Informes, Configuración, etc.
+// todas tienen su propio "if(!st.E.length)await init()"), pero la pestaña que se ve de entrada,
+// Producción > Planificación, no tiene ese chequeo -- así que si alguien abre el link y se queda
+// justo ahí sin tocar ninguna otra pestaña primero, la grilla se queda vacía para siempre y el
+// indicador nunca sale de "Conectando...". Probablemente pasaba desapercibido porque el uso habitual
+// (tocar el botón de recargar semana, o pasar primero por Stock/Configuración) terminaba disparando
+// alguno de esos otros init() como efecto colateral. Esta línea llama a init() SIEMPRE al cargar la
+// página, sin depender de qué pestaña se mire primero -- es seguro llamarlo aunque algún otro camino
+// también lo dispare (initGen, más arriba, hace que sólo el llamado más nuevo pueda escribir en st).
+init();
 </script>
 </body>
 </html>
