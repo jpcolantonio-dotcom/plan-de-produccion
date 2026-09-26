@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.217</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.218</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1305,6 +1305,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <span style="font-size:13px;color:var(--text2)">Familia de empresas &rarr; familia de areas por empresa &rarr; productos que se elaboran en cada area (con su ID vinculado).</span>
       <div class="btns" style="margin-left:auto">
         <button class="btn btn-sm" id="btnSyncIds" onclick="sincronizarIdsDesdePlan()" title="Recorre el plan de la semana actual y, para cada producto que el plan ya identifica con un código, confirma ese vínculo acá en Configuración."><i class="ti ti-refresh"></i> Sincronizar IDs desde el plan</button>
+        <button class="btn btn-sm" id="btnSyncNombres" onclick="limpiarNombresProductos()" title="Para todo producto con código (vinculado o resoluble por Configuración), corrige su nombre para que coincida exacto con ID/Descripción — el Alias, si tiene, ya se muestra solo en todos lados."><i class="ti ti-wand"></i> Sincronizar nombres desde Configuración</button>
         <button class="btn btn-sm" onclick="exportarMaestroExcel()"><i class="ti ti-file-spreadsheet"></i> Exportar Excel</button>
         <button class="btn btn-sm" onclick="toggleMapeoJoselito()"><i class="ti ti-link"></i> Mapeo Joselito</button>
       </div>
@@ -3906,8 +3907,10 @@ function rProdDetail(aid){
   } else {
     h+=`<div style="padding:1.25rem;text-align:center;font-size:13px;color:var(--text2);border:.5px solid var(--border);border-radius:var(--radius-lg);margin-bottom:1rem">Sin productos aun.</div>`;
   }
-  h+=`<div class="add-bar">
+  h+=`<div class="add-bar" style="flex-wrap:wrap;row-gap:4px">
+    <input type="text" id="npcod" inputmode="numeric" placeholder="ID..." title="Código de Configuración > ID/Descripción/Depósito. Si lo tipeás, el nombre y el alias se buscan solos." style="width:90px;font-family:monospace" oninput="npAutoFill()" onchange="npAutoFill()"/>
     <input type="text" id="npnom" placeholder="Nombre del producto" class="wide"/>
+    <span id="npmpinfo" style="font-size:11px;color:var(--text2);white-space:nowrap"></span>
     <input type="text" id="npunit" placeholder="Unidad" list="npudl" style="width:110px"/>
     <datalist id="npudl">${UNITS.map(u=>`<option>${u}</option>`).join('')}</datalist>
     <button class="btn btn-primary" onclick="addProd('${aid}','${area.empresa_id}')"><i class="ti ti-plus"></i> Agregar producto</button>
@@ -4174,10 +4177,46 @@ async function delArea(id){
   try{await del('areas',id);st.A=st.A.filter(a=>a.id!==id);st.Pr=st.Pr.filter(p=>p.area_id!==id);if(st.aaid===id){st.aaid=null;document.getElementById('proddetail').innerHTML='<div style="padding:2rem;text-align:center;font-size:13px;color:var(--text2)">Selecciona un area</div>';}rAreaList(st.aeid);rMae();ss('online','Eliminado');}
   catch(e){alert('Error: '+e.message)}
 }
+// v4.218: "cuando le tengo que agregar un producto, pueda poner el numero de ID, y que me lo busque en
+// ID/descripcion la descripcion y el alias" -- al tipear un ID en el campo nuevo #npcod (arriba de
+// "Agregar producto"), busca ese código en Configuración > ID/Descripción/Depósito y precarga el
+// nombre del producto (#npnom) con la descripción real, mostrando el alias (si tiene) como confirmación
+// en #npmpinfo -- el nombre sigue siendo editable por si se quiere ajustar antes de guardar. El ID es
+// opcional: si se deja vacío, "Agregar producto" funciona exactamente igual que antes (nombre a mano,
+// sin vincular).
+function npAutoFill(){
+  const cod=(document.getElementById('npcod')?.value||'').trim();
+  const info=document.getElementById('npmpinfo');
+  const nomEl=document.getElementById('npnom');
+  if(!info)return;
+  if(!cod){info.textContent='';return}
+  const m=mpData.find(x=>(x.codigo||'').toString().trim()===cod);
+  if(!m){info.textContent='No encontré ese ID en Configuración';info.style.color='var(--red,#c0392b)';return}
+  if(nomEl)nomEl.value=m.nombre;
+  info.textContent=m.alias?`✓ ${m.nombre}${m.alias?' · alias: '+m.alias:''}`:`✓ ${m.nombre} (sin alias)`;
+  info.style.color='var(--green,#1d9e75)';
+}
 async function addProd(aid,eid){
+  const cod=(document.getElementById('npcod')?.value||'').trim();
   const nom=document.getElementById('npnom').value.trim();const unit=document.getElementById('npunit').value.trim()||'unidades';
-  if(!nom)return;ss('saving','Guardando...');
-  try{const r=await ins('productos',{empresa_id:eid,area_id:aid,nombre:nom,unidad:unit});st.Pr.push(r[0]);document.getElementById('npnom').value='';rProdDetail(aid);rMae();onArea();ss('online','Guardado');fl('maemsg');}
+  if(!nom)return;
+  let mpId=null;
+  if(cod){
+    const m=mpData.find(x=>(x.codigo||'').toString().trim()===cod);
+    if(!m){ss('error',`No encontré en Configuración ningún producto con el código "${cod}". Corregilo o dejá el ID vacío para cargarlo sin vincular.`);return}
+    mpId=m.id;
+  }
+  ss('saving','Guardando...');
+  try{
+    const body={empresa_id:eid,area_id:aid,nombre:nom,unidad:unit};
+    if(mpId)body.mp_id=mpId;
+    const r=await ins('productos',body);
+    st.Pr.push(r[0]);
+    document.getElementById('npnom').value='';
+    const codEl=document.getElementById('npcod');if(codEl)codEl.value='';
+    const info=document.getElementById('npmpinfo');if(info)info.textContent='';
+    rProdDetail(aid);rMae();onArea();ss('online','Guardado');fl('maemsg');
+  }
   catch(e){ss('error','Error');document.getElementById('maeErrtxt').textContent=e.message;fl('maeerr')}
 }
 async function updP(id,f,v){
@@ -4272,16 +4311,15 @@ async function propagarCambioNombreArea(empresa_id,nombreViejo,nombreNuevo){
   }catch{}
 }
 
+// Tablas (aparte de "productos", "planes" y las recetas en memoria) que guardan el nombre del
+// producto como texto suelto y necesitan actualizarse cuando ese nombre cambia. Compartida entre
+// propagarCambioNombreProducto (un renombre puntual) y limpiarNombresProductos (v4.218, limpieza
+// masiva) para que ambas toquen exactamente las mismas tablas.
+const PRODUCTO_TABLAS_TEXTO=['proyeccion_diaria','mix_ventas','stock_seguridad','ventas_mensuales','cajas_producto'];
 async function propagarCambioNombreProducto(empresa_id, nombreViejo, nombreNuevo, area_id){
   const area=st.A.find(a=>a.id===area_id)?.nombre||'';
   ss('saving',`Actualizando nombre en tablas...`);
-  const tablas=[
-    'proyeccion_diaria',
-    'mix_ventas',
-    'stock_seguridad',
-    'ventas_mensuales',
-    'cajas_producto',
-  ];
+  const tablas=PRODUCTO_TABLAS_TEXTO;
   let actualizadas=0;
   for(const tabla of tablas){
     try{
@@ -4337,6 +4375,115 @@ async function propagarCambioNombreProducto(empresa_id, nombreViejo, nombreNuevo
   try{ if(typeof renderReal==='function')renderReal(); }catch{}
   ss('online',`Nombre propagado a ${actualizadas} tablas ✓`);
 }
+
+// v4.218: "necesito que hagas una limpieza y que todo lo que este con codigo quede con codigo y su
+// nombre que esta en ID/Descripcion. y si tiene el alias que lo pongas" -- botón "Sincronizar nombres
+// desde Configuración" en Configuración > Producción > 3. Productos. Para cada producto: resuelve su
+// fila de Configuración > ID/Descripción/Depósito con el MISMO criterio que ya usa el resto de la app
+// (mp_id si ya está formalmente vinculado, si no codigo_articulo, si no coincidencia exacta de nombre —
+// igual que mpParaProducto/codigoParaProducto), confirma el vínculo (mp_id) si todavía no estaba
+// formal, y corrige productos.nombre para que coincida EXACTO con esa descripción de Configuración.
+// Una vez el nombre coincide y mp_id queda vinculado, el Alias (si Configuración tiene uno cargado
+// para ese código) ya aparece solo en todos lados -- Planificación, Producción Real, esta misma
+// pantalla, Recetas -- vía nombreVisibleProducto/mpParaProducto, que siempre prefieren el alias de
+// Configuración por sobre el nombre "crudo"; no hace falta guardar el alias en ningún otro lado.
+// No toca productos sin ningún código resoluble en Configuración -- esos quedan igual que antes.
+//
+// Implementado como función masiva propia (no como un loop de updP/propagarCambioNombreProducto por
+// producto) porque esa cascada hace un fetch COMPLETO de "planes" por cada renombre individual -- con
+// ~230 productos y potencialmente decenas de nombres para corregir de una sola pasada, eso serían
+// decenas de fetches completos de la misma tabla. Acá "planes" se trae UNA sola vez, todos los
+// renombres se aplican juntos sobre esa copia en memoria, y se guarda un PATCH por plan realmente
+// modificado (no uno por producto renombrado). Es re-ejecutable sin riesgo: un producto que ya está
+// bien vinculado y bien nombrado no vuelve a aparecer en la lista de cambios la próxima vez.
+async function limpiarNombresProductos(){
+  const cambios=[]; // {prod, mp, nombreViejo, nombreNuevo, necesitaVinculo, necesitaRenombre}
+  st.Pr.forEach(p=>{
+    let mp=null;
+    if(p.mp_id)mp=mpData.find(m=>m.id===p.mp_id);
+    if(!mp&&p.codigo_articulo)mp=mpData.find(m=>m.codigo===p.codigo_articulo);
+    if(!mp)mp=mpData.find(m=>normTxt(m.nombre)===normTxt(p.nombre));
+    if(!mp)return; // sin ningún código resoluble en Configuración -- no hay nada para sincronizar
+    const necesitaVinculo=p.mp_id!==mp.id;
+    const necesitaRenombre=p.nombre!==mp.nombre;
+    if(necesitaVinculo||necesitaRenombre)cambios.push({prod:p,mp,nombreViejo:p.nombre,nombreNuevo:mp.nombre,necesitaVinculo,necesitaRenombre});
+  });
+  if(!cambios.length){ss('online','Ya estaba todo sincronizado — ningún producto con código para corregir.');return}
+  const renombres=cambios.filter(c=>c.necesitaRenombre);
+  const soloVinculo=cambios.filter(c=>c.necesitaVinculo&&!c.necesitaRenombre).length;
+  const preview=renombres.slice(0,8).map(c=>`"${c.nombreViejo}" → "${c.nombreNuevo}"`).join('\n')+(renombres.length>8?`\n...y ${renombres.length-8} más`:'');
+  const msg=`Se van a corregir ${cambios.length} producto${cambios.length!==1?'s':''}: ${renombres.length} cambio${renombres.length!==1?'s':''} de nombre`+(soloVinculo?` y ${soloVinculo} vínculo${soloVinculo!==1?'s':''} de código a confirmar (mismo nombre, todavía sin mp_id formal)`:'')+`.`+(renombres.length?`\n\nNombres que van a cambiar:\n${preview}`:'')+`\n\nLos cambios de nombre se propagan solos a Planificación, Producción Real (semanas ya guardadas), Recetas y demás tablas que usan ese nombre como texto. ¿Confirmás?`;
+  if(!confirm(msg))return;
+  const btn=document.getElementById('btnSyncNombres');
+  const btnHtmlOrig=btn?btn.innerHTML:'';
+  if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Sincronizando...';}
+  ss('saving',`Sincronizando ${cambios.length} producto${cambios.length!==1?'s':''}...`);
+  try{
+    // 1) productos: vínculo + nombre, una fila por producto (no hay forma de evitar esto)
+    for(const c of cambios){
+      const body={};
+      if(c.necesitaVinculo)body.mp_id=c.mp.id;
+      if(c.necesitaRenombre)body.nombre=c.nombreNuevo;
+      const res=await fetch(`${SB}/rest/v1/productos?id=eq.${c.prod.id}`,{method:'PATCH',headers:{...H,'Prefer':'return=representation'},body:JSON.stringify(body)});
+      if(res.ok){const rows=await res.json();if(rows.length)Object.assign(c.prod,rows[0]);}
+    }
+    // 2) tablas de texto simples -- un PATCH por producto renombrado y por tabla
+    for(const c of renombres){
+      for(const tabla of PRODUCTO_TABLAS_TEXTO){
+        try{
+          const filtro=`producto=eq.${encodeURIComponent(c.nombreViejo)}&empresa_id=eq.${c.prod.empresa_id}`;
+          await fetch(`${SB}/rest/v1/${tabla}?${filtro}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({producto:c.nombreNuevo})});
+        }catch{}
+      }
+    }
+    // 3) planes: UN solo fetch de toda la tabla, todos los renombres aplicados juntos, un PATCH por
+    // plan realmente modificado (no por producto renombrado)
+    if(renombres.length){
+      const mapa=new Map(renombres.map(c=>[c.prod.empresa_id+'||'+c.nombreViejo,c.nombreNuevo]));
+      const planesData=await get('planes','select=id,semana,filas');
+      for(const plan of planesData){
+        if(!plan.filas)continue;
+        let modificado=false;
+        const filas=plan.filas.map(f=>{
+          const nuevo=mapa.get(f.empresa_id+'||'+f.producto);
+          if(nuevo){modificado=true;return{...f,producto:nuevo};}
+          return f;
+        });
+        if(modificado){
+          await fetch(`${SB}/rest/v1/planes?id=eq.${plan.id}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({filas})});
+          st.P[plan.semana]=filas;
+          if(st.Ed[plan.semana]){
+            st.Ed[plan.semana]=st.Ed[plan.semana].map(f=>{
+              const nuevo=mapa.get(f.empresa_id+'||'+f.producto);
+              return nuevo?{...f,producto:nuevo}:f;
+            });
+          }
+        }
+      }
+      // 4) recetas en memoria
+      renombres.forEach(c=>{
+        if(st.Rec[c.nombreViejo]!==undefined){
+          st.Rec[c.nombreNuevo]=st.Rec[c.nombreViejo];
+          delete st.Rec[c.nombreViejo];
+        }
+        if(st.RecTanda&&st.RecTanda[c.nombreViejo]!==undefined){
+          st.RecTanda[c.nombreNuevo]=st.RecTanda[c.nombreViejo];
+          delete st.RecTanda[c.nombreViejo];
+        }
+      });
+    }
+    if(st.aaid)rProdDetail(st.aaid);
+    rMae();
+    try{if(typeof rG==='function')rG();}catch{}
+    try{if(typeof renderReal==='function')renderReal();}catch{}
+    ss('online',`Listo: ${renombres.length} nombre${renombres.length!==1?'s':''} corregido${renombres.length!==1?'s':''}, ${cambios.filter(c=>c.necesitaVinculo).length} vínculo${cambios.filter(c=>c.necesitaVinculo).length!==1?'s':''} confirmado${cambios.filter(c=>c.necesitaVinculo).length!==1?'s':''} ✓`);
+  }catch(e){
+    ss('error','Error durante la limpieza');
+    alert('Hubo un error a mitad de camino: '+e.message+'\n\nLos productos que ya se alcanzaron a corregir quedan bien (no se deshacen) -- volvé a apretar el botón para retomar donde quedó, los que ya están bien no se vuelven a tocar.');
+  }
+  if(btn){btn.disabled=false;btn.innerHTML=btnHtmlOrig||'<i class="ti ti-refresh"></i> Sincronizar nombres desde Configuración';}
+}
+
 async function delProd(id){
   if(!confirm('Eliminar producto?'))return;
   try{await del('productos',id);st.Pr=st.Pr.filter(p=>p.id!==id);rProdDetail(st.aaid);rMae();ss('online','Eliminado');}
