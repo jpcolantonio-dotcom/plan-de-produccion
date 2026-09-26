@@ -9,6 +9,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -251,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.216</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.217</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -4345,7 +4346,17 @@ async function delProd(id){
 // RECETAS
 let arec=null;
 let recImportWarn=new Set(); // productos importados con datos a revisar (cantidad no numerica, tanda no detectada)
-function gprod(){const all=new Set();st.Pr.forEach(p=>all.add(p.nombre));Object.keys(st.Rec).forEach(p=>all.add(p));return[...all].sort()}
+// v4.217: a pedido ("solo deja las recetas que estan en configuracion - produccion - empresas - areas,
+// que solo puedan estar esas recetas, lo otro no me importa por el momento") -- antes esta lista era
+// la UNION de los productos configurados en Maestro > Producción (st.Pr) MÁS cualquier receta que se
+// hubiera guardado alguna vez bajo cualquier nombre (Object.keys(st.Rec)), aunque ese nombre nunca se
+// hubiera convertido en un producto real de Producción -- por eso aparecían entradas sueltas como
+// "RELLENO A", "RELLENO BG", etc. marcadas "sin maestro". Ahora la lista de Recetas es EXACTAMENTE
+// la de Maestro > Producción (que ya está scopeada por Empresa y Área en Configuración) y nada más.
+// Ojo: esto NO borra ninguna receta vieja -- los datos siguen en la base (recetas.datos); si en algún
+// momento se crea un producto en Producción con ese nombre exacto, la receta guardada va a reaparecer
+// sola acá.
+function gprod(){const all=new Set();st.Pr.forEach(p=>all.add(p.nombre));return[...all].sort()}
 function rRec(){
   const ps=gprod();const list=document.getElementById('rplist');
   if(!ps.length){list.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Agrega productos en Maestro.</div>';return}
