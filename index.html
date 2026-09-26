@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.218</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.220</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -810,26 +810,24 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   </div>
   <!-- CONTEO DE STOCK -->
   <div id="stock-sub-conteo">
-    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Ingresa el stock actual en camara contado fisicamente.</div>
-    <div style="display:flex;gap:6px;align-items:center;margin-bottom:1rem;flex-wrap:wrap;border-bottom:.5px solid var(--border);padding-bottom:2px">
-      <button class="proy-tab active" id="sctab-terminado" onclick="showStockConteoTipo('terminado')"><i class="ti ti-package"></i> Producto Terminado</button>
-      <button class="proy-tab" id="sctab-proceso" onclick="showStockConteoTipo('proceso')"><i class="ti ti-flask"></i> Producto en Proceso</button>
-      <button class="proy-tab" id="sctab-mp" onclick="showStockConteoTipo('mp')"><i class="ti ti-wheat"></i> Materias Primas</button>
-    </div>
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Elegí un depósito (mismo listado que se imprime en "Impresión": código, nombre y cantidad) y completá el stock contado físicamente ahí. El número junto a cada depósito muestra cuántos productos ya tienen cantidad cargada hoy.</div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
       <label style="font-size:13px;color:var(--text2)">Fecha:</label>
       <input type="date" id="stock-conteo-fecha" onchange="loadStockConteo()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
       <button class="btn btn-sm" onclick="loadStockConteo()"><i class="ti ti-refresh"></i> Actualizar</button>
+      <button class="btn btn-sm" onclick="mostrarResumenConteo()" style="margin-left:auto"><i class="ti ti-clipboard-list"></i> Resumen de todos los depósitos</button>
+    </div>
+    <div id="stock-conteo-dep-grid" style="margin-bottom:1rem"></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:.75rem;flex-wrap:wrap">
       <input type="text" id="mp-conteo-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="filtrarMpConteo()"
         style="flex:1;min-width:200px;max-width:320px;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
     </div>
-    <div id="stock-conteo-emp-tabs" style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:0;flex-wrap:wrap"></div>
     <div id="stock-conteo-content"></div>
     <div style="display:flex;justify-content:space-between;margin-top:1rem;flex-wrap:wrap;gap:8px">
       <div style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px"><i class="ti ti-info-circle"></i> Podes guardar varias veces durante el dia. Los valores se actualizan sin borrar el resto.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn" onclick="exportarTerminadoPlanetaExcel()"><i class="ti ti-file-spreadsheet"></i> Exportar Excel (migración Planeta)</button>
-        <button class="btn btn-primary" onclick="guardarStockConteo()"><i class="ti ti-device-floppy"></i> Guardar conteo</button>
+        <button class="btn btn-primary" id="btnGuardarConteo" onclick="guardarStockConteo()" style="display:none"><i class="ti ti-device-floppy"></i> Guardar conteo</button>
       </div>
     </div>
   </div>
@@ -1306,6 +1304,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <div class="btns" style="margin-left:auto">
         <button class="btn btn-sm" id="btnSyncIds" onclick="sincronizarIdsDesdePlan()" title="Recorre el plan de la semana actual y, para cada producto que el plan ya identifica con un código, confirma ese vínculo acá en Configuración."><i class="ti ti-refresh"></i> Sincronizar IDs desde el plan</button>
         <button class="btn btn-sm" id="btnSyncNombres" onclick="limpiarNombresProductos()" title="Para todo producto con código (vinculado o resoluble por Configuración), corrige su nombre para que coincida exacto con ID/Descripción — el Alias, si tiene, ya se muestra solo en todos lados."><i class="ti ti-wand"></i> Sincronizar nombres desde Configuración</button>
+        <button class="btn btn-sm" id="btnDetectarDuplicados" onclick="mostrarDuplicadosProductos()" title="Busca productos de Maestro > Producción vinculados al mismo código de Configuración (aparecen repetidos en Planificación) y permite fusionarlos en uno solo."><i class="ti ti-git-merge"></i> Detectar duplicados</button>
         <button class="btn btn-sm" onclick="exportarMaestroExcel()"><i class="ti ti-file-spreadsheet"></i> Exportar Excel</button>
         <button class="btn btn-sm" onclick="toggleMapeoJoselito()"><i class="ti ti-link"></i> Mapeo Joselito</button>
       </div>
@@ -4482,6 +4481,162 @@ async function limpiarNombresProductos(){
     alert('Hubo un error a mitad de camino: '+e.message+'\n\nLos productos que ya se alcanzaron a corregir quedan bien (no se deshacen) -- volvé a apretar el botón para retomar donde quedó, los que ya están bien no se vuelven a tocar.');
   }
   if(btn){btn.disabled=false;btn.innerHTML=btnHtmlOrig||'<i class="ti ti-refresh"></i> Sincronizar nombres desde Configuración';}
+}
+
+// v4.220: "porque me genero repitisiones de productos, si no se lo pedi, neciesto que cada plan solo
+// aparezcas los que estan en configurancion" -- el reporte era sobre productos que se VEN repetidos en
+// Planificación. La causa real (confirmada contra los datos de producción, no es algo que haya roto una
+// entrega reciente -- son vínculos de datos preexistentes): más de un producto de Maestro > Producción,
+// dentro de la MISMA área, quedó vinculado (mp_id) al MISMO renglón de Configuración > ID/Descripción.
+// Como nombreVisibleProducto/mpParaProducto siempre muestran el Alias de Configuración cuando existe,
+// esos productos "distintos" en la base terminan viéndose IDÉNTICOS en Planificación -- de ahí la
+// sensación de que "se generaron repeticiones". Estas funciones detectan esos grupos y permiten
+// fusionarlos en un solo producto (se elige cuál nombre queda, el resto se elimina y su historial en
+// Planificación/Producción Real/Recetas/tablas de texto se reasigna al que queda) -- mismo patrón
+// "batcheado" de limpiarNombresProductos: un solo fetch de "planes" para todos los grupos juntos.
+function detectarProductosDuplicados(){
+  const grupos=new Map(); // key: empresa_id||area_id||mp_id -> [productos]
+  st.Pr.forEach(p=>{
+    if(!p.mp_id)return; // solo interesa cuando hay vínculo FORMAL a Configuración
+    const key=p.empresa_id+'||'+p.area_id+'||'+p.mp_id;
+    if(!grupos.has(key))grupos.set(key,[]);
+    grupos.get(key).push(p);
+  });
+  return [...grupos.values()].filter(g=>g.length>1).map(g=>({
+    mp:mpData.find(m=>m.id===g[0].mp_id),
+    productos:g.slice().sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'))
+  })).filter(g=>g.mp);
+}
+
+function mostrarDuplicadosProductos(){
+  const grupos=detectarProductosDuplicados();
+  if(!grupos.length){ss('online','No se encontraron productos duplicados (varios productos vinculados al mismo código de Configuración).');return}
+  const en2=eid=>{const e=st.E.find(x=>x.id===eid);return e?e.nombre:''};
+  const ar2=aid=>{const a=st.A.find(x=>x.id===aid);return a?a.nombre:''};
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay';overlay.id='duplicados-modal';
+  const gruposHtml=grupos.map((g,gi)=>{
+    const hayCoincideMp=g.productos.some(p=>p.nombre===g.mp.nombre);
+    const opciones=g.productos.map((p,pi)=>{
+      const checked=(p.nombre===g.mp.nombre)||(!hayCoincideMp&&pi===0);
+      return `<label style="display:flex;align-items:center;gap:8px;padding:6px 4px;cursor:pointer">
+        <input type="radio" name="dupgrupo-${gi}" value="${p.id}" ${checked?'checked':''}/>
+        <span style="font-weight:500">${p.nombre}</span>
+      </label>`;
+    }).join('');
+    return `<div style="border:.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:8px"><i class="ti ti-link"></i> ${en2(g.productos[0].empresa_id)} / ${ar2(g.productos[0].area_id)} — vinculados al mismo código <span style="font-family:monospace;color:var(--blue)">${g.mp.codigo||''}</span> (${g.mp.nombre})</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:4px">Elegí qué nombre queda (el resto se elimina y su historial pasa al que elijas):</div>
+      ${opciones}
+    </div>`;
+  }).join('');
+  overlay.innerHTML=`<div class="modal" style="width:640px;max-width:95vw">
+    <div class="modal-title"><i class="ti ti-git-merge" style="color:var(--orange,#f59e0b)"></i> Productos duplicados</div>
+    <div class="modal-sub" style="margin-bottom:1rem">Se encontraron ${grupos.length} grupo${grupos.length!==1?'s':''} de productos vinculados al mismo código de Configuración -- por eso se ven repetidos en Planificación. Elegí qué nombre se conserva en cada caso.</div>
+    <div style="max-height:420px;overflow:auto">${gruposHtml}</div>
+    <div class="modal-btns" style="margin-top:1rem">
+      <button class="btn" onclick="document.getElementById('duplicados-modal').remove()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarFusionDuplicados()"><i class="ti ti-git-merge"></i> Fusionar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay._grupos=grupos; // referencia para leer las selecciones al confirmar
+}
+
+async function confirmarFusionDuplicados(){
+  const overlay=document.getElementById('duplicados-modal');
+  if(!overlay)return;
+  const grupos=overlay._grupos||[];
+  const selecciones=grupos.map((g,gi)=>{
+    const checked=overlay.querySelector(`input[name="dupgrupo-${gi}"]:checked`);
+    const survivorId=checked?checked.value:g.productos[0].id;
+    return {grupo:g,survivorId};
+  });
+  const resumen=selecciones.map(s=>{
+    const survivor=s.grupo.productos.find(p=>p.id===s.survivorId);
+    const perdedores=s.grupo.productos.filter(p=>p.id!==s.survivorId);
+    return `"${survivor.nombre}" (queda) — se elimina${perdedores.length>1?'n':''}: ${perdedores.map(p=>`"${p.nombre}"`).join(', ')}`;
+  }).join('\n');
+  if(!confirm(`Se van a fusionar ${selecciones.length} grupo${selecciones.length!==1?'s':''}:\n\n${resumen}\n\nEsto no se puede deshacer. ¿Confirmás?`))return;
+  overlay.remove();
+  await fusionarProductosDuplicados(selecciones);
+}
+
+async function fusionarProductosDuplicados(selecciones){
+  ss('saving','Fusionando productos duplicados...');
+  try{
+    const renombres=[]; // {empresa_id,nombreViejo,nombreNuevo}
+    const perdedoresPorGrupo=[]; // {survivor,perdedores}
+    selecciones.forEach(({grupo,survivorId})=>{
+      const survivor=grupo.productos.find(p=>p.id===survivorId);
+      const perdedores=grupo.productos.filter(p=>p.id!==survivorId);
+      perdedoresPorGrupo.push({survivor,perdedores});
+      perdedores.forEach(p=>{
+        if(p.nombre!==survivor.nombre)renombres.push({empresa_id:p.empresa_id,nombreViejo:p.nombre,nombreNuevo:survivor.nombre});
+      });
+    });
+    // 1) tablas de texto simples -- un PATCH por renombre y por tabla
+    for(const r of renombres){
+      for(const tabla of PRODUCTO_TABLAS_TEXTO){
+        try{
+          const filtro=`producto=eq.${encodeURIComponent(r.nombreViejo)}&empresa_id=eq.${r.empresa_id}`;
+          await fetch(`${SB}/rest/v1/${tabla}?${filtro}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({producto:r.nombreNuevo})});
+        }catch{}
+      }
+    }
+    // 2) planes: un solo fetch de toda la tabla, todos los renombres de todos los grupos aplicados juntos
+    if(renombres.length){
+      const mapa=new Map(renombres.map(r=>[r.empresa_id+'||'+r.nombreViejo,r.nombreNuevo]));
+      const planesData=await get('planes','select=id,semana,filas');
+      for(const plan of planesData){
+        if(!plan.filas)continue;
+        let modificado=false;
+        const filas=plan.filas.map(f=>{
+          const nuevo=mapa.get(f.empresa_id+'||'+f.producto);
+          if(nuevo){modificado=true;return{...f,producto:nuevo};}
+          return f;
+        });
+        if(modificado){
+          await fetch(`${SB}/rest/v1/planes?id=eq.${plan.id}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({filas})});
+          st.P[plan.semana]=filas;
+          if(st.Ed[plan.semana]){
+            st.Ed[plan.semana]=st.Ed[plan.semana].map(f=>{
+              const nuevo=mapa.get(f.empresa_id+'||'+f.producto);
+              return nuevo?{...f,producto:nuevo}:f;
+            });
+          }
+        }
+      }
+    }
+    // 3) recetas en memoria: si el sobreviviente no tiene receta propia pero el perdedor sí, se migra;
+    // si el sobreviviente ya tiene, se respeta la suya y se descarta la del perdedor.
+    perdedoresPorGrupo.forEach(({survivor,perdedores})=>{
+      perdedores.forEach(p=>{
+        if(st.Rec[survivor.nombre]===undefined&&st.Rec[p.nombre]!==undefined)st.Rec[survivor.nombre]=st.Rec[p.nombre];
+        delete st.Rec[p.nombre];
+        if(st.RecTanda){
+          if(st.RecTanda[survivor.nombre]===undefined&&st.RecTanda[p.nombre]!==undefined)st.RecTanda[survivor.nombre]=st.RecTanda[p.nombre];
+          delete st.RecTanda[p.nombre];
+        }
+      });
+    });
+    // 4) eliminar los productos perdedores (no hay ninguna otra tabla con FK a productos.id -- todo lo
+    // demás los referencia por nombre de texto, ya reasignado arriba)
+    let eliminados=0;
+    for(const {perdedores} of perdedoresPorGrupo){
+      for(const p of perdedores){
+        try{await del('productos',p.id);st.Pr=st.Pr.filter(x=>x.id!==p.id);eliminados++;}catch{}
+      }
+    }
+    if(st.aaid)rProdDetail(st.aaid);
+    rMae();
+    try{if(typeof rG==='function')rG();}catch{}
+    try{if(typeof renderReal==='function')renderReal();}catch{}
+    ss('online',`Listo: ${eliminados} producto${eliminados!==1?'s':''} duplicado${eliminados!==1?'s':''} fusionado${eliminados!==1?'s':''} ✓`);
+  }catch(e){
+    ss('error','Error durante la fusión');
+    alert('Hubo un error a mitad de camino: '+e.message+'\n\nAlgunos cambios pueden haberse aplicado ya -- volvé a apretar "Detectar duplicados" para ver qué queda pendiente.');
+  }
 }
 
 async function delProd(id){
@@ -7741,12 +7896,32 @@ async function guardarCajas(){
 let stockSeg=[];
 let stockConteoDepositos=[]; // listado de depósitos (Maestro), para el selector al lado de cada producto en Conteo de stock
 let stockConteoDepositosCargado=false;
-// Renglones extra por producto cuando el mismo item tiene stock repartido en más de un depósito
-// (ej. parte en Camara 6, parte en otro depósito). mpId -> [{slotId, depositoId, dbId}]. El renglón
-// "principal" de cada producto sigue siendo el de siempre (depósito fijo del artículo en
-// materias_primas); estos son renglones adicionales, cada uno con su propia fila en mp_conteo
-// (columna deposito_id) y su propio valor de stock.
-let stockConteoExtra={};
+// v4.219: "necesito que la pestaña de conteo cambie... sea igual a las hojas de impresion en
+// impresion, de esta seria ir a conteo de stock, donde vas a tener el mismo listado de lo que se
+// imprime y te parece una ventana para completar los stock y poder guardarlos, despues voy a
+// necesitar un resumen de ese conteo de todos los deposito, pero que tenga el ID, la descripcion
+// del productos, y que la descricpion este por orden alfabetico, y depsues se pueda imprimir" --
+// Conteo de stock deja de agruparse por tipo (Terminado/Proceso/MP) + empresa/área y pasa a
+// agruparse por DEPÓSITO, con exactamente el mismo listado que ya arma "Impresión" (código, nombre,
+// alfabético) para cada depósito — la diferencia es que acá la columna de cantidad es un input
+// editable con "Guardar conteo", no una hoja para imprimir en blanco. La asignación de depósito de
+// cada artículo (antes editable con un <select> acá mismo, que escribía en materias_primas.deposito_id)
+// se deja de mostrar en esta pantalla: ese mismo trabajo ya se hace, mejor, desde Configuración >
+// ID/Descripción/Depósito (agregarMpDeposito/quitarMpDeposito, tabla mp_depositos), que además permite
+// varios depósitos por artículo — acá alcanza con leerlo. "otro depósito" (el renglón manual que
+// dejaba cargar el mismo item en un segundo depósito) ya no hace falta como botón aparte: en cuanto
+// un artículo está asignado a más de un depósito en Configuración (mp_depositos), aparece solo en la
+// lista de cada uno de esos depósitos acá.
+// Cada renglón se guarda en mp_conteo con la MISMA convención que ya usaba la app (sin cambiar el
+// esquema): si el depósito que se está cargando es el depósito PRINCIPAL del artículo
+// (materias_primas.deposito_id), se guarda con deposito_id=null (el renglón "principal", uno por
+// fecha+mp_id); si el artículo llegó a la lista de este depósito por una asignación secundaria
+// (mp_depositos), se guarda con deposito_id=<este depósito> (puede haber varios renglones por
+// fecha+mp_id, uno por depósito). Todo lo que ya suma stock entre depósitos (Consumo MP según stock,
+// la exportación a Excel de migración) sigue funcionando igual, porque sigue sumando TODOS los
+// renglones de mp_conteo de un mp_id sin importar su deposito_id.
+let stockConteoDepSel=null; // depósito elegido para cargar en este momento (o '_sindep'); null = ninguno
+let resumenConteoUltimo=[]; // último resumen calculado (para poder imprimirlo sin volver a pedirlo)
 
 // ── CONTEO DE STOCK (dentro de la pestaña Stock) ─────────────────
 async function loadStockConteo(){
@@ -7758,229 +7933,130 @@ async function loadStockConteo(){
     try{ stockConteoDepositos=await get('depositos','order=nombre.asc'); }catch{stockConteoDepositos=[]}
     stockConteoDepositosCargado=true;
   }
-  stockConteoExtra={};
-  mpConteoData.forEach(x=>{
-    if(!x.deposito_id)return;
-    if(!stockConteoExtra[x.mp_id])stockConteoExtra[x.mp_id]=[];
-    stockConteoExtra[x.mp_id].push({slotId:'db_'+x.id,depositoId:x.deposito_id,dbId:x.id});
-  });
+  if(!mpDepositosCargado){
+    try{ mpDepositosData=await get('mp_depositos','select=*'); }catch{mpDepositosData=[]}
+    mpDepositosCargado=true;
+  }
   stockConteoDraft={};
   renderStockConteo();
 }
 
-function showStockConteoTipo(t){
-  stockConteoTipo=t;
-  ['terminado','proceso','mp'].forEach(x=>{
-    const btn=document.getElementById(`sctab-${x}`);
-    if(btn)btn.classList.toggle('active',x===t);
-  });
-  const filtro=document.getElementById('mp-conteo-filtro');
-  if(filtro)filtro.value='';
+// Mismo criterio que productosDeDeposito() (Impresión), pero además: 1) filtra a lo que realmente se
+// puede cargar acá (con código y que no sea variante "por unidad" -- ver el comentario de más abajo),
+// y 2) es una red de seguridad para que un renglón ya guardado antes en este depósito puntual (ej. un
+// "otro depósito" cargado a mano antes de esta versión) nunca desaparezca de la vista aunque el
+// artículo ya no esté formalmente asignado a este depósito en Configuración. Cada entrada indica si
+// este depósito es el PRINCIPAL del artículo (esPrincipal) o uno secundario, para saber con qué
+// deposito_id leer/guardar su renglón de mp_conteo.
+function productosDeDepositoConteo(depositoId){
+  const ids=new Set();
+  mpData.forEach(m=>{ if(m.deposito_id===depositoId)ids.add(m.id); });
+  mpDepositosData.forEach(x=>{ if(x.deposito_id===depositoId)ids.add(x.mp_id); });
+  mpConteoData.forEach(x=>{ if(x.deposito_id===depositoId)ids.add(x.mp_id); });
+  return mpData.filter(m=>ids.has(m.id)&&m.codigo&&m.unidad_tipo!=='unidad')
+    .map(m=>({m,prod:prodPorMp(m),esPrincipal:m.deposito_id===depositoId}))
+    .sort((a,b)=>(a.prod?a.prod.nombre:(a.m.sigla||a.m.nombre)).localeCompare(b.prod?b.prod.nombre:(b.m.sigla||b.m.nombre),'es'));
+}
+// Materias primas/productos con código (contables) que todavía no están asignados a NINGÚN depósito
+// -- ni por el campo fijo materias_primas.deposito_id ni por mp_depositos. Para que puedan seguir
+// cargándose acá mientras se les asigna un depósito en Configuración > ID/Descripción/Depósito.
+function itemsSinDepositoConteo(){
+  const conDep=new Set();
+  mpDepositosData.forEach(x=>conDep.add(x.mp_id));
+  return mpData.filter(m=>m.codigo&&m.unidad_tipo!=='unidad'&&!m.deposito_id&&!conDep.has(m.id))
+    .map(m=>({m,prod:prodPorMp(m),esPrincipal:true}))
+    .sort((a,b)=>(a.prod?a.prod.nombre:(a.m.sigla||a.m.nombre)).localeCompare(b.prod?b.prod.nombre:(b.m.sigla||b.m.nombre),'es'));
+}
+function entriesDeConteo(depositoId){
+  return depositoId==='_sindep'?itemsSinDepositoConteo():productosDeDepositoConteo(depositoId);
+}
+
+function stockConteoSetDeposito(depositoId){
+  stockConteoDepSel=depositoId;
   renderStockConteo();
 }
 
-// Todo el conteo de stock (Producto Terminado / Producto en Proceso / Materias Primas) sale de la
-// misma lista con código (Maestro > Configuración), filtrada por el campo "tipo" de cada fila.
-// Producto Terminado y Producto en Proceso ademas se separan por empresa (y por area dentro de
-// cada empresa), igual que en Produccion > Real, usando el producto vinculado (mp_id) de cada item.
+// Botones por depósito (mismo agrupado por empresa que Impresión), con un contador "cargados/total"
+// para el día elegido -- así se ve de un vistazo qué depósitos ya se contaron hoy.
 function renderStockConteo(){
-  const el=document.getElementById('stock-conteo-content');
-  const empTabsEl=document.getElementById('stock-conteo-emp-tabs');
-  // Los items clasificados como variante "por unidad" (m.unidad_tipo==='unidad') no se cuentan en
-  // Stock > Conteo de stock — solo se conteoa la caja cerrada (o items sin esa clasificacion, que
-  // no tienen variante caja/unidad, ej. pastas, ravioles).
-  const rawItems=mpData.filter(m=>m.codigo&&tipoMpDe(m)===stockConteoTipo&&m.unidad_tipo!=='unidad');
-  // Se ordena por el nombre que se termina mostrando (el del producto vinculado si hay, sino la sigla, sino el de Configuración)
-  const nombreOrden=e=>e.prod?e.prod.nombre:(e.m.sigla||e.m.nombre);
-  const items=rawItems.map(m=>({m,prod:prodPorMp(m)})).sort((a,b)=>nombreOrden(a).localeCompare(nombreOrden(b),'es'));
-  const etiqueta={mp:'materias primas',terminado:'productos terminados',proceso:'productos en proceso'}[stockConteoTipo]||'items';
-  const colLbl={mp:'Materia Prima',terminado:'Producto',proceso:'Producto'}[stockConteoTipo]||'Item';
-
-  if(!items.length){
-    if(empTabsEl)empTabsEl.innerHTML='';
-    el.innerHTML=`<div class="empty"><i class="ti ti-package-off"></i>Sin ${etiqueta} con código asignado. Clasificalas en Configuración (columna "Tipo").</div>`;
+  const gridEl=document.getElementById('stock-conteo-dep-grid');
+  const contentEl=document.getElementById('stock-conteo-content');
+  const btnGuardar=document.getElementById('btnGuardarConteo');
+  if(!gridEl||!contentEl)return;
+  if(!stockConteoDepositos.length){
+    gridEl.innerHTML='<div class="empty"><i class="ti ti-building-warehouse"></i> No hay depósitos cargados. Agregalos en Stock &gt; Depositos.</div>';
+    contentEl.innerHTML='';
+    if(btnGuardar)btnGuardar.style.display='none';
     return;
   }
-
-  // Producto en Proceso y Materias Primas: por ahora lista plana en orden alfabetico, sin separar
-  // por empresa (mas adelante se va a agrupar por deposito). Solo Producto Terminado se separa
-  // por empresa/area.
-  if(stockConteoTipo==='mp'||stockConteoTipo==='proceso'){
-    if(empTabsEl)empTabsEl.innerHTML='';
-    el.innerHTML=tablaStockConteo(items,colLbl);
-    return;
-  }
-
-  // Producto Terminado: separar por empresa usando el producto vinculado de cada item
-  const bE={};
-  items.forEach(({m,prod})=>{
-    const eid=prod?(prod.empresa_id||'_'):'_sinvinc';
-    if(!bE[eid])bE[eid]=[];
-    bE[eid].push({m,prod});
-  });
-  const eids=Object.keys(bE).sort((a,b)=>(a==='_sinvinc')-(b==='_sinvinc'));
-  if(!stockConteoActiveEmp[stockConteoTipo]||!bE[stockConteoActiveEmp[stockConteoTipo]])stockConteoActiveEmp[stockConteoTipo]=eids[0];
-  const activeEmp=stockConteoActiveEmp[stockConteoTipo];
-
-  let tabsH='';
-  eids.forEach(eid=>{
-    const sinvinc=eid==='_sinvinc';
-    const clr=sinvinc?'#999':ec(eid);
-    const nm=sinvinc?'Sin vincular':(en(eid)||'SE');
-    const active=eid===activeEmp;
-    tabsH+=`<button class="proy-tab${active?' active':''}" onclick="stockConteoSetEmp('${eid}')" style="${active?'border-bottom:2px solid '+clr+';color:'+clr:''}"><span class="color-dot" style="background:${clr};display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>${nm}${sinvinc?` <span style="font-size:10px;opacity:.7">(${bE[eid].length})</span>`:''}</button>`;
-  });
-  if(empTabsEl)empTabsEl.innerHTML=tabsH;
-
-  renderStockConteoEmpresa(activeEmp,bE[activeEmp],colLbl);
-}
-
-function stockConteoSetEmp(eid){
-  stockConteoActiveEmp[stockConteoTipo]=eid;
-  renderStockConteo();
-}
-
-function stockConteoSetArea(eid,area){
-  stockConteoActiveArea[`${stockConteoTipo}|${eid}`]=area;
-  renderStockConteo();
-}
-
-function renderStockConteoEmpresa(eid,entries,colLbl){
-  const el=document.getElementById('stock-conteo-content');
-  if(!entries||!entries.length){
-    el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin items.</div>';
-    return;
-  }
-  if(eid==='_sinvinc'){
-    el.innerHTML=`<div class="alert alert-info" style="margin-bottom:1rem;font-size:12px"><i class="ti ti-link-off"></i> Estos items de Configuración todavía no están vinculados a un producto de Configuración &gt; Producción, por eso no se puede saber su empresa/área ni mostrar el nombre abreviado. Vinculalos ahí ("Vínculo MP").</div>`
-      +tablaStockConteo(entries,colLbl);
-    return;
-  }
-  const bA={};
-  entries.forEach(({m,prod})=>{
-    const a=prod&&st.A.find(x=>x.id===prod.area_id);
-    const area=a?a.nombre:'SA';
-    if(!bA[area])bA[area]=[];
-    bA[area].push({m,prod});
-  });
-  const areas=Object.keys(bA).sort((a,b)=>a.localeCompare(b,'es'));
-  const key=`${stockConteoTipo}|${eid}`;
-  if(!stockConteoActiveArea[key]||!bA[stockConteoActiveArea[key]])stockConteoActiveArea[key]=areas[0];
-  const activeArea=stockConteoActiveArea[key];
-
-  let h='';
-  if(areas.length>1){
-    h+=`<div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1rem;flex-wrap:wrap">`;
-    areas.forEach(area=>{
-      const isActive=area===activeArea;
-      h+=`<button class="proy-tab${isActive?' active':''}" onclick="stockConteoSetArea('${eid}','${area.replace(/'/g,"\\'")}')">${area}</button>`;
+  const cargados=(depositoId)=>entriesDeConteo(depositoId).filter(({m,esPrincipal})=>{
+    const row=esPrincipal?mpConteoData.find(x=>x.mp_id===m.id&&!x.deposito_id):mpConteoData.find(x=>x.mp_id===m.id&&x.deposito_id===depositoId);
+    return row&&row.stock>0;
+  }).length;
+  const botonesDeps=deps=>{
+    let h='<div style="display:flex;flex-wrap:wrap;gap:8px">';
+    deps.forEach(d=>{
+      const total=entriesDeConteo(d.id).length;
+      const n=cargados(d.id);
+      const active=d.id===stockConteoDepSel;
+      const completo=total>0&&n===total;
+      h+=`<button class="btn${active?' btn-primary':''}" onclick="stockConteoSetDeposito('${d.id}')">
+        <i class="ti ti-building-warehouse"></i> ${d.nombre}
+        <span style="opacity:.75;margin-left:4px">${n}/${total}</span>
+        ${completo?'<i class="ti ti-check" style="color:'+(active?'#fff':'var(--green)')+';margin-left:4px"></i>':''}
+      </button>`;
     });
-    h+=`</div>`;
-  }
-  h+=tablaStockConteo(bA[activeArea],colLbl);
-  el.innerHTML=h;
-}
-
-// entries: array de {m,prod} — m es la fila de Maestro>Configuración, prod es el producto del
-// Maestro vinculado (mp_id) si existe. El nombre que se muestra prioriza: 1) el nombre del
-// producto vinculado del Maestro (normalmente el mas corto/abreviado, ej. "BCA"), 2) la sigla
-// cargada desde el CSV de Iniciales (m.sigla) cuando todavia no hay producto vinculado, 3) el
-// nombre largo de Configuración como ultimo recurso. Siempre que se use 1) o 2), el nombre largo
-// original queda como referencia chica debajo.
-// Selector de depósito al lado de cada producto en Conteo de stock. Las opciones salen del
-// listado de Maestro (tabla "depositos", administrada en Stock > Depositos), filtradas por la
-// empresa del producto vinculado -- si el item no está vinculado a ningún producto (por lo tanto
-// no se sabe su empresa) se muestran todos los depósitos, con la empresa aclarada en cada opción.
-function depositoSelectHtml(m,prod){
-  const opciones=prod?stockConteoDepositos.filter(d=>d.empresa_id===prod.empresa_id):stockConteoDepositos;
-  if(!opciones.length){
-    return `<span style="font-size:11px;color:var(--text3)" title="Cargá depósitos en Stock &gt; Depositos${prod?` para ${en(prod.empresa_id)||''}`:''}">Sin depósitos</span>`;
-  }
-  const val=m.deposito_id||'';
-  let optsH='<option value="">— Sin depósito —</option>';
-  opciones.forEach(d=>{
-    const etiqueta=prod?d.nombre:`${d.nombre} (${en(d.empresa_id)||'?'})`;
-    optsH+=`<option value="${d.id}" ${val===d.id?'selected':''}>${etiqueta}</option>`;
+    return h+'</div>';
+  };
+  let h='';
+  st.E.forEach(e=>{
+    const deps=stockConteoDepositos.filter(d=>d.empresa_id===e.id);
+    if(!deps.length)return;
+    h+=`<div style="margin-bottom:1.2rem"><div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">${e.nombre}</div>${botonesDeps(deps)}</div>`;
   });
-  return `<select class="proy-input" style="font-size:12px;padding:4px 6px;width:100%;max-width:230px" onchange="setDepositoMp('${m.id}',this.value)">${optsH}</select>`
-    +`<div style="margin-top:4px"><button type="button" class="btn btn-xs" onclick="scAgregarDepositoExtra('${m.id}')" style="font-size:10.5px;padding:2px 6px"><i class="ti ti-plus"></i> Otro depósito</button></div>`;
-}
+  const sinEmp=stockConteoDepositos.filter(d=>!st.E.some(e=>e.id===d.empresa_id));
+  if(sinEmp.length){
+    h+=`<div style="margin-bottom:1.2rem"><div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Sin empresa</div>${botonesDeps(sinEmp)}</div>`;
+  }
+  const sinDep=itemsSinDepositoConteo();
+  if(sinDep.length){
+    const active=stockConteoDepSel==='_sindep';
+    const n=cargados('_sindep');
+    h+=`<div style="margin-top:.2rem"><button class="btn${active?' btn-primary':''}" onclick="stockConteoSetDeposito('_sindep')"><i class="ti ti-help-circle"></i> Sin depósito asignado <span style="opacity:.75;margin-left:4px">${n}/${sinDep.length}</span></button></div>`;
+  }
+  gridEl.innerHTML=h;
 
-// Agrega un renglón vacío (sin depósito todavía) debajo de un producto, para cargar stock de ese
-// mismo producto en un segundo depósito. Se guarda recién cuando se elige el depósito y se carga
-// un valor de stock (con "Guardar conteo"). Si se vuelve a poner "— Sin depósito —" el renglón se
-// borra (y si ya estaba guardado en mp_conteo, se borra también de la base).
-function scAgregarDepositoExtra(mpId){
-  if(!stockConteoExtra[mpId])stockConteoExtra[mpId]=[];
-  stockConteoExtra[mpId].push({slotId:'new_'+Date.now()+'_'+Math.random().toString(36).slice(2),depositoId:'',dbId:null});
-  renderStockConteo();
-}
-async function scExtraSetDeposito(mpId,slotId,depositoId){
-  const arr=stockConteoExtra[mpId]||[];
-  const slot=arr.find(s=>s.slotId===slotId);
-  if(!slot)return;
-  if(!depositoId){
-    if(slot.dbId){
-      ss('saving','Eliminando renglón...');
-      try{
-        await del('mp_conteo',slot.dbId);
-        mpConteoData=mpConteoData.filter(x=>x.id!==slot.dbId);
-        ss('online','Renglón eliminado');
-      }catch(e){
-        ss('error','Error: '+e.message);
-      }
-    }
-    stockConteoExtra[mpId]=arr.filter(s=>s.slotId!==slotId);
-    delete stockConteoDraft[slotId];
-    renderStockConteo();
+  if(!stockConteoDepSel||(stockConteoDepSel!=='_sindep'&&!stockConteoDepositos.some(d=>d.id===stockConteoDepSel))){
+    contentEl.innerHTML='<div class="empty"><i class="ti ti-arrow-up"></i> Elegí un depósito arriba para cargar su stock.</div>';
+    if(btnGuardar)btnGuardar.style.display='none';
     return;
   }
-  slot.depositoId=depositoId;
-  renderStockConteo();
-}
-function depositoSelectHtmlExtra(m,prod,slot){
-  const opciones=prod?stockConteoDepositos.filter(d=>d.empresa_id===prod.empresa_id):stockConteoDepositos;
-  if(!opciones.length){
-    return `<span style="font-size:11px;color:var(--text3)">Sin depósitos</span>`;
-  }
-  const val=slot.depositoId||'';
-  let optsH='<option value="">— Sin depósito —</option>';
-  opciones.forEach(d=>{
-    const etiqueta=prod?d.nombre:`${d.nombre} (${en(d.empresa_id)||'?'})`;
-    optsH+=`<option value="${d.id}" ${val===d.id?'selected':''}>${etiqueta}</option>`;
-  });
-  return `<select class="proy-input" style="font-size:12px;padding:4px 6px;width:100%;max-width:230px" onchange="scExtraSetDeposito('${m.id}','${slot.slotId}',this.value)">${optsH}</select>`;
-}
-function scExtraRowHtml(m,prod,slot,txt){
-  const draftVal=stockConteoDraft[slot.slotId];
-  const existing=slot.dbId?mpConteoData.find(x=>x.id===slot.dbId):null;
-  const val=draftVal!==undefined?draftVal:(existing&&existing.stock>0?existing.stock:'');
-  const guardado=existing&&existing.stock>0&&draftVal===undefined;
-  return `<tr class="mpc-row mpc-extra" data-txt="${txt}">
-      <td></td>
-      <td style="font-size:12px;color:var(--text3);padding-left:22px"><i class="ti ti-corner-down-right"></i> otro depósito</td>
-      <td></td>
-      <td>${depositoSelectHtmlExtra(m,prod,slot)}</td>
-      <td style="text-align:right">
-        <input class="proy-input" type="number" min="0"
-          id="mpconteo-${slot.slotId}"
-          value="${val}" placeholder="0" oninput="stockConteoDraft['${slot.slotId}']=this.value"
-          style="border-color:${guardado?'var(--green)':'var(--border2)'};width:90px"/>
-      </td>
-    </tr>`;
+  contentEl.innerHTML=tablaStockConteo(entriesDeConteo(stockConteoDepSel),stockConteoDepSel);
+  if(btnGuardar)btnGuardar.style.display='';
+  filtrarMpConteo();
 }
 
-function tablaStockConteo(entries,colLbl){
+// entries: array de {m,prod,esPrincipal} -- m es la fila de Maestro>Configuración, prod es el
+// producto del Maestro vinculado (mp_id) si existe, esPrincipal indica si depositoId es el depósito
+// fijo del artículo (renglón mp_conteo con deposito_id=null) o uno secundario (deposito_id=depositoId
+// explícito). El nombre que se muestra prioriza: 1) el nombre del producto vinculado (normalmente el
+// mas corto/abreviado, ej. "BCA"), 2) la sigla del CSV de Iniciales, 3) el nombre largo de
+// Configuración -- igual que antes. Cuando hay más de un depósito con stock del mismo artículo, cada
+// uno tiene su propio draft/valor guardado independiente (draftKey compuesto para los secundarios).
+function tablaStockConteo(entries,depositoId){
+  if(!entries.length){
+    return '<div class="empty"><i class="ti ti-package-off"></i>Sin productos asignados a este depósito.</div>';
+  }
   let h=`<div class="stock-card"><div style="overflow-x:auto"><table class="stock-tbl" style="table-layout:fixed"><thead><tr>
     <th style="text-align:left;width:90px">Código</th>
-    <th style="text-align:left;width:260px">${colLbl}</th>
+    <th style="text-align:left">Producto</th>
     <th style="text-align:left;width:90px">Unidad</th>
-    <th style="text-align:left;width:240px">Depósito</th>
     <th style="text-align:right;width:120px">Stock</th>
   </tr></thead><tbody>`;
-  entries.forEach(({m,prod})=>{
-    const draftVal=stockConteoDraft[m.id];
-    const existing=mpConteoData.find(x=>x.mp_id===m.id&&!x.deposito_id);
+  entries.forEach(({m,prod,esPrincipal})=>{
+    const draftKey=esPrincipal?m.id:`${m.id}||${depositoId}`;
+    const draftVal=stockConteoDraft[draftKey];
+    const existing=esPrincipal?mpConteoData.find(x=>x.mp_id===m.id&&!x.deposito_id):mpConteoData.find(x=>x.mp_id===m.id&&x.deposito_id===depositoId);
     const val=draftVal!==undefined?draftVal:(existing&&existing.stock>0?existing.stock:'');
     const guardado=existing&&existing.stock>0&&draftVal===undefined;
     const nombreMostrado=prod?prod.nombre:(m.sigla||m.nombre);
@@ -7989,17 +8065,13 @@ function tablaStockConteo(entries,colLbl){
       <td style="font-size:12px;color:var(--text2);font-family:monospace">${m.codigo||''}</td>
       <td style="font-weight:500">${nombreMostrado}${guardado?` <span style="color:var(--green);font-size:10px">✓</span>`:''}${nombreMostrado!==m.nombre?`<div style="font-size:10px;color:var(--text3);font-weight:400">${m.nombre}</div>`:''}</td>
       <td style="font-size:12px;color:var(--text2)">${m.unidad||''}</td>
-      <td>${depositoSelectHtml(m,prod)}</td>
       <td style="text-align:right">
         <input class="proy-input" type="number" min="0"
-          id="mpconteo-${m.id}"
-          value="${val}" placeholder="0" oninput="stockConteoDraft['${m.id}']=this.value"
+          id="mpconteo-${draftKey}"
+          value="${val}" placeholder="0" oninput="stockConteoDraft['${draftKey}']=this.value"
           style="border-color:${guardado?'var(--green)':'var(--border2)'};width:90px"/>
       </td>
     </tr>`;
-    (stockConteoExtra[m.id]||[]).forEach(slot=>{
-      h+=scExtraRowHtml(m,prod,slot,txt);
-    });
   });
   h+=`</tbody></table></div></div>`;
   return h;
@@ -8013,37 +8085,124 @@ function filtrarMpConteo(){
 }
 
 async function guardarStockConteo(){
+  if(!stockConteoDepSel){ss('error','Elegí primero un depósito.');return}
   const fecha=document.getElementById('stock-conteo-fecha').value||hoyLocal();
   ss('saving','Guardando conteo...');
   let guardados=0;
   try{
-    const items=mpData.filter(m=>m.codigo&&tipoMpDe(m)===stockConteoTipo&&m.unidad_tipo!=='unidad');
-    for(const m of items){
-      const val=stockConteoDraft[m.id];
-      if(val!==undefined&&val!==''){
-        const stock=parseFloat(val)||0;
-        await upsertMpConteo(fecha,m.id,stock,null);
-        guardados++;
-      }
-      for(const slot of (stockConteoExtra[m.id]||[])){
-        if(!slot.depositoId)continue; // renglón agregado pero todavía sin depósito elegido: no se guarda
-        const eval_=stockConteoDraft[slot.slotId];
-        if(eval_===undefined||eval_==='')continue;
-        const stock=parseFloat(eval_)||0;
-        const row=await upsertMpConteo(fecha,m.id,stock,slot.depositoId);
-        if(row)slot.dbId=row.id;
-        guardados++;
-      }
+    const entries=entriesDeConteo(stockConteoDepSel);
+    for(const {m,esPrincipal} of entries){
+      const draftKey=esPrincipal?m.id:`${m.id}||${stockConteoDepSel}`;
+      const val=stockConteoDraft[draftKey];
+      if(val===undefined||val==='')continue;
+      const stock=parseFloat(val)||0;
+      await upsertMpConteo(fecha,m.id,stock,esPrincipal?null:stockConteoDepSel);
+      guardados++;
     }
-    stockConteoDraft={};
-    await loadStockConteo();
-    ss('online',`${guardados} items guardados`);
+    entries.forEach(({m,esPrincipal})=>{
+      const draftKey=esPrincipal?m.id:`${m.id}||${stockConteoDepSel}`;
+      delete stockConteoDraft[draftKey];
+    });
+    renderStockConteo();
+    ss('online',`${guardados} item${guardados!==1?'s':''} guardado${guardados!==1?'s':''}`);
   }catch(e){
     const hintTabla=/relation .*mp_conteo.* does not exist/i.test(e.message||'')?' (falta crear la tabla mp_conteo en Supabase)':'';
     const hintCol=hintFaltaColumna(e.message,'deposito_id','mp_conteo');
     const hintDup=/duplicate key value violates unique constraint/i.test(e.message||'')&&!hintCol?' (falta migrar la restricción única de mp_conteo para permitir varios depósitos por producto — pedime el SQL de nuevo si hace falta)':'';
     ss('error','Error: '+e.message+hintTabla+hintCol+hintDup);
   }
+}
+
+// "Resumen de todos los depósitos" -- a pedido explícito, junta el conteo de TODOS los depósitos de
+// una fecha en una sola lista (sumando entre depósitos si el mismo artículo tiene stock repartido en
+// más de uno, igual que ya hacen Consumo MP según stock y la exportación a Excel de migración), con
+// código + la descripción "oficial" de Configuración > ID/Descripción/Depósito (m.nombre, NO el
+// alias/nombre corto que usa la tabla de carga) ordenada alfabéticamente por esa descripción, e
+// imprimible.
+async function mostrarResumenConteo(){
+  const fecha=document.getElementById('stock-conteo-fecha').value||hoyLocal();
+  let conteo=[];
+  try{ conteo=await get('mp_conteo',`fecha=eq.${fecha}`); }catch(e){ ss('error','Error: '+e.message); return; }
+  const stockPorMp=new Map();
+  conteo.forEach(c=>{ stockPorMp.set(c.mp_id,(stockPorMp.get(c.mp_id)||0)+(c.stock||0)); });
+  const items=mpData.filter(m=>stockPorMp.has(m.id))
+    .map(m=>({m,stock:stockPorMp.get(m.id)}))
+    .sort((a,b)=>normTxt(a.m.nombre).localeCompare(normTxt(b.m.nombre),'es'));
+  resumenConteoUltimo=items;
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay';overlay.id='resumen-conteo-modal';
+  const filas=items.map(({m,stock})=>`<tr>
+    <td style="font-family:monospace;font-size:12px;color:var(--text2)">${m.codigo||''}</td>
+    <td style="font-weight:500">${m.nombre}</td>
+    <td style="text-align:right;font-weight:700;color:${stock>0?'var(--green)':'var(--text2)'}">${stock.toLocaleString('es-AR')}</td>
+    <td style="font-size:12px;color:var(--text2)">${m.unidad||''}</td>
+  </tr>`).join('');
+  overlay.innerHTML=`<div class="modal" style="width:680px;max-width:95vw">
+    <div class="modal-title"><i class="ti ti-clipboard-list" style="color:var(--blue)"></i> Resumen de conteo — ${fecha}</div>
+    <div class="modal-sub" style="margin-bottom:1rem">${items.length} producto${items.length!==1?'s':''} con conteo cargado ese día (sumado entre todos los depósitos).</div>
+    ${items.length?`
+    <div style="overflow:auto;max-height:420px">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr>
+          <th style="text-align:left;padding:6px;border-bottom:.5px solid var(--border);color:var(--text2);width:90px">Código</th>
+          <th style="text-align:left;padding:6px;border-bottom:.5px solid var(--border);color:var(--text2)">Descripción</th>
+          <th style="text-align:right;padding:6px;border-bottom:.5px solid var(--border);color:var(--text2);width:100px">Stock</th>
+          <th style="text-align:left;padding:6px;border-bottom:.5px solid var(--border);color:var(--text2);width:80px">Unidad</th>
+        </tr></thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>`:`<div class="alert alert-info">Todavía no hay ningún conteo guardado para esta fecha.</div>`}
+    <div class="modal-btns" style="margin-top:1rem">
+      <button class="btn" onclick="document.getElementById('resumen-conteo-modal').remove()">Cerrar</button>
+      ${items.length?`<button class="btn btn-primary" onclick="imprimirResumenConteo('${fecha}')"><i class="ti ti-printer"></i> Imprimir</button>`:''}
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+}
+
+function imprimirResumenConteo(fecha){
+  const items=resumenConteoUltimo||[];
+  const ahora=new Date();
+  const p2=n=>String(n).padStart(2,'0');
+  const fechaImpresion=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()} ${p2(ahora.getHours())}:${p2(ahora.getMinutes())}`;
+  let filas='';
+  if(!items.length){
+    filas='<tr><td colspan="4" style="text-align:center;padding:20px;color:#888">Sin conteo cargado</td></tr>';
+  }else{
+    items.forEach(({m,stock})=>{
+      filas+=`<tr><td class="cod">${(m.codigo||'').toString()}</td><td class="nom">${m.nombre}</td><td class="cant">${stock.toLocaleString('es-AR')}</td><td class="un">${m.unidad||''}</td></tr>`;
+    });
+  }
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Resumen de Conteo — ${fecha}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;padding:8mm;font-size:11pt}
+    h1{font-size:15pt;margin-bottom:2px}
+    .sub{font-size:10pt;color:#555;margin-bottom:10px}
+    table{width:100%;border-collapse:collapse}
+    th{text-align:left;padding:5px 8px;font-size:10.5pt;border-bottom:2px solid #333}
+    td{padding:5px 8px;font-size:11pt;border-bottom:1px solid #ccc}
+    td.cod{width:12%;font-family:monospace}
+    td.nom{width:53%}
+    td.cant{width:20%;text-align:right;font-weight:700}
+    td.un{width:15%}
+    @media print{@page{size:A4 portrait;margin:10mm}body{padding:0}}
+  </style></head>
+  <body>
+    <h1>RESUMEN DE CONTEO</h1>
+    <div class="sub">Fecha del conteo: ${fecha} · Impreso ${fechaImpresion} · ${items.length} producto(s)</div>
+    <table>
+      <thead><tr><th>Código</th><th>Descripción</th><th style="text-align:right">Stock</th><th>Unidad</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
+  </body></html>`;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para imprimir.');
 }
 
 // depositoId=null => el renglón "principal" del producto (uno por fecha+mp_id). Un depositoId real
@@ -9519,10 +9678,7 @@ async function confirmarImport(){
 // ── PROYECCION DIARIA ─────────────────────────────────────────────
 let proyData = []; // cache proyeccion del dia
 let mpConteoData = []; // cache conteo de MP del dia
-let stockConteoTipo = 'terminado'; // 'terminado' | 'proceso' | 'mp'
-let stockConteoDraft = {}; // valores tipeados sin guardar todavia, por mp_id (sobreviven al cambiar de pestaña empresa/area)
-let stockConteoActiveEmp = {}; // pestaña de empresa activa, por tipo ('terminado'|'proceso')
-let stockConteoActiveArea = {}; // pestaña de area activa, por "tipo|empresa_id"
+let stockConteoDraft = {}; // valores tipeados sin guardar todavia, por mp_id (o "mp_id||deposito_id" para renglones secundarios)
 
 function tipoStockDe(p){
   if(p.tipo_stock)return p.tipo_stock;
