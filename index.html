@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.220</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.221</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -4205,6 +4205,17 @@ async function addProd(aid,eid){
     if(!m){ss('error',`No encontré en Configuración ningún producto con el código "${cod}". Corregilo o dejá el ID vacío para cargarlo sin vincular.`);return}
     mpId=m.id;
   }
+  // v4.221: "agregar producto" con un nombre que ya existe en esta empresa+área choca con la
+  // restricción única de la tabla (productos_empresa_area_nombre_key) y el error crudo de Postgres
+  // ({"code":"23505",...}) le quedaba mostrado tal cual al usuario -- se detecta ANTES de mandar el
+  // insert (evita el viaje de red y muestra un mensaje claro, avisando si ese producto ya tiene
+  // código vinculado) y, por las dudas de una condición de carrera, se traduce igual en el catch.
+  const existente=st.Pr.find(p=>p.empresa_id===eid&&p.area_id===aid&&normTxt(p.nombre)===normTxt(nom));
+  if(existente){
+    const areaNom=st.A.find(a=>a.id===aid)?.nombre||'';
+    ss('error',`Ya existe un producto llamado "${existente.nombre}" en ${areaNom}`+(existente.mp_id?' (ya vinculado a Configuración)':'')+' -- buscalo en la lista de arriba en vez de agregarlo de nuevo.');
+    return;
+  }
   ss('saving','Guardando...');
   try{
     const body={empresa_id:eid,area_id:aid,nombre:nom,unidad:unit};
@@ -4216,7 +4227,12 @@ async function addProd(aid,eid){
     const info=document.getElementById('npmpinfo');if(info)info.textContent='';
     rProdDetail(aid);rMae();onArea();ss('online','Guardado');fl('maemsg');
   }
-  catch(e){ss('error','Error');document.getElementById('maeErrtxt').textContent=e.message;fl('maeerr')}
+  catch(e){
+    ss('error','Error');
+    const dup=/23505/.test(e.message)||/duplicate key/i.test(e.message);
+    document.getElementById('maeErrtxt').textContent=dup?'Ya existe un producto con ese nombre en esta área -- buscalo en la lista de arriba en vez de agregarlo de nuevo.':e.message;
+    fl('maeerr');
+  }
 }
 async function updP(id,f,v){
   try{
@@ -14488,3 +14504,5 @@ init();
 </script>
 </body>
 </html>
+
+  
