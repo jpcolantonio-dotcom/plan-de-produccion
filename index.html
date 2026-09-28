@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.224</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.225</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -321,17 +321,17 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div class="toolbar">
       <div>
         <div style="font-size:16px;font-weight:600">Planificación de Rellenos</div>
-        <div style="font-size:13px;color:var(--text2)">Kg a elaborar por día según el plan semanal</div>
+        <div style="font-size:13px;color:var(--text2)">Semana: <b id="rell-semana-lbl"></b> — mismo plan que "Planificación"</div>
       </div>
       <div class="btns">
-        <select id="rell-wsel" onchange="renderRellenos()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
-        <button class="btn btn-sm" onclick="renderRellenos()"><i class="ti ti-refresh"></i> Actualizar</button>
-        <button class="btn btn-sm" onclick="imprimirRellenos()"><i class="ti ti-file-type-pdf"></i> PDF</button>
+        <button class="btn btn-sm" onclick="renderRellenos()" title="Recargar"><i class="ti ti-refresh"></i> Actualizar</button>
+        <button class="btn btn-pdf" onclick="imprimirRellenos()"><i class="ti ti-file-type-pdf"></i> PDF</button>
+        <button class="btn btn-primary" id="btnsave-rell" onclick="savePlan('btnsave-rell')"><i class="ti ti-device-floppy"></i> Guardar plan</button>
       </div>
     </div>
     <div class="alert alert-info" style="margin-bottom:1rem">
       <i class="ti ti-info-circle"></i>
-      <span>🔥 <b>Caliente</b>: se elabora el día anterior al cierre (si cae domingo → sábado). &nbsp; ❄️ <b>Frío</b>: se elabora el mismo día del cierre.</span>
+      <span>Cargá cuánto rinde una tanda de cada relleno (columna "Tandas") -- una vez cargada, los días solo van a dejar elegir múltiplos de esa cantidad.</span>
     </div>
     <div id="rell-content"></div>
   </div>
@@ -2589,8 +2589,13 @@ function addAllEmp(){
   });
   st.Ed[st.w]=r;rG();if(!n)alert('Todos ya estaban en el plan.');
 }
-async function savePlan(){
-  const btn=document.getElementById('btnsave');btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;ss('saving','Guardando...');
+async function savePlan(btnId){
+  // btnId: opcional -- permite reusar este mismo guardado desde otro botón (ej. "Guardar plan" de
+  // la sub-pestaña Rellenos, que edita el mismo gE()/st.Ed[st.w] que Planificación) sin duplicar
+  // el id="btnsave" en el DOM. Default 'btnsave' mantiene el comportamiento de siempre.
+  const btn=document.getElementById(btnId||'btnsave');
+  if(btn){btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;}
+  ss('saving','Guardando...');
   try{
     const rows=JSON.parse(JSON.stringify(gE()));
     // Primero intentar update, si no existe insertar
@@ -2619,7 +2624,9 @@ async function savePlan(){
     });
     ss('online','Guardado');fl('pmsg');
   }catch(e){ss('error','Error');document.getElementById('perrtxt').textContent=e.message;fl('perr')}
-  btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar plan';btn.disabled=false;
+  if(btn){btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar plan';btn.disabled=false;}
+  // Si la sub-pestaña Rellenos está en pantalla, refrescarla también (comparte el mismo plan).
+  if(prodActiveSubTab==='rell')renderRellenos();
 }
 
 async function loadReal2(){
@@ -12164,257 +12171,185 @@ if('serviceWorker' in navigator){
 // gramos por unidad). Si el producto vinculado es de elaboración "caliente", el kg se contabiliza el
 // día ANTERIOR (el relleno se prepara un día antes); "frío" = mismo día. Devuelve un objeto
 // {nombreRelleno: {prod, elaboracion, kgPorDia:[7], empresa, area}}.
-function calcularKgRellenoSemana(sem){
-  const plan=st.P[sem]||[];
-  const rellenoMap={}; // key = nombre relleno
-
-  plan.forEach(row=>{
-    const prod=st.Pr.find(p=>p.nombre===row.producto&&p.empresa_id===row.empresa_id);
-    if(!prod)return;
-    const elaboracion=prod.elaboracion||'frio'; // default frio si no está seteado
-
-    // Buscar todos los rellenos de Cocina que vinculan este producto
-    const rellenosDeEsteProducto=st.Pr.filter(r=>{
-      if(!r.vinculo_productos)return false;
-      try{
-        const v=JSON.parse(r.vinculo_productos);
-        return v.some(x=>x.producto_id===prod.id);
-      }catch{return false}
-    });
-
-    rellenosDeEsteProducto.forEach(relleno=>{
-      let vinculos=[];
-      try{vinculos=JSON.parse(relleno.vinculo_productos);}catch{}
-      const vinc=vinculos.find(x=>x.producto_id===prod.id);
-      if(!vinc)return;
-      const gramosPorUnidad=parseFloat(vinc.gramos_por_unidad)||0;
-      if(!gramosPorUnidad)return;
-
-      const key=relleno.nombre;
-      if(!rellenoMap[key]){
-        const area=st.A.find(a=>a.id===prod.area_id);
-        rellenoMap[key]={prod:relleno,elaboracion,kgPorDia:Array(7).fill(0),empresa:relleno.empresa_id,area:area?.nombre||'Sin área'};
-      }
-
-      // Asignar kg al día de elaboración según frío/caliente
-      (row.days||[]).forEach((unidades,di)=>{
-        if(!unidades)return;
-        const kg=(unidades*gramosPorUnidad)/1000;
-        let diaElab=di;
-        if(elaboracion==='caliente'){
-          diaElab=di-1;
-          // Si cae domingo (índice 6) → sábado (índice 5)
-          if(diaElab<0)diaElab=0; // si el lunes necesita elaboración previa, queda el lunes mismo
-          if(di===0)diaElab=0;    // lunes caliente → elaborar el lunes (no hay domingo anterior en la semana)
-        }
-        // Si el día calculado es domingo (di===6) para caliente, ya viene di-1=5 (sábado), ok
-        rellenoMap[key].kgPorDia[diaElab]+=kg;
-      });
-    });
-  });
-
-  return rellenoMap;
-}
+// v4.225: rediseño completo de "Rellenos" -- de una vista de solo lectura (kg calculados vía el
+// mecanismo vinculo_productos, que en la práctica casi no se usa) a una grilla EDITABLE a mano,
+// igual que Planificación, filtrada a los productos del área "Rellenos" de Configuración. Agrupa
+// por categoría (Criolla 15/13, Hojaldre 15/13, Burritos -- asignada por Juan Pablo a mano en cada
+// fila, se guarda en productos.categoria_relleno) y agrega columnas de ID/Descripción/Tandas. La
+// cantidad que rinde una tanda se guarda en productos.unidades_tanda (campo ya existente, usado
+// para otra cosa en productos de áreas normales -- pero ahí solo aplica si hay un dato de Stock >
+// Cajas cargado también, así que reusarlo acá para Rellenos no pisa nada). Comparte el mismo plan
+// editable (gE()/st.Ed[st.w]) y el mismo botón "Guardar plan" que Planificación -- por eso ya no
+// tiene selector de semana propio, siempre muestra/edita la semana actual (st.w).
+const RELLENO_CATS=['Criolla 15','Criolla 13','Hojaldre 15','Hojaldre 13','Burritos'];
 
 async function initRellenos(){
   if(!st.E.length||!st.Pr.length)await init();
-  // Sincronizar selector de semanas con todas las semanas disponibles
-  const sel=document.getElementById('rell-wsel');
-  const valorActual=sel.value||st.w;
-  const sems=[...new Set([...st.Sem,st.w])].sort().reverse();
-  sel.innerHTML='';
-  sems.forEach(s=>{
-    const o=document.createElement('option');
-    o.value=s;o.textContent=wlb(s);
-    if(s===valorActual)o.selected=true;
-    sel.appendChild(o);
-  });
-  if(!sel.value)sel.value=st.w;
-  await renderRellenos();
+  await lp(st.w); // asegura que el plan de la semana actual esté cargado
+  renderRellenos();
 }
 
-async function renderRellenos(){
-  const el=document.getElementById('rell-content');
-  el.innerHTML='<div style="padding:2rem;text-align:center;color:var(--text2)"><span class="spinner spinner-dark"></span> Calculando...</div>';
+// Devuelve, para cada producto del área "Rellenos" (en cualquier empresa que la tenga configurada),
+// su fila del plan editable (creándola si por algún motivo todavía no existe) junto con el código y
+// la descripción que salen de Configuración (vía mpParaProducto, igual que en Planificación).
+function rellenosConFila(){
+  const rows=gE();
+  const prods=st.Pr.filter(p=>{
+    const a=st.A.find(x=>x.id===p.area_id);
+    return a && normTxt(a.nombre)==='RELLENOS';
+  });
+  return prods.map(p=>{
+    const areaNom=(st.A.find(a=>a.id===p.area_id)||{}).nombre||'Rellenos';
+    let idx=rows.findIndex(r=>r.producto===p.nombre&&r.empresa_id===p.empresa_id&&r.area===areaNom);
+    if(idx===-1){
+      rows.push({empresa_id:p.empresa_id,area:areaNom,producto:p.nombre,unidad:p.unidad||'unidades',days:Array(7).fill(0)});
+      st.Ed[st.w]=rows;
+      idx=rows.length-1;
+    }
+    const row=rows[idx];
+    if(!row.days)row.days=Array(7).fill(0);
+    const mp=mpParaProducto(row);
+    return {p, idx, row, codigo:mp?(mp.codigo||''):'', descripcion:mp?(mp.alias||mp.nombre):p.nombre};
+  });
+}
 
-  const sem=document.getElementById('rell-wsel').value||st.w;
-  // Cargar plan si no está en memoria
-  await lp(sem);
-  const plan=st.P[sem]||[];
-  if(!plan.length){
-    el.innerHTML='<div class="empty"><i class="ti ti-bowl-chopsticks-off"></i> Sin plan cargado para esta semana.</div>';
+// Agrupa por categoria_relleno en el orden fijo de RELLENO_CATS, con los que todavía no tienen
+// categoría asignada al final ("Sin categoría"). Compartido entre la vista en pantalla y el PDF.
+function rellenosPorCategoria(){
+  const items=rellenosConFila();
+  const grupos={};
+  RELLENO_CATS.forEach(c=>grupos[c]=[]);
+  grupos['Sin categoría']=[];
+  items.forEach(it=>{
+    const cat=(it.p.categoria_relleno&&RELLENO_CATS.includes(it.p.categoria_relleno))?it.p.categoria_relleno:'Sin categoría';
+    grupos[cat].push(it);
+  });
+  Object.values(grupos).forEach(list=>list.sort((a,b)=>a.descripcion.localeCompare(b.descripcion,'es')));
+  return grupos;
+}
+
+async function updRellenoCategoria(id,val){
+  await updP(id,'categoria_relleno',val||null);
+  renderRellenos();
+}
+async function updRellenoTanda(id,val){
+  await updP(id,'unidades_tanda',val?parseFloat(val):null);
+  renderRellenos();
+}
+// Cambia una cantidad de un día -- mismo mecanismo que Planificación (ud(), sobre gE()/st.Ed[st.w]),
+// solo que acá además re-renderizamos esta tabla (ud() por sí sola solo refresca Planificación).
+function udRelleno(i,di,v){
+  ud(i,di,v);
+  renderRellenos();
+}
+
+function renderRellenos(){
+  const el=document.getElementById('rell-content');
+  const lbl=document.getElementById('rell-semana-lbl');
+  if(lbl)lbl.textContent=wlb(st.w);
+  const grupos=rellenosPorCategoria();
+  const totalItems=Object.values(grupos).reduce((s,l)=>s+l.length,0);
+  if(!totalItems){
+    el.innerHTML='<div class="empty"><i class="ti ti-info-circle"></i> Todavía no hay productos en el área "Rellenos" de Configuración > Producción. Cargalos ahí primero (con su código de Configuración vinculado).</div>';
     return;
   }
 
   const DIAS=['Lun','Mar','Mie','Jue','Vie','Sab','Dom'];
-  // Calcular fecha real de cada día de la semana
   const fechasDia=DIAS.map((_,di)=>{
-    const d=new Date(sem+'T00:00:00');
+    const d=new Date(st.w+'T00:00:00');
     d.setDate(d.getDate()+di);
     return d;
   });
+  const nCols=4+DIAS.length+1;
 
-  // Construir mapa: relleno → { elaboracion, dias: [kg × 7] } (helper compartido con "Consumo de MP Semanal")
-  const rellenoMap=calcularKgRellenoSemana(sem);
+  const catOpts=actual=>`<option value=""${!actual?' selected':''}>— Sin categoría —</option>`+RELLENO_CATS.map(c=>`<option value="${c}"${c===actual?' selected':''}>${c}</option>`).join('');
 
-  const rellenos=Object.entries(rellenoMap);
-  if(!rellenos.length){
-    el.innerHTML='<div class="empty"><i class="ti ti-info-circle"></i> No hay vínculos relleno→producto configurados. Andá a Maestro → Cocina para vincularlos.</div>';
-    return;
-  }
-
-  // Guardar datos para re-ordenar sin recargar todo
-  el._rellenosData={rellenos,DIAS,fechasDia};
-  renderRellenosTabla(el, rellenos, DIAS, fechasDia, 'nombre', 'asc');
-}
-
-// Ordenamiento: col = 'nombre' | 'tipo' | 'total' | 0..6 (día)
-let rellenoSortCol='nombre', rellenoSortDir='asc';
-
-function sortRellenos(col){
-  if(rellenoSortCol===col){
-    rellenoSortDir=rellenoSortDir==='asc'?'desc':'asc';
-  } else {
-    rellenoSortCol=col;
-    rellenoSortDir=col==='nombre'||col==='tipo'?'asc':'desc';
-  }
-  const el=document.getElementById('rell-content');
-  if(!el._rellenosData)return;
-  const {rellenos,DIAS,fechasDia}=el._rellenosData;
-  renderRellenosTabla(el,rellenos,DIAS,fechasDia,rellenoSortCol,rellenoSortDir);
-}
-
-function renderRellenosTabla(el, rellenos, DIAS, fechasDia, sortCol, sortDir){
-  // Ordenar: siempre primero por área, luego por el criterio elegido
-  const sorted=[...rellenos].sort((a,b)=>{
-    // Primero agrupar por área
-    const areaA=a[1].area||'';
-    const areaB=b[1].area||'';
-    const areaCmp=areaA.localeCompare(areaB);
-    if(areaCmp!==0)return areaCmp;
-    // Dentro del área, ordenar por el criterio elegido
-    let va,vb;
-    if(sortCol==='nombre'){va=a[0];vb=b[0];return sortDir==='asc'?va.localeCompare(vb):vb.localeCompare(va);}
-    if(sortCol==='tipo'){va=a[1].elaboracion;vb=b[1].elaboracion;return sortDir==='asc'?va.localeCompare(vb):vb.localeCompare(va);}
-    if(sortCol==='total'){va=a[1].kgPorDia.reduce((s,v)=>s+v,0);vb=b[1].kgPorDia.reduce((s,v)=>s+v,0);}
-    else{va=a[1].kgPorDia[sortCol]||0;vb=b[1].kgPorDia[sortCol]||0;}
-    return sortDir==='asc'?va-vb:vb-va;
-  });
-
-  const arrow=dir=>dir==='asc'?'↑':'↓';
-  const thStyle=(col)=>`cursor:pointer;user-select:none;${sortCol===col?'color:var(--blue)':''}`;
-  const nCols=2+DIAS.length+1; // relleno + tipo + 7 días + total
-
-  let h=`<div class="grid-card" style="overflow-x:auto">
-    <table class="ptbl">
-      <thead><tr>
-        <th style="${thStyle('nombre')};min-width:180px" onclick="sortRellenos('nombre')">
-          Relleno ${sortCol==='nombre'?arrow(sortDir):'↕'}
-        </th>
-        <th style="${thStyle('tipo')};width:80px;text-align:center" onclick="sortRellenos('tipo')">
-          Tipo ${sortCol==='tipo'?arrow(sortDir):'↕'}
-        </th>`;
+  let h=`<div class="grid-card" style="overflow-x:auto"><table class="ptbl"><thead><tr>
+    <th style="min-width:70px">ID</th>
+    <th style="min-width:190px">Descripción</th>
+    <th style="min-width:150px">Categoría</th>
+    <th style="width:90px" title="Cantidad que rinde una tanda de este relleno">Tandas</th>`;
   DIAS.forEach((d,di)=>{
-    const fecha=fechasDia[di];
-    const dd=fecha.getDate().toString().padStart(2,'0');
-    const mm=(fecha.getMonth()+1).toString().padStart(2,'0');
-    h+=`<th style="${thStyle(di)};text-align:right;width:90px" onclick="sortRellenos(${di})">
-      ${d} ${sortCol===di?arrow(sortDir):'↕'}<br>
-      <span style="font-size:10px;font-weight:400">${dd}/${mm}</span>
-    </th>`;
+    const f=fechasDia[di];
+    const dd=f.getDate().toString().padStart(2,'0'), mm=(f.getMonth()+1).toString().padStart(2,'0');
+    h+=`<th style="text-align:center;width:110px">${d}<br><span style="font-size:10px;font-weight:400">${dd}/${mm}</span></th>`;
   });
-  h+=`<th style="${thStyle('total')};text-align:right;width:90px" onclick="sortRellenos('total')">
-    Total ${sortCol==='total'?arrow(sortDir):'↕'}
-  </th></tr></thead><tbody>`;
+  h+=`<th style="width:90px;text-align:right">Total</th></tr></thead><tbody>`;
 
-  let areaActual='';
-  sorted.forEach(([nombre,data])=>{
-    // Separador de área
-    if(data.area!==areaActual){
-      areaActual=data.area;
+  [...RELLENO_CATS,'Sin categoría'].forEach(cat=>{
+    const list=grupos[cat];
+    if(!list.length)return;
+    h+=`<tr><td colspan="${nCols}" style="background:var(--surface2);padding:6px 12px;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;border-top:2px solid var(--border2)"><i class="ti ti-tag" style="font-size:12px"></i> ${cat}</td></tr>`;
+    list.forEach(it=>{
+      const {p,idx,row,codigo,descripcion}=it;
+      const tanda=parseFloat(p.unidades_tanda)||0;
+      const total=(row.days||[]).reduce((s,v)=>s+(v||0),0);
       h+=`<tr>
-        <td colspan="${nCols}" style="background:var(--surface2);padding:6px 12px;font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;border-top:2px solid var(--border2)">
-          <i class="ti ti-tag" style="font-size:12px"></i> ${areaActual}
-        </td>
-      </tr>`;
-    }
-    const esCaliente=data.elaboracion==='caliente';
-    const tipoLabel=esCaliente?'🔥 Caliente':'❄️ Frío';
-    const tipoColor=esCaliente?'var(--red)':'var(--blue)';
-    const total=data.kgPorDia.reduce((s,v)=>s+v,0);
-    h+=`<tr>
-      <td style="font-weight:600;padding-left:20px">${nombre}</td>
-      <td style="text-align:center;font-size:12px;color:${tipoColor}">${tipoLabel}</td>`;
-    data.kgPorDia.forEach(kg=>{
-      const val=kg>0?kg.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:2}):'—';
-      const color=kg>0?'var(--text)':'var(--text3)';
-      h+=`<td style="text-align:right;color:${color};font-weight:${kg>0?'600':'400'}">${val}</td>`;
+        <td style="font-size:12px;color:var(--text2);font-family:monospace">${codigo||'—'}</td>
+        <td style="font-weight:500">${descripcion}</td>
+        <td><select style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)" onchange="updRellenoCategoria('${p.id}',this.value)">${catOpts(p.categoria_relleno)}</select></td>
+        <td><input type="number" min="0" step="any" value="${p.unidades_tanda||''}" placeholder="—" style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)" title="Cantidad que rinde una tanda de este relleno" onchange="updRellenoTanda('${p.id}',this.value)"/></td>`;
+      (row.days||[]).forEach((v,di)=>{
+        if(tanda>0){
+          const maxT=10;let opts='';
+          for(let t2=0;t2<=maxT;t2++){
+            const val=Math.round(t2*tanda*1000)/1000;
+            opts+=`<option value="${val}"${val===v?' selected':''}>${t2===0?'—':`${t2} tanda${t2!==1?'s':''} = ${val.toLocaleString('es-AR')}`}</option>`;
+          }
+          if(v>0&&!opts.includes(`value="${v}"`))opts=`<option value="${v}" selected>${v.toLocaleString('es-AR')} ✎</option>`+opts;
+          h+=`<td class="day-cell"><select class="day-input${v>0?' has-val':''}" style="width:100%;font-size:11px;padding:3px" onchange="udRelleno(${idx},${di},this.value)">${opts}</select></td>`;
+        }else{
+          h+=`<td class="day-cell"><input class="day-input${v>0?' has-val':''}" type="number" min="0" step="any" value="${v||''}" placeholder="—" title="Cargá cuánto rinde una tanda (columna Tandas) para poder elegir en múltiplos" onchange="udRelleno(${idx},${di},this.value)"/></td>`;
+        }
+      });
+      h+=`<td class="total-cell" style="text-align:right;font-weight:700;color:var(--green)">${total>0?total.toLocaleString('es-AR'):'—'}</td></tr>`;
     });
-    const totalFmt=total>0?total.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:2}):'—';
-    h+=`<td style="text-align:right;font-weight:700;color:var(--green)">${totalFmt}</td></tr>`;
   });
 
   h+=`</tbody></table></div>
-  <div style="font-size:12px;color:var(--text2);margin-top:8px">Todos los valores en <b>kg</b>. El día de elaboración ya está ajustado según Frío/Caliente.</div>`;
+  <div style="font-size:12px;color:var(--text2);margin-top:8px">Los valores se guardan junto con el resto del plan de la semana — acordate de tocar "Guardar plan". Una vez que cargás cuánto rinde una tanda, los días solo dejan elegir múltiplos de esa cantidad.</div>`;
   el.innerHTML=h;
 }
 
 function imprimirRellenos(){
-  const el=document.getElementById('rell-content');
-  if(!el._rellenosData){alert('Cargá primero los rellenos.');return}
-  const {rellenos,DIAS,fechasDia}=el._rellenosData;
-  const sem=document.getElementById('rell-wsel').value||'';
-
-  // Ordenar por área y luego por nombre
-  const sorted=[...rellenos].sort((a,b)=>{
-    const ca=(a[1].area||'').localeCompare(b[1].area||'');
-    return ca!==0?ca:a[0].localeCompare(b[0]);
-  });
-
-  // Agrupar por área
-  const grupos={};
-  sorted.forEach(([nombre,data])=>{
-    const area=data.area||'Sin área';
-    if(!grupos[area])grupos[area]=[];
-    grupos[area].push([nombre,data]);
-  });
-
+  const grupos=rellenosPorCategoria();
+  const totalItems=Object.values(grupos).reduce((s,l)=>s+l.length,0);
+  if(!totalItems){alert('No hay rellenos para imprimir.');return}
+  const sem=st.w;
+  const DIAS=['Lun','Mar','Mie','Jue','Vie','Sab','Dom'];
+  const fechasDia=DIAS.map((_,di)=>{const d=new Date(sem+'T00:00:00');d.setDate(d.getDate()+di);return d;});
   const DIAS_HDR=DIAS.map((d,di)=>{
     const f=fechasDia[di];
     return `${d}<br><span style="font-size:7pt;font-weight:400">${f.getDate().toString().padStart(2,'0')}/${(f.getMonth()+1).toString().padStart(2,'0')}</span>`;
   });
 
   let tablas='';
-  Object.entries(grupos).forEach(([area,items])=>{
+  [...RELLENO_CATS,'Sin categoría'].forEach(cat=>{
+    const list=grupos[cat];
+    if(!list.length)return;
     let filas='';
-    items.forEach(([nombre,data])=>{
-      const esC=data.elaboracion==='caliente';
-      const total=data.kgPorDia.reduce((s,v)=>s+v,0);
-      filas+=`<tr>
-        <td class="prod">${nombre}</td>
-        <td class="tipo ${esC?'cal':'fri'}">${esC?'🔥 Cal.':'❄️ Frío'}</td>`;
-      data.kgPorDia.forEach(kg=>{
-        filas+=`<td class="num ${kg>0?'hasval':''}">${kg>0?kg.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:2}):''}</td>`;
+    list.forEach(it=>{
+      const total=(it.row.days||[]).reduce((s,v)=>s+(v||0),0);
+      filas+=`<tr><td class="cod">${it.codigo||''}</td><td class="prod">${it.descripcion}</td>`;
+      (it.row.days||[]).forEach(v=>{
+        filas+=`<td class="num ${v>0?'hasval':''}">${v>0?v.toLocaleString('es-AR'):''}</td>`;
       });
-      filas+=`<td class="num tot">${total>0?total.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:2}):''}</td>
-      </tr>`;
+      filas+=`<td class="num tot">${total>0?total.toLocaleString('es-AR'):''}</td></tr>`;
     });
-
-    // Fila de totales del área
-    let totFila='<tr class="tot-row"><td class="prod">TOTAL</td><td></td>';
+    let totFila='<tr class="tot-row"><td class="cod"></td><td class="prod">TOTAL</td>';
     DIAS.forEach((_,di)=>{
-      const tot=items.reduce((s,[,d])=>s+(d.kgPorDia[di]||0),0);
-      totFila+=`<td class="num tot">${tot>0?tot.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:2}):''}</td>`;
+      const tot=list.reduce((s,it)=>s+((it.row.days&&it.row.days[di])||0),0);
+      totFila+=`<td class="num tot">${tot>0?tot.toLocaleString('es-AR'):''}</td>`;
     });
-    const gtot=items.reduce((s,[,d])=>s+d.kgPorDia.reduce((a,v)=>a+v,0),0);
-    totFila+=`<td class="num tot">${gtot>0?gtot.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:2}):''}</td></tr>`;
+    const gtot=list.reduce((s,it)=>s+(it.row.days||[]).reduce((a,v)=>a+(v||0),0),0);
+    totFila+=`<td class="num tot">${gtot>0?gtot.toLocaleString('es-AR'):''}</td></tr>`;
 
     tablas+=`
-      <div class="area-titulo">${area}</div>
+      <div class="area-titulo">${cat}</div>
       <table>
         <thead><tr>
+          <th class="h-cod">ID</th>
           <th class="h-prod">Relleno</th>
-          <th class="h-tipo">Tipo</th>
           ${DIAS_HDR.map(d=>`<th class="h-num">${d}</th>`).join('')}
           <th class="h-tot">Total</th>
         </tr></thead>
@@ -12429,20 +12364,17 @@ function imprimirRellenos(){
     body{font-family:Arial,sans-serif;font-size:9pt;padding:8mm}
     h1{font-size:12pt;margin-bottom:1px}
     .sub{font-size:8pt;color:#555;margin-bottom:8px}
-    .leyenda{font-size:7.5pt;color:#555;margin-bottom:10px;padding:4px 8px;background:#f0f4ff;border-radius:4px;display:inline-block}
     .area-titulo{font-size:10pt;font-weight:700;color:#1B3A6B;margin:12px 0 4px;padding:4px 8px;background:#e8f0fe;border-left:3px solid #1B3A6B;border-radius:2px}
     table{width:100%;border-collapse:collapse;margin-bottom:4px}
     th{background:#1B3A6B;color:#fff;padding:4px 5px;font-size:7.5pt;text-align:right;border:1px solid #0f2a52}
+    th.h-cod{text-align:left;width:60px}
     th.h-prod{text-align:left;min-width:160px}
-    th.h-tipo{text-align:center;width:60px}
     th.h-num{width:70px}
     th.h-tot{background:#16a34a;width:70px}
     td{padding:3px 5px;font-size:8pt;border-top:.5px solid #ddd;border-bottom:.5px solid #ddd;border-left:1.5px solid #c8d5e8;border-right:none}
     td:last-child{border-right:1.5px solid #c8d5e8}
+    td.cod{text-align:left;font-family:monospace;color:#555}
     td.prod{text-align:left;font-weight:600}
-    td.tipo{text-align:center;font-size:7.5pt}
-    td.cal{color:#dc2626}
-    td.fri{color:#2563eb}
     td.num{text-align:right;color:#aaa}
     td.hasval{color:#111;font-weight:600}
     td.tot{font-weight:700;color:#16a34a;background:#f0fdf4}
@@ -12453,9 +12385,8 @@ function imprimirRellenos(){
     @media print{@page{size:A4 landscape;margin:7mm}body{padding:0}.area-titulo{page-break-before:auto}}
   </style></head>
   <body>
-    <h1>Planificación de Rellenos — ${sem}</h1>
+    <h1>Planificación de Rellenos — ${wlb(sem)}</h1>
     <div class="sub">PAPO · Generado ${new Date().toLocaleDateString('es-AR')}</div>
-    <div class="leyenda">🔥 <b>Caliente</b>: elaborar día anterior al cierre &nbsp;|&nbsp; ❄️ <b>Frío</b>: elaborar el mismo día</div>
     ${tablas}
   <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
   </body></html>`;
