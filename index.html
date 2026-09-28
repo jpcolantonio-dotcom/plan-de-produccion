@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.221</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.224</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -3751,18 +3751,48 @@ async function addMaeDeposito(){
     ss('error','Error');document.getElementById('maeErrtxt').textContent=e.message;fl('maeerr');
   }
 }
+// v4.223: "Eliminar depósito" tiraba el JSON crudo de Postgres ({"code":"23503",...,"still
+// referenced from table \"materias_primas\"..."}) porque el depósito todavía estaba asignado en
+// materias_primas.deposito_id (y/o mp_depositos) -- el confirm() de acá ABAJO ya le prometía "los
+// productos que lo tengan asignado quedarán sin depósito", pero el código nunca llegaba a cumplirlo
+// porque Postgres rechazaba el delete antes. limpiarYBorrarDeposito() ahora sí lo hace: suelta todo
+// lo que es solo "asignación" (no se pierde nada real) antes de borrar, y mensajeErrorDeposito()
+// traduce cualquier FK que igual bloquee el borrado (ej. mp_conteo con historial de stock -- eso
+// SÍ se deja bloqueado a propósito, para no borrar historial en silencio).
+async function limpiarYBorrarDeposito(id){
+  try{ await fetch(`${SB}/rest/v1/materias_primas?deposito_id=eq.${id}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({deposito_id:null})}); }catch{}
+  try{ await fetch(`${SB}/rest/v1/mp_depositos?deposito_id=eq.${id}`,{method:'DELETE',headers:H}); }catch{}
+  try{ await fetch(`${SB}/rest/v1/deposito_productos?deposito_id=eq.${id}`,{method:'DELETE',headers:H}); }catch{}
+  try{ await fetch(`${SB}/rest/v1/deposito_torres?deposito_id=eq.${id}`,{method:'DELETE',headers:H}); }catch{}
+  await del('depositos',id); // el borrado real -- si algo todavía lo referencia, esto es lo que tira el error
+}
+
+function mensajeErrorDeposito(msg){
+  let code=null,details='';
+  try{ const j=JSON.parse(msg); code=j.code; details=j.details||j.message||''; }catch{ details=String(msg||''); }
+  if(code==='23503'){
+    const m=details.match(/referenced from table "([a-z_]+)"/i);
+    const tabla=m?m[1]:null;
+    const tablasConocidas={mp_conteo:'todavía tiene conteos de stock guardados ahí',materias_primas:'todavía tiene materias primas asignadas',mp_depositos:'todavía tiene materias primas asignadas',deposito_productos:'todavía tiene productos ubicados en sus torres',deposito_torres:'todavía tiene torres configuradas'};
+    const detalle=tabla?(tablasConocidas[tabla]||`todavía tiene registros relacionados (tabla "${tabla}")`):'todavía está en uso en otra parte del sistema';
+    return `No se pudo eliminar el depósito: ${detalle}. Sacale esas asignaciones primero e intentá de nuevo.`;
+  }
+  return 'Error: '+String(msg||'');
+}
+
 async function delDeposito(id){
   if(!confirm('¿Eliminar este depósito? Los productos que lo tengan asignado quedarán sin depósito.'))return;
-  ss('saving','...');
+  ss('saving','Eliminando depósito...');
   try{
-    await del('depositos',id);
+    await limpiarYBorrarDeposito(id);
     maeDepositos=maeDepositos.filter(d=>d.id!==id);
     mpData.forEach(m=>{ if(m.deposito_id===id)m.deposito_id=null; });
+    mpDepositosData=mpDepositosData.filter(x=>x.deposito_id!==id);
     rDepoList(st.aeid);
     stockConteoDepositosCargado=false;
     ss('online','Eliminado');
   }catch(e){
-    ss('error','Error');alert('Error: '+e.message);
+    ss('error','Error');alert(mensajeErrorDeposito(e.message));
   }
 }
 
@@ -7099,13 +7129,22 @@ async function addDeposito(){
 
 async function deleteDeposito(id,nombre){
   if(!confirm(`¿Eliminar deposito "${nombre}"?`))return;
+  // v4.223: usa la misma limpieza que delDeposito (Configuración) -- antes esto ni siquiera revisaba
+  // si el DELETE había funcionado (fetch no tira error por un 4xx/5xx), así que un borrado bloqueado
+  // por la misma restricción de clave foránea (materias_primas/mp_depositos) quedaba mostrando
+  // "Eliminado" en verde aunque el depósito siguiera ahí.
+  ss('saving','Eliminando depósito...');
   try{
-    await fetch(`${SB}/rest/v1/depositos?id=eq.${id}`,{method:'DELETE',headers:H});
+    await limpiarYBorrarDeposito(id);
     depositosData=depositosData.filter(d=>d.id!==id);
     depTorresData=depTorresData.filter(t=>t.deposito_id!==id);
     depProdData=depProdData.filter(p=>p.deposito_id!==id);
+    mpData.forEach(m=>{ if(m.deposito_id===id)m.deposito_id=null; });
+    mpDepositosData=mpDepositosData.filter(x=>x.deposito_id!==id);
     renderDepConfig();ss('online','Eliminado');
-  }catch(e){ss('error','Error')}
+  }catch(e){
+    ss('error','Error');alert(mensajeErrorDeposito(e.message));
+  }
 }
 
 async function addTorreDeposito(depId){
@@ -14504,5 +14543,3 @@ init();
 </script>
 </body>
 </html>
-
-  
