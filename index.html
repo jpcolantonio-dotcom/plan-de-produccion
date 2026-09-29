@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.226</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.227</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -319,19 +319,21 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <!-- SUB-TAB RELLENOS -->
   <div id="tab-rell" style="display:none">
     <div class="toolbar">
-      <div>
-        <div style="font-size:16px;font-weight:600">Planificación de Rellenos</div>
-        <div style="font-size:13px;color:var(--text2)">Semana: <b id="rell-semana-lbl"></b> — mismo plan que "Planificación"</div>
+      <div class="real-sel">
+        <label>Semana:</label>
+        <select id="rell-wsel" onchange="onRellSemana()"></select>
+        <button class="btn btn-sm" onclick="onRellSemana()" title="Recargar"><i class="ti ti-refresh"></i></button>
+        <button class="btn btn-sm" onclick="copiarRellenosSemanaAnterior()" title="Copiar las cantidades de rellenos de la semana anterior" style="gap:5px"><i class="ti ti-copy"></i> Copiar sem. anterior</button>
       </div>
       <div class="btns">
-        <button class="btn btn-sm" onclick="renderRellenos()" title="Recargar"><i class="ti ti-refresh"></i> Actualizar</button>
         <button class="btn btn-pdf" onclick="imprimirRellenos()"><i class="ti ti-file-type-pdf"></i> PDF</button>
         <button class="btn btn-primary" id="btnsave-rell" onclick="savePlan('btnsave-rell')"><i class="ti ti-device-floppy"></i> Guardar plan</button>
       </div>
     </div>
+    <div style="font-size:12px;color:var(--text2);margin:-6px 0 10px">Mismo plan que "Planificación" — cambiar la semana acá también la cambia allá (y viceversa).</div>
     <div class="alert alert-info" style="margin-bottom:1rem">
       <i class="ti ti-info-circle"></i>
-      <span>Cargá cuánto rinde una tanda de cada relleno (columna "Tandas") -- una vez cargada, los días solo van a dejar elegir múltiplos de esa cantidad.</span>
+      <span>Cargá cuánto rinde una tanda de cada relleno (columna "Tandas") -- una vez cargada, los días solo van a dejar elegir múltiplos de esa cantidad. Usá las flechitas ↑↓ para ordenar los rellenos dentro de cada categoría (el orden es independiente por categoría).</span>
     </div>
     <div id="rell-content"></div>
   </div>
@@ -1664,15 +1666,20 @@ async function crearNuevaSemana(){
   }catch(e){ss('error','Error al guardar: '+e.message)}
 }
 
+// Rellenos comparte el mismo plan/semana editable que Planificación (mismo st.w/gE()), así que su
+// selector de semana (rell-wsel) se mantiene sincronizado acá también -- cambiar la semana desde
+// cualquiera de las dos sub-pestañas se refleja en la otra.
 function poblarPlanWsel(){
-  const sel=document.getElementById('plan-wsel');
-  if(!sel)return;
-  const cur=sel.value||st.w;
-  sel.innerHTML='';
-  [...new Set([...st.Sem,st.w])].sort().reverse().forEach(w=>{
-    const o=document.createElement('option');o.value=w;o.textContent=wlb(w);sel.appendChild(o);
+  const weeks=[...new Set([...st.Sem,st.w])].sort().reverse();
+  ['plan-wsel','rell-wsel'].forEach(id=>{
+    const sel=document.getElementById(id);
+    if(!sel)return;
+    sel.innerHTML='';
+    weeks.forEach(w=>{
+      const o=document.createElement('option');o.value=w;o.textContent=wlb(w);sel.appendChild(o);
+    });
+    sel.value=st.w;
   });
-  sel.value=cur||st.w;
 }
 
 async function lp(k){if(st.P[k]!==undefined)return;try{const d=await get('planes',`semana=eq.${k}&select=filas`);st.P[k]=d.length?d[0].filas:[];}catch{st.P[k]=[]}completarProductosDesdeConfig(k,st.P[k]);quitarFilasAreaNoConfigurada(k,st.P[k]);}
@@ -2047,7 +2054,20 @@ function onPlanSemana(){
   // Forzar recarga borrando cache
   delete st.P[k];
   delete st.Ed[k];
-  lp(k).then(()=>{document.getElementById('gload').style.display='none';rG()});
+  lp(k).then(()=>{document.getElementById('gload').style.display='none';poblarPlanWsel();rG();if(prodActiveSubTab==='rell')renderRellenos();});
+}
+// Igual que onPlanSemana() pero disparado desde el selector de semana de la sub-pestaña Rellenos --
+// cambia la misma st.w/plan compartido, así que Planificación queda al día apenas se vuelva a esa
+// sub-pestaña (poblarPlanWsel ya deja los dos selectores sincronizados).
+function onRellSemana(){
+  const k=document.getElementById('rell-wsel').value;
+  if(!k)return;
+  st.w=k;
+  delete st.P[k];
+  delete st.Ed[k];
+  const cont=document.getElementById('rell-content');
+  if(cont)cont.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando...</div>';
+  lp(k).then(()=>{poblarPlanWsel();renderRellenos();});
 }
 function changeWeek(n){st.w=addW(st.w,n);document.getElementById('gload').style.display='flex';lp(st.w).then(()=>{document.getElementById('gload').style.display='none';planActiveEmp=null;rG()})}
 function gE(){if(!st.Ed[st.w])st.Ed[st.w]=st.P[st.w]?JSON.parse(JSON.stringify(st.P[st.w])):[];return st.Ed[st.w]}
@@ -2068,17 +2088,8 @@ function rG(){
   rGInner();
 }
 function rGInner(){
-  // Popular selector de semana si está vacío
-  const sel=document.getElementById('plan-wsel');
-  if(sel){
-    if(!sel.options.length||sel.options.length<st.Sem.length){
-      sel.innerHTML='';
-      [...new Set([...st.Sem,st.w])].sort().reverse().forEach(w=>{
-        const o=document.createElement('option');o.value=w;o.textContent=wlb(w);sel.appendChild(o);
-      });
-    }
-    sel.value=st.w;
-  }
+  // Popular selector(es) de semana (Planificación y Rellenos comparten st.w)
+  poblarPlanWsel();
   const all=gE();
   const wrap=document.getElementById('grid');
   if(!all.length){wrap.innerHTML='<div class="empty"><i class="ti ti-table-off"></i>Agrega productos desde el maestro.</div>';return}
@@ -2616,6 +2627,7 @@ async function savePlan(btnId){
     st.P[st.w]=rows;
     if(!st.Sem.includes(st.w)){st.Sem.push(st.w);st.Sem.sort();}
     // Actualizar todos los selectores de semana
+    poblarPlanWsel();
     ['rwsel','cwsel','cswsel'].forEach(id=>{
       const s=document.getElementById(id);if(!s)return;
       const cur=s.value;s.innerHTML='';
@@ -12187,12 +12199,22 @@ if('serviceWorker' in navigator){
 // agrega a esa sección. "Quitar" en una fila solo saca esa categoría de la lista -- nunca borra el
 // producto ni le toca las otras categorías en las que esté. La tanda es una sola por relleno (no por
 // categoría, confirmado con Juan Pablo), así que sigue en productos.unidades_tanda como antes.
+// v4.227: 1) Rellenos ahora tiene su propio selector de semana (rell-wsel), sincronizado con el de
+// Planificación (plan-wsel) porque comparten el mismo st.w/plan -- cambiar la semana desde cualquiera
+// de las dos sub-pestañas se refleja en la otra (ver poblarPlanWsel). 2) Se agregó "Copiar sem.
+// anterior" para Rellenos (copiarRellenosSemanaAnterior), igual que ya existía por área en
+// Planificación. 3) Orden manual (↑↓) de los rellenos DENTRO de cada categoría, e INDEPENDIENTE por
+// categoría (confirmado con Juan Pablo: un mismo relleno puede ir arriba en "Criolla 15" y abajo en
+// "Hojaldre 13") -- se guarda en productos.orden_categorias_relleno (jsonb, {categoria:numero}), un
+// campo NUEVO aparte de categorias_relleno para no pisar/migrar las asignaciones que Juan Pablo ya
+// había cargado.
 const RELLENO_CATS=['Criolla 15','Criolla 13','Hojaldre 15','Hojaldre 13','Burritos'];
 const catSlug=cat=>normTxt(cat).toLowerCase().replace(/\s+/g,'-');
 
 async function initRellenos(){
   if(!st.E.length||!st.Pr.length)await init();
   await lp(st.w); // asegura que el plan de la semana actual esté cargado
+  poblarPlanWsel();
   renderRellenos();
 }
 
@@ -12220,9 +12242,20 @@ function rellenosConFila(){
   });
 }
 
+// Orden manual guardado para un relleno DENTRO de una categoría puntual (productos.orden_categorias_
+// relleno, jsonb {categoria:numero}). Infinity para el que todavía no tiene uno asignado en esa
+// categoría -- así cae al final, después de los que ya se ordenaron a mano (mismo criterio que
+// productos.orden en Configuración).
+function ordenEnCategoria(p,cat){
+  const o=p&&p.orden_categorias_relleno;
+  return (o&&typeof o==='object'&&o[cat]!=null)?o[cat]:Infinity;
+}
+
 // Agrupa por categorías (un mismo relleno puede caer en varios grupos a la vez), en el orden fijo de
-// RELLENO_CATS; los que todavía no están en NINGUNA categoría van en "Sin categoría". Compartido
-// entre la vista en pantalla y el PDF.
+// RELLENO_CATS; los que todavía no están en NINGUNA categoría van en "Sin categoría". Dentro de cada
+// categoría real se ordena por orden_categorias_relleno (manual, independiente por categoría) y a
+// igualdad (ambos sin asignar todavía) por descripción; "Sin categoría" es solo una lista de
+// referencia y va siempre alfabética. Compartido entre la vista en pantalla y el PDF.
 function rellenosPorCategoria(){
   const items=rellenosConFila();
   const grupos={};
@@ -12233,8 +12266,74 @@ function rellenosPorCategoria(){
     if(!cats.length){grupos['Sin categoría'].push(it);return}
     cats.forEach(c=>grupos[c].push(it));
   });
-  Object.values(grupos).forEach(list=>list.sort((a,b)=>a.descripcion.localeCompare(b.descripcion,'es')));
+  RELLENO_CATS.forEach(c=>{
+    grupos[c].sort((a,b)=>{
+      const oa=ordenEnCategoria(a.p,c),ob=ordenEnCategoria(b.p,c);
+      if(oa!==ob)return oa-ob;
+      return a.descripcion.localeCompare(b.descripcion,'es');
+    });
+  });
+  grupos['Sin categoría'].sort((a,b)=>a.descripcion.localeCompare(b.descripcion,'es'));
   return grupos;
+}
+
+// Sube/baja un relleno dentro de UNA categoría puntual (dir=-1 sube, +1 baja) -- el orden es
+// independiente por categoría, así que esto solo toca orden_categorias_relleno[cat] de los dos
+// rellenos que se intercambian, no afecta su posición en ninguna otra categoría. Mismo patrón que
+// moveProd() (Configuración > Productos): si alguno de los dos todavía no tenía un orden asignado en
+// esta categoría, se le asigna su posición actual antes de intercambiar.
+async function moveRellenoEnCategoria(prodId,cat,dir){
+  const list=(rellenosPorCategoria()[cat])||[];
+  const idx=list.findIndex(it=>it.p.id===prodId);if(idx<0)return;
+  const swapIdx=idx+dir;if(swapIdx<0||swapIdx>=list.length)return;
+  const a=list[idx].p,b=list[swapIdx].p;
+  const oa0=ordenEnCategoria(a,cat),ob0=ordenEnCategoria(b,cat);
+  const aOrd=oa0===Infinity?idx:oa0, bOrd=ob0===Infinity?swapIdx:ob0;
+  const oa={...(a.orden_categorias_relleno||{}),[cat]:bOrd};
+  const ob={...(b.orden_categorias_relleno||{}),[cat]:aOrd};
+  a.orden_categorias_relleno=oa;b.orden_categorias_relleno=ob;
+  ss('saving','Guardando orden...');
+  try{
+    await Promise.all([pat('productos',a.id,{orden_categorias_relleno:oa}),pat('productos',b.id,{orden_categorias_relleno:ob})]);
+    ss('online','Guardado');
+  }catch(e){ss('error','Error al reordenar')}
+  renderRellenos();
+}
+
+// Copia las cantidades de rellenos (todos los productos del área "Rellenos") de la semana anterior a
+// la semana actual -- mismo patrón que copiarAreaSemanaAnterior() en Planificación, pero sin filtrar
+// por área/empresa activa porque Rellenos siempre muestra el área completa.
+async function copiarRellenosSemanaAnterior(){
+  const semAnterior=addW(st.w,-1);
+  const confirmar=confirm(`¿Copiar los rellenos de ${wlb(semAnterior)} a esta semana (${wlb(st.w)})?\n\nOK = copiar con cantidades\nCancelar = solo estructura (cantidades en 0)`);
+  ss('saving','Cargando semana anterior...');
+  await lp(semAnterior);
+  const planAnterior=st.P[semAnterior]||[];
+  const nombresRelleno=new Set(st.Pr.filter(p=>{
+    const a=st.A.find(x=>x.id===p.area_id);
+    return a&&normTxt(a.nombre)==='RELLENOS';
+  }).map(p=>p.nombre));
+  const itemsRelleno=planAnterior.filter(r=>nombresRelleno.has(r.producto));
+  if(!itemsRelleno.length){
+    ss('online','Sin datos');
+    alert(`No hay plan de Rellenos en la semana anterior (${wlb(semAnterior)}).`);
+    return;
+  }
+  const rows=gE();
+  let copiados=0;
+  itemsRelleno.forEach(r=>{
+    const existe=rows.find(x=>x.producto===r.producto&&x.empresa_id===r.empresa_id&&x.area===r.area);
+    if(existe){
+      existe.days=confirmar?[...(r.days||Array(7).fill(0))]:Array(7).fill(0);
+      copiados++;
+    }else{
+      rows.push({empresa_id:r.empresa_id,area:r.area,producto:r.producto,unidad:r.unidad,days:confirmar?[...(r.days||Array(7).fill(0))]:Array(7).fill(0)});
+      copiados++;
+    }
+  });
+  st.Ed[st.w]=rows;
+  ss('online',`${copiados} rellenos copiados ✓`);
+  renderRellenos();
 }
 
 // "Agregar por ID" de cada sección de categoría: busca el código en Configuración, encuentra el
@@ -12285,14 +12384,22 @@ function udRelleno(i,di,v){
   renderRellenos();
 }
 
-// Fila de una tabla de relleno (compartida por cada sección de categoría): ID/Descripción/Tandas +
-// los 7 días (múltiplos de la tanda una vez cargada) + Total + un botón para sacarlo de ESTA
-// categoría puntual (quitarCat=null en la sección "Sin categoría", donde no hay nada que sacar).
-function filaRelleno(it,quitarCat){
+// Fila de una tabla de relleno (compartida por cada sección de categoría): flechitas de orden
+// (independiente por categoría) + ID/Descripción/Tandas + los 7 días (múltiplos de la tanda una vez
+// cargada) + Total + un botón para sacarlo de ESTA categoría puntual. `cat` identifica la categoría en
+// la que se está renderizando esta fila -- se usa tanto para el botón "quitar" como para las
+// flechitas de orden y su habilitación (idxInCat/lenInCat = posición y tamaño de la lista de ESA
+// categoría, no la lista global de rellenos).
+function filaRelleno(it,cat,idxInCat,lenInCat){
   const {p,idx,row,codigo,descripcion}=it;
   const tanda=parseFloat(p.unidades_tanda)||0;
   const total=(row.days||[]).reduce((s,v)=>s+(v||0),0);
+  const catEsc=(cat||'').replace(/'/g,"\\'");
   let h=`<tr>
+    <td style="text-align:center"><div style="display:flex;flex-direction:column;gap:2px">
+      <button class="btn btn-xs" onclick="moveRellenoEnCategoria('${p.id}','${catEsc}',-1)" ${idxInCat===0?'disabled':''} title="Subir en ${cat}" style="padding:2px 6px"><i class="ti ti-chevron-up"></i></button>
+      <button class="btn btn-xs" onclick="moveRellenoEnCategoria('${p.id}','${catEsc}',1)" ${idxInCat===lenInCat-1?'disabled':''} title="Bajar en ${cat}" style="padding:2px 6px"><i class="ti ti-chevron-down"></i></button>
+    </div></td>
     <td style="font-size:12px;color:var(--text2);font-family:monospace">${codigo||'—'}</td>
     <td style="font-weight:500">${descripcion}</td>
     <td><input type="number" min="0" step="any" value="${p.unidades_tanda||''}" placeholder="—" style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)" title="Cantidad que rinde una tanda de este relleno" onchange="updRellenoTanda('${p.id}',this.value)"/></td>`;
@@ -12310,14 +12417,12 @@ function filaRelleno(it,quitarCat){
     }
   });
   h+=`<td class="total-cell" style="text-align:right;font-weight:700;color:var(--green)">${total>0?total.toLocaleString('es-AR'):'—'}</td>`;
-  h+=`<td style="text-align:center">${quitarCat?`<button class="btn btn-xs btn-danger" onclick="quitarRellenoDeCategoria('${p.id}','${quitarCat}')" title="Sacar de esta categoría (no borra el producto)"><i class="ti ti-x"></i></button>`:''}</td></tr>`;
+  h+=`<td style="text-align:center">${cat?`<button class="btn btn-xs btn-danger" onclick="quitarRellenoDeCategoria('${p.id}','${catEsc}')" title="Sacar de esta categoría (no borra el producto)"><i class="ti ti-x"></i></button>`:''}</td></tr>`;
   return h;
 }
 
 function renderRellenos(){
   const el=document.getElementById('rell-content');
-  const lbl=document.getElementById('rell-semana-lbl');
-  if(lbl)lbl.textContent=wlb(st.w);
   const grupos=rellenosPorCategoria();
   const totalItems=rellenosConFila().length;
   if(!totalItems){
@@ -12333,7 +12438,7 @@ function renderRellenos(){
   });
 
   const theadCols=()=>{
-    let t=`<th style="min-width:70px">ID</th><th style="min-width:190px">Descripción</th><th style="width:90px" title="Cantidad que rinde una tanda de este relleno">Tandas</th>`;
+    let t=`<th style="width:40px" title="Orden dentro de esta categoría"><i class="ti ti-arrows-sort" style="font-size:13px"></i></th><th style="min-width:70px">ID</th><th style="min-width:190px">Descripción</th><th style="width:90px" title="Cantidad que rinde una tanda de este relleno">Tandas</th>`;
     DIAS.forEach((d,di)=>{
       const f=fechasDia[di];
       const dd=f.getDate().toString().padStart(2,'0'), mm=(f.getMonth()+1).toString().padStart(2,'0');
@@ -12355,7 +12460,7 @@ function renderRellenos(){
       </div>`;
     if(list.length){
       h+=`<table class="ptbl"><thead><tr>${theadCols()}</tr></thead><tbody>`;
-      list.forEach(it=>{h+=filaRelleno(it,cat);});
+      list.forEach((it,i)=>{h+=filaRelleno(it,cat,i,list.length);});
       h+='</tbody></table>';
     }else{
       h+='<div style="padding:0 12px 12px;font-size:12px;color:var(--text3)">Todavía no hay rellenos en esta categoría.</div>';
