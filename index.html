@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.227</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.229</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -990,6 +990,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <div id="tab-rrhh" class="section">
   <div class="proy-subtabs">
     <button class="proy-tab active" id="rrhhtab-horarios" onclick="showRrhhTab('horarios')"><i class="ti ti-clock-hour-4"></i> Horarios</button>
+    <button class="proy-tab" id="rrhhtab-fichaje" onclick="showRrhhTab('fichaje')"><i class="ti ti-clipboard-check"></i> Fichaje</button>
     <button class="proy-tab" id="rrhhtab-indumentaria" onclick="showRrhhTab('indumentaria')"><i class="ti ti-shirt"></i> Indumentaria</button>
     <button class="proy-tab" id="rrhhtab-configuracion" onclick="showRrhhTab('configuracion')"><i class="ti ti-settings"></i> Configuración</button>
     <button class="proy-tab" id="rrhhtab-entrenamiento" onclick="showRrhhTab('entrenamiento')"><i class="ti ti-school"></i> Entrenamiento</button>
@@ -1025,6 +1026,30 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div class="grid-card"><div class="grid-scroll" id="hor-grid"></div></div>
     <div id="hor-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Horarios guardados.</div>
     <div id="hor-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="hor-errtxt"></span></div>
+  </div>
+
+  <!-- FICHAJE MANUAL -->
+  <div id="rrhh-sub-fichaje" style="display:none">
+    <div class="toolbar">
+      <div>
+        <div style="font-size:16px;font-weight:600">Fichaje manual</div>
+        <div style="font-size:13px;color:var(--text2)">Horario real de ingreso y salida por empleado, agrupado por empresa</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <div class="week-nav">
+          <button class="btn btn-sm" onclick="changeFichSemana(-1)"><i class="ti ti-chevron-left"></i></button>
+          <span id="fich-wlabel" style="font-size:14px;font-weight:500;min-width:220px;text-align:center"></span>
+          <button class="btn btn-sm" onclick="changeFichSemana(1)"><i class="ti ti-chevron-right"></i></button>
+        </div>
+        <select id="fich-esel" onchange="renderFichaje()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
+        <button class="btn btn-pdf" onclick="pdfFichaje()"><i class="ti ti-file-type-pdf"></i> PDF para imprimir</button>
+        <button class="btn btn-primary" onclick="saveFichaje()"><i class="ti ti-device-floppy"></i> Guardar</button>
+      </div>
+    </div>
+    <!-- Tabla de fichaje -->
+    <div class="grid-card"><div class="grid-scroll" id="fich-grid"></div></div>
+    <div id="fich-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Fichaje guardado.</div>
+    <div id="fich-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="fich-errtxt"></span></div>
   </div>
 
   <!-- INDUMENTARIA -->
@@ -10367,11 +10392,12 @@ async function initRrhh(){
 }
 
 function showRrhhTab(t){
-  ['horarios','indumentaria','configuracion','entrenamiento'].forEach(id=>{
+  ['horarios','fichaje','indumentaria','configuracion','entrenamiento'].forEach(id=>{
     document.getElementById('rrhh-sub-'+id).style.display=id===t?'block':'none';
     document.getElementById('rrhhtab-'+id).classList.toggle('active',id===t);
   });
   if(t==='horarios')initHorarios();
+  if(t==='fichaje')initFichaje();
   if(t==='indumentaria')initIndumentaria();
   if(t==='configuracion')initConfigRrhh();
   if(t==='entrenamiento')initEntrenamiento();
@@ -11054,6 +11080,214 @@ function pdfHorarios(){
   else alert('Permití ventanas emergentes para generar el PDF.');
 }
 
+// ── FICHAJE MANUAL ───────────────────────────────────────────────
+// v4.228: "necesot uq eme armes una pestaña par apoder hacer el fichaje manual, para eso que me lo
+// separes por empresa, que me pongas el dia de la semana horario de ingreso y horario de salida" --
+// nueva sub-pestaña de RRHH, separada de "Horarios" (que es el turno PLANIFICADO) porque el fichaje
+// es lo que REALMENTE pasó cada día -- por eso, a diferencia de Horarios, acá no hay "copiar el
+// lunes a toda la semana" ni "copiar semana anterior" (no tendría sentido copiar una asistencia real).
+// Reusa el mismo padrón de empleados (tabla `empleados`, cargado por Horarios) y el mismo patrón de
+// semana/agrupación por empresa, pero guarda en su propia tabla `fichajes` (misma forma que
+// `horarios`: una fila por semana+empleado, con <dia>_entrada/<dia>_salida en texto "HH:MM").
+let fichSemana=wk(new Date());
+let fichajes={};
+
+async function initFichaje(){
+  fichSemana=fichSemana||wk(new Date());
+  if(!empleados.length) await loadEmpleados();
+  const se=document.getElementById('fich-esel');
+  if(se){
+    const cur=se.value;
+    se.innerHTML='<option value="all">Todas las empresas</option>';
+    st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se.appendChild(o)});
+    if(cur)se.value=cur;
+  }
+  await loadFichajesSemana(fichSemana);
+  renderFichaje();
+}
+
+async function loadFichajesSemana(sem){
+  fichajes={};
+  try{
+    const data=await get('fichajes',`semana=eq.${sem}`);
+    data.forEach(f=>{fichajes[f.empleado_id]=f;});
+  }catch{}
+}
+
+function changeFichSemana(n){
+  fichSemana=addW(fichSemana,n);
+  loadFichajesSemana(fichSemana).then(()=>renderFichaje());
+}
+
+function renderFichaje(){
+  const lbl=document.getElementById('fich-wlabel');
+  if(lbl)lbl.textContent=wlb(fichSemana);
+  const ef=document.getElementById('fich-esel')?.value||'all';
+  const emps=ef==='all'?empleados:empleados.filter(e=>e.empresa_id===ef);
+  const wrap=document.getElementById('fich-grid');
+  if(!emps.length){
+    wrap.innerHTML='<div class="empty"><i class="ti ti-users"></i>Agregá empleados desde "Horarios" para comenzar.</div>';
+    return;
+  }
+  let h=`<table class="plan-grid" style="min-width:1100px"><thead>
+    <tr><th class="left" style="width:160px">Empleado</th>`;
+  DIAS_HOR_LBL.forEach((d,i)=>{
+    h+=`<th colspan="2" style="text-align:center;font-size:11px">${d}<br><span style="font-weight:400;font-size:10px">${ddate(fichSemana,i)}</span></th>`;
+  });
+  h+=`</tr>
+    <tr style="background:var(--bg2)"><th></th>`;
+  DIAS_HOR_LBL.forEach(()=>{
+    h+=`<th style="font-size:10px;font-weight:400;color:var(--green);padding:3px;text-align:center">Ingreso</th>
+        <th style="font-size:10px;font-weight:400;color:var(--red);padding:3px;text-align:center">Salida</th>`;
+  });
+  h+=`</tr></thead><tbody>`;
+  // Agrupar por empresa (mismo patrón que Horarios)
+  const byEmp={};
+  emps.forEach(emp=>{const eid=emp.empresa_id||'_';if(!byEmp[eid])byEmp[eid]=[];byEmp[eid].push(emp)});
+  Object.entries(byEmp).forEach(([eid,eEmps])=>{
+    const clr=eid!=='_'?ec(eid):'var(--text2)';
+    const nm=eid!=='_'?en(eid)||'Sin empresa':'Sin empresa';
+    const conFichaje=eEmps.filter(e=>{const f=fichajes[e.id]||{};return DIAS_HOR.some(d=>f[`${d}_entrada`]);}).length;
+    h+=`<tr><td colspan="${2*7+1}" style="background:${eid!=='_'?`${clr}18`:'var(--bg2)'};padding:6px 12px;font-size:12px;font-weight:700;color:${clr};border-top:2px solid ${clr};display:flex;align-items:center;justify-content:space-between">
+      <span>${nm}</span>
+      <span style="font-weight:400;font-size:11px;color:${clr};opacity:.8">
+        <span style="font-weight:700">${eEmps.length}</span> empleados
+        ${conFichaje>0?`· <span style="font-weight:700">${conFichaje}</span> con fichaje`:''}
+      </span>
+    </td></tr>`;
+    eEmps.forEach(emp=>{
+      const f=fichajes[emp.id]||{};
+      h+=`<tr><td style="font-weight:500;white-space:nowrap">${emp.nombre}</td>`;
+      DIAS_HOR.forEach(dia=>{
+        const eVal=f[`${dia}_entrada`]||'';
+        const sVal=f[`${dia}_salida`]||'';
+        h+=`<td class="day-cell" style="padding:2px;vertical-align:top">
+          <select class="day-input" style="width:70px;font-size:11px;padding:2px" onchange="updFichaje('${emp.id}','${dia}_entrada',this.value)">${horOptsSel(eVal)}</select>
+        </td>
+        <td class="day-cell" style="padding:2px;vertical-align:top">
+          <select class="day-input" style="width:70px;font-size:11px;padding:2px" onchange="updFichaje('${emp.id}','${dia}_salida',this.value)">${horOptsSel(sVal)}</select>
+        </td>`;
+      });
+      h+='</tr>';
+    });
+  });
+  h+='</tbody></table>';
+  wrap.innerHTML=h;
+}
+
+function updFichaje(eid,campo,val){
+  if(!fichajes[eid])fichajes[eid]={empleado_id:eid};
+  fichajes[eid][campo]=val;
+}
+
+async function saveFichaje(){
+  const btn=document.querySelector('#rrhh-sub-fichaje .btn-primary');
+  if(btn){btn.innerHTML='<span class="spinner"></span>';btn.disabled=true;}
+  ss('saving','Guardando fichaje...');
+  try{
+    for(const emp of empleados){
+      const f=fichajes[emp.id]||{};
+      const hayAlgo=DIAS_HOR.some(dia=>f[`${dia}_entrada`]||f[`${dia}_salida`]);
+      if(!hayAlgo)continue; // no crear filas vacías para empleados sin nada cargado esta semana
+      const row={semana:fichSemana,empleado_id:emp.id,updated_at:new Date().toISOString()};
+      DIAS_HOR.forEach(dia=>{
+        row[`${dia}_entrada`]=f[`${dia}_entrada`]||null;
+        row[`${dia}_salida`]=f[`${dia}_salida`]||null;
+      });
+      const existing=await get('fichajes',`semana=eq.${fichSemana}&empleado_id=eq.${emp.id}&select=id`).catch(()=>[]);
+      if(existing.length){
+        await fetch(`${SB}/rest/v1/fichajes?id=eq.${existing[0].id}`,{
+          method:'PATCH',headers:{...H,'Prefer':'return=minimal'},
+          body:JSON.stringify(row)
+        });
+      } else {
+        await ins('fichajes',row);
+      }
+    }
+    ss('online','Guardado');fl('fich-msg');
+  }catch(e){ss('error','Error');document.getElementById('fich-errtxt').textContent=e.message;fl('fich-err')}
+  if(btn){btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar';btn.disabled=false;}
+}
+
+// v4.229: "neceisot qu eme genere un pdf para imprimir, no lo vamos a completar en el sistema on
+// line" -- el fichaje se completa en PAPEL, no en la grilla de la app, así que hace falta una
+// planilla EN BLANCO para imprimir (mismo agrupado por empresa + columnas por día que la grilla
+// online, pero las celdas de Ingreso/Salida quedan vacías para escribir a mano) en vez de (o además
+// de) exportar valores ya cargados. Mismo patrón que pdfHorarios, adaptado para no volcar ningún dato.
+function pdfFichaje(){
+  const ef=document.getElementById('fich-esel')?.value||'all';
+  const semLabel=wlb(fichSemana);
+  const fecha=new Date().toLocaleDateString('es-AR');
+  const hdrs=DIAS_HOR_LBL.map((d,i)=>`<th colspan="2">${d}<br><span style="font-weight:400;font-size:8pt">${ddate(fichSemana,i)}</span></th>`).join('');
+  const subHdrs=DIAS_HOR_LBL.map(()=>`<th class="sub">Ingreso</th><th class="sub">Salida</th>`).join('');
+
+  // Determinar qué empresas imprimir (misma empresa que esté filtrada en fich-esel, o todas)
+  const empresasImprimir=ef==='all'?st.E:st.E.filter(e=>e.id===ef);
+  if(!empresasImprimir.length){alert('No hay empresas para imprimir.');return}
+
+  const secciones=[];
+  empresasImprimir.forEach(empresa=>{
+    const eEmps=empleados.filter(e=>e.empresa_id===empresa.id);
+    if(!eEmps.length)return;
+    const clr=empresa.color||'#1B3A6B';
+    const filas=eEmps.map(emp=>{
+      const celdas=DIAS_HOR.map(()=>`<td class="blank"></td><td class="blank"></td>`).join('');
+      return`<tr><td class="emp">${emp.nombre}</td>${celdas}</tr>`;
+    }).join('');
+    secciones.push(`
+      <div class="pagina">
+        <div class="header" style="border-color:${clr}">
+          <div>
+            <div class="empresa" style="color:${clr}">${empresa.nombre}</div>
+            <div class="semana">Fichaje manual — ${semLabel}</div>
+          </div>
+          <div class="meta">Generado: ${fecha} · ${eEmps.length} empleados</div>
+        </div>
+        <table>
+          <thead>
+            <tr><th class="th-emp" rowspan="2">Empleado</th>${hdrs}</tr>
+            <tr>${subHdrs}</tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>`);
+  });
+
+  if(!secciones.length){alert('Sin empleados para imprimir. Cargalos desde RRHH > Horarios.');return}
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Fichaje manual ${semLabel}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:9.5pt;background:#fff}
+    .pagina{padding:10mm;page-break-after:always}
+    .pagina:last-child{page-break-after:avoid}
+    .header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px;border-bottom:3px solid #1B3A6B;padding-bottom:8px}
+    .empresa{font-size:15pt;font-weight:700}
+    .semana{font-size:10pt;color:#444;margin-top:2px}
+    .meta{font-size:8.5pt;color:#888;text-align:right}
+    table{width:100%;border-collapse:collapse;font-size:8.5pt}
+    th{color:#fff;padding:5px 4px;text-align:center;border:1px solid rgba(0,0,0,.15);line-height:1.4;background:#1B3A6B}
+    th.sub{font-size:7pt;font-weight:400;padding:3px 2px;background:#3a5a8f}
+    .th-emp{text-align:left;width:130px;vertical-align:middle}
+    td{padding:2px;border:1px solid #ccc;vertical-align:middle;text-align:center}
+    td.emp{text-align:left;font-weight:500;padding:5px 6px}
+    td.blank{height:26px;min-width:44px}
+    tr:nth-child(even) td.emp{background:#f8f8f8}
+    @media print{
+      @page{size:A4 landscape;margin:6mm}
+      .pagina{padding:0;margin:0}
+    }
+  </style>
+  </head><body>
+  ${secciones.join('')}
+  <script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script>
+  </body></html>`;
+
+  const w=window.open('','_blank','width=1200,height=800');
+  if(w){w.document.write(html);w.document.close();}
+  else alert('Permití ventanas emergentes para generar el PDF.');
+}
 
 // ── RENDIMIENTO ──────────────────────────────────────────────────
 // ── RENDIMIENTO SUBTABS ──────────────────────────────────────────
