@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.230</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.231</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -645,17 +645,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <!-- CONTEO -->
   <div id="proy-conteo">
     <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Ingresa el stock actual en camara contado fisicamente.</div>
-    <div class="grid-card" style="margin-bottom:1rem">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px"><i class="ti ti-file-spreadsheet"></i> Importar Excel Joselito</div>
-      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Subí el xlsx del sistema Joselito y se carga automáticamente acá abajo (columna A = código, columna U = stock). Después podés ajustar cualquier valor a mano y guardar.</div>
-      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <input type="file" id="conteo-xlsx-input" accept=".xlsx,.xls" onchange="importarExcelAConteo(this)"
-          style="flex:1;min-width:200px;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-        <span id="conteo-import-loading" style="display:none;font-size:13px;color:var(--text2);white-space:nowrap"><span class="spinner" style="width:12px;height:12px;border-width:2px"></span> Importando...</span>
-      </div>
-      <div id="conteo-import-msg" style="display:none;margin-top:8px" class="alert alert-ok"><i class="ti ti-check"></i> <span id="conteo-import-msg-txt"></span></div>
-      <div id="conteo-import-err" style="display:none;margin-top:8px" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="conteo-import-err-txt"></span></div>
-    </div>
     <div id="proy-conteo-content"></div>
     <div style="display:flex;justify-content:space-between;margin-top:1rem;flex-wrap:wrap;gap:8px">
       <div style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px"><i class="ti ti-info-circle"></i> Podes guardar varias veces durante el dia. Los valores se actualizan sin borrar el resto.</div>
@@ -812,6 +801,17 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <!-- CONTEO DE STOCK -->
   <div id="stock-sub-conteo">
     <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Elegí un depósito (mismo listado que se imprime en "Impresión": código, nombre y cantidad) y completá el stock contado físicamente ahí. El número junto a cada depósito muestra cuántos productos ya tienen cantidad cargada hoy.</div>
+    <div class="grid-card" style="margin-bottom:1rem">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px"><i class="ti ti-file-spreadsheet"></i> Importar Excel de Flexxus (Stock por Casilleros)</div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Subí el xlsx/xls que baja Flexxus ("Stock - Listado por Depósitos", filtrado por UN depósito, con "Agrupar por Depósito" tildado). Suma automáticamente todos los casilleros de cada código (columna "S. Remanente") y carga el conteo de ese depósito para la fecha de arriba — sirve igual para un depósito de Joselito que de Planeta Empanada, si el depósito todavía no existe en Stock &gt; Depositos se crea solo. Después revisás y apretás "Guardar conteo" como siempre.</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <input type="file" id="flexxus-stock-input" accept=".xlsx,.xls" onchange="importarExcelFlexxusStock(this)"
+          style="flex:1;min-width:200px;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        <span id="flexxus-stock-loading" style="display:none;font-size:13px;color:var(--text2);white-space:nowrap"><span class="spinner" style="width:12px;height:12px;border-width:2px"></span> Importando...</span>
+      </div>
+      <div id="flexxus-stock-msg" style="display:none;margin-top:8px" class="alert alert-ok"><i class="ti ti-check"></i> <span id="flexxus-stock-msg-txt"></span></div>
+      <div id="flexxus-stock-err" style="display:none;margin-top:8px" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="flexxus-stock-err-txt"></span></div>
+    </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
       <label style="font-size:13px;color:var(--text2)">Fecha:</label>
       <input type="date" id="stock-conteo-fecha" onchange="loadStockConteo()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
@@ -8465,6 +8465,115 @@ async function upsertMpConteo(fecha,mpId,stock,depositoId){
   return null;
 }
 
+// v4.231: "necesito que me borres todos las importaciones que tenemos para stock y que me dejes esta
+// nueva donde vas a encontrar los productos de producción de Joselito y de planeta" -- reemplaza la
+// vieja "Importar Excel Joselito" (pensada para un export puntual del sistema Joselito, código 302xxx
+// en columna A / stock en columna U, solo para productos TERMINADOS en Proyección) por UN SOLO
+// importador genérico para el formato real que baja de Flexxus: "Stock - Listado por Depósitos",
+// filtrado por UN depósito, con "Agrupar por Depósito" tildado -- cada código aparece repetido una vez
+// por casillero dentro de ese depósito, así que hay que sumarlos (columna "S. Remanente", la misma
+// letra I tanto en el export de Joselito como en el de Planeta Empanada). Sirve igual para el depósito
+// de Joselito (ej. "DESPACHO JOSELITO") que para el de Planeta Empanada (ej. "INDIADA PRODUCCION") --
+// el depósito filtrado define a qué empresa corresponde, no hace falta ninguna lógica particular por
+// empresa. Vive acá en Stock > Conteo de stock (no en Proyección, que es sobre productos TERMINADOS,
+// un concepto distinto) porque escribe en mp_conteo (materias primas), que es lo que ya junta
+// "Resumen de todos los depósitos" para las dos empresas juntas.
+async function importarExcelFlexxusStock(input){
+  const file=input.files[0];
+  if(!file)return;
+  const errEl=document.getElementById('flexxus-stock-err');
+  const msgEl=document.getElementById('flexxus-stock-msg');
+  const loadingEl=document.getElementById('flexxus-stock-loading');
+  errEl.style.display='none';msgEl.style.display='none';
+  loadingEl.style.display='inline-flex';
+  try{
+    if(!window.XLSX){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload=res;s.onerror=rej;document.head.appendChild(s);
+      });
+    }
+    const buf=await file.arrayBuffer();
+    const wb=window.XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const filas=window.XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+    if(!filas.length)throw new Error('El archivo está vacío.');
+
+    // Empresa: la celda A1 del export ("JOSELITO" / "PLANETA EMPANADA")
+    const empresaTxt=filas[0]&&filas[0][0]!=null?String(filas[0][0]).trim():'';
+    const empresaMatch=st.E.find(e=>normTxt(e.nombre)===normTxt(empresaTxt));
+
+    // Depósito filtrado: fila con "Deposito:" en alguna celda, el nombre está en la celda siguiente
+    let depositoTxt=null;
+    for(const row of filas){
+      const idx=row.findIndex(c=>typeof c==='string'&&/^dep(o|ó)sito:?$/i.test(c.trim()));
+      if(idx>=0&&row[idx+1]!=null&&String(row[idx+1]).trim()){depositoTxt=String(row[idx+1]).trim();break;}
+    }
+    if(!depositoTxt)throw new Error('No encontré la línea "Deposito:" en el archivo -- ¿es un export de Flexxus "Stock - Listado por Depósitos"?');
+    if(/^todos$/i.test(depositoTxt))throw new Error('Este archivo está filtrado por "Todos" los depósitos -- en Flexxus filtrá UN solo depósito y volvé a exportar.');
+
+    // Encabezado: primera fila con "Código" en la columna A -- de ahí se saca en qué columna está
+    // "S. Remanente" (por si alguna vez cambia de posición entre exports).
+    const headerRow=filas.find(row=>row[0]==='Código');
+    if(!headerRow)throw new Error('No encontré la fila de encabezados ("Código" / "S. Remanente") -- ¿es el formato correcto de Flexxus?');
+    const colRem=headerRow.findIndex(c=>typeof c==='string'&&c.trim()==='S. Remanente');
+    if(colRem<0)throw new Error('No encontré la columna "S. Remanente" en el encabezado.');
+
+    // Filas de datos: columna A = código numérico, la columna de remanente trae un número. Un mismo
+    // código puede repetirse (un renglón por casillero dentro del depósito) -- se suman.
+    const acum=new Map(); // codigo -> remanente sumado
+    for(const row of filas){
+      const c0=row[0];
+      if(typeof c0!=='string'||!/^\d{4,10}$/.test(c0.trim()))continue;
+      const rem=row[colRem];
+      if(typeof rem!=='number')continue;
+      const codigo=c0.trim();
+      acum.set(codigo,(acum.get(codigo)||0)+rem);
+    }
+    if(!acum.size)throw new Error('No encontré filas de datos (código + S. Remanente) en el archivo.');
+
+    // Matchear/crear el depósito del archivo contra Stock > Depositos
+    if(!stockConteoDepositosCargado){
+      try{ stockConteoDepositos=await get('depositos','order=nombre.asc'); }catch{stockConteoDepositos=[]}
+      stockConteoDepositosCargado=true;
+    }
+    let depositoMatch=stockConteoDepositos.find(d=>normTxt(d.nombre)===normTxt(depositoTxt));
+    let depositoCreado=false;
+    if(!depositoMatch){
+      if(!empresaMatch)throw new Error(`El depósito "${depositoTxt}" no existe en Stock &gt; Depositos y no pude saber a qué empresa asignarlo (la celda A1 del archivo dice "${empresaTxt}", que no coincide con ninguna empresa del maestro). Creá el depósito a mano primero.`);
+      const res=await ins('depositos',{empresa_id:empresaMatch.id,nombre:depositoTxt});
+      depositoMatch=res[0];
+      stockConteoDepositos.push(depositoMatch);
+      depositoCreado=true;
+    }
+
+    // Matchear cada código contra materias_primas.codigo y guardar (upsert) en mp_conteo para la
+    // fecha elegida y ese depósito -- mismo criterio "principal" (deposito_id null) / "secundario"
+    // (deposito_id explícito) que usa el resto de Conteo de stock.
+    const fecha=document.getElementById('stock-conteo-fecha').value||hoyLocal();
+    let cargados=0,sinMapeo=0;
+    for(const [codigo,remanente] of acum){
+      const mp=mpData.find(m=>(m.codigo||'').toString().trim()===codigo);
+      if(!mp){ if(remanente!==0)sinMapeo++; continue; }
+      const depId=mp.deposito_id===depositoMatch.id?null:depositoMatch.id;
+      await upsertMpConteo(fecha,mp.id,Math.round(remanente*100)/100,depId);
+      cargados++;
+    }
+    stockConteoDepSel=depositoMatch.id;
+    await loadStockConteo();
+    loadingEl.style.display='none';
+    document.getElementById('flexxus-stock-msg-txt').textContent=`${cargados} producto${cargados!==1?'s':''} cargado${cargados!==1?'s':''} en "${depositoMatch.nombre}"${depositoCreado?' (depósito nuevo, creado ahora)':''} para el ${fecha}.${sinMapeo?` (${sinMapeo} código${sinMapeo!==1?'s':''} del archivo con stock pero sin producto vinculado en Configuración.)`:''} Podés ajustar cualquier valor a mano y guardar.`;
+    msgEl.style.display='';
+    setTimeout(()=>msgEl.style.display='none',9000);
+    input.value='';
+  }catch(e){
+    loadingEl.style.display='none';
+    document.getElementById('flexxus-stock-err-txt').textContent=e.message;
+    errEl.style.display='';
+  }
+}
+
 // ── CONGELADO (carga de productos de Planeta Empanada) ──────────
 async function initCongelado(){
   if(!st.E.length||!st.Pr.length)await init();
@@ -13214,86 +13323,6 @@ async function renderResumenPedidosFuturos(){
     el.innerHTML=h;
   }catch(e){
     el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> ${e.message}</div>`;
-  }
-}
-
-// ===== IMPORTAR EXCEL JOSELITO DIRECTO AL CONTEO =====
-async function importarExcelAConteo(input){
-  const file=input.files[0];
-  if(!file)return;
-  const errEl=document.getElementById('conteo-import-err');
-  const msgEl=document.getElementById('conteo-import-msg');
-  const loadingEl=document.getElementById('conteo-import-loading');
-  errEl.style.display='none';msgEl.style.display='none';
-  loadingEl.style.display='inline-flex';
-  try{
-    if(!window.XLSX){
-      await new Promise((res,rej)=>{
-        const s=document.createElement('script');
-        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-        s.onload=res;s.onerror=rej;document.head.appendChild(s);
-      });
-    }
-    const buf=await file.arrayBuffer();
-    const wb=window.XLSX.read(buf,{type:'array'});
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    const rows=window.XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
-    // El archivo puede tener múltiples bloques — acumular por código
-    // Col A = código 302xxx, Col U (índice 20) = stock
-    // Algunos valores usan punto como separador de miles (ej: 10.659 = 10659)
-    const acum={};
-    for(const row of rows){
-      const codigo=row[0]!=null?String(row[0]).trim():'';
-      if(!codigo.match(/^302\d+$/))continue;
-      let stockRaw=row[20];
-      if(stockRaw===null||stockRaw===undefined)continue;
-      let stock;
-      if(typeof stockRaw==='number'){
-        const str=stockRaw.toString();
-        if(str.includes('.')&&str.split('.')[1].length===3){
-          if(Math.floor(stockRaw)>0){
-            stock=parseFloat(str.replace('.',''));
-          } else {
-            stock=stockRaw;
-          }
-        } else {
-          stock=stockRaw;
-        }
-      } else {
-        stock=parseFloat(String(stockRaw).replace(/\./g,'').replace(',','.'))||0;
-      }
-      if(!acum[codigo])acum[codigo]=0;
-      acum[codigo]+=stock;
-    }
-    const datos=Object.entries(acum).map(([codigo,stock])=>({codigo,stock:Math.round(stock*100)/100}));
-    if(!datos.length){
-      throw new Error('No se encontraron filas con códigos 302xxx en la columna A.');
-    }
-
-    const fecha=document.getElementById('proy-fecha').value||hoyLocal();
-    const joselito=st.E.find(e=>e.nombre.toLowerCase().includes('joselito'));
-    if(!joselito)throw new Error('No se encontró la empresa Joselito en el maestro.');
-    const prods=st.Pr.filter(p=>p.empresa_id===joselito.id&&p.codigo_articulo);
-
-    let cargados=0,sinMapeo=0;
-    for(const d of datos){
-      const prod=prods.find(p=>p.codigo_articulo===d.codigo);
-      if(!prod){sinMapeo++;continue;}
-      const area=st.A.find(a=>a.id===prod.area_id);
-      if(!area)continue;
-      await upsertProy(fecha,joselito.id,area.nombre,prod.nombre,prod.unidad||'Unidad',{stock:d.stock});
-      cargados++;
-    }
-    await loadProy(); // refresca la tabla de Conteo de stock con los valores importados
-    loadingEl.style.display='none';
-    document.getElementById('conteo-import-msg-txt').textContent=`${cargados} productos cargados desde el Excel para el ${fecha}.${sinMapeo?` (${sinMapeo} códigos sin mapeo en PAPO — revisá Mapeo Joselito en Configuración &gt; Producción)`:''} Podés ajustar cualquier valor a mano y guardar.`;
-    msgEl.style.display='';
-    setTimeout(()=>msgEl.style.display='none',7000);
-    input.value='';
-  }catch(e){
-    loadingEl.style.display='none';
-    document.getElementById('conteo-import-err-txt').textContent=e.message;
-    errEl.style.display='';
   }
 }
 
