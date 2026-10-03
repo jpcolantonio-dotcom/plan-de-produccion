@@ -9,7 +9,6 @@
 
 
 
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -252,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.229</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.230</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1332,6 +1331,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <button class="btn btn-sm" id="btnSyncIds" onclick="sincronizarIdsDesdePlan()" title="Recorre el plan de la semana actual y, para cada producto que el plan ya identifica con un código, confirma ese vínculo acá en Configuración."><i class="ti ti-refresh"></i> Sincronizar IDs desde el plan</button>
         <button class="btn btn-sm" id="btnSyncNombres" onclick="limpiarNombresProductos()" title="Para todo producto con código (vinculado o resoluble por Configuración), corrige su nombre para que coincida exacto con ID/Descripción — el Alias, si tiene, ya se muestra solo en todos lados."><i class="ti ti-wand"></i> Sincronizar nombres desde Configuración</button>
         <button class="btn btn-sm" id="btnDetectarDuplicados" onclick="mostrarDuplicadosProductos()" title="Busca productos de Maestro > Producción vinculados al mismo código de Configuración (aparecen repetidos en Planificación) y permite fusionarlos en uno solo."><i class="ti ti-git-merge"></i> Detectar duplicados</button>
+        <button class="btn btn-sm" id="btnHuerfanos" onclick="mostrarProductosHuerfanos()" title="Busca filas del historial de Planificación con cantidad cargada cuyo producto/área ya no existe tal cual en Configuración (quedaron así por renombres o reorganización de áreas) y permite reasignarlas al producto actual correspondiente."><i class="ti ti-search"></i> Reconciliar productos viejos</button>
         <button class="btn btn-sm" onclick="exportarMaestroExcel()"><i class="ti ti-file-spreadsheet"></i> Exportar Excel</button>
         <button class="btn btn-sm" onclick="toggleMapeoJoselito()"><i class="ti ti-link"></i> Mapeo Joselito</button>
       </div>
@@ -4726,6 +4726,147 @@ async function fusionarProductosDuplicados(selecciones){
   }catch(e){
     ss('error','Error durante la fusión');
     alert('Hubo un error a mitad de camino: '+e.message+'\n\nAlgunos cambios pueden haberse aplicado ya -- volvé a apretar "Detectar duplicados" para ver qué queda pendiente.');
+  }
+}
+
+// v4.230: "viste cuando hicimos el cambio de los nombres por el id, perdi toda la info de la produccion"
+// -- investigado contra los datos en vivo: NO se perdió ninguna cantidad (las filas siguen en "planes"
+// tal cual se guardaron). Lo que pasa es que filas viejas de Planificación quedaron con un texto de
+// producto/área que ya no coincide con ningún producto ACTUAL de Configuración -- por renombres (ej.
+// "Ravioles de Ricota" -> "Ravioles De Ricota caja por 96 unidades") o porque se reorganizaron áreas (ej.
+// Joselito: "Tallarines"+"Embolsados" se fusionaron en "Envase"). Por eso esas filas dejaron de agruparse
+// con el producto actual y da la sensación de que "se perdió" la info. "y si lo compras con el alias ???"
+// -- probado contra los 38 casos únicos del historial real: comparar solo por Alias resuelve 1 de 38;
+// agregando una comparación más amplia ("contiene" en cualquier sentido, contra nombre actual O alias)
+// sube a 8 de 38 con un único candidato razonable (el resto, 29 casos, no tiene ningún candidato
+// detectable así -- quedan para elegir a mano). Por eso la sugerencia automática de abajo solo se ofrece
+// cuando hay EXACTAMENTE un candidato -- si hay ninguno o más de uno, queda en blanco para elegir a mano.
+async function detectarProductosHuerfanosDB(){
+  const actuales=new Set(st.Pr.map(p=>p.empresa_id+'||'+p.nombre));
+  const planesData=await get('planes','select=semana,filas');
+  const grupos=new Map(); // key: empresa_id||producto||area -> {empresa_id,producto,area,semanas:Set,total}
+  planesData.forEach(plan=>{
+    (plan.filas||[]).forEach(f=>{
+      const qty=(f.days||[]).reduce((a,b)=>a+(Number(b)||0),0);
+      if(qty<=0)return; // sin cantidad cargada -- no hay nada que reconciliar
+      if(actuales.has(f.empresa_id+'||'+f.producto))return; // coincide con un producto actual, no es huérfano
+      const key=f.empresa_id+'||'+f.producto+'||'+f.area;
+      if(!grupos.has(key))grupos.set(key,{empresa_id:f.empresa_id,producto:f.producto,area:f.area,semanas:new Set(),total:0});
+      const g=grupos.get(key);
+      g.semanas.add(plan.semana);
+      g.total+=qty;
+    });
+  });
+  return [...grupos.values()].map(g=>({...g,semanas:g.semanas.size})).sort((a,b)=>b.total-a.total);
+}
+
+// Sugiere un único producto actual de la misma empresa cuyo nombre o alias "contenga" (en cualquier
+// sentido) el texto viejo -- solo si hay exactamente un candidato así, sino null (ver nota arriba).
+function sugerirProductoHuerfano(empresa_id,textoViejo){
+  const n=normTxt(textoViejo);
+  if(!n)return null;
+  const candidatos=st.Pr.filter(p=>{
+    if(p.empresa_id!==empresa_id)return false;
+    const nn=normTxt(p.nombre);
+    if(!nn||nn===n)return false;
+    const mp=p.mp_id?mpData.find(m=>m.id===p.mp_id):null;
+    const na=mp&&mp.alias?normTxt(mp.alias):'';
+    return (nn.includes(n)||n.includes(nn))||(na&&(na.includes(n)||n.includes(na)));
+  });
+  return candidatos.length===1?candidatos[0]:null;
+}
+
+async function mostrarProductosHuerfanos(){
+  const btn=document.getElementById('btnHuerfanos');
+  const btnHtmlOrig=btn?btn.innerHTML:'';
+  if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner"></span> Buscando...';}
+  let huerfanos;
+  try{huerfanos=await detectarProductosHuerfanosDB();}
+  catch(e){alert('Error buscando huérfanos: '+e.message);if(btn){btn.disabled=false;btn.innerHTML=btnHtmlOrig;}return;}
+  if(btn){btn.disabled=false;btn.innerHTML=btnHtmlOrig||'<i class="ti ti-search"></i> Reconciliar productos viejos';}
+  if(!huerfanos.length){ss('online','No se encontraron productos huérfanos en el historial de Planificación.');return}
+  const en2=eid=>{const e=st.E.find(x=>x.id===eid);return e?e.nombre:''};
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay';overlay.id='huerfanos-modal';
+  const filasHtml=huerfanos.map((g,gi)=>{
+    const candidatosEmp=st.Pr.filter(p=>p.empresa_id===g.empresa_id).slice().sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+    const sugerido=sugerirProductoHuerfano(g.empresa_id,g.producto);
+    const opciones=`<option value="">-- no corregir --</option>`+candidatosEmp.map(p=>{
+      const areaNom=(st.A.find(a=>a.id===p.area_id)||{}).nombre||'';
+      return `<option value="${p.id}" ${sugerido&&sugerido.id===p.id?'selected':''}>${p.nombre}${areaNom?' ('+areaNom+')':''}</option>`;
+    }).join('');
+    return `<div style="border:.5px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:10px">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:4px"><i class="ti ti-alert-triangle" style="color:var(--orange,#f59e0b)"></i> ${en2(g.empresa_id)} / área vieja "${g.area}" — <b>${g.producto}</b> &nbsp;·&nbsp; ${g.semanas} semana${g.semanas!==1?'s':''}, cantidad total ${g.total}${sugerido?' · <span style="color:var(--accent)">sugerido ✓</span>':''}</div>
+      <select class="inp" style="width:100%" data-gi="${gi}">${opciones}</select>
+    </div>`;
+  }).join('');
+  overlay.innerHTML=`<div class="modal" style="width:680px;max-width:95vw">
+    <div class="modal-title"><i class="ti ti-search" style="color:var(--orange,#f59e0b)"></i> Productos huérfanos en Planificación</div>
+    <div class="modal-sub" style="margin-bottom:1rem">Se encontraron ${huerfanos.length} caso${huerfanos.length!==1?'s':''} de filas con cantidad cargada cuyo producto/área ya no existe tal cual en Configuración (quedaron así por renombres o reorganización de áreas -- la cantidad NO se perdió). Elegí a qué producto actual corresponde cada uno, o dejá "no corregir" si no estás seguro.</div>
+    <div style="max-height:420px;overflow:auto">${filasHtml}</div>
+    <div class="modal-btns" style="margin-top:1rem">
+      <button class="btn" onclick="document.getElementById('huerfanos-modal').remove()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarReconciliacionHuerfanos()"><i class="ti ti-check"></i> Reasignar seleccionados</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  overlay._huerfanos=huerfanos;
+}
+
+async function confirmarReconciliacionHuerfanos(){
+  const overlay=document.getElementById('huerfanos-modal');
+  if(!overlay)return;
+  const huerfanos=overlay._huerfanos||[];
+  const selecciones=[];
+  huerfanos.forEach((g,gi)=>{
+    const sel=overlay.querySelector(`select[data-gi="${gi}"]`);
+    const prodId=sel?sel.value:'';
+    if(!prodId)return;
+    const prod=st.Pr.find(p=>p.id===prodId);
+    if(!prod)return;
+    const areaNom=(st.A.find(a=>a.id===prod.area_id)||{}).nombre||'';
+    selecciones.push({huerfano:g,prod,areaNom});
+  });
+  if(!selecciones.length){alert('No seleccionaste ningún reemplazo.');return}
+  const resumen=selecciones.map(s=>`"${s.huerfano.producto}" (${s.huerfano.area}) → "${s.prod.nombre}" (${s.areaNom})`).join('\n');
+  if(!confirm(`Se van a reasignar ${selecciones.length} caso${selecciones.length!==1?'s':''} en todo el historial de Planificación:\n\n${resumen}\n\nEsto no se puede deshacer. ¿Confirmás?`))return;
+  overlay.remove();
+  await reconciliarProductosHuerfanos(selecciones);
+}
+
+async function reconciliarProductosHuerfanos(selecciones){
+  ss('saving','Reasignando productos huérfanos...');
+  try{
+    const mapa=new Map(selecciones.map(s=>[s.huerfano.empresa_id+'||'+s.huerfano.producto+'||'+s.huerfano.area,{producto:s.prod.nombre,area:s.areaNom}]));
+    const planesData=await get('planes','select=id,semana,filas');
+    let plansTocados=0,filasTocadas=0;
+    for(const plan of planesData){
+      if(!plan.filas)continue;
+      let modificado=false;
+      const filas=plan.filas.map(f=>{
+        const nuevo=mapa.get(f.empresa_id+'||'+f.producto+'||'+f.area);
+        if(nuevo){modificado=true;filasTocadas++;return{...f,producto:nuevo.producto,area:nuevo.area};}
+        return f;
+      });
+      if(modificado){
+        await fetch(`${SB}/rest/v1/planes?id=eq.${plan.id}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({filas})});
+        st.P[plan.semana]=filas;
+        if(st.Ed[plan.semana]){
+          st.Ed[plan.semana]=st.Ed[plan.semana].map(f=>{
+            const nuevo=mapa.get(f.empresa_id+'||'+f.producto+'||'+f.area);
+            return nuevo?{...f,producto:nuevo.producto,area:nuevo.area}:f;
+          });
+        }
+        plansTocados++;
+      }
+    }
+    try{if(typeof rP==='function')rP();}catch{}
+    try{if(typeof rG==='function')rG();}catch{}
+    try{if(typeof renderReal==='function')renderReal();}catch{}
+    ss('online',`Listo: ${filasTocadas} fila${filasTocadas!==1?'s':''} reasignada${filasTocadas!==1?'s':''} en ${plansTocados} semana${plansTocados!==1?'s':''} ✓`);
+  }catch(e){
+    ss('error','Error durante la reconciliación');
+    alert('Hubo un error a mitad de camino: '+e.message+'\n\nLas semanas que ya se alcanzaron a corregir quedan bien (no se deshacen) -- volvé a abrir "Reconciliar productos viejos" para ver qué queda pendiente.');
   }
 }
 
@@ -12445,6 +12586,20 @@ if('serviceWorker' in navigator){
 const RELLENO_CATS=['Criolla 15','Criolla 13','Hojaldre 15','Hojaldre 13','Burritos'];
 const catSlug=cat=>normTxt(cat).toLowerCase().replace(/\s+/g,'-');
 
+// v4.230: "en el plan de produccion especialmente en rellenos... que se pueda ordenar alfabaticamente
+// cada area" -- Planificación YA tenía esto (click en el encabezado "Producto" alterna orden alfabético
+// / orden manual, planProdSort). A Rellenos le faltaba el equivalente: por sección de categoría, un
+// link para ver esa categoría ordenada alfabéticamente en vez de por el orden manual guardado
+// (orden_categorias_relleno). Es solo una vista (no pisa el orden manual guardado) -- igual que
+// planProdSort no toca productos.orden. Mientras está activo para una categoría, las flechitas ↑↓ de
+// esa categoría se deshabilitan (mismo criterio que moveProd en Configuración > Productos: no tiene
+// sentido reordenar a mano mientras estás mirando en alfabético).
+let rellAlfa={};
+function rellToggleAlfa(cat){
+  rellAlfa[cat]=!rellAlfa[cat];
+  renderRellenos();
+}
+
 async function initRellenos(){
   if(!st.E.length||!st.Pr.length)await init();
   await lp(st.w); // asegura que el plan de la semana actual esté cargado
@@ -12623,16 +12778,19 @@ function udRelleno(i,di,v){
 // cargada) + Total + un botón para sacarlo de ESTA categoría puntual. `cat` identifica la categoría en
 // la que se está renderizando esta fila -- se usa tanto para el botón "quitar" como para las
 // flechitas de orden y su habilitación (idxInCat/lenInCat = posición y tamaño de la lista de ESA
-// categoría, no la lista global de rellenos).
-function filaRelleno(it,cat,idxInCat,lenInCat){
+// categoría, no la lista global de rellenos). `alfaOn`: esta categoría se está viendo en orden
+// alfabético (rellAlfa) -- en ese caso las flechitas se deshabilitan, mismo criterio que moveProd.
+function filaRelleno(it,cat,idxInCat,lenInCat,alfaOn){
   const {p,idx,row,codigo,descripcion}=it;
   const tanda=parseFloat(p.unidades_tanda)||0;
   const total=(row.days||[]).reduce((s,v)=>s+(v||0),0);
   const catEsc=(cat||'').replace(/'/g,"\\'");
+  const subirTitle=alfaOn?'Desactivá el orden alfabético para reordenar a mano':`Subir en ${cat}`;
+  const bajarTitle=alfaOn?'Desactivá el orden alfabético para reordenar a mano':`Bajar en ${cat}`;
   let h=`<tr>
     <td style="text-align:center"><div style="display:flex;flex-direction:column;gap:2px">
-      <button class="btn btn-xs" onclick="moveRellenoEnCategoria('${p.id}','${catEsc}',-1)" ${idxInCat===0?'disabled':''} title="Subir en ${cat}" style="padding:2px 6px"><i class="ti ti-chevron-up"></i></button>
-      <button class="btn btn-xs" onclick="moveRellenoEnCategoria('${p.id}','${catEsc}',1)" ${idxInCat===lenInCat-1?'disabled':''} title="Bajar en ${cat}" style="padding:2px 6px"><i class="ti ti-chevron-down"></i></button>
+      <button class="btn btn-xs" onclick="moveRellenoEnCategoria('${p.id}','${catEsc}',-1)" ${(alfaOn||idxInCat===0)?'disabled':''} title="${subirTitle}" style="padding:2px 6px"><i class="ti ti-chevron-up"></i></button>
+      <button class="btn btn-xs" onclick="moveRellenoEnCategoria('${p.id}','${catEsc}',1)" ${(alfaOn||idxInCat===lenInCat-1)?'disabled':''} title="${bajarTitle}" style="padding:2px 6px"><i class="ti ti-chevron-down"></i></button>
     </div></td>
     <td style="font-size:12px;color:var(--text2);font-family:monospace">${codigo||'—'}</td>
     <td style="font-weight:500">${descripcion}</td>
@@ -12683,10 +12841,14 @@ function renderRellenos(){
 
   let h='';
   RELLENO_CATS.forEach(cat=>{
-    const list=grupos[cat];
+    const alfaOn=!!rellAlfa[cat];
+    const list=alfaOn?[...grupos[cat]].sort((a,b)=>a.descripcion.localeCompare(b.descripcion,'es')):grupos[cat];
     const slug=catSlug(cat);
+    const alfaLink=alfaOn
+      ?`<span style="font-size:10px;font-weight:400;color:var(--accent);cursor:pointer;text-transform:none" onclick="rellToggleAlfa('${cat}')" title="Volver al orden manual guardado">· Orden manual</span>`
+      :`<span style="font-size:10px;font-weight:400;color:var(--accent);cursor:pointer;text-transform:none" onclick="rellToggleAlfa('${cat}')" title="Ver esta categoría ordenada alfabéticamente (no borra el orden manual guardado)">· Ordenar alfabético</span>`;
     h+=`<div class="grid-card" style="overflow-x:auto;margin-bottom:14px">
-      <div style="padding:8px 12px;font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px"><i class="ti ti-tag" style="font-size:14px"></i> ${cat} <span style="font-weight:400;text-transform:none;font-size:12px;color:var(--text3)">(${list.length})</span></div>
+      <div style="padding:8px 12px;font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px"><i class="ti ti-tag" style="font-size:14px"></i> ${cat} <span style="font-weight:400;text-transform:none;font-size:12px;color:var(--text3)">(${list.length})</span> ${alfaLink}</div>
       <div style="display:flex;gap:8px;align-items:center;padding:0 12px 10px;flex-wrap:wrap">
         <span style="font-size:12px;color:var(--text2)">Agregar relleno por ID:</span>
         <input type="text" id="rell-add-${slug}" placeholder="Código..." inputmode="numeric" style="width:120px;padding:5px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)" onkeydown="if(event.key==='Enter')agregarRellenoACategoria('${cat}',this.value)"/>
@@ -12694,7 +12856,7 @@ function renderRellenos(){
       </div>`;
     if(list.length){
       h+=`<table class="ptbl"><thead><tr>${theadCols()}</tr></thead><tbody>`;
-      list.forEach((it,i)=>{h+=filaRelleno(it,cat,i,list.length);});
+      list.forEach((it,i)=>{h+=filaRelleno(it,cat,i,list.length,alfaOn);});
       h+='</tbody></table>';
     }else{
       h+='<div style="padding:0 12px 12px;font-size:12px;color:var(--text3)">Todavía no hay rellenos en esta categoría.</div>';
