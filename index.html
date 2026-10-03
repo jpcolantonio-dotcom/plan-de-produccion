@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.232</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.233</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -8587,12 +8587,19 @@ async function importarExcelFlexxusStock(input){
       await upsertMpConteo(fecha,mp.id,Math.round(remanente*100)/100,depId);
       cargados++;
     }
-    stockConteoDepSel=depositoMatch.id;
+    // v4.233: "en conteo de flexxus debe estar en la pestaña de flexxus, cuando es conteo manual ahi
+    // puedo cargarlo manual por deposito cuando solito entrar a un deposito" -- antes acá se dejaba
+    // PRESELECCIONADO el depósito recién importado (stockConteoDepSel=depositoMatch.id), así que al
+    // entrar a "Conteo de stock manual" aparecía de entrada lleno con lo que vino de Flexxus. Ahora NO
+    // se toca la selección de depósito del tab manual -- ese tab solo muestra algo cuando él mismo
+    // entra a un depósito haciendo clic. Lo que sí se actualiza es mpConteoData (vía loadStockConteo,
+    // sin tocar stockConteoDepSel) para que los contadores "cargados/total" de cada botón de depósito
+    // reflejen el import apenas lo abra, y la fecha del tab manual, para que si entra coincida.
     const fechaManualEl=document.getElementById('stock-conteo-fecha');
     if(fechaManualEl)fechaManualEl.value=fecha;
     await loadStockConteo();
     loadingEl.style.display='none';
-    document.getElementById('flexxus-stock-msg-txt').textContent=`${cargados} producto${cargados!==1?'s':''} cargado${cargados!==1?'s':''} en "${depositoMatch.nombre}"${depositoCreado?' (depósito nuevo, creado ahora)':''} para el ${fecha}.${sinMapeo?` (${sinMapeo} código${sinMapeo!==1?'s':''} del archivo con stock pero sin producto vinculado en Configuración.)`:''} Podés revisarlo y ajustar valores a mano en "Conteo de stock manual".`;
+    document.getElementById('flexxus-stock-msg-txt').textContent=`${cargados} producto${cargados!==1?'s':''} cargado${cargados!==1?'s':''} en "${depositoMatch.nombre}"${depositoCreado?' (depósito nuevo, creado ahora)':''} para el ${fecha}.${sinMapeo?` (${sinMapeo} código${sinMapeo!==1?'s':''} del archivo con stock pero sin producto vinculado en Configuración.)`:''} Para revisarlo o ajustar algo a mano, entrá a "Conteo de stock manual" y elegí el depósito "${depositoMatch.nombre}".`;
     msgEl.style.display='';
     setTimeout(()=>msgEl.style.display='none',9000);
     input.value='';
