@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.233</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.234</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -7904,87 +7904,135 @@ async function renderDepCalc(){
 }
 
 let mixData=[];
+let mixCargado=false; // evita re-pedir mix_ventas al servidor cada vez que se cambia de empresa/área
+let mixDraft={}; // valores tipeados sin guardar todavía, por pid -- ver nota de v4.234 más abajo
+let mixActiveEmp=null;
+let mixActiveArea={};
 
+// v4.234: "necesito que en stock, configuracion de stock, mix de ventas, me lo separes como si fuera
+// el plan de produccion, por empresa y por area" -- antes Mix ventas era UNA tabla larga con todas las
+// empresas y áreas apiladas (secciones con encabezado). Ahora usa el mismo patrón de navegación que
+// Producción/Planificación: una fila de pestañas por empresa arriba y, adentro, una fila de pestañas
+// por área (renderMixTabs/renderMixEmpresa, mismo esquema que rGInner/renderPlanEmpresa). Como ahora
+// solo los inputs del área visible existen en el DOM en un momento dado, lo tipeado en otras áreas se
+// perdería al cambiar de pestaña si se leyera todo del DOM recién al guardar -- por eso cada input
+// escribe en mixDraft (mismo patrón que stockConteoDraft de Conteo de stock) apenas se tipea, y
+// guardarMix() lee de ahí, no del DOM, así que sobrevive a los cambios de pestaña.
 async function renderMix(){
-  const ef=document.getElementById('stock-hist-esel').value;
   const el=document.getElementById('stock-mix-content');
   el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
-  // Cargar maestro si no está
   if(!st.Pr.length){
     try{
       const[ar,pr]=await Promise.all([get('areas','order=nombre.asc'),get('productos','order=nombre.asc')]);
       st.A=ar||[];st.Pr=pr||[];
     }catch{}
   }
-  try{
-    let f='order=area.asc,producto.asc';
-    if(ef!=='all')f+=`&empresa_id=eq.${ef}`;
-    mixData=await get('mix_ventas',f);
-  }catch{mixData=[]}
-  let prods=st.Pr;
-  if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
-  if(!prods.length){el.innerHTML='<div class="empty">Sin productos.</div>';return}
+  if(!mixCargado){
+    try{ mixData=await get('mix_ventas','order=area.asc,producto.asc'); }catch{mixData=[]}
+    mixDraft={};
+    mixCargado=true;
+  }
+  if(!st.Pr.length){el.innerHTML='<div class="empty">Sin productos.</div>';return}
+  renderMixTabs();
+}
 
-  // Calcular totales por empresa para mostrar suma
-  const totEmp={};
-  prods.forEach(p=>{
-    const area=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';
-    const m=mixData.find(x=>x.empresa_id===p.empresa_id&&x.area===area&&x.producto===p.nombre);
-    const val=m?m.porcentaje:0;
-    if(!totEmp[p.empresa_id])totEmp[p.empresa_id]=0;
-    totEmp[p.empresa_id]+=val;
+function mixPid(eid,area,nombre){
+  return `mix-${eid}-${area.replace(/\s/g,'_')}-${nombre.replace(/[\s'\/]/g,'_')}`;
+}
+
+function renderMixTabs(){
+  const el=document.getElementById('stock-mix-content');
+  if(!el)return;
+  const byE={};st.Pr.forEach(p=>{const eid=p.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(p)});
+  const eids=Object.keys(byE);
+  if(!eids.length){el.innerHTML='<div class="empty">Sin productos.</div>';return}
+  if(!mixActiveEmp||!byE[mixActiveEmp])mixActiveEmp=eids[0];
+
+  let h=`<div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1rem;flex-wrap:wrap">`;
+  eids.forEach(eid=>{
+    const clr=ec(eid);const nm=en(eid)||'SE';
+    const active=eid===mixActiveEmp;
+    h+=`<button class="proy-tab${active?' active':''}" onclick="mixSetEmp('${eid}')" style="${active?'border-bottom:2px solid '+clr+';color:'+clr:''}">
+      <span class="color-dot" style="background:${clr};display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>${nm}
+    </button>`;
   });
+  h+=`</div><div id="mix-emp-content"></div>`;
+  el.innerHTML=h;
+  renderMixEmpresa(mixActiveEmp, byE[mixActiveEmp]||[]);
+}
 
-  const byE={};prods.forEach(p=>{const eid=p.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(p)});
-  let h=`<div class="stock-card"><table class="stock-tbl"><thead><tr>
-    <th style="text-align:left">Empresa / Area / Producto</th>
+function mixSetEmp(eid){ mixActiveEmp=eid; renderMixTabs(); }
+function mixSetArea(eid,area){ mixActiveArea[eid]=area; renderMixTabs(); }
+
+function renderMixEmpresa(eid, items){
+  const el=document.getElementById('mix-emp-content');
+  if(!el)return;
+
+  const bA={};
+  items.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';if(!bA[a])bA[a]=[];bA[a].push(p)});
+  const areas=Object.keys(bA);
+  const as=gas(areas.map(a=>({area:a})));
+  if(!mixActiveArea[eid]||!bA[mixActiveArea[eid]])mixActiveArea[eid]=areas[0];
+  const activeArea=mixActiveArea[eid];
+
+  // Total de la empresa entera (todas las áreas, no solo la que se está viendo) -- toma lo tipeado sin
+  // guardar (mixDraft) si lo hay, si no el valor ya guardado.
+  let totEmp=0;
+  items.forEach(p=>{
+    const area=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';
+    const pid=mixPid(eid,area,p.nombre);
+    const draftVal=mixDraft[pid];
+    const val=draftVal!==undefined?(parseFloat(draftVal)||0):(mixData.find(x=>x.empresa_id===eid&&x.area===area&&x.producto===p.nombre)?.porcentaje||0);
+    totEmp+=val;
+  });
+  const totCls=Math.abs(totEmp-100)<0.1?'color:var(--green)':totEmp>100?'color:var(--red)':'color:var(--amber)';
+
+  let h=`<div style="display:flex;gap:8px;border-bottom:.5px solid var(--border);margin-bottom:1rem;flex-wrap:wrap;align-items:center;justify-content:space-between">`;
+  h+=`<div style="display:flex;gap:0;flex-wrap:wrap">`;
+  areas.forEach(area=>{
+    const bg2=ab(area,as);const ac2=ac(area,as);
+    const isActive=area===activeArea;
+    h+=`<button class="proy-tab${isActive?' active':''}" onclick="mixSetArea('${eid}','${area.replace(/'/g,"\\'")}')">
+      <span style="background:${bg2};color:${ac2};border-radius:4px;padding:1px 6px;font-size:11px">${area}</span>
+    </button>`;
+  });
+  h+=`</div>`;
+  h+=`<span style="font-size:12px;font-weight:700;white-space:nowrap;${totCls}">Total ${en(eid)||''}: ${totEmp.toFixed(1)}%</span>`;
+  h+=`</div>`;
+
+  h+=`<div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
+    <th style="text-align:left">Producto</th>
     <th style="text-align:left;width:70px">Unidad</th>
     <th style="text-align:right;width:120px">% Mix ventas</th>
   </tr></thead><tbody>`;
-
-  Object.entries(byE).forEach(([eid,items])=>{
-    const clr=ec(eid);const nm=en(eid)||'SE';
-    const tot=totEmp[eid]||0;
-    const totCls=Math.abs(tot-100)<0.1?'color:var(--green)':tot>100?'color:var(--red)':'color:var(--amber)';
-    h+=`<tr><td colspan="3" style="background:var(--bg2);padding:6px 12px;font-size:12px;border-top:2px solid ${clr}">
-      <span style="font-weight:700;color:${clr}">${nm}</span>
-      <span style="float:right;font-size:12px;font-weight:700;${totCls}">Total: ${tot.toFixed(1)}%</span>
-    </td></tr>`;
-    const byArea={};items.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';if(!byArea[a])byArea[a]=[];byArea[a].push(p)});
-    Object.entries(byArea).forEach(([area,aItems])=>{
-      h+=`<tr><td colspan="3" style="padding:4px 12px 4px 20px;font-size:11px;color:${clr};font-weight:600">${area}</td></tr>`;
-      aItems.forEach(p=>{
-        const m=mixData.find(x=>x.empresa_id===eid&&x.area===area&&x.producto===p.nombre);
-        const val=m?m.porcentaje:'';
-        const pid=`mix-${eid}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
-        h+=`<tr>
-          <td style="font-weight:500;padding-left:28px">${p.nombre}</td>
-          <td style="font-size:12px;color:var(--text2)">${p.unidad}</td>
-          <td style="text-align:right">
-            <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
-              <input class="proy-input" type="number" min="0" max="100" step="0.1" id="${pid}" value="${val}" placeholder="0" style="width:80px"/>
-              <span style="font-size:12px;color:var(--text2)">%</span>
-            </div>
-          </td>
-        </tr>`;
-      });
-    });
+  (bA[activeArea]||[]).forEach(p=>{
+    const pid=mixPid(eid,activeArea,p.nombre);
+    const draftVal=mixDraft[pid];
+    const m=mixData.find(x=>x.empresa_id===eid&&x.area===activeArea&&x.producto===p.nombre);
+    const val=draftVal!==undefined?draftVal:(m?m.porcentaje:'');
+    h+=`<tr>
+      <td style="font-weight:500">${p.nombre}</td>
+      <td style="font-size:12px;color:var(--text2)">${p.unidad}</td>
+      <td style="text-align:right">
+        <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
+          <input class="proy-input" type="number" min="0" max="100" step="0.1" id="${pid}" value="${val}" placeholder="0" style="width:80px" oninput="mixDraft['${pid}']=this.value"/>
+          <span style="font-size:12px;color:var(--text2)">%</span>
+        </div>
+      </td>
+    </tr>`;
   });
   h+=`</tbody></table></div>`;
   el.innerHTML=h;
 }
 
 async function guardarMix(){
-  const ef=document.getElementById('stock-hist-esel').value;
-  let prods=st.Pr;if(ef!=='all')prods=prods.filter(p=>p.empresa_id===ef);
   ss('saving','Guardando...');
   try{
-    for(const p of prods){
+    for(const p of st.Pr){
       const area=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';
-      const pid=`mix-${p.empresa_id}-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
-      const inp=document.getElementById(pid);
-      if(!inp||inp.value==='')continue;
-      const porcentaje=parseFloat(inp.value)||0;
+      const pid=mixPid(p.empresa_id,area,p.nombre);
+      if(!(pid in mixDraft)||mixDraft[pid]==='')continue;
+      const porcentaje=parseFloat(mixDraft[pid])||0;
       const existing=mixData.find(x=>x.empresa_id===p.empresa_id&&x.area===area&&x.producto===p.nombre);
       if(existing){
         await fetch(`${SB}/rest/v1/mix_ventas?id=eq.${existing.id}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({porcentaje,updated_at:new Date().toISOString()})});
@@ -7994,10 +8042,11 @@ async function guardarMix(){
         if(res&&res[0])mixData.push(res[0]);
       }
     }
+    mixDraft={};
     ss('online','Guardado');
     const msg=document.getElementById('stock-mix-msg');msg.style.display='flex';
     setTimeout(()=>msg.style.display='none',3000);
-    renderMix();
+    renderMixTabs();
   }catch(e){ss('error','Error: '+e.message)}
 }
 
