@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.234</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.235</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -885,7 +885,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 
     <!-- MIX VENTAS -->
     <div id="cf-mix" style="display:none">
-      <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Ingresá el % de participación de cada producto en el total de ventas. La suma por empresa debería ser 100%.</div>
+      <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Ingresá el % de participación de cada producto en el total de ventas. La suma por empresa debería ser 100%. Solo aparecen productos con área asignada en Configuración &gt; Producción — si falta alguno, asignale un área ahí primero.</div>
       <div id="stock-mix-content"></div>
       <div style="display:flex;justify-content:flex-end;margin-top:1rem">
         <button class="btn btn-primary" onclick="guardarMix()"><i class="ti ti-device-floppy"></i> Guardar mix</button>
@@ -7940,10 +7940,20 @@ function mixPid(eid,area,nombre){
   return `mix-${eid}-${area.replace(/\s/g,'_')}-${nombre.replace(/[\s'\/]/g,'_')}`;
 }
 
+// v4.235: "no lo pongas solo los que estan en la configuracion, en todo caso agrego desde la
+// configuracion" -- Mix ventas lumpeaba los productos sin área asignada (o con un área que ya no
+// existe en Configuración > Producción) bajo una pestaña rotulada "SA" ("Sin Área", el mismo fallback
+// que ya usaba el resto de Stock) -- confirmado en vivo: 82 productos de Planeta en esa situación.
+// Confundía porque no es un área que él haya creado. Ahora Mix ventas directamente NO LOS MUESTRA --
+// si un producto necesita entrar acá, primero hay que asignarle un área en Configuración.
+function mixProductosValidos(){
+  return st.Pr.filter(p=>p.area_id&&st.A.some(a=>a.id===p.area_id));
+}
+
 function renderMixTabs(){
   const el=document.getElementById('stock-mix-content');
   if(!el)return;
-  const byE={};st.Pr.forEach(p=>{const eid=p.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(p)});
+  const byE={};mixProductosValidos().forEach(p=>{const eid=p.empresa_id||'_';if(!byE[eid])byE[eid]=[];byE[eid].push(p)});
   const eids=Object.keys(byE);
   if(!eids.length){el.innerHTML='<div class="empty">Sin productos.</div>';return}
   if(!mixActiveEmp||!byE[mixActiveEmp])mixActiveEmp=eids[0];
@@ -8028,7 +8038,7 @@ function renderMixEmpresa(eid, items){
 async function guardarMix(){
   ss('saving','Guardando...');
   try{
-    for(const p of st.Pr){
+    for(const p of mixProductosValidos()){
       const area=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';
       const pid=mixPid(p.empresa_id,area,p.nombre);
       if(!(pid in mixDraft)||mixDraft[pid]==='')continue;
