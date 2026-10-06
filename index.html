@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.236</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.237</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -847,6 +847,10 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       </div>
       <div id="flexxus-stock-msg" style="display:none;margin-top:8px" class="alert alert-ok"><i class="ti ti-check"></i> <span id="flexxus-stock-msg-txt"></span></div>
       <div id="flexxus-stock-err" style="display:none;margin-top:8px" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="flexxus-stock-err-txt"></span></div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:.75rem;flex-wrap:wrap">
+      <input type="text" id="flexxus-stock-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="filtrarFlexxusStock()"
+        style="flex:1;min-width:200px;max-width:320px;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
     </div>
     <div id="flexxus-stock-content"></div>
   </div>
@@ -8590,7 +8594,8 @@ function tablaFlexxusResultado(entries,depositoId){
     const existing=esPrincipal?mpConteoData.find(x=>x.mp_id===m.id&&!x.deposito_id):mpConteoData.find(x=>x.mp_id===m.id&&x.deposito_id===depositoId);
     const val=existing&&existing.stock!=null?existing.stock:'';
     const nombreMostrado=prod?prod.nombre:(m.sigla||m.nombre);
-    h+=`<tr>
+    const txt=((prod?prod.nombre:'')+' '+(m.sigla||'')+' '+m.nombre+' '+(m.codigo||'')).toLowerCase();
+    h+=`<tr class="fxr-row" data-txt="${txt}">
       <td style="font-size:12px;color:var(--text2);font-family:monospace">${m.codigo||''}</td>
       <td style="font-weight:500">${nombreMostrado}${nombreMostrado!==m.nombre?`<div style="font-size:10px;color:var(--text3);font-weight:400">${m.nombre}</div>`:''}</td>
       <td style="font-size:12px;color:var(--text2)">${m.unidad||''}</td>
@@ -8600,12 +8605,22 @@ function tablaFlexxusResultado(entries,depositoId){
   h+=`</tbody></table></div></div>`;
   return h;
 }
+// v4.237: "aca necesito que me hagas un buscador de producto" -- mismo patrón que mp-conteo-filtro de
+// "Conteo de stock manual" (filtrarMpConteo): un input de texto filtra las filas ya renderizadas por
+// data-txt (nombre/sigla/nombre largo/código en minúscula), sin volver a pedir nada a Supabase.
+function filtrarFlexxusStock(){
+  const flt=(document.getElementById('flexxus-stock-filtro')?.value||'').toLowerCase().trim();
+  document.querySelectorAll('#flexxus-stock-content tr.fxr-row').forEach(tr=>{
+    tr.style.display=(!flt||tr.dataset.txt.includes(flt))?'':'none';
+  });
+}
 function renderFlexxusStockResultado(){
   const el=document.getElementById('flexxus-stock-content');
   if(!el)return;
   if(!flexxusStockUltimoDep){el.innerHTML='';return}
   const entries=entriesDeConteo(flexxusStockUltimoDep.id);
   el.innerHTML=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin:1rem 0 8px">Stock cargado en "${flexxusStockUltimoDep.nombre}"</div>${tablaFlexxusResultado(entries,flexxusStockUltimoDep.id)}`;
+  filtrarFlexxusStock();
 }
 
 async function importarExcelFlexxusStock(input){
