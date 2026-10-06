@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.235</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.236</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -848,6 +848,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <div id="flexxus-stock-msg" style="display:none;margin-top:8px" class="alert alert-ok"><i class="ti ti-check"></i> <span id="flexxus-stock-msg-txt"></span></div>
       <div id="flexxus-stock-err" style="display:none;margin-top:8px" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="flexxus-stock-err-txt"></span></div>
     </div>
+    <div id="flexxus-stock-content"></div>
   </div>
   <!-- HISTORIAL -->
   <div id="stock-sub-hist" style="display:none">
@@ -8245,6 +8246,12 @@ let stockConteoDepositosCargado=false;
 // renglones de mp_conteo de un mp_id sin importar su deposito_id.
 let stockConteoDepSel=null; // depósito elegido para cargar en este momento (o '_sindep'); null = ninguno
 let resumenConteoUltimo=[]; // último resumen calculado (para poder imprimirlo sin volver a pedirlo)
+let flexxusStockUltimoDep=null; // {id,nombre} del último depósito importado en Conteo stock Flexxus
+                                 // esta sesión -- v4.236: "necesito que el stock me lo ponga abajo de
+                                 // esa pestaña" (antes solo se veía un cartel de texto, había que ir a
+                                 // "Conteo de stock manual" para ver los valores). Se usa para volver a
+                                 // mostrar la tabla si se sale y se vuelve a entrar a la pestaña sin
+                                 // haber importado de nuevo.
 
 // ── CONTEO DE STOCK (dentro de la pestaña Stock) ─────────────────
 async function loadStockConteo(){
@@ -8564,6 +8571,43 @@ async function upsertMpConteo(fecha,mpId,stock,depositoId){
 // dos empresas juntas. Tiene su propia fecha (flexxus-stock-fecha) -- al importar, esa misma fecha se
 // copia al selector de "Conteo de stock manual" para que al cambiar de pestaña se vea lo recién
 // cargado.
+
+// v4.236: tabla de solo-lectura que muestra, debajo del botón de importar, lo que efectivamente quedó
+// cargado en mp_conteo para el depósito recién importado -- mismas filas que tablaStockConteo (reusa
+// entriesDeConteo) pero sin inputs editables ni draft, porque esto no es un formulario de carga, es
+// una confirmación visual de lo que ya se guardó.
+function tablaFlexxusResultado(entries,depositoId){
+  if(!entries.length){
+    return '<div class="empty"><i class="ti ti-package-off"></i>Sin productos asignados a este depósito.</div>';
+  }
+  let h=`<div class="stock-card"><div style="overflow-x:auto"><table class="stock-tbl" style="table-layout:fixed"><thead><tr>
+    <th style="text-align:left;width:90px">Código</th>
+    <th style="text-align:left">Producto</th>
+    <th style="text-align:left;width:90px">Unidad</th>
+    <th style="text-align:right;width:120px">Stock cargado</th>
+  </tr></thead><tbody>`;
+  entries.forEach(({m,prod,esPrincipal})=>{
+    const existing=esPrincipal?mpConteoData.find(x=>x.mp_id===m.id&&!x.deposito_id):mpConteoData.find(x=>x.mp_id===m.id&&x.deposito_id===depositoId);
+    const val=existing&&existing.stock!=null?existing.stock:'';
+    const nombreMostrado=prod?prod.nombre:(m.sigla||m.nombre);
+    h+=`<tr>
+      <td style="font-size:12px;color:var(--text2);font-family:monospace">${m.codigo||''}</td>
+      <td style="font-weight:500">${nombreMostrado}${nombreMostrado!==m.nombre?`<div style="font-size:10px;color:var(--text3);font-weight:400">${m.nombre}</div>`:''}</td>
+      <td style="font-size:12px;color:var(--text2)">${m.unidad||''}</td>
+      <td style="text-align:right;font-weight:600">${val}</td>
+    </tr>`;
+  });
+  h+=`</tbody></table></div></div>`;
+  return h;
+}
+function renderFlexxusStockResultado(){
+  const el=document.getElementById('flexxus-stock-content');
+  if(!el)return;
+  if(!flexxusStockUltimoDep){el.innerHTML='';return}
+  const entries=entriesDeConteo(flexxusStockUltimoDep.id);
+  el.innerHTML=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin:1rem 0 8px">Stock cargado en "${flexxusStockUltimoDep.nombre}"</div>${tablaFlexxusResultado(entries,flexxusStockUltimoDep.id)}`;
+}
+
 async function importarExcelFlexxusStock(input){
   const file=input.files[0];
   if(!file)return;
@@ -8657,6 +8701,8 @@ async function importarExcelFlexxusStock(input){
     const fechaManualEl=document.getElementById('stock-conteo-fecha');
     if(fechaManualEl)fechaManualEl.value=fecha;
     await loadStockConteo();
+    flexxusStockUltimoDep={id:depositoMatch.id,nombre:depositoMatch.nombre};
+    renderFlexxusStockResultado();
     loadingEl.style.display='none';
     document.getElementById('flexxus-stock-msg-txt').textContent=`${cargados} producto${cargados!==1?'s':''} cargado${cargados!==1?'s':''} en "${depositoMatch.nombre}"${depositoCreado?' (depósito nuevo, creado ahora)':''} para el ${fecha}.${sinMapeo?` (${sinMapeo} código${sinMapeo!==1?'s':''} del archivo con stock pero sin producto vinculado en Configuración.)`:''} Para revisarlo o ajustar algo a mano, entrá a "Conteo de stock manual" y elegí el depósito "${depositoMatch.nombre}".`;
     msgEl.style.display='';
@@ -8825,6 +8871,7 @@ function showStockSubTab(t){
   if(t==='flexxus'){
     const fEl=document.getElementById('flexxus-stock-fecha');
     if(fEl&&!fEl.value)fEl.value=hoyLocal();
+    renderFlexxusStockResultado();
   }
   if(t==='config')showConfigStockTab('seg');
   if(t==='consumomp'){
