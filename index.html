@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.237</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.239</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -406,6 +406,8 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <button class="btn" onclick="document.getElementById('rec-xlsx-input').click()"><i class="ti ti-file-spreadsheet"></i> Importar desde Excel</button>
         <input type="file" id="rec-csv-estructura-input" accept=".csv" style="display:none" onchange="importarRecetasCsvEstructura(this)"/>
         <button class="btn" onclick="document.getElementById('rec-csv-estructura-input').click()"><i class="ti ti-sitemap"></i> Importar Rellenos/Proceso (CSV Estructura)</button>
+        <input type="file" id="rec-xls-estructura-input" accept=".xls,.xlsx" style="display:none" onchange="importarEstructuraProductoXls(this)"/>
+        <button class="btn" onclick="document.getElementById('rec-xls-estructura-input').click()"><i class="ti ti-sitemap"></i> Importar Estructura de Producto (Excel)</button>
         <span id="rec-import-loading" style="display:none;font-size:13px;color:var(--text2);align-items:center;gap:6px"><span class="spinner spinner-dark"></span> Procesando archivo...</span>
       </div>
       <button class="btn btn-primary" id="btnsaverec2" onclick="saveRecetas()"><i class="ti ti-device-floppy"></i> Guardar recetas</button>
@@ -838,7 +840,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div class="grid-card" style="margin-bottom:1rem">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
         <label style="font-size:13px;color:var(--text2)">Fecha:</label>
-        <input type="date" id="flexxus-stock-fecha" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        <input type="date" id="flexxus-stock-fecha" onchange="loadFlexxusStock()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
       </div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <input type="file" id="flexxus-stock-input" accept=".xlsx,.xls" onchange="importarExcelFlexxusStock(this)"
@@ -848,6 +850,9 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <div id="flexxus-stock-msg" style="display:none;margin-top:8px" class="alert alert-ok"><i class="ti ti-check"></i> <span id="flexxus-stock-msg-txt"></span></div>
       <div id="flexxus-stock-err" style="display:none;margin-top:8px" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="flexxus-stock-err-txt"></span></div>
     </div>
+    <!-- v4.239: selector de depósito -- siempre permite volver a ver el stock YA GUARDADO de cualquier
+         depósito para la fecha elegida, sin depender de haber importado algo en esta sesión del navegador. -->
+    <div id="flexxus-stock-dep-grid" style="margin-bottom:1rem"></div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:.75rem;flex-wrap:wrap">
       <input type="text" id="flexxus-stock-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="filtrarFlexxusStock()"
         style="flex:1;min-width:200px;max-width:320px;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
@@ -6661,6 +6666,197 @@ async function importarRecetasCsvEstructura(input){
   }
 }
 
+// v4.238: "Te paso la estructura de producto... cargar esto a las recetas de cada uno de los
+// productos... por unica vez la exportacion... que me quede la posibilidad de editarlo manualmente...
+// si vez alguna inconsistencia avisame" -- importa el export "Estructura de Producto" de Flexxus en
+// formato .xls/.xlsx (reporte paginado: un bloque "Artículo: <nombre>" por producto, fila de
+// encabezados, y una fila por ingrediente con el código en columna A y la cantidad en columna H -- tal
+// cual lo describió). A diferencia de importarRecetasCsvEstructura (que ya existía, pero sólo trae
+// Rellenos/Proceso vía un CSV con "Codigo Padre" explícito), este archivo:
+// (a) no trae código para el producto "padre" -- sólo el nombre -- así que hay que resolverlo contra
+//     Maestro (primero Producción de Planeta, después Materias Primas) por nombre, exacto o sacándole el
+//     sufijo de unidad/caja ("POR KILOS/LITROS/UNIDADES...", "CAJA POR N ...") y acentos; si no matchea
+//     nada, igual se importa bajo el nombre tal cual viene del archivo (va a aparecer "sin maestro" en la
+//     lista, mismo comportamiento que cualquier receta sin producto vinculado) y se avisa en el resumen;
+// (b) el reporte corta cada página cada ~30 filas, y cuando la lista de ingredientes de un producto no
+//     entra en una página, Flexxus repite el bloque "Artículo: <mismo nombre>" en la página siguiente y
+//     sigue ahí -- verificado contra el archivo real que esto SIEMPRE coincide con un salto de página
+//     (nunca se corta una lista a mitad de página sin repetir el encabezado) -- por eso los bloques con
+//     el mismo nombre de producto se FUSIONAN en una sola receta (concatenando ingredientes) en vez de
+//     pisarse uno al otro, que hubiera sido pérdida de datos silenciosa.
+async function importarEstructuraProductoXls(input){
+  const file=input.files[0];
+  if(!file)return;
+  const loadingEl=document.getElementById('rec-import-loading');
+  const msgEl=document.getElementById('rec-import-msg');
+  const errEl=document.getElementById('rec-import-err');
+  msgEl.style.display='none';errEl.style.display='none';
+  loadingEl.style.display='inline-flex';
+  try{
+    if(!window.XLSX){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload=res;s.onerror=rej;document.head.appendChild(s);
+      });
+    }
+    const buf=await file.arrayBuffer();
+    const wb=window.XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const filas=window.XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
+    if(!filas.length)throw new Error('El archivo está vacío.');
+
+    const strip=s=>String(s).normalize('NFD').replace(/[̀-ͯ]/g,'');
+    const UNIT_RE=/\s*(CAJA\s+)?POR\s+\d*\s*(KILOS?|LITROS?|UNIDADES?|GRAMOS?|CC\.?|DOCENAS?|\d+U\.?)\s*\.?\s*$/i;
+    const coreName=desc=>String(desc).replace(UNIT_RE,'').trim();
+    const inferUnidad=desc=>{
+      const m=String(desc).match(UNIT_RE);
+      if(!m)return 'Unidad';
+      const u=strip(m[2]||'').toLowerCase();
+      if(u.startsWith('kilo'))return 'Kg';
+      if(u.startsWith('litro'))return 'Litros';
+      if(u.startsWith('gramo'))return 'Gr';
+      if(u.startsWith('cc'))return 'CC';
+      return 'Unidad';
+    };
+    const norm=s=>strip(String(s||'').trim().toLowerCase()).replace(/\s+/g,' ');
+
+    // 1) Parsear bloques "Artículo: <nombre>" -> filas de ingrediente, saltando encabezados/paginación
+    // (fila con la empresa, fila con el título del reporte, fila "Page N of M").
+    const isPageNoise=row=>{
+      const c0=String((row&&row[0])||'').trim();
+      const c10=String((row&&row[10])||'');
+      return c0==='PLANETA EMPANADA'||c0==='JOSELITO'||c0==='Estructura de Producto'||/Page\s+\d+\s+of\s+\d+/i.test(c10);
+    };
+    const bloques=[];
+    let i=0;
+    while(i<filas.length){
+      const row=filas[i]||[];
+      const c0=String(row[0]||'').trim();
+      if(isPageNoise(row)){i++;continue}
+      if(c0==='Artículo:'){
+        const nombre=String(row[1]||'').trim();
+        i++;
+        if(i<filas.length&&String((filas[i]||[])[0]||'').trim()==='Código')i++; // fila de encabezados
+        const ings=[];
+        while(i<filas.length){
+          const r2=filas[i]||[];
+          const rc0=String(r2[0]||'').trim();
+          if(rc0==='Artículo:')break;
+          if(isPageNoise(r2)){i++;continue}
+          ings.push({codigo:rc0,nombre:String(r2[1]||'').trim(),cantidad:r2[7]});
+          i++;
+        }
+        if(nombre)bloques.push({nombre,ingredientes:ings});
+        continue;
+      }
+      i++;
+    }
+    if(!bloques.length)throw new Error('No encontré ningún bloque "Artículo:" -- ¿es el export de "Estructura de Producto" de Flexxus?');
+
+    // 2) Fusionar bloques con el mismo nombre (ver nota arriba sobre el corte de página).
+    const porNombre=new Map();
+    const orden=[];
+    bloques.forEach(b=>{
+      if(!porNombre.has(b.nombre)){porNombre.set(b.nombre,[]);orden.push(b.nombre)}
+      porNombre.get(b.nombre).push(...b.ingredientes);
+    });
+
+    // 3) Matchear cada producto "padre" contra Maestro: primero Producción de Planeta (empresa del
+    // archivo), después Materias Primas -- exacto y, si no, por nombre "core" (sin sufijo de unidad/caja).
+    const planeta=congGetPlaneta();
+    const prodPlaneta=planeta?st.Pr.filter(p=>p.empresa_id===planeta.id):[];
+    const prodPorNombreNorm=new Map();prodPlaneta.forEach(p=>prodPorNombreNorm.set(norm(p.nombre),p));
+    const prodPorCoreNorm=new Map();prodPlaneta.forEach(p=>{const k=norm(coreName(p.nombre));if(!prodPorCoreNorm.has(k))prodPorCoreNorm.set(k,p)});
+    const mpPorNombreNorm=new Map();mpData.forEach(m=>mpPorNombreNorm.set(norm(m.nombre),m));
+    const mpPorCoreNorm=new Map();mpData.forEach(m=>{const k=norm(coreName(m.nombre));if(!mpPorCoreNorm.has(k))mpPorCoreNorm.set(k,m)});
+    const mpPorCodigo=new Map();mpData.forEach(m=>{if(m.codigo)mpPorCodigo.set(m.codigo,m)});
+
+    function matchPadre(nombre){
+      const n=norm(nombre),nc=norm(coreName(nombre));
+      if(prodPorNombreNorm.has(n))return prodPorNombreNorm.get(n);
+      if(mpPorNombreNorm.has(n))return mpPorNombreNorm.get(n);
+      if(prodPorCoreNorm.has(nc))return prodPorCoreNorm.get(nc);
+      if(mpPorCoreNorm.has(nc))return mpPorCoreNorm.get(nc);
+      return null;
+    }
+
+    // 4) Armar las recetas: key definitiva = nombre real de Maestro si matcheó, si no el nombre del
+    // archivo tal cual (va a quedar marcada "sin maestro" en la lista). Ingredientes matcheados por
+    // código contra Materias Primas; sin match, se agrega una MP nueva al final.
+    let nuevas=0,actualizadas=0;
+    const sinMaestro=[];
+    let blancos=0,ceros=0;
+    const nuevosIngredientes=new Map();
+    if(!st.RecTanda)st.RecTanda={};
+
+    for(const nombreArchivo of orden){
+      const ingsRaw=porNombre.get(nombreArchivo);
+      const matched=matchPadre(nombreArchivo);
+      const key=matched?matched.nombre:nombreArchivo;
+
+      const ingredientes=[];
+      ingsRaw.forEach(ing=>{
+        if(!ing.codigo&&!ing.nombre){blancos++;return} // línea sin código ni nombre (dato incompleto en el archivo)
+        const cantidad=typeof ing.cantidad==='number'?ing.cantidad:parseFloat(String(ing.cantidad||'').replace(',','.'));
+        if(!isFinite(cantidad)||cantidad===0){ceros++;return} // cantidad 0 -- mismo criterio que importarRecetasCsvEstructura
+        let mpHijo=ing.codigo?mpPorCodigo.get(ing.codigo):undefined;
+        let ingrediente,unidad;
+        if(mpHijo){
+          ingrediente=mpHijo.nombre;unidad=mpHijo.unidad||inferUnidad(ing.nombre);
+        }else{
+          const nombreIng=coreName(ing.nombre)||ing.nombre;
+          unidad=inferUnidad(ing.nombre);
+          ingrediente=nombreIng;
+          const k=norm(nombreIng);
+          if(!nuevosIngredientes.has(k))nuevosIngredientes.set(k,{nombre:nombreIng,unidad,codigo:ing.codigo||null});
+        }
+        ingredientes.push({ingrediente,cantidad,unidad});
+      });
+      if(!ingredientes.length)continue;
+
+      const existia=st.Rec[key]!==undefined;
+      st.Rec[key]=ingredientes;
+      if(existia)actualizadas++;else nuevas++;
+      if(!matched)sinMaestro.push(nombreArchivo);
+    }
+
+    // 5) Crear en Materias Primas los ingredientes nuevos detectados (con su código de Flexxus, si vino).
+    let mpCreadas=0;
+    for(const {nombre,unidad,codigo} of nuevosIngredientes.values()){
+      try{
+        const payload={nombre,unidad};
+        if(codigo)payload.codigo=codigo;
+        const res=await ins('materias_primas',payload);
+        mpData.push(res[0]);
+        mpCreadas++;
+      }catch(e){/* si falla la creo a mano despues desde Maestro */}
+    }
+    mpData.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+
+    rRec();
+    loadingEl.style.display='none';
+    const total=nuevas+actualizadas;
+    if(!total)throw new Error('No se importó ninguna receta. Verificá que sea el archivo de "Estructura de Producto" de Flexxus.');
+    const partes=[`${total} recetas importadas (${nuevas} nuevas, ${actualizadas} actualizadas)`];
+    if(mpCreadas)partes.push(`${mpCreadas} materias primas nuevas agregadas al maestro (código del artículo sin coincidencia previa)`);
+    if(sinMaestro.length)partes.push(`⚠ ${sinMaestro.length} producto(s) del archivo no coinciden con ningún producto/materia prima existente en Maestro -- se cargaron igual con el nombre tal cual viene del archivo (etiqueta "sin maestro" en la lista); si corresponden a algo que ya tenés, renombrá la receta para que el nombre coincida, o cargalo primero en Configuración`);
+    if(ceros)partes.push(`${ceros} línea(s) de ingrediente con cantidad 0 en el archivo se omitieron (mayormente condimentos sin costear en el sistema de origen) -- revisalas a mano si hace falta`);
+    if(blancos)partes.push(`${blancos} línea(s) sin código ni nombre se ignoraron (dato incompleto en el archivo de origen)`);
+    msgEl.innerHTML=`<i class="ti ti-check"></i> ${partes.join('. ')}. Todavía no se guardó nada: revisá las recetas y después hacé click en "Guardar recetas".`;
+    if(sinMaestro.length){
+      msgEl.innerHTML+=`<div style="margin-top:8px;font-size:12px;max-height:140px;overflow-y:auto;color:var(--text2)">${sinMaestro.map(n=>`• ${n}`).join('<br>')}</div>`;
+    }
+    msgEl.style.display='';
+    input.value='';
+  }catch(e){
+    loadingEl.style.display='none';
+    errEl.innerHTML=`<i class="ti ti-alert-circle"></i> ${e.message}`;
+    errEl.style.display='';
+    input.value='';
+  }
+}
+
 // CONSUMO
 async function renderCon(){
   const modo=document.getElementById('cmodo').value;const ef=document.getElementById('ceesel').value;
@@ -8576,6 +8772,66 @@ async function upsertMpConteo(fecha,mpId,stock,depositoId){
 // copia al selector de "Conteo de stock manual" para que al cambiar de pestaña se vea lo recién
 // cargado.
 
+// v4.239: "cuando salgo del stock de flexxus y quiero volver se me borra todo el stock, asegurate que
+// lo grabe" -- el stock SIEMPRE quedó guardado en mp_conteo (el import ya escribe directo a Supabase,
+// no depende de ningún botón "Guardar"), pero la tabla "Stock cargado en X" se armaba solo a partir de
+// flexxusStockUltimoDep, una variable en memoria que se pierde al recargar la página o abrir la app de
+// nuevo -- por eso parecía "borrado" aunque los datos seguían intactos en la base. Fix: un selector de
+// depósito (mismo agrupado por empresa que ya usa "Conteo de stock manual") que siempre permite volver
+// a ver el stock YA GUARDADO de cualquier depósito para la fecha elegida, sin depender de haber
+// importado algo en esta misma sesión de navegador. loadFlexxusStock() trae mp_conteo fresco para la
+// fecha de ESTA pestaña (flexxus-stock-fecha, independiente de la fecha del tab manual, ver nota de
+// v4.233 más abajo) y se llama cada vez que se entra a la pestaña o se cambia la fecha -- así el
+// selector y la tabla siempre reflejan lo que de verdad hay guardado, no un recuerdo de la sesión.
+async function loadFlexxusStock(){
+  const fecha=document.getElementById('flexxus-stock-fecha').value||hoyLocal();
+  try{ mpConteoData=await get('mp_conteo',`fecha=eq.${fecha}`); }catch{mpConteoData=[]}
+  if(!stockConteoDepositosCargado){
+    try{ stockConteoDepositos=await get('depositos','order=nombre.asc'); }catch{stockConteoDepositos=[]}
+    stockConteoDepositosCargado=true;
+  }
+  if(!mpDepositosCargado){
+    try{ mpDepositosData=await get('mp_depositos','select=*'); }catch{mpDepositosData=[]}
+    mpDepositosCargado=true;
+  }
+  renderFlexxusDepSelector();
+  renderFlexxusStockResultado();
+}
+function flexxusStockSetDep(id,nombre){
+  flexxusStockUltimoDep={id,nombre};
+  renderFlexxusDepSelector();
+  renderFlexxusStockResultado();
+}
+// Grilla de botones por depósito (agrupados por empresa), igual que "Conteo de stock manual" -- deja
+// elegir CUALQUIER depósito para ver su stock ya guardado, no solo el que se acaba de importar.
+function renderFlexxusDepSelector(){
+  const el=document.getElementById('flexxus-stock-dep-grid');
+  if(!el)return;
+  if(!stockConteoDepositos.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-building-warehouse"></i> No hay depósitos cargados. Agregalos en Stock &gt; Configuración stock &gt; Depositos.</div>';
+    return;
+  }
+  const botonesDeps=deps=>{
+    let h='<div style="display:flex;flex-wrap:wrap;gap:8px">';
+    deps.forEach(d=>{
+      const active=d.id===(flexxusStockUltimoDep&&flexxusStockUltimoDep.id);
+      h+=`<button class="btn${active?' btn-primary':''}" onclick="flexxusStockSetDep('${d.id}','${d.nombre.replace(/'/g,"\\'")}')"><i class="ti ti-building-warehouse"></i> ${d.nombre}</button>`;
+    });
+    return h+'</div>';
+  };
+  let h='';
+  st.E.forEach(e=>{
+    const deps=stockConteoDepositos.filter(d=>d.empresa_id===e.id);
+    if(!deps.length)return;
+    h+=`<div style="margin-bottom:.8rem"><div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">${e.nombre}</div>${botonesDeps(deps)}</div>`;
+  });
+  const sinEmp=stockConteoDepositos.filter(d=>!st.E.some(e=>e.id===d.empresa_id));
+  if(sinEmp.length){
+    h+=`<div style="margin-bottom:.8rem"><div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Sin empresa</div>${botonesDeps(sinEmp)}</div>`;
+  }
+  el.innerHTML=h;
+}
+
 // v4.236: tabla de solo-lectura que muestra, debajo del botón de importar, lo que efectivamente quedó
 // cargado en mp_conteo para el depósito recién importado -- mismas filas que tablaStockConteo (reusa
 // entriesDeConteo) pero sin inputs editables ni draft, porque esto no es un formulario de carga, es
@@ -8617,7 +8873,10 @@ function filtrarFlexxusStock(){
 function renderFlexxusStockResultado(){
   const el=document.getElementById('flexxus-stock-content');
   if(!el)return;
-  if(!flexxusStockUltimoDep){el.innerHTML='';return}
+  if(!flexxusStockUltimoDep){
+    el.innerHTML=stockConteoDepositos.length?'<div class="empty"><i class="ti ti-arrow-up"></i> Elegí un depósito arriba para ver su stock cargado.</div>':'';
+    return;
+  }
   const entries=entriesDeConteo(flexxusStockUltimoDep.id);
   el.innerHTML=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin:1rem 0 8px">Stock cargado en "${flexxusStockUltimoDep.nombre}"</div>${tablaFlexxusResultado(entries,flexxusStockUltimoDep.id)}`;
   filtrarFlexxusStock();
@@ -8697,6 +8956,12 @@ async function importarExcelFlexxusStock(input){
     // fecha elegida y ese depósito -- mismo criterio "principal" (deposito_id null) / "secundario"
     // (deposito_id explícito) que usa el resto de Conteo de stock.
     const fecha=document.getElementById('flexxus-stock-fecha').value||hoyLocal();
+    // v4.239: refrescar mpConteoData ANTES de upsertear -- si no, en una sesión recién abierta (donde
+    // todavía no se visitó "Conteo de stock manual" ni esta pestaña) mpConteoData arranca vacío, y
+    // upsertMpConteo (que busca la fila existente DENTRO de mpConteoData) no la encuentra y hace un
+    // INSERT duplicado en vez de un PATCH -- exactamente el "que si cargo un archivo nuevo lo pise" que
+    // pidió Juan Pablo. Trayendo el estado real de la fecha elegida antes de arrancar, siempre pisa.
+    try{ mpConteoData=await get('mp_conteo',`fecha=eq.${fecha}`); }catch{mpConteoData=[]}
     let cargados=0,sinMapeo=0;
     for(const [codigo,remanente] of acum){
       const mp=mpData.find(m=>(m.codigo||'').toString().trim()===codigo);
@@ -8716,7 +8981,9 @@ async function importarExcelFlexxusStock(input){
     const fechaManualEl=document.getElementById('stock-conteo-fecha');
     if(fechaManualEl)fechaManualEl.value=fecha;
     await loadStockConteo();
+    await loadFlexxusStock();
     flexxusStockUltimoDep={id:depositoMatch.id,nombre:depositoMatch.nombre};
+    renderFlexxusDepSelector();
     renderFlexxusStockResultado();
     loadingEl.style.display='none';
     document.getElementById('flexxus-stock-msg-txt').textContent=`${cargados} producto${cargados!==1?'s':''} cargado${cargados!==1?'s':''} en "${depositoMatch.nombre}"${depositoCreado?' (depósito nuevo, creado ahora)':''} para el ${fecha}.${sinMapeo?` (${sinMapeo} código${sinMapeo!==1?'s':''} del archivo con stock pero sin producto vinculado en Configuración.)`:''} Para revisarlo o ajustar algo a mano, entrá a "Conteo de stock manual" y elegí el depósito "${depositoMatch.nombre}".`;
@@ -8886,7 +9153,7 @@ function showStockSubTab(t){
   if(t==='flexxus'){
     const fEl=document.getElementById('flexxus-stock-fecha');
     if(fEl&&!fEl.value)fEl.value=hoyLocal();
-    renderFlexxusStockResultado();
+    loadFlexxusStock();
   }
   if(t==='config')showConfigStockTab('seg');
   if(t==='consumomp'){
