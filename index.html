@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.239</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.240</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -397,6 +397,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab active" id="rtab-recetas" onclick="showRecTab('recetas')"><i class="ti ti-notebook"></i> Recetas</button>
     <button class="proy-tab" id="rtab-consumo" onclick="showRecTab('consumo')"><i class="ti ti-chart-bar"></i> Consumo MP</button>
     <button class="proy-tab" id="rtab-consumostock" onclick="showRecTab('consumostock')"><i class="ti ti-stack-2"></i> MP en Stock de Proceso</button>
+    <button class="proy-tab" id="rtab-buscarmp" onclick="showRecTab('buscarmp')"><i class="ti ti-search"></i> Búsqueda de PT según MP</button>
   </div>
   <!-- Sub-tab Recetas -->
   <div id="rsub-recetas">
@@ -464,6 +465,19 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       </div>
     </div>
     <div id="rconstock-content"><div class="empty"><i class="ti ti-package"></i> Seleccioná una fecha y calculá.</div></div>
+  </div>
+  <!-- Sub-tab Búsqueda de PT según MP: elegís una materia prima y te muestra, según las Recetas, qué
+       productos (Producto Terminado o en proceso) la usan y cuánto entra por tanda de cada uno. -->
+  <div id="rsub-buscarmp" style="display:none">
+    <div class="alert alert-info" style="margin-bottom:12px"><i class="ti ti-info-circle"></i> Elegí una materia prima de la izquierda y te muestra todos los productos que la usan en su receta, con la cantidad que entra por tanda de cada uno.</div>
+    <div style="display:grid;grid-template-columns:340px 1fr;gap:1.5rem">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Materias primas</div>
+        <input type="text" id="rbmp-buscar" placeholder="🔍 Buscar materia prima..." oninput="rBuscarMPList()" style="width:100%;padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);margin-bottom:8px"/>
+        <div id="rbmplist" class="rlist"><div class="empty"><i class="ti ti-package-off"></i>Sin materias primas.</div></div>
+      </div>
+      <div id="rbmpdetail"><div class="empty"><i class="ti ti-arrow-left"></i>Elegí una materia prima.</div></div>
+    </div>
   </div>
 
   <div id="recmsg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Recetas guardadas.</div>
@@ -5696,7 +5710,7 @@ function toggleCfgDepositos(){
 }
 
 function showRecTab(t){
-  ['recetas','consumo','consumostock'].forEach(x=>{
+  ['recetas','consumo','consumostock','buscarmp'].forEach(x=>{
     document.getElementById('rsub-'+x).style.display=x===t?'':'none';
     document.getElementById('rtab-'+x).classList.toggle('active',x===t);
   });
@@ -5717,6 +5731,89 @@ function showRecTab(t){
     const fEl=document.getElementById('rconstock-fecha');
     if(!fEl.value)fEl.value=hoyLocal();
   }
+  if(t==='buscarmp'){
+    rBuscarMPList();
+  }
+}
+
+// v4.240: "agregame en consumo de mp, otra pestaña que se llame busqueda de PT según MP. ahi
+// seleccionado una materia prima me debe dar como resultado que producto usan esa materia prima y la
+// cantidad por tanda" -- búsqueda inversa a la de Recetas (que va de producto -> ingredientes): elegís
+// una MP de la lista y te muestra, recorriendo TODAS las recetas cargadas (st.Rec), cuáles la usan como
+// ingrediente y con qué cantidad por tanda (ing.cantidad ya está guardado "por tanda", no por unidad --
+// mismo criterio que ya usan Consumo MP y MP en Stock de Proceso más arriba). El match contra la MP es
+// por nombre exacto (case/espacios insensible), igual que el resto de Recetas (rRecDet) ya hace para
+// mostrar el código de MP de cada ingrediente.
+let rbmpSel=null;
+function rBuscarMPList(){
+  const list=document.getElementById('rbmplist');
+  if(!list)return;
+  if(!mpData.length){list.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin materias primas cargadas en Maestro.</div>';return}
+  const filtro=(document.getElementById('rbmp-buscar')?.value||'').toLowerCase().trim();
+  const items=mpData.filter(m=>!filtro||m.nombre.toLowerCase().includes(filtro)||(m.codigo||'').toLowerCase().includes(filtro))
+    .slice().sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+  if(!items.length){list.innerHTML=`<div class="empty" style="padding:1rem;font-size:13px;color:var(--text2)">Sin resultados para "${filtro}"</div>`;return}
+  let h='';
+  items.forEach(m=>{
+    const sel=m.id===rbmpSel;
+    h+=`<div class="rrow${sel?' sel':''}" onclick="rBuscarMPSel('${m.id}')">
+      <div style="min-width:0;flex:1">
+        <div style="font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;flex-wrap:nowrap;white-space:nowrap">${m.codigo?`<span style="font-size:10px;color:var(--text2);font-family:monospace;flex-shrink:0">${m.codigo}</span>`:''}<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis" title="${m.nombre}">${m.nombre}</span></div>
+        <div style="font-size:12px;color:var(--text2)">${m.unidad||''}</div>
+      </div>
+      <i class="ti ti-chevron-right" style="color:var(--text3);font-size:14px"></i>
+    </div>`;
+  });
+  list.innerHTML=h;
+  if(rbmpSel)rBuscarMPDetail();
+}
+function rBuscarMPSel(id){
+  rbmpSel=id;
+  rBuscarMPList();
+  rBuscarMPDetail();
+}
+function rBuscarMPDetail(){
+  const wrap=document.getElementById('rbmpdetail');
+  if(!wrap)return;
+  const mp=mpData.find(m=>m.id===rbmpSel);
+  if(!mp){wrap.innerHTML='<div class="empty"><i class="ti ti-arrow-left"></i>Elegí una materia prima.</div>';return}
+  const nombreNorm=mp.nombre.trim().toLowerCase();
+  const usos=[];
+  Object.keys(st.Rec).forEach(recKey=>{
+    (st.Rec[recKey]||[]).forEach(ing=>{
+      if((ing.ingrediente||'').trim().toLowerCase()===nombreNorm){
+        usos.push({recKey,cantidad:ing.cantidad,unidad:ing.unidad});
+      }
+    });
+  });
+  usos.sort((a,b)=>a.recKey.localeCompare(b.recKey,'es'));
+  let h=`<div style="font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:1rem">
+    <i class="ti ti-flask" style="color:var(--purple)"></i>${mp.nombre}${mp.codigo?`<span style="font-size:11px;font-weight:400;color:var(--text2);font-family:monospace;background:var(--bg2);border-radius:4px;padding:2px 7px">${mp.codigo}</span>`:''}
+  </div>`;
+  if(!usos.length){
+    h+=`<div class="empty"><i class="ti ti-package-off"></i>Ningún producto usa "${mp.nombre}" en su receta todavía.</div>`;
+    wrap.innerHTML=h;
+    return;
+  }
+  h+=`<table class="itbl"><thead><tr>
+    <th>Producto</th>
+    <th style="width:120px">Empresa</th>
+    <th style="width:120px">Área</th>
+    <th style="width:150px">Cant. x tanda</th>
+  </tr></thead><tbody>`;
+  usos.forEach(u=>{
+    const pr=st.Pr.find(x=>x.nombre===u.recKey);
+    const em=pr?st.E.find(e=>e.id===pr.empresa_id):null;
+    const ar=pr?st.A.find(a=>a.id===pr.area_id):null;
+    h+=`<tr>
+      <td style="font-weight:500">${u.recKey}${!pr?'<span class="badge" style="font-size:10px;padding:1px 6px;margin-left:6px;background:var(--bg3);color:var(--text2)" title="No existe en Maestro de productos">sin maestro</span>':''}</td>
+      <td style="font-size:12px;color:var(--text2)">${em?em.nombre:'—'}</td>
+      <td style="font-size:12px;color:var(--text2)">${ar?ar.nombre:'—'}</td>
+      <td style="text-align:right;font-weight:600">${(u.cantidad||0).toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:6})} <span style="font-size:10px;font-weight:400;color:var(--text3)">${u.unidad}</span></td>
+    </tr>`;
+  });
+  h+=`</tbody></table>`;
+  wrap.innerHTML=h;
 }
 
 async function loadMateriasPrimas(){
