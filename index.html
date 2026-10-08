@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.240</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.241</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -10037,38 +10037,44 @@ async function initStock(){
   loadStockConteo();
 }
 
+// v4.241: "donde lo veo cuando se guardo porque pongo historial y no aparece??" -- Historial seguía
+// leyendo de `proyeccion_diaria`, una tabla de un sistema de proyección VIEJO y separado que nada
+// escribe desde que v4.231 reemplazó el único importador que la alimentaba (el "Importar Excel
+// Joselito" de Proyección) por el importador de Flexxus actual, que guarda en `mp_conteo` -- por eso
+// Historial quedaba siempre vacío aunque el conteo SÍ se hubiera guardado bien (mismo mecanismo ya
+// diagnosticado para "se borra el stock de Flexxus" en v4.239: los datos estaban bien, lo que estaba
+// mal era de dónde los leía la pantalla). Fix: lee de `mp_conteo` para la fecha elegida, sumando entre
+// depósitos (mismo criterio que "Resumen de todos los depósitos" de Conteo de stock manual), y filtra
+// por empresa resolviendo cada materia prima a su producto vinculado (prodPorMp) cuando corresponde --
+// as materias primas no tienen empresa_id propio (ver v4.224), así que sin producto vinculado quedan
+// fuera del filtro por empresa pero SÍ aparecen en "Todas las empresas".
 async function renderHistStock(){
   const fecha=document.getElementById('stock-hist-fecha').value;
   const ef=document.getElementById('stock-hist-esel').value;
   const el=document.getElementById('stock-hist-content');
+  if(!fecha){el.innerHTML='<div class="empty"><i class="ti ti-calendar-off"></i>Elegí una fecha.</div>';return}
   el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
   try{
-    let f=`fecha=eq.${fecha}&order=area.asc,producto.asc`;
-    if(ef!=='all')f+=`&empresa_id=eq.${ef}`;
-    const data=await get('proyeccion_diaria',f);
-    if(!data.length){el.innerHTML='<div class="empty"><i class="ti ti-calendar-off"></i>Sin conteo para esta fecha.</div>';return}
-    const byE={};data.forEach(d=>{if(!byE[d.empresa_id])byE[d.empresa_id]=[];byE[d.empresa_id].push(d)});
+    const conteo=await get('mp_conteo',`fecha=eq.${fecha}`);
+    const stockPorMp=new Map();
+    conteo.forEach(c=>{ stockPorMp.set(c.mp_id,(stockPorMp.get(c.mp_id)||0)+(c.stock||0)); });
+    let items=mpData.filter(m=>stockPorMp.has(m.id)).map(m=>({m,stock:stockPorMp.get(m.id),prod:prodPorMp(m)}));
+    if(ef!=='all')items=items.filter(it=>it.prod&&it.prod.empresa_id===ef);
+    items.sort((a,b)=>normTxt(a.m.nombre).localeCompare(normTxt(b.m.nombre),'es'));
+    if(!items.length){el.innerHTML=`<div class="empty"><i class="ti ti-calendar-off"></i>Sin conteo guardado para esta fecha${ef!=='all'?' en esta empresa':''}.</div>`;return}
     let h=`<div class="stock-card"><table class="stock-tbl"><thead><tr>
-      <th style="text-align:left">Empresa / Area / Producto</th>
-      <th style="text-align:right;width:90px">Stock</th>
-      <th style="text-align:left;width:60px">Unidad</th>
+      <th style="text-align:left;width:90px">Código</th>
+      <th style="text-align:left">Producto</th>
+      <th style="text-align:right;width:110px">Stock</th>
+      <th style="text-align:left;width:80px">Unidad</th>
     </tr></thead><tbody>`;
-    Object.entries(byE).forEach(([eid,items])=>{
-      const clr=ec(eid);const nm=en(eid)||'SE';const bg=rgba(clr,.12);
-      const byArea={};items.forEach(d=>{if(!byArea[d.area])byArea[d.area]=[];byArea[d.area].push(d)});
-      Object.entries(byArea).forEach(([area,aItems])=>{
-        // Fila separadora empresa/area
-        h+=`<tr><td colspan="3" style="background:var(--bg2);padding:5px 10px;font-size:11px;font-weight:700;color:${clr};border-top:2px solid var(--border2)">
-          <span class="color-dot" style="background:${clr}"></span> ${nm} — ${area}
-        </td></tr>`;
-        aItems.forEach(d=>{
-          h+=`<tr>
-            <td style="font-weight:500;padding-left:16px">${d.producto}</td>
-            <td style="text-align:right;font-weight:700;font-size:15px;color:${d.stock>0?'var(--green)':'var(--text2)'}">${d.stock>0?d.stock.toLocaleString('es-AR'):'--'}</td>
-            <td style="font-size:12px;color:var(--text2)">${d.unidad}</td>
-          </tr>`;
-        });
-      });
+    items.forEach(({m,stock})=>{
+      h+=`<tr>
+        <td style="font-family:monospace;font-size:12px;color:var(--text2)">${m.codigo||''}</td>
+        <td style="font-weight:500">${m.nombre}</td>
+        <td style="text-align:right;font-weight:700;font-size:15px;color:${stock>0?'var(--green)':'var(--text2)'}">${stock>0?stock.toLocaleString('es-AR'):'--'}</td>
+        <td style="font-size:12px;color:var(--text2)">${m.unidad||''}</td>
+      </tr>`;
     });
     h+=`</tbody></table></div>`;
     el.innerHTML=h;
