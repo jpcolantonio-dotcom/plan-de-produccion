@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.246</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.247</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -7799,37 +7799,34 @@ async function deleteTorreDeposito(id){
   }catch(e){ss('error','Error')}
 }
 
-// v4.246: "necesito poner lo que son empanadas por cajas, burritos por caja y pizzas zen y pizzetas por
-// cajas por el momento el resto no me importa" -- el modal "Asignar producto al depósito" mostraba TODOS
-// los productos de la empresa sin filtrar (Juan Pablo preguntó "esta de donde sale la lista" al verlo
-// lleno de ítems de Vegetales y sin área asignada, "SA"). Confirmado en vivo contra Supabase (Config >
-// Producción) a qué área corresponde cada cosa: empanadas = CRIOLLO 13/15 + HOJALDRE 13/15, burritos =
-// BURRITOS, "pizzas zen" = área NAPOLITANA (así se llaman sus productos: "PIZZA ZEN ..."), pizzetas =
-// PIZZETA. El resto (VEGETALES, RELLENOS, y todas las áreas de Joselito: TAPAS/ENVASE/PASTAS
-// ESPECIALES/PASTELES COCIDOS/PASTELES FRESCOS/ROTISERIA) queda afuera por ahora -- lista aparte para
-// poder ajustarla fácil si cambia más adelante.
-const AREAS_DEPOSITO_PERMITIDAS=['BURRITOS','CRIOLLO 13','CRIOLLO 15','HOJALDRE 13','HOJALDRE 15','NAPOLITANA','PIZZETA'];
+// v4.247: vuelta atrás de v4.246 -- "quiero que me aparezca la lista desplegable de todo lo que tengo y
+// lo hago de cero nuevamente eso si, que me deje buscar con escribiendo asi es mas rapido". Confirmado
+// por AskUserQuestion: vuelve a mostrar TODOS los productos de la empresa (sin el filtro de
+// Empanadas/Burritos/Pizzas Zen/Pizzetas de v4.246), pero el `<select>` nativo (lento de recorrer a mano
+// con una lista larga, que es justo el problema que motivó el filtro de v4.246 en primer lugar) se
+// reemplaza por un buscador: un input de texto + una lista de resultados filtrados en vivo mientras
+// tipea (por nombre O por código), agrupados por área igual que antes. `modalDepProdList`/`modalDepProdSel`
+// guardan el universo de productos y la selección actual (no hay <select> nativo del que leer value);
+// `confirmarAddDepProd` ahora lee de `modalDepProdSel` en vez de un elemento del DOM.
+let modalDepProdList=[];
+let modalDepProdSel=null;
+
 function showAddProdDeposito(depId,eid){
-  const prods=st.Pr.filter(p=>p.empresa_id===eid&&AREAS_DEPOSITO_PERMITIDAS.includes(st.A.find(a=>a.id===p.area_id)?.nombre));
-  if(!prods.length){alert('Sin productos de Empanadas, Burritos, Pizzas o Pizzetas para esta empresa.');return}
+  const prods=st.Pr.filter(p=>p.empresa_id===eid);
+  if(!prods.length){alert('Sin productos.');return}
+  modalDepProdList=prods.map(p=>({...p,_area:st.A.find(x=>x.id===p.area_id)?.nombre||'SA'}));
+  modalDepProdSel=null;
   const overlay=document.createElement('div');overlay.className='modal-overlay';overlay.id='modal-dep-prod';
-  const byArea={};prods.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';if(!byArea[a])byArea[a]=[];byArea[a].push(p)});
-  let opts='<option value="">Seleccioná un producto</option>';
-  Object.entries(byArea).forEach(([area,items])=>{
-    opts+=`<optgroup label="${area}">`;
-    items.forEach(p=>{
-      const yaAsig=depProdData.find(dp=>dp.deposito_id===depId&&dp.producto===p.nombre&&dp.area===area);
-      opts+=`<option value="${eid}||${area}||${p.nombre}"${yaAsig?' disabled':''}>`;
-      opts+=`${p.nombre}${yaAsig?' (ya asignado)':''}</option>`;
-    });
-    opts+=`</optgroup>`;
-  });
   // Familias disponibles en este depósito
   const famsDep=depFamiliasData.filter(f=>f.deposito_id===depId);
   const famOpts=famsDep.map(f=>`<option value="${f.codigo}">${f.codigo} · ${f.nombre}</option>`).join('');
-  overlay.innerHTML=`<div class="modal" style="width:420px">
+  overlay.innerHTML=`<div class="modal" style="width:460px">
     <div class="modal-title"><i class="ti ti-box"></i> Asignar producto al deposito</div>
-    <select id="modal-dep-prod-sel" style="width:100%;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);margin-bottom:10px">${opts}</select>
+    <input type="text" id="modal-dep-prod-search" placeholder="Buscá por nombre o código..." autocomplete="off"
+      oninput="renderModalDepProdResults('${depId}')"
+      style="width:100%;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);margin-bottom:6px"/>
+    <div id="modal-dep-prod-sel-txt" style="font-size:12px;color:var(--text2);min-height:16px;margin-bottom:4px"></div>
+    <div id="modal-dep-prod-results" style="max-height:260px;overflow-y:auto;border:.5px solid var(--border2);border-radius:var(--radius);margin-bottom:10px"></div>
     <div style="margin-bottom:1rem">
       <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:4px">Familia de torres${famsDep.length?'':' <span style="color:var(--amber)">(definí familias primero en Configuración)</span>'}</label>
       <select id="modal-dep-prod-fam" style="width:100%;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"${famsDep.length?'':' disabled'}>
@@ -7842,12 +7839,41 @@ function showAddProdDeposito(depId,eid){
     </div>
   </div>`;
   document.body.appendChild(overlay);
+  renderModalDepProdResults(depId);
+  setTimeout(()=>document.getElementById('modal-dep-prod-search')?.focus(),0);
+}
+
+function elegirModalDepProd(eid,area,nombre){
+  modalDepProdSel={eid,area,producto:nombre};
+  const txt=document.getElementById('modal-dep-prod-sel-txt');
+  if(txt)txt.innerHTML=`Elegido: <b>${nombre}</b> <span style="color:var(--text3)">(${area})</span>`;
+}
+
+function renderModalDepProdResults(depId){
+  const el=document.getElementById('modal-dep-prod-results');
+  if(!el)return;
+  const q=normTxt(document.getElementById('modal-dep-prod-search')?.value||'');
+  const filtrados=q?modalDepProdList.filter(p=>normTxt(p.nombre).includes(q)||normTxt(p.codigo_articulo||'').includes(q)):modalDepProdList;
+  if(!filtrados.length){el.innerHTML='<div style="padding:10px;font-size:12px;color:var(--text3)">Sin resultados.</div>';return}
+  const byArea={};filtrados.forEach(p=>{if(!byArea[p._area])byArea[p._area]=[];byArea[p._area].push(p)});
+  let h='';
+  Object.entries(byArea).forEach(([area,items])=>{
+    h+=`<div style="padding:4px 10px;font-size:10.5px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;background:var(--bg2);position:sticky;top:0">${area}</div>`;
+    items.forEach(p=>{
+      const yaAsig=depProdData.find(dp=>dp.deposito_id===depId&&dp.producto===p.nombre&&dp.area===area);
+      const activo=modalDepProdSel&&modalDepProdSel.producto===p.nombre&&modalDepProdSel.area===area;
+      h+=`<div onclick="${yaAsig?'':`elegirModalDepProd('${p.empresa_id}','${area.replace(/'/g,"\\'")}','${p.nombre.replace(/'/g,"\\'")}')`}"
+        style="padding:7px 10px;font-size:13px;cursor:${yaAsig?'default':'pointer'};${activo?'background:var(--blue)14':''};${yaAsig?'color:var(--text3)':''};border-bottom:.5px solid var(--border)">
+        ${p.nombre}${yaAsig?' <span style="font-size:11px">(ya asignado)</span>':''}${p.codigo_articulo?` <span style="font-size:10px;color:var(--text3);font-family:monospace">· ${p.codigo_articulo}</span>`:''}
+      </div>`;
+    });
+  });
+  el.innerHTML=h;
 }
 
 async function confirmarAddDepProd(depId){
-  const sel=document.getElementById('modal-dep-prod-sel');
-  if(!sel?.value)return;
-  const[eid,area,producto]=sel.value.split('||');
+  if(!modalDepProdSel){alert('Elegí un producto de la lista primero.');return}
+  const{eid,area,producto}=modalDepProdSel;
   const familia_torre=document.getElementById('modal-dep-prod-fam')?.value||null;
   document.getElementById('modal-dep-prod')?.remove();
   ss('saving','Guardando...');
