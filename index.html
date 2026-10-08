@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.244</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.245</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -8112,6 +8112,14 @@ function generarTablasPDF(eid){
   return out;
 }
 
+// v4.245: "agregale el código ID a la izquierda, porque no me esta poneinedo bien el producto y quiero
+// asegurarme" -- después de v4.244 (revincular productos huérfanos), Juan Pablo quiere una forma rápida
+// de confirmar visualmente que cada fila de esta tabla corresponde al producto correcto: agrega una
+// columna "Código" a la izquierda de "Producto" con `productos.codigo_articulo` (el mismo "ID" que ya se
+// usa en Configuración/Recetas para vincular por código -- queda vacía si ese producto todavía no tiene
+// código cargado ahí, no es un dato nuevo, solo se muestra). La tabla ahora vive dentro de un contenedor
+// con scroll horizontal (`overflow-x:auto` + `min-width:900px` en la tabla) para que la columna nueva no
+// aplaste al resto en pantallas angostas, en vez de recortarse con el `overflow:hidden` de `.stock-card`.
 async function renderDepCalc(){
   const eid=document.getElementById('dep-calc-esel').value;
   const el=document.getElementById('dep-calc-content');
@@ -8150,7 +8158,8 @@ async function renderDepCalc(){
           ${torres.map(t=>`${t.cantidad}×${t.altura_cajas}${t.doble?' (doble)':''}`).join(' + ')} = <b>${capTotal} cajas totales</b>
         </span>
       </div>
-      <table class="stock-tbl"><thead><tr>
+      <div style="overflow-x:auto"><table class="stock-tbl" style="min-width:900px"><thead><tr>
+        <th style="text-align:left;width:90px">Código</th>
         <th style="text-align:left">Producto</th>
         <th style="text-align:left">Area</th>
         <th style="text-align:right">% Mix</th>
@@ -8203,7 +8212,7 @@ async function renderDepCalc(){
       if(famsDep2.length){
         const famLabel=famObj?`${famObj.codigo} · ${famObj.nombre}`:'Sin familia asignada';
         const famColor=famObj?'var(--amber)':'var(--text3)';
-        h+=`<tr style="background:var(--bg2)"><td colspan="7" style="padding:6px 12px;font-size:11px;font-weight:700;color:${famColor};border-top:1.5px solid ${famColor}44">
+        h+=`<tr style="background:var(--bg2)"><td colspan="8" style="padding:6px 12px;font-size:11px;font-weight:700;color:${famColor};border-top:1.5px solid ${famColor}44">
           ${famLabel} — Capacidad: <b>${capFam} cajas</b>
         </td></tr>`;
       }
@@ -8222,8 +8231,9 @@ async function renderDepCalc(){
         const pct=mix?mix.porcentaje:0;
         const prodMaestro=st.Pr.find(pr=>pr.nombre===p.producto&&pr.empresa_id===p.empresa_id);
         const ujc=caja?caja.unidades_por_caja:(prodMaestro&&prodMaestro.unidades_bandeja?parseInt(prodMaestro.unidades_bandeja):0);
-        if(!pct){prodsSinMix.push(p);return;}
-        mixFam.push({p,pct,ujc});
+        const codigo=prodMaestro&&prodMaestro.codigo_articulo||'';
+        if(!pct){prodsSinMix.push({...p,_codigo:codigo});return;}
+        mixFam.push({p,pct,ujc,codigo});
       });
 
       // Normalizar % entre productos con mix de esta familia
@@ -8239,13 +8249,13 @@ async function renderDepCalc(){
       const torresMinimas=Math.min(nProds,torresReales); // 1 por producto (o menos si no alcanza)
       const torresParaDistribuir=Math.max(0,torresReales-torresMinimas);
 
-      const torresExactas=mixFam.map(({p,pct,ujc})=>{
+      const torresExactas=mixFam.map(({p,pct,ujc,codigo})=>{
         const pctNorm=sumPctFam>0?(pct/sumPctFam)*100:100/nProds;
         const torresExtra=torresParaDistribuir*(pctNorm/100);
         const torresRaw=torresReales>0?(1+torresExtra):0; // minimo 1 + proporcional, solo si la familia tiene torres reales
         const torresBase=Math.floor(torresRaw);
         const fraccion=torresRaw-torresBase;
-        return{p,pct,pctNorm,ujc,torresBase,fraccion,torresExtra:0};
+        return{p,pct,pctNorm,ujc,codigo,torresBase,fraccion,torresExtra:0};
       });
 
       // Distribuir torres sobrantes a los de mayor fracción
@@ -8272,14 +8282,14 @@ async function renderDepCalc(){
 
       areasOrdenadas.forEach(area=>{
         const grupo=porArea.get(area);
-        h+=`<tr style="background:var(--bg2)"><td colspan="7" style="padding:4px 12px 4px 22px;font-size:10.5px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">${area}</td></tr>`;
+        h+=`<tr style="background:var(--bg2)"><td colspan="8" style="padding:4px 12px 4px 22px;font-size:10.5px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">${area}</td></tr>`;
 
         grupo.sinMix.forEach(p=>{
-          h+=`<tr><td style="font-weight:500">${p.producto}</td><td class="muted">${p.area}</td>
+          h+=`<tr><td style="font-family:monospace;font-size:12px;color:var(--text2)">${p._codigo||''}</td><td style="font-weight:500">${p.producto}</td><td class="muted">${p.area}</td>
             <td colspan="5" style="text-align:center;color:var(--text3);font-size:12px">Sin % mix definido</td></tr>`;
         });
 
-        grupo.conMix.forEach(({p,pct,pctNorm,ujc,cajasRaw,torresBase,torresExtra,torresTotal})=>{
+        grupo.conMix.forEach(({p,pct,pctNorm,ujc,codigo,cajasRaw,torresBase,torresExtra,torresTotal})=>{
           const cajasReales=Math.round(torresTotal*cajasXtorreUnit);
           const unidades=cajasReales*ujc;
           totalCajasUsadas+=cajasReales; subtotalCajas+=cajasReales;
@@ -8290,6 +8300,7 @@ async function renderDepCalc(){
             ?`${torresTotal} <span style="font-size:10px;color:var(--blue)">(doble)</span>`
             :`${torresTotal}`)+' '+extraBadge;
           h+=`<tr${torresExtra?` style="background:var(--blue)07"`:'>'}>
+            <td style="font-family:monospace;font-size:12px;color:var(--text2)">${codigo||''}</td>
             <td style="font-weight:500">${p.producto}</td>
             <td class="muted">${p.area}</td>
             <td style="text-align:right">${pct.toFixed(1)}%${Math.abs(pctNorm-pct)>0.5?`<span style="font-size:10px;color:var(--blue);margin-left:3px">(${pctNorm.toFixed(1)}%↑)</span>`:''}</td>
@@ -8305,7 +8316,7 @@ async function renderDepCalc(){
         const famColor=famObj?'var(--amber)':'var(--text3)';
         const sobranteFam=capFam-subtotalCajas;
         h+=`<tr style="background:${famObj?'var(--amber)09':'var(--bg2)'}">
-          <td colspan="5" style="padding:5px 12px;font-size:12px;font-weight:600;color:${famColor}">Subtotal ${famObj?famObj.nombre:''}</td>
+          <td colspan="6" style="padding:5px 12px;font-size:12px;font-weight:600;color:${famColor}">Subtotal ${famObj?famObj.nombre:''}</td>
           <td style="text-align:right;font-weight:700;color:${famColor}">${subtotalCajas.toLocaleString('es-AR')} <span style="font-size:10px;font-weight:400;color:var(--text2)">· sob: ${sobranteFam}</span></td>
           <td style="text-align:right;font-weight:700;color:${famColor}">${subtotalUds>0?subtotalUds.toLocaleString('es-AR')+'<span style="font-size:10px"> uds</span>':'--'}</td>
         </tr>`;
@@ -8314,13 +8325,13 @@ async function renderDepCalc(){
 
     const sobrante=capTotal-totalCajasUsadas;
     h+=`<tr style="background:var(--bg2)">
-      <td colspan="5" style="font-weight:700">Total usado</td>
+      <td colspan="6" style="font-weight:700">Total usado</td>
       <td style="text-align:right;font-weight:700;color:${totalCajasUsadas>capTotal?'var(--red)':'var(--green)'}">
         ${totalCajasUsadas.toLocaleString('es-AR')} <span style="font-size:10px;font-weight:400;color:var(--text2)">· sobrante: ${sobrante}</span>
       </td>
       <td style="text-align:right;font-weight:700;color:var(--green)">${totalUnidades>0?totalUnidades.toLocaleString('es-AR')+'<span style="font-size:10px"> uds</span>':'--'}</td>
     </tr>`;
-    h+=`</tbody></table></div>`;
+    h+=`</tbody></table></div></div>`;
   });
   if(!h)h='<div class="empty"><i class="ti ti-calculator"></i>Configurá depositos con torres y productos primero.</div>';
   el.innerHTML=h;
