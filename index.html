@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.247</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.248</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -7811,10 +7811,39 @@ async function deleteTorreDeposito(id){
 let modalDepProdList=[];
 let modalDepProdSel=null;
 
+// v4.248: "por ejemplo no me aparecen todo, pongo un codigo y no aparece" -- el buscador de v4.247 solo
+// miraba `productos.codigo_articulo`, un campo que casi ningún producto tiene cargado (55 en total,
+// numeración sin relación con Flexxus). El código que Juan Pablo realmente usa para identificar un
+// producto (ej. "60400204") vive en `materias_primas` (tipo='terminado') -- confirmado en vivo: ese
+// código exacto es "EMPANADA DE CARNE CRUDA TAPA HOJALDRE 13 CAJA POR 48U.", mientras que el producto en
+// Configuración se llama solo "EMPANADA DE CARNE CRUDA TAPA HOJALDRE 13" (sin el "CAJA POR 48U.") y
+// encima está vinculado (`mp_id`) a OTRA fila de materias_primas con código distinto ("60400201", la
+// variante "por unidad", no la de caja) -- por eso ni buscar por ese código ni pegar el nombre completo
+// con el sufijo de caja encontraba nada. `codigosRelacionadosProd()` junta TODOS los códigos de
+// materias_primas (tipo=terminado) cuyo nombre normalizado coincide o empieza igual que el del producto
+// (cubre tanto la variante "por unidad" como "por caja" aunque el producto solo esté vinculado a una),
+// sumados al `codigo_articulo` de siempre -- el buscador ahora matchea contra cualquiera de esos
+// códigos, y la lista de resultados los muestra todos junto al producto para que se vea de dónde salió
+// el match.
+function codigosRelacionadosProd(p){
+  const codigos=new Set();
+  if(p.codigo_articulo)codigos.add(p.codigo_articulo);
+  const nombreNorm=normTxt(p.nombre);
+  if(nombreNorm){
+    mpData.forEach(m=>{
+      if(!m.codigo||m.tipo!=='terminado')return;
+      const mNorm=normTxt(m.nombre||'');
+      if(!mNorm)return;
+      if(mNorm===nombreNorm||mNorm.startsWith(nombreNorm)||nombreNorm.startsWith(mNorm))codigos.add(m.codigo);
+    });
+  }
+  return[...codigos];
+}
+
 function showAddProdDeposito(depId,eid){
   const prods=st.Pr.filter(p=>p.empresa_id===eid);
   if(!prods.length){alert('Sin productos.');return}
-  modalDepProdList=prods.map(p=>({...p,_area:st.A.find(x=>x.id===p.area_id)?.nombre||'SA'}));
+  modalDepProdList=prods.map(p=>({...p,_area:st.A.find(x=>x.id===p.area_id)?.nombre||'SA',_codigos:codigosRelacionadosProd(p)}));
   modalDepProdSel=null;
   const overlay=document.createElement('div');overlay.className='modal-overlay';overlay.id='modal-dep-prod';
   // Familias disponibles en este depósito
@@ -7853,7 +7882,7 @@ function renderModalDepProdResults(depId){
   const el=document.getElementById('modal-dep-prod-results');
   if(!el)return;
   const q=normTxt(document.getElementById('modal-dep-prod-search')?.value||'');
-  const filtrados=q?modalDepProdList.filter(p=>normTxt(p.nombre).includes(q)||normTxt(p.codigo_articulo||'').includes(q)):modalDepProdList;
+  const filtrados=q?modalDepProdList.filter(p=>normTxt(p.nombre).includes(q)||p._codigos.some(c=>normTxt(c).includes(q))):modalDepProdList;
   if(!filtrados.length){el.innerHTML='<div style="padding:10px;font-size:12px;color:var(--text3)">Sin resultados.</div>';return}
   const byArea={};filtrados.forEach(p=>{if(!byArea[p._area])byArea[p._area]=[];byArea[p._area].push(p)});
   let h='';
@@ -7864,7 +7893,7 @@ function renderModalDepProdResults(depId){
       const activo=modalDepProdSel&&modalDepProdSel.producto===p.nombre&&modalDepProdSel.area===area;
       h+=`<div onclick="${yaAsig?'':`elegirModalDepProd('${p.empresa_id}','${area.replace(/'/g,"\\'")}','${p.nombre.replace(/'/g,"\\'")}')`}"
         style="padding:7px 10px;font-size:13px;cursor:${yaAsig?'default':'pointer'};${activo?'background:var(--blue)14':''};${yaAsig?'color:var(--text3)':''};border-bottom:.5px solid var(--border)">
-        ${p.nombre}${yaAsig?' <span style="font-size:11px">(ya asignado)</span>':''}${p.codigo_articulo?` <span style="font-size:10px;color:var(--text3);font-family:monospace">· ${p.codigo_articulo}</span>`:''}
+        ${p.nombre}${yaAsig?' <span style="font-size:11px">(ya asignado)</span>':''}${p._codigos.length?` <span style="font-size:10px;color:var(--text3);font-family:monospace">· ${p._codigos.join(' / ')}</span>`:''}
       </div>`;
     });
   });
