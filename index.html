@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.245</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.246</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -7799,9 +7799,19 @@ async function deleteTorreDeposito(id){
   }catch(e){ss('error','Error')}
 }
 
+// v4.246: "necesito poner lo que son empanadas por cajas, burritos por caja y pizzas zen y pizzetas por
+// cajas por el momento el resto no me importa" -- el modal "Asignar producto al depósito" mostraba TODOS
+// los productos de la empresa sin filtrar (Juan Pablo preguntó "esta de donde sale la lista" al verlo
+// lleno de ítems de Vegetales y sin área asignada, "SA"). Confirmado en vivo contra Supabase (Config >
+// Producción) a qué área corresponde cada cosa: empanadas = CRIOLLO 13/15 + HOJALDRE 13/15, burritos =
+// BURRITOS, "pizzas zen" = área NAPOLITANA (así se llaman sus productos: "PIZZA ZEN ..."), pizzetas =
+// PIZZETA. El resto (VEGETALES, RELLENOS, y todas las áreas de Joselito: TAPAS/ENVASE/PASTAS
+// ESPECIALES/PASTELES COCIDOS/PASTELES FRESCOS/ROTISERIA) queda afuera por ahora -- lista aparte para
+// poder ajustarla fácil si cambia más adelante.
+const AREAS_DEPOSITO_PERMITIDAS=['BURRITOS','CRIOLLO 13','CRIOLLO 15','HOJALDRE 13','HOJALDRE 15','NAPOLITANA','PIZZETA'];
 function showAddProdDeposito(depId,eid){
-  const prods=st.Pr.filter(p=>p.empresa_id===eid);
-  if(!prods.length){alert('Sin productos.');return}
+  const prods=st.Pr.filter(p=>p.empresa_id===eid&&AREAS_DEPOSITO_PERMITIDAS.includes(st.A.find(a=>a.id===p.area_id)?.nombre));
+  if(!prods.length){alert('Sin productos de Empanadas, Burritos, Pizzas o Pizzetas para esta empresa.');return}
   const overlay=document.createElement('div');overlay.className='modal-overlay';overlay.id='modal-dep-prod';
   const byArea={};prods.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';if(!byArea[a])byArea[a]=[];byArea[a].push(p)});
   let opts='<option value="">Seleccioná un producto</option>';
