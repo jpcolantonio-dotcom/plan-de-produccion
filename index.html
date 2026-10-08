@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.241</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.242</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -848,10 +848,19 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     </div>
   </div>
 
-  <!-- CONTEO STOCK FLEXXUS: import genérico del export de Flexxus, separado del conteo manual -->
+  <!-- CONTEO STOCK FLEXXUS: import genérico del export de Flexxus, separado del conteo manual.
+       v4.242: "la carga directa del excel solo esos dos depositos" -- a diferencia de "Conteo de stock
+       manual" (que sigue viendo y usando TODOS los depósitos/cámaras configurados, sin tocar), el
+       importador de Flexxus ya no mira el nombre del depósito que viene en el archivo: siempre vuelca
+       todo a UNO de los dos depósitos consolidados por empresa (ver flexxusDestinoSelect()), elegido acá
+       mismo ANTES de subir el archivo. -->
   <div id="stock-sub-flexxus" style="display:none">
-    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Subí el xlsx/xls que baja Flexxus ("Stock - Listado por Depósitos", filtrado por UN depósito, con "Agrupar por Depósito" tildado). Suma automáticamente todos los casilleros de cada código (columna "S. Remanente") y carga el conteo de ese depósito para la fecha de abajo — sirve igual para un depósito de Joselito que de Planeta Empanada, si el depósito todavía no existe en Stock &gt; Configuración stock &gt; Depositos se crea solo. Después revisalo en "Conteo de stock manual" y apretá "Guardar conteo".</div>
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Subí el xlsx/xls que baja Flexxus ("Stock - Listado por Depósitos", "Agrupar por Depósito" tildado — sirve tanto si lo filtrás por un depósito como por "Todos"). Suma automáticamente todos los casilleros de cada código (columna "S. Remanente") y carga el conteo en el depósito que elijas abajo (uno solo por empresa, no por cámara). Después revisalo en "Conteo de stock manual" y apretá "Guardar conteo".</div>
     <div class="grid-card" style="margin-bottom:1rem">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+        <label style="font-size:13px;color:var(--text2)">Depósito destino:</label>
+        <select id="flexxus-stock-deposito-destino" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Elegí a qué empresa va este archivo...</option></select>
+      </div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
         <label style="font-size:13px;color:var(--text2)">Fecha:</label>
         <input type="date" id="flexxus-stock-fecha" onchange="loadFlexxusStock()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
@@ -8891,8 +8900,45 @@ async function loadFlexxusStock(){
     try{ mpDepositosData=await get('mp_depositos','select=*'); }catch{mpDepositosData=[]}
     mpDepositosCargado=true;
   }
+  await poblarFlexxusDestino();
   renderFlexxusDepSelector();
   renderFlexxusStockResultado();
+}
+// v4.242: "los deposito deben quedar pero solo para la carga manual, la carga directa del excel solo
+// esos dos depositos" -- Juan Pablo confirmó (tras ver que la tabla de depósitos también la usan
+// Torres/Impresión por depósito y Etiquetas/stock congelado con QR, con cajas activas ubicadas en
+// cámaras específicas) que NO quiere borrar ni tocar los depósitos existentes: "Conteo de stock
+// manual" sigue viendo y usando todos los que ya había. Lo que pidió es que el importador de Flexxus
+// deje de crear un depósito nuevo por cada cámara que aparece en el archivo (eso era lo que generaba
+// los ~29 depósitos del screenshot) y en cambio siempre vuelque todo a UN depósito consolidado por
+// empresa, nombrado igual que la empresa ("Planeta Empanada"/"Joselito"), elegido a mano ANTES de subir
+// el archivo -- ya no se lee ni se usa el nombre de depósito que trae el Excel para decidir dónde
+// guardar. asegurarDepositoConsolidado() crea ese depósito una sola vez por empresa si todavía no
+// existe (mismo patrón de auto-creación que ya usaba el import viejo en v4.231).
+async function asegurarDepositoConsolidado(empresa){
+  let dep=stockConteoDepositos.find(d=>normTxt(d.nombre)===normTxt(empresa.nombre)&&d.empresa_id===empresa.id);
+  if(dep)return dep;
+  const res=await ins('depositos',{empresa_id:empresa.id,nombre:empresa.nombre});
+  dep=res[0];
+  stockConteoDepositos.push(dep);
+  return dep;
+}
+async function poblarFlexxusDestino(){
+  const sel=document.getElementById('flexxus-stock-deposito-destino');
+  if(!sel)return;
+  if(!stockConteoDepositosCargado){
+    try{ stockConteoDepositos=await get('depositos','order=nombre.asc'); }catch{stockConteoDepositos=[]}
+    stockConteoDepositosCargado=true;
+  }
+  const valorPrevio=sel.value;
+  for(const e of st.E){ await asegurarDepositoConsolidado(e); }
+  let h='<option value="">Elegí a qué empresa va este archivo...</option>';
+  st.E.forEach(e=>{
+    const dep=stockConteoDepositos.find(d=>normTxt(d.nombre)===normTxt(e.nombre)&&d.empresa_id===e.id);
+    if(dep)h+=`<option value="${dep.id}">${e.nombre}</option>`;
+  });
+  sel.innerHTML=h;
+  if(valorPrevio&&stockConteoDepositos.some(d=>d.id===valorPrevio))sel.value=valorPrevio;
 }
 function flexxusStockSetDep(id,nombre){
   flexxusStockUltimoDep={id,nombre};
@@ -8986,6 +9032,15 @@ async function importarExcelFlexxusStock(input){
   const msgEl=document.getElementById('flexxus-stock-msg');
   const loadingEl=document.getElementById('flexxus-stock-loading');
   errEl.style.display='none';msgEl.style.display='none';
+  // v4.242: el depósito destino ahora se elige ANTES de subir el archivo (select de arriba, solo 2
+  // opciones -- una por empresa) en vez de leerse del nombre de depósito que trae el Excel.
+  const depositoDestinoId=document.getElementById('flexxus-stock-deposito-destino').value;
+  if(!depositoDestinoId){
+    document.getElementById('flexxus-stock-err-txt').textContent='Elegí primero a qué empresa va este archivo (depósito destino) antes de subir el Excel.';
+    errEl.style.display='';
+    input.value='';
+    return;
+  }
   loadingEl.style.display='inline-flex';
   try{
     if(!window.XLSX){
@@ -9001,18 +9056,18 @@ async function importarExcelFlexxusStock(input){
     const filas=window.XLSX.utils.sheet_to_json(ws,{header:1,defval:null});
     if(!filas.length)throw new Error('El archivo está vacío.');
 
-    // Empresa: la celda A1 del export ("JOSELITO" / "PLANETA EMPANADA")
+    const depositoMatch=stockConteoDepositos.find(d=>d.id===depositoDestinoId);
+    if(!depositoMatch)throw new Error('No encontré el depósito elegido -- volvé a elegirlo en "Depósito destino" e intentá de nuevo.');
+
+    // Empresa: la celda A1 del export ("JOSELITO" / "PLANETA EMPANADA") -- ya NO se usa para elegir el
+    // depósito (eso lo decide el select de arriba), solo como chequeo de que no te confundiste de
+    // depósito destino con el archivo equivocado.
     const empresaTxt=filas[0]&&filas[0][0]!=null?String(filas[0][0]).trim():'';
     const empresaMatch=st.E.find(e=>normTxt(e.nombre)===normTxt(empresaTxt));
-
-    // Depósito filtrado: fila con "Deposito:" en alguna celda, el nombre está en la celda siguiente
-    let depositoTxt=null;
-    for(const row of filas){
-      const idx=row.findIndex(c=>typeof c==='string'&&/^dep(o|ó)sito:?$/i.test(c.trim()));
-      if(idx>=0&&row[idx+1]!=null&&String(row[idx+1]).trim()){depositoTxt=String(row[idx+1]).trim();break;}
+    if(empresaMatch&&empresaMatch.id!==depositoMatch.empresa_id){
+      const empresaDestinoNombre=(st.E.find(e=>e.id===depositoMatch.empresa_id)||{}).nombre||'?';
+      throw new Error(`El archivo es de "${empresaTxt}" pero elegiste el depósito destino de "${empresaDestinoNombre}" -- revisá el archivo o cambiá el depósito destino antes de importar.`);
     }
-    if(!depositoTxt)throw new Error('No encontré la línea "Deposito:" en el archivo -- ¿es un export de Flexxus "Stock - Listado por Depósitos"?');
-    if(/^todos$/i.test(depositoTxt))throw new Error('Este archivo está filtrado por "Todos" los depósitos -- en Flexxus filtrá UN solo depósito y volvé a exportar.');
 
     // Encabezado: primera fila con "Código" en la columna A -- de ahí se saca en qué columna está
     // "S. Remanente" (por si alguna vez cambia de posición entre exports).
@@ -9022,7 +9077,8 @@ async function importarExcelFlexxusStock(input){
     if(colRem<0)throw new Error('No encontré la columna "S. Remanente" en el encabezado.');
 
     // Filas de datos: columna A = código numérico, la columna de remanente trae un número. Un mismo
-    // código puede repetirse (un renglón por casillero dentro del depósito) -- se suman.
+    // código puede repetirse (un renglón por casillero o por depósito, si el archivo viene filtrado
+    // por "Todos") -- se suman todos, porque ahora todo va al mismo depósito consolidado de la empresa.
     const acum=new Map(); // codigo -> remanente sumado
     for(const row of filas){
       const c0=row[0];
@@ -9034,24 +9090,9 @@ async function importarExcelFlexxusStock(input){
     }
     if(!acum.size)throw new Error('No encontré filas de datos (código + S. Remanente) en el archivo.');
 
-    // Matchear/crear el depósito del archivo contra Stock > Configuración stock > Depositos
-    if(!stockConteoDepositosCargado){
-      try{ stockConteoDepositos=await get('depositos','order=nombre.asc'); }catch{stockConteoDepositos=[]}
-      stockConteoDepositosCargado=true;
-    }
-    let depositoMatch=stockConteoDepositos.find(d=>normTxt(d.nombre)===normTxt(depositoTxt));
-    let depositoCreado=false;
-    if(!depositoMatch){
-      if(!empresaMatch)throw new Error(`El depósito "${depositoTxt}" no existe en Stock &gt; Configuración stock &gt; Depositos y no pude saber a qué empresa asignarlo (la celda A1 del archivo dice "${empresaTxt}", que no coincide con ninguna empresa del maestro). Creá el depósito a mano primero.`);
-      const res=await ins('depositos',{empresa_id:empresaMatch.id,nombre:depositoTxt});
-      depositoMatch=res[0];
-      stockConteoDepositos.push(depositoMatch);
-      depositoCreado=true;
-    }
-
     // Matchear cada código contra materias_primas.codigo y guardar (upsert) en mp_conteo para la
-    // fecha elegida y ese depósito -- mismo criterio "principal" (deposito_id null) / "secundario"
-    // (deposito_id explícito) que usa el resto de Conteo de stock.
+    // fecha elegida y el depósito consolidado -- mismo criterio "principal" (deposito_id null) /
+    // "secundario" (deposito_id explícito) que usa el resto de Conteo de stock.
     const fecha=document.getElementById('flexxus-stock-fecha').value||hoyLocal();
     // v4.239: refrescar mpConteoData ANTES de upsertear -- si no, en una sesión recién abierta (donde
     // todavía no se visitó "Conteo de stock manual" ni esta pestaña) mpConteoData arranca vacío, y
@@ -9083,7 +9124,7 @@ async function importarExcelFlexxusStock(input){
     renderFlexxusDepSelector();
     renderFlexxusStockResultado();
     loadingEl.style.display='none';
-    document.getElementById('flexxus-stock-msg-txt').textContent=`${cargados} producto${cargados!==1?'s':''} cargado${cargados!==1?'s':''} en "${depositoMatch.nombre}"${depositoCreado?' (depósito nuevo, creado ahora)':''} para el ${fecha}.${sinMapeo?` (${sinMapeo} código${sinMapeo!==1?'s':''} del archivo con stock pero sin producto vinculado en Configuración.)`:''} Para revisarlo o ajustar algo a mano, entrá a "Conteo de stock manual" y elegí el depósito "${depositoMatch.nombre}".`;
+    document.getElementById('flexxus-stock-msg-txt').textContent=`${cargados} producto${cargados!==1?'s':''} cargado${cargados!==1?'s':''} en "${depositoMatch.nombre}" para el ${fecha}.${sinMapeo?` (${sinMapeo} código${sinMapeo!==1?'s':''} del archivo con stock pero sin producto vinculado en Configuración.)`:''} Para revisarlo o ajustar algo a mano, entrá a "Conteo de stock manual" y elegí el depósito "${depositoMatch.nombre}".`;
     msgEl.style.display='';
     setTimeout(()=>msgEl.style.display='none',9000);
     input.value='';
