@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.243</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.244</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -931,6 +931,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <div class="proy-subtabs" style="margin-bottom:1rem">
         <button class="proy-tab active" id="dtab-config" onclick="showDepTab('config')"><i class="ti ti-settings"></i> Configuracion</button>
         <button class="proy-tab" id="dtab-calc" onclick="showDepTab('calc')"><i class="ti ti-calculator"></i> Calculo de stock</button>
+        <button class="proy-tab" id="dtab-relink" onclick="showDepTab('relink')"><i class="ti ti-link"></i> Revincular productos<span id="dep-relink-badge" style="font-weight:700"></span></button>
       </div>
       <div id="dep-config">
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
@@ -948,6 +949,9 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
           <button class="btn btn-sm" onclick="copiarDepAStockSeg()" style="background:var(--green);color:#fff;border-color:var(--green)"><i class="ti ti-shield-check"></i> Copiar a stock de seguridad</button>
         </div>
         <div id="dep-calc-content"></div>
+      </div>
+      <div id="dep-relink" style="display:none">
+        <div id="dep-relink-content"></div>
       </div>
       <div id="dep-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Guardado.</div>
     </div>
@@ -7494,11 +7498,12 @@ function showStockTab(t){
 let depositosData=[], depTorresData=[], depProdData=[], depFamiliasData=[];
 
 function showDepTab(t){
-  ['config','calc'].forEach(id=>{
+  ['config','calc','relink'].forEach(id=>{
     document.getElementById('dep-'+id).style.display=id===t?'block':'none';
     document.getElementById('dtab-'+id).classList.toggle('active',id===t);
   });
   if(t==='calc')renderDepCalc();
+  if(t==='relink')renderDepRelink();
 }
 
 async function initDepositos(){
@@ -7509,6 +7514,117 @@ async function initDepositos(){
     if(st.E.length===1){se.value=st.E[0].id;}
   });
   await loadDepositos();
+  actualizarBadgeRelinkAsync();
+}
+
+// v4.244: "necesito ver porque no se vee los porcentajes y me genera la cantidad que va por cada una de
+// las variedades" -- investigando en vivo (solo lectura) encontré que "Productos asignados" en cada
+// depósito guarda el nombre del producto como TEXTO SUELTO en el momento de asignarlo (deposito_productos
+// .producto), no un vínculo permanente al producto. Cuando el catálogo se renombra después (por ejemplo
+// al reimportar "Estructura de Producto"), ese texto queda apuntando a un nombre que ya no existe --
+// confirmado en vivo: 76 de 82 productos asignados a estanterías (Burritos, Criollo 13, Criollo 15,
+// Napolitana, Pizzeta, T&C15) tenían nombres viejos ("A12", etc.) sin equivalente en el catálogo actual,
+// por eso Mix de ventas (que sí usa el catálogo actual) nunca encontraba el % y todo salía "Sin % mix
+// definido". Juan Pablo confirmó que prefiere una pantalla para revincular cada uno a mano (no una
+// asignación automática, que podría adivinar mal y asignar el % de un sabor a otro). Esta pantalla lista
+// cada producto huérfano agrupado por depósito, con un select del catálogo ACTUAL de esa empresa
+// (agrupado por área, mismo criterio que "Asignar producto al depósito") para que él elija a mano a qué
+// producto corresponde; al confirmar, actualiza el texto guardado (producto + area) para que vuelva a
+// matchear con Mix de ventas.
+let depRelinkTodosDep=[];
+let depRelinkTodosProd=[];
+
+async function renderDepRelink(){
+  const el=document.getElementById('dep-relink-content');
+  if(!el)return;
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
+  try{
+    [depRelinkTodosDep,depRelinkTodosProd]=await Promise.all([
+      get('depositos','order=nombre.asc'),
+      get('deposito_productos','order=area.asc,producto.asc'),
+    ]);
+  }catch(e){el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> Error: ${e.message}</div>`;return}
+  const prodKey=new Set(st.Pr.map(p=>p.empresa_id+'||'+p.nombre));
+  const huerfanos=depRelinkTodosProd.filter(dp=>!prodKey.has(dp.empresa_id+'||'+dp.producto));
+  actualizarBadgeRelink(huerfanos.length);
+  if(!huerfanos.length){
+    el.innerHTML='<div class="alert alert-ok"><i class="ti ti-check"></i> Todos los productos asignados a estanterías están vinculados al catálogo actual.</div>';
+    return;
+  }
+  let h=`<div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i>
+    Estos productos fueron asignados a una estantería con un nombre que ya no existe en el catálogo actual
+    (seguramente porque el producto se renombró después). Elegí para cada uno a qué producto de hoy
+    corresponde -- así se reconecta con Mix de ventas y vuelve a calcular la cantidad por variedad.</div>`;
+  const porDep={};
+  huerfanos.forEach(dp=>{if(!porDep[dp.deposito_id])porDep[dp.deposito_id]=[];porDep[dp.deposito_id].push(dp)});
+  Object.entries(porDep).forEach(([depId,items])=>{
+    const dep=depRelinkTodosDep.find(d=>d.id===depId);
+    h+=`<div class="stock-card" style="margin-bottom:1.2rem">
+      <div style="padding:10px 14px;border-bottom:.5px solid var(--border);background:var(--bg2);font-size:14px;font-weight:700">
+        <i class="ti ti-temperature-snow" style="color:var(--blue)"></i> ${dep?dep.nombre:'Depósito'}
+        <span style="font-size:11px;font-weight:400;color:var(--text2);margin-left:6px">${en(items[0].empresa_id)}</span>
+      </div>
+      <div style="padding:12px;display:flex;flex-direction:column;gap:8px">`;
+    items.forEach(dp=>{
+      h+=`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px;background:var(--bg2);border-radius:var(--radius)">
+        <span style="font-size:12px;color:var(--text3);text-decoration:line-through;min-width:90px">${dp.producto}</span>
+        <i class="ti ti-arrow-right" style="color:var(--text3);font-size:12px"></i>
+        <select id="relink-sel-${dp.id}" style="flex:1;min-width:220px;padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius)">${depRelinkOpciones(dp.empresa_id)}</select>
+        <button class="btn btn-sm btn-primary" onclick="vincularDepProd('${dp.id}')"><i class="ti ti-link"></i> Vincular</button>
+      </div>`;
+    });
+    h+=`</div></div>`;
+  });
+  el.innerHTML=h;
+}
+
+function depRelinkOpciones(eid){
+  const prods=st.Pr.filter(p=>p.empresa_id===eid);
+  const byArea={};
+  prods.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';if(!byArea[a])byArea[a]=[];byArea[a].push(p)});
+  let h='<option value="">Elegí el producto actual...</option>';
+  Object.entries(byArea).forEach(([area,items])=>{
+    h+=`<optgroup label="${area}">`;
+    items.forEach(p=>{h+=`<option value="${area.replace(/"/g,'&quot;')}||${p.nombre.replace(/"/g,'&quot;')}">${p.nombre}</option>`});
+    h+=`</optgroup>`;
+  });
+  return h;
+}
+
+async function vincularDepProd(dpId){
+  const sel=document.getElementById(`relink-sel-${dpId}`);
+  if(!sel||!sel.value){alert('Elegí un producto antes de vincular.');return}
+  const[area,producto]=sel.value.split('||');
+  const dp=depRelinkTodosProd.find(x=>x.id===dpId);
+  if(!dp)return;
+  const yaAsignado=depRelinkTodosProd.find(x=>x.id!==dpId&&x.deposito_id===dp.deposito_id&&x.producto===producto&&x.area===area);
+  if(yaAsignado){alert('Ese producto ya está asignado a este depósito con otro ítem.');return}
+  ss('saving','Guardando...');
+  try{
+    await pat('deposito_productos',dpId,{producto,area});
+    dp.producto=producto;dp.area=area;
+    const local=depProdData.find(x=>x.id===dpId);
+    if(local){local.producto=producto;local.area=area;}
+    ss('online','Vinculado');
+    renderDepRelink();
+    if(document.getElementById('dep-esel')?.value)renderDepConfig();
+  }catch(e){ss('error','Error: '+e.message)}
+}
+
+function actualizarBadgeRelink(n){
+  const b=document.getElementById('dep-relink-badge');
+  if(!b)return;
+  b.textContent=n>0?` (${n})`:'';
+  b.style.color=n>0?'var(--red)':'';
+}
+
+async function actualizarBadgeRelinkAsync(){
+  try{
+    const todosProd=await get('deposito_productos','select=empresa_id,producto');
+    const prodKey=new Set(st.Pr.map(p=>p.empresa_id+'||'+p.nombre));
+    const n=todosProd.filter(dp=>!prodKey.has(dp.empresa_id+'||'+dp.producto)).length;
+    actualizarBadgeRelink(n);
+  }catch{}
 }
 
 async function loadDepositos(){
