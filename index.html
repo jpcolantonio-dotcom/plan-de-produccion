@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.242</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.243</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -8945,33 +8945,30 @@ function flexxusStockSetDep(id,nombre){
   renderFlexxusDepSelector();
   renderFlexxusStockResultado();
 }
-// Grilla de botones por depósito (agrupados por empresa), igual que "Conteo de stock manual" -- deja
-// elegir CUALQUIER depósito para ver su stock ya guardado, no solo el que se acaba de importar.
+// v4.243: "en conteo stock Flexxus, ahi solo necesito que exista dos depositos, uno que se llame Planeta
+// Empanada y otro que se llame Joselito" -- Juan Pablo aclaró que esto es ADEMÁS de lo pedido en v4.242:
+// no solo el IMPORT tiene que escribir únicamente en el depósito consolidado de cada empresa, sino que
+// esta grilla (para VER lo ya guardado) también tiene que mostrar solo esos dos, no los ~29 depósitos
+// viejos (cámaras, etc.) que siguen existiendo intactos para "Conteo de stock manual". Antes esta grilla
+// mostraba TODOS los depósitos de stockConteoDepositos por empresa (igual que el manual); ahora filtra
+// para quedarse solo con el depósito consolidado (mismo nombre que la empresa, el que crea/usa
+// asegurarDepositoConsolidado) -- así los dos pueden tener productos repetidos entre sí sin problema,
+// cada uno es independiente. Stock que haya quedado en depósitos viejos (de antes de v4.242) sigue
+// existiendo en la base y se puede ver desde "Conteo de stock manual", solo que ya no aparece acá.
 function renderFlexxusDepSelector(){
   const el=document.getElementById('flexxus-stock-dep-grid');
   if(!el)return;
-  if(!stockConteoDepositos.length){
-    el.innerHTML='<div class="empty"><i class="ti ti-building-warehouse"></i> No hay depósitos cargados. Agregalos en Stock &gt; Configuración stock &gt; Depositos.</div>';
+  const consolidados=st.E.map(e=>stockConteoDepositos.find(d=>d.empresa_id===e.id&&normTxt(d.nombre)===normTxt(e.nombre))).filter(Boolean);
+  if(!consolidados.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-building-warehouse"></i> No hay depósitos cargados todavía. Elegí una empresa arriba en "Depósito destino" para crearlos.</div>';
     return;
   }
-  const botonesDeps=deps=>{
-    let h='<div style="display:flex;flex-wrap:wrap;gap:8px">';
-    deps.forEach(d=>{
-      const active=d.id===(flexxusStockUltimoDep&&flexxusStockUltimoDep.id);
-      h+=`<button class="btn${active?' btn-primary':''}" onclick="flexxusStockSetDep('${d.id}','${d.nombre.replace(/'/g,"\\'")}')"><i class="ti ti-building-warehouse"></i> ${d.nombre}</button>`;
-    });
-    return h+'</div>';
-  };
-  let h='';
-  st.E.forEach(e=>{
-    const deps=stockConteoDepositos.filter(d=>d.empresa_id===e.id);
-    if(!deps.length)return;
-    h+=`<div style="margin-bottom:.8rem"><div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">${e.nombre}</div>${botonesDeps(deps)}</div>`;
+  let h='<div style="display:flex;flex-wrap:wrap;gap:8px">';
+  consolidados.forEach(d=>{
+    const active=d.id===(flexxusStockUltimoDep&&flexxusStockUltimoDep.id);
+    h+=`<button class="btn${active?' btn-primary':''}" onclick="flexxusStockSetDep('${d.id}','${d.nombre.replace(/'/g,"\\'")}')"><i class="ti ti-building-warehouse"></i> ${d.nombre}</button>`;
   });
-  const sinEmp=stockConteoDepositos.filter(d=>!st.E.some(e=>e.id===d.empresa_id));
-  if(sinEmp.length){
-    h+=`<div style="margin-bottom:.8rem"><div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">Sin empresa</div>${botonesDeps(sinEmp)}</div>`;
-  }
+  h+='</div>';
   el.innerHTML=h;
 }
 
