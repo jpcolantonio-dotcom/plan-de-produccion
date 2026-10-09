@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.251</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.249</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -3938,27 +3938,6 @@ function prodSetSort(field){
 }
 function prodSortArrow(field){ return prodSort.field===field?(prodSort.dir==='asc'?' ▲':' ▼'):' <span style="opacity:.35">⇅</span>'; }
 
-// v4.251: "es que esta configurado asi hace rato" -- le dije a Juan Pablo que renombrara "SP13" acá, pero
-// me mandó un screenshot de esta misma tarjeta mostrando el nombre completo de siempre. Investigando el
-// código: esta tarjeta solo muestra `linkedMp.nombre` (el nombre de la MATERIA PRIMA vinculada) cuando
-// hay un vínculo -- el nombre PROPIO del producto (`productos.nombre`, el que realmente usan Mix
-// ventas/Depósitos/Planificación) nunca se mostraba en ningún lado de esta pantalla una vez vinculado.
-// Por eso Juan Pablo veía siempre el nombre correcto acá (el de la materia prima, sin cambios "hace
-// rato") sin forma de notar que el campo nombre del producto en sí había quedado como "SP13" -- texto
-// tipeado en el plan antes de vincularlo por código (vincular por código solo conecta, nunca renombra,
-// ver vincularCodigoNuevoProducto/vincularProdPorCodigo más arriba). Ahora, cuando los dos nombres no
-// coinciden, la tarjeta muestra un aviso con el nombre real guardado (el "equivocado") y un botón para
-// sincronizarlo de un clic al nombre de la materia prima vinculada -- mismo renombre que haría a mano en
-// el campo nombre, con la misma propagación a Mix ventas/Depósitos/Planes que ya hace updP.
-async function sincronizarNombreProdConMp(prodId){
-  const p=st.Pr.find(x=>x.id===prodId);
-  if(!p||!p.mp_id)return;
-  const m=mpData.find(x=>x.id===p.mp_id);
-  if(!m)return;
-  await updP(prodId,'nombre',m.nombre);
-  if(st.aaid)rProdDetail(st.aaid);
-}
-
 function rProdDetail(aid){
   const area=st.A.find(a=>a.id===aid);if(!area)return;
   const emp=st.E.find(e=>e.id===area.empresa_id);
@@ -4019,13 +3998,6 @@ function rProdDetail(aid){
           </div>
           <button class="btn btn-xs btn-danger" onclick="delProd('${p.id}')" style="flex-shrink:0"><i class="ti ti-trash"></i></button>
         </div>
-        ${linkedMp&&normTxt(p.nombre)!==normTxt(linkedMp.nombre)?`
-        <div style="padding:5px 12px 5px 52px;background:var(--amber)10;border-top:.5px solid var(--border);display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-          <i class="ti ti-alert-triangle" style="color:var(--amber);font-size:12px;flex-shrink:0"></i>
-          <span style="font-size:11px;color:var(--amber)">Mix ventas/Depósitos todavía lo muestran como "<b>${p.nombre}</b>" (no como el nombre de arriba)</span>
-          <button class="btn btn-xs" onclick="sincronizarNombreProdConMp('${p.id}')"><i class="ti ti-refresh"></i> Usar ese nombre</button>
-        </div>
-        `:''}
         <!-- Línea 2: configuración secundaria -->
         <div style="display:flex;align-items:center;gap:16px;padding:8px 12px 10px 52px;background:var(--bg2);flex-wrap:wrap;border-top:.5px solid var(--border)">
           <label style="display:flex;align-items:center;gap:5px;cursor:pointer" title="Habilita campos de hora inicio, hora fin, desperdicio y cantidad al cargar producción">
@@ -7572,21 +7544,8 @@ async function renderDepRelink(){
       get('deposito_productos','order=area.asc,producto.asc'),
     ]);
   }catch(e){el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> Error: ${e.message}</div>`;return}
-  // v4.250: "aca me dice que no lo reconoce SA, y que no tiene mix pero en el mix esta" -- confirmado en
-  // vivo, dos variantes del mismo problema de fondo: (1) productos DUPLICADOS en el catálogo -- una fila
-  // vieja sin área (ej. "EMPANADA DE CARNE PRECOCIDA TAPA CRIOLLA 13", area_id null) y una fila nueva
-  // con área y el sufijo "CAJA POR 48U." (la que realmente se usa en Mix ventas, que excluye las sin
-  // área desde v4.235) -- deposito_productos seguía apuntando a la fila vieja por nombre, que
-  // técnicamente "existe" en el catálogo, así que esta pantalla no la marcaba como huérfana aunque nunca
-  // aparece en Mix ventas por no tener área; (2) el caso de "EMPANADA DE VERDURA..." es más sutil -- el
-  // NOMBRE guardado sí coincide con el producto vigente (con área), pero el ÁREA guardada quedó en "SA"
-  // de todos modos (seguro de cuando se asignó, antes de que el producto tuviera área) -- el nombre solo
-  // no alcanza para decir "está vinculado" si el área no matchea, porque Mix ventas exige las dos cosas
-  // iguales. Antes solo se comparaba por nombre; ahora "está vinculado" exige la tripleta completa
-  // (empresa + área + nombre) contra el catálogo vigente (mismo criterio que mixProductosValidos(), que
-  // ya excluye productos sin área como "vigentes").
-  const prodKey=new Set(mixProductosValidos().map(p=>p.empresa_id+'||'+(st.A.find(a=>a.id===p.area_id)?.nombre||'')+'||'+p.nombre));
-  const huerfanos=depRelinkTodosProd.filter(dp=>!prodKey.has(dp.empresa_id+'||'+dp.area+'||'+dp.producto));
+  const prodKey=new Set(st.Pr.map(p=>p.empresa_id+'||'+p.nombre));
+  const huerfanos=depRelinkTodosProd.filter(dp=>!prodKey.has(dp.empresa_id+'||'+dp.producto));
   actualizarBadgeRelink(huerfanos.length);
   if(!huerfanos.length){
     el.innerHTML='<div class="alert alert-ok"><i class="ti ti-check"></i> Todos los productos asignados a estanterías están vinculados al catálogo actual.</div>';
@@ -7620,9 +7579,7 @@ async function renderDepRelink(){
 }
 
 function depRelinkOpciones(eid){
-  // v4.250: la lista de destinos posibles también debe excluir duplicados sin área -- si no, Juan Pablo
-  // podría revincular por error a la misma fila muerta que ya tenía, sin arreglar nada.
-  const prods=mixProductosValidos().filter(p=>p.empresa_id===eid);
+  const prods=st.Pr.filter(p=>p.empresa_id===eid);
   const byArea={};
   prods.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';if(!byArea[a])byArea[a]=[];byArea[a].push(p)});
   let h='<option value="">Elegí el producto actual...</option>';
@@ -7663,9 +7620,9 @@ function actualizarBadgeRelink(n){
 
 async function actualizarBadgeRelinkAsync(){
   try{
-    const todosProd=await get('deposito_productos','select=empresa_id,area,producto');
-    const prodKey=new Set(mixProductosValidos().map(p=>p.empresa_id+'||'+(st.A.find(a=>a.id===p.area_id)?.nombre||'')+'||'+p.nombre));
-    const n=todosProd.filter(dp=>!prodKey.has(dp.empresa_id+'||'+dp.area+'||'+dp.producto)).length;
+    const todosProd=await get('deposito_productos','select=empresa_id,producto');
+    const prodKey=new Set(st.Pr.map(p=>p.empresa_id+'||'+p.nombre));
+    const n=todosProd.filter(dp=>!prodKey.has(dp.empresa_id+'||'+dp.producto)).length;
     actualizarBadgeRelink(n);
   }catch{}
 }
