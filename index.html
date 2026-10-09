@@ -251,7 +251,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.248</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.250</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -7544,8 +7544,21 @@ async function renderDepRelink(){
       get('deposito_productos','order=area.asc,producto.asc'),
     ]);
   }catch(e){el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> Error: ${e.message}</div>`;return}
-  const prodKey=new Set(st.Pr.map(p=>p.empresa_id+'||'+p.nombre));
-  const huerfanos=depRelinkTodosProd.filter(dp=>!prodKey.has(dp.empresa_id+'||'+dp.producto));
+  // v4.250: "aca me dice que no lo reconoce SA, y que no tiene mix pero en el mix esta" -- confirmado en
+  // vivo, dos variantes del mismo problema de fondo: (1) productos DUPLICADOS en el catálogo -- una fila
+  // vieja sin área (ej. "EMPANADA DE CARNE PRECOCIDA TAPA CRIOLLA 13", area_id null) y una fila nueva
+  // con área y el sufijo "CAJA POR 48U." (la que realmente se usa en Mix ventas, que excluye las sin
+  // área desde v4.235) -- deposito_productos seguía apuntando a la fila vieja por nombre, que
+  // técnicamente "existe" en el catálogo, así que esta pantalla no la marcaba como huérfana aunque nunca
+  // aparece en Mix ventas por no tener área; (2) el caso de "EMPANADA DE VERDURA..." es más sutil -- el
+  // NOMBRE guardado sí coincide con el producto vigente (con área), pero el ÁREA guardada quedó en "SA"
+  // de todos modos (seguro de cuando se asignó, antes de que el producto tuviera área) -- el nombre solo
+  // no alcanza para decir "está vinculado" si el área no matchea, porque Mix ventas exige las dos cosas
+  // iguales. Antes solo se comparaba por nombre; ahora "está vinculado" exige la tripleta completa
+  // (empresa + área + nombre) contra el catálogo vigente (mismo criterio que mixProductosValidos(), que
+  // ya excluye productos sin área como "vigentes").
+  const prodKey=new Set(mixProductosValidos().map(p=>p.empresa_id+'||'+(st.A.find(a=>a.id===p.area_id)?.nombre||'')+'||'+p.nombre));
+  const huerfanos=depRelinkTodosProd.filter(dp=>!prodKey.has(dp.empresa_id+'||'+dp.area+'||'+dp.producto));
   actualizarBadgeRelink(huerfanos.length);
   if(!huerfanos.length){
     el.innerHTML='<div class="alert alert-ok"><i class="ti ti-check"></i> Todos los productos asignados a estanterías están vinculados al catálogo actual.</div>';
@@ -7579,7 +7592,9 @@ async function renderDepRelink(){
 }
 
 function depRelinkOpciones(eid){
-  const prods=st.Pr.filter(p=>p.empresa_id===eid);
+  // v4.250: la lista de destinos posibles también debe excluir duplicados sin área -- si no, Juan Pablo
+  // podría revincular por error a la misma fila muerta que ya tenía, sin arreglar nada.
+  const prods=mixProductosValidos().filter(p=>p.empresa_id===eid);
   const byArea={};
   prods.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id)?.nombre||'SA';if(!byArea[a])byArea[a]=[];byArea[a].push(p)});
   let h='<option value="">Elegí el producto actual...</option>';
@@ -7620,9 +7635,9 @@ function actualizarBadgeRelink(n){
 
 async function actualizarBadgeRelinkAsync(){
   try{
-    const todosProd=await get('deposito_productos','select=empresa_id,producto');
-    const prodKey=new Set(st.Pr.map(p=>p.empresa_id+'||'+p.nombre));
-    const n=todosProd.filter(dp=>!prodKey.has(dp.empresa_id+'||'+dp.producto)).length;
+    const todosProd=await get('deposito_productos','select=empresa_id,area,producto');
+    const prodKey=new Set(mixProductosValidos().map(p=>p.empresa_id+'||'+(st.A.find(a=>a.id===p.area_id)?.nombre||'')+'||'+p.nombre));
+    const n=todosProd.filter(dp=>!prodKey.has(dp.empresa_id+'||'+dp.area+'||'+dp.producto)).length;
     actualizarBadgeRelink(n);
   }catch{}
 }
@@ -7825,6 +7840,34 @@ let modalDepProdSel=null;
 // sumados al `codigo_articulo` de siempre -- el buscador ahora matchea contra cualquiera de esos
 // códigos, y la lista de resultados los muestra todos junto al producto para que se vea de dónde salió
 // el match.
+// v4.249: "como se que no se equivoca y me pone otro codigo ya que tengo dos productos similares uno
+// quees por unidad y otro por caja, necesito poner por caja porque despues va a tenewr que comprar con
+// el stock real" -- codigosRelacionadosProd() (v4.248) junta TODOS los códigos relacionados sin elegir
+// entre ellos, pero acá (Cálculo de stock) lo que importa es UNO solo: el de la variante por CAJA,
+// porque es el código con el que después se compara contra el stock real (ver
+// productosDeDepositoConteo/itemsSinDepositoConteo, que ya usan `unidad_tipo!=='unidad'` para separar
+// lo que es stock real contable de la variante "por unidad"). materias_primas tiene un campo explícito
+// `unidad_tipo` ('caja'/'unidad'/sin clasificar) -- más confiable que adivinar por el nombre. Si no hay
+// ninguna variante de caja y lo único que aparece es la de "por unidad", se muestra igual pero marcado
+// en ámbar con ⚠ para que quede claro que NO es el código de caja (en vez de mostrar un código
+// silenciosamente equivocado).
+function codigoCajaInfo(p){
+  if(!p)return{codigo:'',advertencia:false};
+  const nombreNorm=normTxt(p.nombre);
+  const candidatos=mpData.filter(m=>m.tipo==='terminado'&&m.codigo&&(m.id===p.mp_id||(nombreNorm&&(normTxt(m.nombre)===nombreNorm||normTxt(m.nombre).startsWith(nombreNorm)||nombreNorm.startsWith(normTxt(m.nombre))))));
+  const caja=candidatos.find(m=>m.unidad_tipo==='caja');
+  if(caja)return{codigo:caja.codigo,advertencia:false};
+  const sinClasificar=candidatos.find(m=>!m.unidad_tipo);
+  if(sinClasificar)return{codigo:sinClasificar.codigo,advertencia:false};
+  const soloUnidad=candidatos.find(m=>m.unidad_tipo==='unidad');
+  if(soloUnidad)return{codigo:soloUnidad.codigo,advertencia:true};
+  return{codigo:p.codigo_articulo||'',advertencia:false};
+}
+function codigoCeldaHtml(info){
+  if(!info)return'<td></td>';
+  return`<td style="font-family:monospace;font-size:12px;color:${info.advertencia?'var(--amber)':'var(--text2)'}"${info.advertencia?` title="Único código encontrado es el de la variante POR UNIDAD -- todavía no hay variante por caja cargada en Materias Primas para este producto"`:''}>${info.codigo||''}${info.advertencia?' <span title="No es código de caja">⚠</span>':''}</td>`;
+}
+
 function codigosRelacionadosProd(p){
   const codigos=new Set();
   if(p.codigo_articulo)codigos.add(p.codigo_articulo);
@@ -8296,9 +8339,9 @@ async function renderDepCalc(){
         const pct=mix?mix.porcentaje:0;
         const prodMaestro=st.Pr.find(pr=>pr.nombre===p.producto&&pr.empresa_id===p.empresa_id);
         const ujc=caja?caja.unidades_por_caja:(prodMaestro&&prodMaestro.unidades_bandeja?parseInt(prodMaestro.unidades_bandeja):0);
-        const codigo=prodMaestro&&prodMaestro.codigo_articulo||'';
-        if(!pct){prodsSinMix.push({...p,_codigo:codigo});return;}
-        mixFam.push({p,pct,ujc,codigo});
+        const codigoInfo=codigoCajaInfo(prodMaestro);
+        if(!pct){prodsSinMix.push({...p,_codigoInfo:codigoInfo});return;}
+        mixFam.push({p,pct,ujc,codigoInfo});
       });
 
       // Normalizar % entre productos con mix de esta familia
@@ -8314,13 +8357,13 @@ async function renderDepCalc(){
       const torresMinimas=Math.min(nProds,torresReales); // 1 por producto (o menos si no alcanza)
       const torresParaDistribuir=Math.max(0,torresReales-torresMinimas);
 
-      const torresExactas=mixFam.map(({p,pct,ujc,codigo})=>{
+      const torresExactas=mixFam.map(({p,pct,ujc,codigoInfo})=>{
         const pctNorm=sumPctFam>0?(pct/sumPctFam)*100:100/nProds;
         const torresExtra=torresParaDistribuir*(pctNorm/100);
         const torresRaw=torresReales>0?(1+torresExtra):0; // minimo 1 + proporcional, solo si la familia tiene torres reales
         const torresBase=Math.floor(torresRaw);
         const fraccion=torresRaw-torresBase;
-        return{p,pct,pctNorm,ujc,codigo,torresBase,fraccion,torresExtra:0};
+        return{p,pct,pctNorm,ujc,codigoInfo,torresBase,fraccion,torresExtra:0};
       });
 
       // Distribuir torres sobrantes a los de mayor fracción
@@ -8350,11 +8393,11 @@ async function renderDepCalc(){
         h+=`<tr style="background:var(--bg2)"><td colspan="8" style="padding:4px 12px 4px 22px;font-size:10.5px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">${area}</td></tr>`;
 
         grupo.sinMix.forEach(p=>{
-          h+=`<tr><td style="font-family:monospace;font-size:12px;color:var(--text2)">${p._codigo||''}</td><td style="font-weight:500">${p.producto}</td><td class="muted">${p.area}</td>
+          h+=`<tr>${codigoCeldaHtml(p._codigoInfo)}<td style="font-weight:500">${p.producto}</td><td class="muted">${p.area}</td>
             <td colspan="5" style="text-align:center;color:var(--text3);font-size:12px">Sin % mix definido</td></tr>`;
         });
 
-        grupo.conMix.forEach(({p,pct,pctNorm,ujc,codigo,cajasRaw,torresBase,torresExtra,torresTotal})=>{
+        grupo.conMix.forEach(({p,pct,pctNorm,ujc,codigoInfo,cajasRaw,torresBase,torresExtra,torresTotal})=>{
           const cajasReales=Math.round(torresTotal*cajasXtorreUnit);
           const unidades=cajasReales*ujc;
           totalCajasUsadas+=cajasReales; subtotalCajas+=cajasReales;
@@ -8365,7 +8408,7 @@ async function renderDepCalc(){
             ?`${torresTotal} <span style="font-size:10px;color:var(--blue)">(doble)</span>`
             :`${torresTotal}`)+' '+extraBadge;
           h+=`<tr${torresExtra?` style="background:var(--blue)07"`:'>'}>
-            <td style="font-family:monospace;font-size:12px;color:var(--text2)">${codigo||''}</td>
+            ${codigoCeldaHtml(codigoInfo)}
             <td style="font-weight:500">${p.producto}</td>
             <td class="muted">${p.area}</td>
             <td style="text-align:right">${pct.toFixed(1)}%${Math.abs(pctNorm-pct)>0.5?`<span style="font-size:10px;color:var(--blue);margin-left:3px">(${pctNorm.toFixed(1)}%↑)</span>`:''}</td>
@@ -8509,9 +8552,10 @@ function renderMixEmpresa(eid, items){
   h+=`<span style="font-size:12px;font-weight:700;white-space:nowrap;${totCls}">Total ${en(eid)||''}: ${totEmp.toFixed(1)}%</span>`;
   h+=`</div>`;
 
+  h+=`<datalist id="mix-udl">${UNITS.map(u=>`<option>${u}</option>`).join('')}</datalist>`;
   h+=`<div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
     <th style="text-align:left">Producto</th>
-    <th style="text-align:left;width:70px">Unidad</th>
+    <th style="text-align:left;width:90px">Unidad</th>
     <th style="text-align:right;width:120px">% Mix ventas</th>
   </tr></thead><tbody>`;
   (bA[activeArea]||[]).forEach(p=>{
@@ -8521,7 +8565,10 @@ function renderMixEmpresa(eid, items){
     const val=draftVal!==undefined?draftVal:(m?m.porcentaje:'');
     h+=`<tr>
       <td style="font-weight:500">${p.nombre}</td>
-      <td style="font-size:12px;color:var(--text2)">${p.unidad}</td>
+      <td>
+        <input type="text" value="${p.unidad||''}" list="mix-udl" placeholder="unidad" onchange="updMixUnidad('${p.id}',this.value)"
+          style="width:78px;padding:3px 5px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      </td>
       <td style="text-align:right">
         <div style="display:flex;align-items:center;gap:4px;justify-content:flex-end">
           <input class="proy-input" type="number" min="0" max="100" step="0.1" id="${pid}" value="${val}" placeholder="0" style="width:80px" oninput="mixDraft['${pid}']=this.value"/>
@@ -8532,6 +8579,18 @@ function renderMixEmpresa(eid, items){
   });
   h+=`</tbody></table></div>`;
   el.innerHTML=h;
+}
+
+// v4.249: "aca tambien tendria que tener por cajas y asi todo deberia poder ponerlo manualmente por el
+// momento" (screenshot de Mix ventas, columna "Unidad" mostrando "docenas" fijo para todos los
+// productos de Hojaldre 13). Esa columna venía de `productos.unidad`, cargado solo una vez al crear el
+// producto y sin forma de corregirlo después -- ahora es un campo de texto editable ahí mismo (con
+// autocompletar de la misma lista `UNITS` que ya se usa al crear productos nuevos, que incluye
+// "cajas"), para que Juan Pablo pueda ajustarlo a mano producto por producto mientras no haya algo más
+// automático.
+async function updMixUnidad(pid,v){
+  await updP(pid,'unidad',v);
+  renderMixTabs();
 }
 
 async function guardarMix(){
