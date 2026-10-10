@@ -25,6 +25,7 @@
 <meta name="mobile-web-app-capable" content="yes"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{--bg:#fff;--bg2:#f5f5f4;--bg3:#eeede9;--text:#1a1a1a;--text2:#6b6b6b;--text3:#bbb;--border:rgba(0,0,0,.10);--border2:rgba(0,0,0,.20);--radius:8px;--radius-lg:12px;--green:#1D9E75;--green-bg:#E1F5EE;--blue:#378ADD;--blue-bg:#E6F1FB;--amber:#BA7517;--amber-bg:#FAEEDA;--red:#E24B4A;--red-bg:#FCEBEB;--purple:#534AB7;--purple-bg:#EEEDFE;--today-bg:rgba(55,138,221,.07);--today-head:rgba(55,138,221,.13)}
@@ -251,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.252</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.253</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -269,6 +270,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('ped')"><i class="ti ti-shopping-cart"></i>Pedidos</button>
   <button class="tab" onclick="T('cfg')"><i class="ti ti-settings"></i>Configuración</button>
   <button class="tab" onclick="T('etq')"><i class="ti ti-qrcode"></i>Etiquetas</button>
+  <button class="tab" onclick="T('rem')"><i class="ti ti-truck-delivery"></i>Remitos</button>
   <button class="tab" onclick="T('planillas')"><i class="ti ti-file-text"></i>Planillas</button>
 </div>
 <div class="pad">
@@ -1534,6 +1536,21 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div id="etq-stock-content"></div>
   </div>
 </div>
+<!-- REMITOS -->
+<div id="tab-rem" class="section">
+  <div class="toolbar">
+    <div>
+      <div style="font-size:16px;font-weight:600">Remitos</div>
+      <div style="font-size:13px;color:var(--text2)">Subí el remito en PDF que manda Flexxus y te arma el remito de reparto por categoría, listo para imprimir en una hoja A4</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1.25rem">
+    <button class="proy-tab active" id="remtab-subir" onclick="remIrVista('subir')"><i class="ti ti-upload"></i> Subir remito</button>
+    <button class="proy-tab" id="remtab-historial" onclick="remIrVista('historial')"><i class="ti ti-history"></i> Historial</button>
+    <button class="proy-tab" id="remtab-config" onclick="remIrVista('config')"><i class="ti ti-adjustments"></i> Categorías</button>
+  </div>
+  <div id="rem-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
+</div>
 <!-- PLANILLAS -->
 <div id="tab-planillas" class="section">
   <div class="toolbar">
@@ -1796,7 +1813,7 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['prod','cmp','inf','stock','cong','rec','rrhh','ped','cfg','etq'];
+const TABS=['prod','cmp','inf','stock','cong','rec','rrhh','ped','cfg','etq','rem'];
 // Sub-pestaña activa dentro de Producción (Planificación/Rellenos/Prod. Real, unificadas en una sola
 // pestaña) -- se recuerda para que volver a "Producción" desde otra pestaña principal reabra la misma
 // sub-pestaña en la que el usuario estaba, en vez de resetear siempre a Planificación.
@@ -1829,6 +1846,7 @@ function T(t){
   if(t==='cfg'){renderMPList();rMae();loadMaeDepositosOnce();}
   if(t==='ped')initPedidos();
   if(t==='etq')initEtiquetas();
+  if(t==='rem')initRemitos();
   if(t==='planillas')initPlanillas();
 }
 // Sub-pestaña activa dentro de Informes (Desvíos/Dashboard/Rendimiento/Producción del Día, unificadas
@@ -15972,6 +15990,532 @@ function togglePlanillaInfo(slug){
 // alguno de esos otros init() como efecto colateral. Esta línea llama a init() SIEMPRE al cargar la
 // página, sin depender de qué pestaña se mire primero -- es seguro llamarlo aunque algún otro camino
 // también lo dispare (initGen, más arriba, hace que sólo el llamado más nuevo pueda escribir en st).
+// ── REMITOS ──────────────────────────────────────────────────────────────
+// v1 (10/10/2026): reemplaza a la app aparte "remitos.html" -- ahora vive adentro de PAPO, como
+// pestaña propia. Sube el PDF de remito que manda Flexxus, lo clasifica por categoría (configurable
+// por código, reutilizando materias_primas.alias para mostrar el nombre corto) y genera una hoja A4
+// vertical lista para imprimir con el resumen por categoría abajo (mismo espíritu que el PDF de
+// "Remito - Patagonia" que mandó Juan Pablo de ejemplo). Lo guardado queda en las tablas remitos/
+// remito_items/remito_categorias_producto (ya creadas en Supabase para la app anterior -- no hace
+// falta ninguna migración nueva) para poder evaluar ventas más adelante.
+
+// ---------- Parser del texto del remito (idéntico al probado con 29/29 asserts sobre el PDF real) ----------
+function parseRemitoTexto(texto){
+  const lineas=texto.split('\n').map(l=>l.trim()).filter(Boolean);
+  const CUIT_RE=/^\d{2}-\d{8}-\d$/;
+  const FECHAHORA_RE=/^(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2})$/;
+  const REMITO_RE=/^REMITO\s+(\S+)/i;
+  const HEADER_TABLA_RE=/^codigo\s+cant\.?\s+descripcion/i;
+  const ITEM_RE=/^(\d{4,})\s+([\d.,]+)\s+(.+)$/;
+  const SOLO_CODIGO_CANT_RE=/^(\d{4,})\s+([\d.,]+)$/;
+
+  let idxFecha=-1,idxCuit=-1,idxHeaderTabla=-1;
+  let numero=null,fecha=null,hora=null,cuit=null;
+
+  lineas.forEach((l,i)=>{
+    if(numero===null){const m=l.match(REMITO_RE);if(m){numero=m[1];return;}}
+    if(idxFecha===-1){const m=l.match(FECHAHORA_RE);if(m){idxFecha=i;fecha=m[1];hora=m[2];return;}}
+    if(idxCuit===-1){const m=l.match(CUIT_RE);if(m){idxCuit=i;cuit=l;return;}}
+    if(idxHeaderTabla===-1&&HEADER_TABLA_RE.test(l)){idxHeaderTabla=i;return;}
+  });
+
+  let cliente=null,direccion=null;
+  if(idxFecha!==-1&&idxCuit!==-1&&idxCuit>idxFecha){
+    const entreMedio=lineas.slice(idxFecha+1,idxCuit);
+    if(entreMedio.length>=2){cliente=entreMedio[0];direccion=entreMedio[entreMedio.length-1].replace(/\s*-\s*$/,'').trim();}
+    else if(entreMedio.length===1){cliente=entreMedio[0];}
+  }
+
+  const items=[];
+  if(idxHeaderTabla!==-1){
+    for(let i=idxHeaderTabla+1;i<lineas.length;i++){
+      let linea=lineas[i];
+      let m=linea.match(ITEM_RE);
+      if(!m){
+        const mSolo=linea.match(SOLO_CODIGO_CANT_RE);
+        if(mSolo&&i+1<lineas.length&&!ITEM_RE.test(lineas[i+1])&&!SOLO_CODIGO_CANT_RE.test(lineas[i+1])){
+          linea=linea+' '+lineas[i+1];
+          m=linea.match(ITEM_RE);
+          if(m)i++;
+        }
+      }
+      if(!m)continue;
+      items.push({codigo:m[1],cantidad:parseFloat(m[2].replace(',','.')),descripcion:m[3].trim()});
+    }
+  }
+  return{numero,fecha,hora,cliente,direccion,cuit,items};
+}
+function resolverUnidadesReales(cantidad,descripcion){
+  const mCaja=descripcion.match(/CAJA\s+POR\s+(\d+)\s*U\.?/i);
+  if(mCaja)return cantidad*parseInt(mCaja[1],10);
+  return cantidad;
+}
+function clasificarItem(descripcion){
+  return /^EMPANADA/i.test(descripcion.trim())?'empanada':'unidad';
+}
+function convertirParaMostrar(unidadesReales,tipo){
+  if(tipo==='empanada'){
+    const bandejasEnteras=Math.floor(unidadesReales/24);
+    const resto=Math.round((unidadesReales-bandejasEnteras*24)*100)/100;
+    return{cantidad_mostrada:Math.round((unidadesReales/24)*100)/100,unidad_mostrada:'bandejas',texto:resto>0?`${bandejasEnteras} bandejas + ${resto}u`:`${bandejasEnteras} bandejas`};
+  }
+  return{cantidad_mostrada:unidadesReales,unidad_mostrada:'unidades',texto:`${unidadesReales} unidades`};
+}
+function procesarRemito(texto){
+  const{numero,fecha,hora,cliente,direccion,cuit,items}=parseRemitoTexto(texto);
+  const itemsProcesados=items.map((it,idx)=>{
+    const unidadesReales=resolverUnidadesReales(it.cantidad,it.descripcion);
+    const tipo=clasificarItem(it.descripcion);
+    const conv=convertirParaMostrar(unidadesReales,tipo);
+    return{orden:idx,codigo:it.codigo,descripcion:it.descripcion,cantidad_original:it.cantidad,unidades_reales:unidadesReales,tipo,...conv,recibido:false,cantidad_recibida:null};
+  });
+  return{numero,fecha,hora,cliente,direccion,cuit,items:itemsProcesados};
+}
+
+// ---------- Extracción del texto del PDF con pdf.js (agrupa por línea igual que remitos.html, ya
+// probado contra un caso real donde pdf.js parte el código+cantidad de la descripción en dos líneas) ----------
+async function remExtraerTextoPdf(file){
+  const buf=await file.arrayBuffer();
+  const doc=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
+  const lineasTotales=[];
+  for(let p=1;p<=doc.numPages;p++){
+    const page=await doc.getPage(p);
+    const content=await page.getTextContent();
+    const grupos=new Map();
+    for(const item of content.items){
+      const y=Math.round(item.transform[5]);
+      if(!grupos.has(y))grupos.set(y,[]);
+      grupos.get(y).push(item);
+    }
+    const ys=Array.from(grupos.keys()).sort((a,b)=>b-a);
+    for(const y of ys){
+      const its=grupos.get(y).sort((a,b)=>a.transform[4]-b.transform[4]);
+      let linea='',lastEndX=null;
+      for(const it of its){
+        const txt=it.str;
+        if(!txt)continue;
+        const x=it.transform[4];
+        if(lastEndX!==null&&x-lastEndX>2&&linea&&!linea.endsWith(' '))linea+=' ';
+        linea+=txt;
+        lastEndX=x+(it.width||0);
+      }
+      linea=linea.replace(/\s+/g,' ').trim();
+      if(linea)lineasTotales.push(linea);
+    }
+  }
+  return lineasTotales.join('\n');
+}
+
+// ---------- Alias (reutiliza mpData, ya cargado globalmente por el resto de PAPO -- no hace falta
+// pedirlo de nuevo a Supabase) ----------
+function remAliasInfo(codigo){
+  const m=mpData.find(x=>x.codigo===codigo);
+  return m?{alias:m.alias||'',nombre:m.nombre||''}:{alias:'',nombre:''};
+}
+
+// ---------- Categorías configurables por producto ----------
+const REM_CATEGORIAS_SUGERIDAS=['Clásicas','Especiales','Planetarias','Premium','Deluxe','Burritos Clásicos','Burritos Especiales','Pizzetas Clásicas','Pizzetas Especiales','Pizzetas Premium','Salsas'];
+let remCategoriaMap={}; // codigo -> categoria
+let remCatalogoCodigos=[]; // [{codigo,descripcion}] -- todos los códigos vistos hasta ahora
+
+function remBuildCategoriaMap(rows){
+  const map={};
+  (rows||[]).forEach(r=>{if(r.codigo)map[r.codigo]=r.categoria;});
+  return map;
+}
+async function remCargarCategoriaMap(){
+  try{
+    const rows=await get('remito_categorias_producto','select=codigo,categoria');
+    remCategoriaMap=remBuildCategoriaMap(rows);
+  }catch(e){remCategoriaMap={};}
+}
+function remBuildCatalogoCodigos(rowsHistoricos,itemsPreview){
+  const map={};
+  (rowsHistoricos||[]).forEach(r=>{if(r.codigo&&!map[r.codigo])map[r.codigo]=r.descripcion;});
+  (itemsPreview||[]).forEach(it=>{if(it.codigo&&!map[it.codigo])map[it.codigo]=it.descripcion;});
+  return Object.entries(map).map(([codigo,descripcion])=>({codigo,descripcion})).sort((a,b)=>a.codigo.localeCompare(b.codigo));
+}
+async function remCargarCatalogoCodigos(){
+  try{
+    const rows=await get('remito_items','select=codigo,descripcion&order=codigo.asc');
+    remCatalogoCodigos=remBuildCatalogoCodigos(rows,remPreview?remPreview.items:[]);
+  }catch(e){remCatalogoCodigos=[];}
+}
+async function remAsignarCategoria(codigo,categoria){
+  categoria=(categoria||'').trim();
+  try{
+    if(!categoria){
+      const r=await fetch(`${SB}/rest/v1/remito_categorias_producto?codigo=eq.${encodeURIComponent(codigo)}`,{method:'DELETE',headers:H});
+      if(!r.ok)throw new Error('DELETE remito_categorias_producto '+r.status);
+      delete remCategoriaMap[codigo];
+    }else{
+      const r=await fetch(`${SB}/rest/v1/remito_categorias_producto?on_conflict=codigo`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates'},body:JSON.stringify([{codigo,categoria}])});
+      if(!r.ok)throw new Error('UPSERT remito_categorias_producto '+r.status);
+      remCategoriaMap[codigo]=categoria;
+    }
+    remRender();
+  }catch(e){
+    console.error(e);
+    alert('No se pudo guardar la categoría: '+e.message);
+  }
+}
+function remAgruparPorCategoria(items){
+  const grupos={};
+  (items||[]).forEach(it=>{
+    const cat=remCategoriaMap[it.codigo]||'Sin categoría asignada';
+    if(!grupos[cat])grupos[cat]=[];
+    grupos[cat].push(it);
+  });
+  const nombres=Object.keys(grupos).filter(c=>c!=='Sin categoría asignada').sort((a,b)=>a.localeCompare(b));
+  if(grupos['Sin categoría asignada'])nombres.push('Sin categoría asignada');
+  return nombres.map(categoria=>({categoria,items:grupos[categoria]}));
+}
+// resumen por categoría: suma bandejas (empanadas) y unidades sueltas (el resto) de cada grupo
+function remResumenPorCategoria(items){
+  return remAgruparPorCategoria(items).map(g=>{
+    let bandejas=0,unidades=0;
+    g.items.forEach(it=>{if(it.unidad_mostrada==='bandejas')bandejas+=it.cantidad_mostrada;else unidades+=it.cantidad_mostrada;});
+    return{categoria:g.categoria,bandejas,unidades};
+  });
+}
+
+function remEsc(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ---------- Pantalla (dentro de PAPO) ----------
+let remVista='subir';
+let remPreview=null; // remito recién leído, todavía no guardado
+let remHistorial=[];
+let remDetalle=null; // {remito,items} cuando se abre uno del historial
+let remFiltroHist='';
+
+function initRemitos(){
+  Promise.all([remCargarCategoriaMap()]).then(remRender);
+  remRender();
+}
+function remIrVista(v){
+  remVista=v;
+  ['subir','historial','config'].forEach(x=>document.getElementById('remtab-'+x).classList.toggle('active',x===v));
+  if(v==='historial'){remDetalle=null;remCargarHistorial();}
+  if(v==='config'){remCargarCatalogoCodigos().then(remRender);remCargarCategoriaMap().then(remRender);}
+  remRender();
+}
+function remRender(){
+  const cont=document.getElementById('rem-content');
+  if(!cont)return;
+  if(remVista==='subir')cont.innerHTML=remRenderSubir();
+  else if(remVista==='config')cont.innerHTML=remRenderConfiguracion();
+  else if(remDetalle)cont.innerHTML=remRenderDetalle();
+  else cont.innerHTML=remRenderHistorial();
+}
+
+function remCabeceraHtml(r){
+  return `
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px 16px;font-size:13px;margin-bottom:14px;border:.5px solid var(--border);border-radius:var(--radius);padding:10px 14px">
+    <div><div style="color:var(--text2);font-size:10.5px;text-transform:uppercase">N° de remito</div><div style="font-weight:600">${remEsc(r.numero||'-')}</div></div>
+    <div><div style="color:var(--text2);font-size:10.5px;text-transform:uppercase">Fecha y hora</div><div style="font-weight:600">${remEsc(r.fecha||'-')} ${remEsc(r.hora||'')}</div></div>
+    <div><div style="color:var(--text2);font-size:10.5px;text-transform:uppercase">Cliente</div><div style="font-weight:600">${remEsc(r.cliente||'-')}</div></div>
+  </div>`;
+}
+
+function remItemRowHtml(item,toggleFn,cantFn){
+  const info=remAliasInfo(item.codigo);
+  const aliasTxt=info.alias?` · ${remEsc(info.alias)}`:'';
+  const checked=item.recibido?'checked':'';
+  const key=item.id!=null?`'${item.id}'`:item.orden;
+  const onToggle=toggleFn?`onchange="${toggleFn}(${key},this.checked)"`:'';
+  const onCant=cantFn?`onchange="${cantFn}(${key},this.value)"`:'';
+  const cantRecHtml=(!item.recibido&&toggleFn)?`<input type="number" step="0.5" placeholder="cant. real" title="Si no llegó completo, poné la cantidad real" style="width:84px;border:.5px solid var(--amber);border-radius:6px;padding:3px 6px;font-size:11.5px;background:var(--bg);color:var(--text)" value="${item.cantidad_recibida!=null?item.cantidad_recibida:''}" ${onCant}/>`:'';
+  return `
+  <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:.5px solid var(--border)">
+    <div style="flex:1;min-width:0">
+      <div style="font-size:13px;font-weight:600"><span style="font-family:monospace;color:var(--blue)">${remEsc(item.codigo)}</span>${aliasTxt}</div>
+      <div style="font-size:11.5px;color:var(--text2);margin-top:2px">${remEsc(item.descripcion)}</div>
+    </div>
+    <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px">
+      <div style="font-size:13px;font-weight:600">${remEsc(item.texto)}</div>
+      ${toggleFn?`<label style="display:flex;align-items:center;gap:5px;font-size:11px;color:${item.recibido?'var(--green)':'var(--text2)'};font-weight:${item.recibido?'600':'400'};cursor:pointer"><input type="checkbox" style="width:16px;height:16px;cursor:pointer" ${checked} ${onToggle}/> Recibido</label>`:''}
+      ${cantRecHtml}
+    </div>
+  </div>`;
+}
+function remSeccionesHtml(items,toggleFn,cantFn){
+  return remAgruparPorCategoria(items).map(g=>`
+    <div style="margin-bottom:4px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:${g.categoria==='Sin categoría asignada'?'var(--amber)':'var(--blue)'};padding:9px 0 3px;border-top:.5px solid var(--border)">${remEsc(g.categoria)}</div>
+      ${g.items.map(it=>remItemRowHtml(it,toggleFn,cantFn)).join('')}
+    </div>`).join('');
+}
+function remResumenDiferenciasHtml(items){
+  const conDif=(items||[]).filter(it=>it.cantidad_recibida!=null);
+  if(!conDif.length)return'';
+  return `
+  <div class="alert" style="border:1px solid var(--amber);border-radius:var(--radius);padding:12px 14px;margin-top:14px">
+    <div style="font-weight:600;font-size:13px;margin-bottom:6px"><i class="ti ti-alert-triangle" style="color:var(--amber)"></i> Resumen de diferencias</div>
+    ${conDif.map(it=>{
+      const info=remAliasInfo(it.codigo);
+      return `<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-bottom:.5px solid var(--border);font-size:12px">
+        <span>${remEsc(it.codigo)}${info.alias?(' · '+remEsc(info.alias)):''}</span>
+        <span>esperado: <b>${remEsc(it.texto)}</b> · llegó: <b style="color:var(--amber)">${it.cantidad_recibida} ${remEsc(it.unidad_mostrada)}</b></span>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function remRenderSubir(){
+  if(!remPreview){
+    return `
+    <label for="rem-file-input" style="display:block;border:1.5px dashed var(--border2);border-radius:var(--radius-lg);padding:32px 14px;text-align:center;cursor:pointer;color:var(--text2);font-size:13px">
+      <i class="ti ti-file-upload" style="font-size:28px;color:var(--blue);display:block;margin-bottom:6px"></i>
+      Tocá para elegir el PDF del remito que manda Flexxus<br/>
+      <span style="font-size:11px">Se arma la hoja de reparto agrupada por categoría, lista para imprimir</span>
+    </label>
+    <input type="file" id="rem-file-input" accept="application/pdf" style="display:none" onchange="remManejarArchivoSeleccionado(this.files[0])"/>`;
+  }
+  const seccionesContenido=remSeccionesHtml(remPreview.items,'remTogglearRecibidoPreview','remSetCantidadRecibidaPreview');
+  return `
+  ${remCabeceraHtml(remPreview)}
+  <div style="display:flex;gap:8px;margin-bottom:14px">
+    <button class="btn btn-primary" onclick="remGuardarEImprimir()" id="rem-btn-guardar"><i class="ti ti-printer"></i> Guardar e imprimir</button>
+    <button class="btn" onclick="remPreview=null;remRender();"><i class="ti ti-x"></i> Descartar</button>
+  </div>
+  <div style="font-size:13px;font-weight:600;margin-bottom:4px">Ítems (${remPreview.items.length})</div>
+  ${seccionesContenido}
+  ${remResumenDiferenciasHtml(remPreview.items)}`;
+}
+
+function remRenderHistorial(){
+  const lista=remHistorial.filter(r=>!remFiltroHist||`${r.numero} ${r.cliente}`.toLowerCase().includes(remFiltroHist.toLowerCase()));
+  if(!remHistorial.length)return `<div class="empty"><i class="ti ti-inbox" style="font-size:26px;display:block;margin-bottom:6px"></i>Todavía no guardaste ningún remito</div>`;
+  return `
+  <input type="text" placeholder="Buscar por número o cliente..." value="${remEsc(remFiltroHist)}" style="width:100%;max-width:340px;padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);margin-bottom:12px" oninput="remFiltroHist=this.value;remRender();"/>
+  <div>
+    ${lista.map(r=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:.5px solid var(--border);cursor:pointer" onclick="remAbrirRemito('${r.id}')">
+        <div>
+          <div style="font-size:13px;font-weight:600">${remEsc(r.numero)} · ${remEsc(r.cliente||'')}</div>
+          <div style="font-size:11.5px;color:var(--text2)">${remEsc(r.fecha||'')} ${remEsc(r.hora||'')}</div>
+        </div>
+        <span style="font-size:11px;color:var(--text2);background:var(--bg2);border-radius:20px;padding:3px 9px">${r._pendientes>0?`${r._pendientes} sin recibir`:'completo'}</span>
+      </div>`).join('')||`<div class="empty">Sin resultados</div>`}
+  </div>`;
+}
+
+function remRenderDetalle(){
+  const{remito,items}=remDetalle;
+  const seccionesContenido=remSeccionesHtml(items,'remTogglearRecibido','remSetCantidadRecibida');
+  return `
+  <div style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--blue);cursor:pointer;margin-bottom:10px;font-weight:600" onclick="remDetalle=null;remRender();"><i class="ti ti-arrow-left"></i> Volver al historial</div>
+  ${remCabeceraHtml(remito)}
+  <div style="margin-bottom:14px"><button class="btn" onclick="remImprimir(remDetalle.remito,remDetalle.items)"><i class="ti ti-printer"></i> Imprimir</button></div>
+  <div style="font-size:13px;font-weight:600;margin-bottom:4px">Ítems (${items.length})</div>
+  ${seccionesContenido}
+  ${remResumenDiferenciasHtml(items)}`;
+}
+
+function remRenderConfiguracion(){
+  if(!remCatalogoCodigos.length)return `<div class="empty"><i class="ti ti-tag" style="font-size:26px;display:block;margin-bottom:6px"></i>Todavía no hay productos para categorizar.<br/>Subí o guardá al menos un remito primero.</div>`;
+  return `
+  <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Asignale una categoría a cada producto para que el remito se divida en secciones (Clásicas, Premium, Burritos, etc). Podés escribir una categoría nueva o elegir una ya usada -- no está limitado a una lista fija.</div>
+  ${remCatalogoCodigos.map(c=>{
+    const info=remAliasInfo(c.codigo);
+    return `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600"><span style="font-family:monospace;color:var(--blue)">${remEsc(c.codigo)}</span>${info.alias?(' · '+remEsc(info.alias)):''}</div>
+        <div style="font-size:11px;color:var(--text2)">${remEsc(c.descripcion)}</div>
+      </div>
+      <input type="text" list="rem-categorias-dl" placeholder="Sin categoría" style="width:180px;border:.5px solid var(--border2);border-radius:6px;padding:5px 8px;font-size:12px;background:var(--bg);color:var(--text)" value="${remEsc(remCategoriaMap[c.codigo]||'')}" onchange="remAsignarCategoria('${c.codigo}',this.value)"/>
+    </div>`;
+  }).join('')}
+  <datalist id="rem-categorias-dl">${REM_CATEGORIAS_SUGERIDAS.map(c=>`<option value="${remEsc(c)}"></option>`).join('')}</datalist>`;
+}
+
+// ---------- Acciones ----------
+async function remManejarArchivoSeleccionado(file){
+  if(!file)return;
+  ss('saving','Leyendo PDF...');
+  try{
+    const texto=await remExtraerTextoPdf(file);
+    const r=procesarRemito(texto);
+    if(!r.items.length){
+      alert('No se pudo leer ningún ítem de este PDF. Probá con otro archivo.');
+      ss('online','Conectado');
+      return;
+    }
+    remPreview=r;
+    remRender();
+    ss('online','Conectado');
+  }catch(e){
+    console.error(e);
+    alert('Error leyendo el PDF: '+e.message);
+    ss('error','Error leyendo PDF');
+  }
+}
+
+async function remGuardarEImprimir(){
+  if(!remPreview)return;
+  const btn=document.getElementById('rem-btn-guardar');
+  if(btn)btn.disabled=true;
+  ss('saving','Guardando...');
+  let guardado=null;
+  try{
+    const[remitoIns]=await ins('remitos',{numero:remPreview.numero,fecha:remPreview.fecha,hora:remPreview.hora,cliente:remPreview.cliente,direccion:remPreview.direccion,cuit:remPreview.cuit});
+    const itemsPayload=remPreview.items.map(it=>({
+      remito_id:remitoIns.id,orden:it.orden,codigo:it.codigo,descripcion:it.descripcion,
+      cantidad_original:it.cantidad_original,unidades_reales:it.unidades_reales,tipo:it.tipo,
+      cantidad_mostrada:it.cantidad_mostrada,unidad_mostrada:it.unidad_mostrada,texto:it.texto,recibido:it.recibido,
+      cantidad_recibida:it.cantidad_recibida!=null?it.cantidad_recibida:null
+    }));
+    const itemsIns=await ins('remito_items',itemsPayload);
+    guardado={remito:remitoIns,items:itemsIns};
+    remPreview=null;
+    ss('online','Conectado');
+  }catch(e){
+    console.error(e);
+    alert('Error guardando el remito: '+e.message);
+    ss('error','Error al guardar');
+    return;
+  }finally{
+    if(btn)btn.disabled=false;
+  }
+  remIrVista('historial');
+  if(guardado)remImprimir(guardado.remito,guardado.items);
+}
+
+async function remCargarHistorial(){
+  ss('saving','Cargando...');
+  try{
+    const remitos=await get('remitos','select=*&order=creado_en.desc');
+    const items=await get('remito_items','select=remito_id,recibido');
+    const pendPorRemito={};
+    items.forEach(it=>{if(!it.recibido)pendPorRemito[it.remito_id]=(pendPorRemito[it.remito_id]||0)+1;});
+    remHistorial=remitos.map(r=>({...r,_pendientes:pendPorRemito[r.id]||0}));
+    ss('online','Conectado');
+    if(remVista==='historial'&&!remDetalle)remRender();
+  }catch(e){
+    console.error(e);
+    ss('error','Error cargando historial');
+  }
+}
+async function remAbrirRemito(id){
+  ss('saving','Cargando...');
+  try{
+    const[remito]=await get('remitos',`select=*&id=eq.${id}`);
+    const items=await get('remito_items',`select=*&remito_id=eq.${id}&order=orden.asc`);
+    remDetalle={remito,items};
+    ss('online','Conectado');
+    remRender();
+  }catch(e){
+    console.error(e);
+    ss('error','Error abriendo remito');
+  }
+}
+function remTogglearRecibidoPreview(orden,checked){
+  if(!remPreview)return;
+  const it=remPreview.items.find(x=>x.orden===orden);
+  if(it){it.recibido=checked;if(checked)it.cantidad_recibida=null;}
+  remRender();
+}
+async function remTogglearRecibido(itemId,checked){
+  try{
+    const patch={recibido:checked};
+    if(checked)patch.cantidad_recibida=null;
+    await pat('remito_items',itemId,patch);
+    const it=remDetalle.items.find(x=>x.id===itemId);
+    if(it){it.recibido=checked;if(checked)it.cantidad_recibida=null;}
+    remRender();
+  }catch(e){
+    console.error(e);
+    alert('No se pudo guardar el cambio: '+e.message);
+  }
+}
+function remSetCantidadRecibidaPreview(orden,valor){
+  if(!remPreview)return;
+  const it=remPreview.items.find(x=>x.orden===orden);
+  if(it)it.cantidad_recibida=valor===''?null:parseFloat(valor);
+  remRender();
+}
+async function remSetCantidadRecibida(itemId,valor){
+  const v=valor===''?null:parseFloat(valor);
+  try{
+    await pat('remito_items',itemId,{cantidad_recibida:v});
+    const it=remDetalle.items.find(x=>x.id===itemId);
+    if(it)it.cantidad_recibida=v;
+    remRender();
+  }catch(e){
+    console.error(e);
+    alert('No se pudo guardar la cantidad: '+e.message);
+  }
+}
+
+// ---------- Impresión: una sola hoja A4 vertical, agrupada por categoría + resumen abajo (mismo
+// mecanismo que ya usa PAPO para las otras planillas: Blob + window.open + auto window.print()) ----------
+function remImprimir(remito,items){
+  const grupos=remAgruparPorCategoria(items);
+  const resumen=remResumenPorCategoria(items);
+  const bloquesHtml=grupos.map(g=>`
+    <div class="catblock">
+      <div class="cath">${remEsc(g.categoria)}</div>
+      <table>
+        <tr><th>Cód.</th><th>Producto</th><th class="num">Cant.</th></tr>
+        ${g.items.map(it=>{
+          const info=remAliasInfo(it.codigo);
+          const nombre=info.alias||it.descripcion;
+          return `<tr><td class="cod">${remEsc(it.codigo)}</td><td>${remEsc(nombre)}</td><td class="num">${remEsc(it.texto)}</td></tr>`;
+        }).join('')}
+      </table>
+    </div>`).join('');
+  const resumenFilas=resumen.map(r=>`<tr><td>${remEsc(r.categoria)}</td><td class="num">${r.bandejas?r.bandejas.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}):'0'}</td><td class="num">${r.unidades||0}</td></tr>`).join('');
+  const fechaImpresion=new Date().toLocaleString('es-AR');
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Remito ${remEsc(remito.numero||'')}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;padding:8mm;font-size:8.5pt;color:#111}
+    h1{font-size:13pt;margin-bottom:2px}
+    .sub{font-size:9pt;color:#555;margin-bottom:8px}
+    .cab{display:flex;gap:18px;font-size:9pt;border:1px solid #999;padding:6px 10px;margin-bottom:10px}
+    .cab b{display:block;font-size:10.5pt}
+    .catgrid{column-count:2;column-gap:12px}
+    .catblock{break-inside:avoid;margin-bottom:8px}
+    .cath{background:#dbe9f8;font-weight:bold;font-size:8.5pt;padding:3px 6px;border:1px solid #999;border-bottom:none}
+    table{width:100%;border-collapse:collapse;font-size:8pt}
+    th,td{border:1px solid #999;padding:2px 5px;text-align:left}
+    th{background:#eee;font-size:7.5pt;text-transform:uppercase}
+    td.cod{font-family:monospace;white-space:nowrap}
+    td.num,th.num{text-align:right;white-space:nowrap}
+    .resumen{margin-top:10px;break-before:avoid}
+    .resumen h2{font-size:10pt;margin:0 0 4px;border-top:2px solid #333;padding-top:6px}
+    .resumen table th{background:#333;color:#fff}
+    .firma{margin-top:16px;font-size:9pt;display:flex;justify-content:space-between}
+    .firma div{border-top:1px solid #333;width:200px;padding-top:3px;text-align:center}
+    @media print{@page{size:A4 portrait;margin:8mm}body{padding:0}}
+  </style></head>
+  <body>
+    <h1>Remito de reparto — Planeta Empanada</h1>
+    <div class="sub">Agrupado por categoría · Impreso ${fechaImpresion}</div>
+    <div class="cab">
+      <div><span style="color:#666">N° remito</span><b>${remEsc(remito.numero||'-')}</b></div>
+      <div><span style="color:#666">Fecha y hora</span><b>${remEsc(remito.fecha||'-')} ${remEsc(remito.hora||'')}</b></div>
+      <div><span style="color:#666">Cliente</span><b>${remEsc(remito.cliente||'-')}</b></div>
+    </div>
+    <div class="catgrid">${bloquesHtml}</div>
+    <div class="resumen">
+      <h2>Resumen por categoría</h2>
+      <table><tr><th>Categoría</th><th class="num">Bandejas</th><th class="num">Unidades sueltas</th></tr>${resumenFilas}</table>
+    </div>
+    <div class="firma"><div>Entregó</div><div>Recibió</div></div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
+  </body></html>`;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para poder imprimir.');
+}
+
 init();
 </script>
 </body>
