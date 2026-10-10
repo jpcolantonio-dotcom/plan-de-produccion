@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Remitos</title>
+<!-- PWA -->
+<link rel="manifest" href="manifest-remitos.json"/>
+<meta name="theme-color" content="#1a1a1a"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Remitos"/>
+<link rel="apple-touch-icon" href="icon-192.png"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#fff;--bg2:#f5f5f4;--bg3:#eeede9;--text:#1a1a1a;--text2:#6b6b6b;--text3:#bbb;--border:rgba(0,0,0,.10);--border2:rgba(0,0,0,.20);--radius:8px;--radius-lg:12px;--green:#1D9E75;--green-bg:#E1F5EE;--blue:#378ADD;--blue-bg:#E6F1FB;--amber:#BA7517;--amber-bg:#FAEEDA;--red:#E24B4A;--red-bg:#FCEBEB}
+@media(prefers-color-scheme:dark){:root{--bg:#1c1c1b;--bg2:#262624;--bg3:#2e2e2c;--text:#f0efec;--text2:#999;--text3:#555;--border:rgba(255,255,255,.10);--border2:rgba(255,255,255,.20)}}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg3);color:var(--text);min-height:100vh}
+header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.2rem;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100}
+.logo{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
+.logo i{color:var(--blue);font-size:20px}
+.logo .sub{font-weight:400;font-size:13px;color:var(--text2)}
+.status-dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;margin-right:5px;transition:background .3s}
+.status-dot.online{background:var(--green)}.status-dot.saving{background:var(--amber);animation:pulse .8s infinite}.status-dot.error{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.status-label{font-size:12px;color:var(--text2);display:flex;align-items:center}
+.tabs{display:flex;gap:4px;padding:10px 1.2rem 0}
+.tab-btn{border:none;background:none;padding:8px 14px;font-size:13px;font-weight:600;color:var(--text2);cursor:pointer;border-radius:var(--radius) var(--radius) 0 0;border-bottom:2px solid transparent}
+.tab-btn.active{color:var(--blue);border-bottom:2px solid var(--blue)}
+main{max-width:720px;margin:0 auto;padding:10px 1.2rem 60px}
+.card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-lg);padding:16px;margin-bottom:14px}
+.card h2{font-size:14px;font-weight:600;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.btn{display:inline-flex;align-items:center;gap:6px;border:.5px solid var(--border2);background:var(--bg2);color:var(--text);border-radius:var(--radius);padding:7px 12px;font-size:13px;font-weight:600;cursor:pointer}
+.btn:hover{background:var(--bg3)}
+.btn.primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+.btn.primary:disabled{opacity:.5;cursor:default}
+.btn-sm{padding:4px 9px;font-size:12px}
+.upload-zone{border:1.5px dashed var(--border2);border-radius:var(--radius-lg);padding:28px 14px;text-align:center;cursor:pointer;color:var(--text2);font-size:13px}
+.upload-zone:hover{background:var(--bg2)}
+.upload-zone i{font-size:28px;color:var(--blue);display:block;margin-bottom:6px}
+input[type=file]{display:none}
+.cab-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;font-size:13px;margin-bottom:4px}
+.cab-grid .lbl{color:var(--text2);font-size:11px;text-transform:uppercase;letter-spacing:.03em}
+.cab-grid .val{font-weight:600}
+.item-row{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-bottom:.5px solid var(--border)}
+.item-row:last-child{border-bottom:none}
+.item-main{flex:1;min-width:0}
+.item-id-alias{font-size:13px;font-weight:600;display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
+.item-id-alias .codigo{font-family:monospace;color:var(--blue)}
+.item-id-alias .alias{color:var(--text)}
+.item-desc{font-size:11.5px;color:var(--text2);margin-top:2px}
+.item-right{text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.item-cant{font-size:13px;font-weight:600}
+.item-cant-orig{font-size:10.5px;color:var(--text3)}
+.chk-recibido{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);cursor:pointer}
+.chk-recibido input{width:16px;height:16px;cursor:pointer}
+.chk-recibido.ok{color:var(--green);font-weight:600}
+.hist-item{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:.5px solid var(--border);cursor:pointer}
+.hist-item:last-child{border-bottom:none}
+.hist-item:hover{opacity:.8}
+.hist-main{font-size:13px;font-weight:600}
+.hist-sub{font-size:11.5px;color:var(--text2)}
+.hist-badge{font-size:11px;color:var(--text2);background:var(--bg2);border-radius:20px;padding:3px 9px}
+.empty{text-align:center;color:var(--text2);font-size:13px;padding:30px 10px}
+.toolbar{display:flex;gap:8px;margin-bottom:10px}
+.toolbar input[type=text]{flex:1;border:.5px solid var(--border2);border-radius:var(--radius);padding:7px 10px;font-size:13px;background:var(--bg);color:var(--text)}
+.backlink{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--blue);cursor:pointer;margin-bottom:10px;font-weight:600}
+.cat-section{margin-bottom:6px}
+.cat-title{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--blue);padding:10px 0 4px;border-top:.5px solid var(--border)}
+.cat-section:first-child .cat-title{border-top:none;padding-top:0}
+.cat-title.sin-cat{color:var(--amber)}
+.cant-real{width:90px;border:.5px solid var(--amber);border-radius:6px;padding:4px 6px;font-size:12px;background:var(--bg);color:var(--text)}
+.cfg-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid var(--border)}
+.cfg-row:last-child{border-bottom:none}
+.cfg-input{width:170px;border:.5px solid var(--border2);border-radius:6px;padding:5px 8px;font-size:12px;background:var(--bg);color:var(--text)}
+.resumen-row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:.5px solid var(--border);font-size:12.5px}
+.resumen-row:last-child{border-bottom:none}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><i class="ti ti-file-text"></i>Remitos<span class="sub">Planeta Empanada</span></div>
+  <div class="status-label"><span class="status-dot" id="dot"></span><span id="status-txt">Conectando...</span></div>
+</header>
+<div class="tabs">
+  <button class="tab-btn active" id="tab-subir" onclick="irVista('subir')"><i class="ti ti-upload"></i> Subir remito</button>
+  <button class="tab-btn" id="tab-historial" onclick="irVista('historial')"><i class="ti ti-history"></i> Historial</button>
+  <button class="tab-btn" id="tab-config" onclick="irVista('config')"><i class="ti ti-adjustments"></i> Categorías</button>
+</div>
+<main id="main"></main>
+
+<script>
+// ===================== Conexión (misma que PAPO) =====================
+const SB='https://ugmjfvgjumpnvbfskcgl.supabase.co';
+const SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnbWpmdmdqdW1wbnZiZnNrY2dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MjU4OTIsImV4cCI6MjA5NDEwMTg5Mn0.fmf7Isp5rDi10mq0VjahWRCgl6J4mD8-ib89DKWtPLs';
+const H={'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK};
+
+function ss(status,label){
+  const dot=document.getElementById('dot'),txt=document.getElementById('status-txt');
+  if(!dot||!txt)return;
+  dot.className='status-dot '+status;
+  txt.textContent=label;
+}
+
+async function get(t,f){
+  const r=await fetch(`${SB}/rest/v1/${t}?${f||''}`,{headers:H});
+  if(!r.ok)throw new Error('GET '+t+' '+r.status);
+  return r.json();
+}
+async function ins(t,d){
+  const r=await fetch(`${SB}/rest/v1/${t}`,{method:'POST',headers:{...H,'Prefer':'return=representation'},body:JSON.stringify(d)});
+  if(!r.ok)throw new Error('INSERT '+t+' '+r.status+' '+(await r.text()));
+  return r.json();
+}
+async function pat(t,id,d){
+  const r=await fetch(`${SB}/rest/v1/${t}?id=eq.${id}`,{method:'PATCH',headers:H,body:JSON.stringify(d)});
+  if(!r.ok)throw new Error('PATCH '+t+' '+r.status);
+}
+
+// ===================== Parser del remito (probado con 29/29 asserts sobre el PDF real) =====================
+function parseRemitoTexto(texto){
+  const lineas=texto.split('\n').map(l=>l.trim()).filter(Boolean);
+  const CUIT_RE=/^\d{2}-\d{8}-\d$/;
+  const FECHAHORA_RE=/^(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2})$/;
+  const REMITO_RE=/^REMITO\s+(\S+)/i;
+  const HEADER_TABLA_RE=/^codigo\s+cant\.?\s+descripcion/i;
+  const ITEM_RE=/^(\d{4,})\s+([\d.,]+)\s+(.+)$/;
+  const SOLO_CODIGO_CANT_RE=/^(\d{4,})\s+([\d.,]+)$/;
+
+  let idxFecha=-1,idxCuit=-1,idxHeaderTabla=-1;
+  let numero=null,fecha=null,hora=null,cuit=null;
+
+  lineas.forEach((l,i)=>{
+    if(numero===null){const m=l.match(REMITO_RE);if(m){numero=m[1];return;}}
+    if(idxFecha===-1){const m=l.match(FECHAHORA_RE);if(m){idxFecha=i;fecha=m[1];hora=m[2];return;}}
+    if(idxCuit===-1){const m=l.match(CUIT_RE);if(m){idxCuit=i;cuit=l;return;}}
+    if(idxHeaderTabla===-1&&HEADER_TABLA_RE.test(l)){idxHeaderTabla=i;return;}
+  });
+
+  let cliente=null,direccion=null;
+  if(idxFecha!==-1&&idxCuit!==-1&&idxCuit>idxFecha){
+    const entreMedio=lineas.slice(idxFecha+1,idxCuit);
+    if(entreMedio.length>=2){cliente=entreMedio[0];direccion=entreMedio[entreMedio.length-1].replace(/\s*-\s*$/,'').trim();}
+    else if(entreMedio.length===1){cliente=entreMedio[0];}
+  }
+
+  const items=[];
+  if(idxHeaderTabla!==-1){
+    for(let i=idxHeaderTabla+1;i<lineas.length;i++){
+      let linea=lineas[i];
+      let m=linea.match(ITEM_RE);
+      if(!m){
+        const mSolo=linea.match(SOLO_CODIGO_CANT_RE);
+        if(mSolo&&i+1<lineas.length&&!ITEM_RE.test(lineas[i+1])&&!SOLO_CODIGO_CANT_RE.test(lineas[i+1])){
+          linea=linea+' '+lineas[i+1];
+          m=linea.match(ITEM_RE);
+          if(m)i++;
+        }
+      }
+      if(!m)continue;
+      items.push({codigo:m[1],cantidad:parseFloat(m[2].replace(',','.')),descripcion:m[3].trim()});
+    }
+  }
+  return{numero,fecha,hora,cliente,direccion,cuit,items};
+}
+function resolverUnidadesReales(cantidad,descripcion){
+  const mCaja=descripcion.match(/CAJA\s+POR\s+(\d+)\s*U\.?/i);
+  if(mCaja)return cantidad*parseInt(mCaja[1],10);
+  return cantidad;
+}
+function clasificarItem(descripcion){
+  return /^EMPANADA/i.test(descripcion.trim())?'empanada':'unidad';
+}
+function convertirParaMostrar(unidadesReales,tipo){
+  if(tipo==='empanada'){
+    const bandejasEnteras=Math.floor(unidadesReales/24);
+    const resto=Math.round((unidadesReales-bandejasEnteras*24)*100)/100;
+    return{cantidad_mostrada:Math.round((unidadesReales/24)*100)/100,unidad_mostrada:'bandejas',texto:resto>0?`${bandejasEnteras} bandejas + ${resto}u`:`${bandejasEnteras} bandejas`};
+  }
+  return{cantidad_mostrada:unidadesReales,unidad_mostrada:'unidades',texto:`${unidadesReales} unidades`};
+}
+function procesarRemito(texto){
+  const{numero,fecha,hora,cliente,direccion,cuit,items}=parseRemitoTexto(texto);
+  const itemsProcesados=items.map((it,idx)=>{
+    const unidadesReales=resolverUnidadesReales(it.cantidad,it.descripcion);
+    const tipo=clasificarItem(it.descripcion);
+    const conv=convertirParaMostrar(unidadesReales,tipo);
+    return{orden:idx,codigo:it.codigo,descripcion:it.descripcion,cantidad_original:it.cantidad,unidades_reales:unidadesReales,tipo,...conv,recibido:false,cantidad_recibida:null};
+  });
+  return{numero,fecha,hora,cliente,direccion,cuit,items:itemsProcesados};
+}
+
+// ===================== Extracción de texto del PDF con pdf.js =====================
+if(window['pdfjsLib']){
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+async function extraerTextoPdf(file){
+  const buf=await file.arrayBuffer();
+  const doc=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
+  const lineasTotales=[];
+  for(let p=1;p<=doc.numPages;p++){
+    const page=await doc.getPage(p);
+    const content=await page.getTextContent();
+    const grupos=new Map();
+    for(const item of content.items){
+      const y=Math.round(item.transform[5]);
+      if(!grupos.has(y))grupos.set(y,[]);
+      grupos.get(y).push(item);
+    }
+    const ys=Array.from(grupos.keys()).sort((a,b)=>b-a);
+    for(const y of ys){
+      const its=grupos.get(y).sort((a,b)=>a.transform[4]-b.transform[4]);
+      let linea='',lastEndX=null;
+      for(const it of its){
+        const txt=it.str;
+        if(!txt)continue;
+        const x=it.transform[4];
+        if(lastEndX!==null&&x-lastEndX>2&&linea&&!linea.endsWith(' '))linea+=' ';
+        linea+=txt;
+        lastEndX=x+(it.width||0);
+      }
+      linea=linea.replace(/\s+/g,' ').trim();
+      if(linea)lineasTotales.push(linea);
+    }
+  }
+  return lineasTotales.join('\n');
+}
+
+// ===================== Alias (cruzado con materias_primas de PAPO) =====================
+function buildAliasMap(materias){
+  const map={};
+  (materias||[]).forEach(m=>{
+    if(m.codigo)map[m.codigo]={alias:m.alias||'',nombre:m.nombre||''};
+  });
+  return map;
+}
+let aliasMap={};
+async function cargarAliasMap(){
+  try{
+    const materias=await get('materias_primas','select=codigo,alias,nombre');
+    aliasMap=buildAliasMap(materias);
+  }catch(e){aliasMap={};}
+}
+
+// ===================== Categorías por producto (configurable, no hardcodeado) =====================
+// Sugerencias para el datalist -- Juan Pablo puede escribir cualquier otra categoría nueva, no está
+// limitado a esta lista.
+const CATEGORIAS_SUGERIDAS=['Burritos','Pizzetas Rellenas','Pizzas ZEN','Salsas','Premium','Clásicas','Planetarias'];
+let categoriaMap={}; // codigo -> categoria
+let catalogoCodigos=[]; // [{codigo,descripcion}] -- todos los códigos vistos hasta ahora, para la pantalla de Configuración
+
+function buildCategoriaMap(rows){
+  const map={};
+  (rows||[]).forEach(r=>{if(r.codigo)map[r.codigo]=r.categoria;});
+  return map;
+}
+async function cargarCategoriaMap(){
+  try{
+    const rows=await get('remito_categorias_producto','select=codigo,categoria');
+    categoriaMap=buildCategoriaMap(rows);
+  }catch(e){categoriaMap={};}
+}
+function buildCatalogoCodigos(rowsHistoricos,itemsPreview){
+  const map={};
+  (rowsHistoricos||[]).forEach(r=>{if(r.codigo&&!map[r.codigo])map[r.codigo]=r.descripcion;});
+  (itemsPreview||[]).forEach(it=>{if(it.codigo&&!map[it.codigo])map[it.codigo]=it.descripcion;});
+  return Object.entries(map).map(([codigo,descripcion])=>({codigo,descripcion})).sort((a,b)=>a.codigo.localeCompare(b.codigo));
+}
+async function cargarCatalogoCodigos(){
+  try{
+    const rows=await get('remito_items','select=codigo,descripcion&order=codigo.asc');
+    catalogoCodigos=buildCatalogoCodigos(rows,preview?preview.items:[]);
+  }catch(e){catalogoCodigos=[];}
+}
+async function asignarCategoria(codigo,categoria){
+  categoria=(categoria||'').trim();
+  try{
+    if(!categoria){
+      const r=await fetch(`${SB}/rest/v1/remito_categorias_producto?codigo=eq.${encodeURIComponent(codigo)}`,{method:'DELETE',headers:H});
+      if(!r.ok)throw new Error('DELETE remito_categorias_producto '+r.status);
+      delete categoriaMap[codigo];
+    }else{
+      const r=await fetch(`${SB}/rest/v1/remito_categorias_producto?on_conflict=codigo`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates'},body:JSON.stringify([{codigo,categoria}])});
+      if(!r.ok)throw new Error('UPSERT remito_categorias_producto '+r.status);
+      categoriaMap[codigo]=categoria;
+    }
+    render();
+  }catch(e){
+    console.error(e);
+    alert('No se pudo guardar la categoría: '+e.message);
+  }
+}
+// agrupa una lista de ítems de un remito según la categoría asignada a cada código (orden alfabético,
+// y "Sin categoría asignada" siempre al final para que salte a la vista)
+function agruparPorCategoria(items){
+  const grupos={};
+  (items||[]).forEach(it=>{
+    const cat=categoriaMap[it.codigo]||'Sin categoría asignada';
+    if(!grupos[cat])grupos[cat]=[];
+    grupos[cat].push(it);
+  });
+  const nombres=Object.keys(grupos).filter(c=>c!=='Sin categoría asignada').sort((a,b)=>a.localeCompare(b));
+  if(grupos['Sin categoría asignada'])nombres.push('Sin categoría asignada');
+  return nombres.map(categoria=>({categoria,items:grupos[categoria]}));
+}
+
+// ===================== Render de un ítem (preview sin guardar / detalle guardado) =====================
+// handlers: {toggle:'nombreFn', cantidad:'nombreFn'} -- preview (todavía sin id) usa las versiones
+// "...Preview" que solo tocan el estado local; un remito ya guardado usa las que persisten en Supabase.
+function itemRowHtml(item,handlers){
+  handlers=handlers||{};
+  const info=aliasMap[item.codigo]||{};
+  const aliasTxt=info.alias?` · ${esc(info.alias)}`:'';
+  const checked=item.recibido?'checked':'';
+  const key=item.id!=null?`'${item.id}'`:item.orden;
+  const onToggle=handlers.toggle?`onchange="${handlers.toggle}(${key},this.checked)"`:'';
+  const onCantidad=handlers.cantidad?`onchange="${handlers.cantidad}(${key},this.value)"`:'';
+  const cantRecibidaHtml=!item.recibido?`<input type="number" step="0.5" class="cant-real" placeholder="cant. real" title="Si no llegó completo, poné la cantidad real que llegó" value="${item.cantidad_recibida!=null?item.cantidad_recibida:''}" ${onCantidad}/>`:'';
+  return `
+  <div class="item-row">
+    <div class="item-main">
+      <div class="item-id-alias"><span class="codigo">${esc(item.codigo)}</span><span class="alias">${aliasTxt}</span></div>
+      <div class="item-desc">${esc(item.descripcion)}</div>
+    </div>
+    <div class="item-right">
+      <div class="item-cant">${esc(item.texto)}</div>
+      <div class="item-cant-orig">remito: ${item.cantidad_original}</div>
+      <label class="chk-recibido ${item.recibido?'ok':''}"><input type="checkbox" ${checked} ${onToggle}/> Recibido</label>
+      ${cantRecibidaHtml}
+    </div>
+  </div>`;
+}
+function seccionesHtml(items,handlers){
+  return agruparPorCategoria(items).map(g=>`
+    <div class="cat-section">
+      <div class="cat-title ${g.categoria==='Sin categoría asignada'?'sin-cat':''}">${esc(g.categoria)}</div>
+      ${g.items.map(it=>itemRowHtml(it,handlers)).join('')}
+    </div>`).join('');
+}
+function resumenDiferenciasHtml(items){
+  const conDif=(items||[]).filter(it=>it.cantidad_recibida!=null);
+  if(!conDif.length)return'';
+  return `
+  <div class="card" style="border-color:var(--amber)">
+    <h2><i class="ti ti-alert-triangle" style="color:var(--amber)"></i> Resumen de diferencias</h2>
+    ${conDif.map(it=>{
+      const info=aliasMap[it.codigo]||{};
+      return `<div class="resumen-row">
+        <span>${esc(it.codigo)}${info.alias?(' · '+esc(info.alias)):''}</span>
+        <span>esperado: <b>${esc(it.texto)}</b> · llegó: <b style="color:var(--amber)">${it.cantidad_recibida} ${esc(it.unidad_mostrada)}</b></span>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+function esc(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function cabeceraHtml(r){
+  return `
+  <div class="cab-grid">
+    <div><div class="lbl">Remito</div><div class="val">${esc(r.numero||'-')}</div></div>
+    <div><div class="lbl">Fecha y hora</div><div class="val">${esc(r.fecha||'-')} ${esc(r.hora||'')}</div></div>
+    <div><div class="lbl">Cliente</div><div class="val">${esc(r.cliente||'-')}</div></div>
+    <div><div class="lbl">Dirección</div><div class="val">${esc(r.direccion||'-')}</div></div>
+  </div>`;
+}
+
+// ===================== Estado y navegación =====================
+let vistaActual='subir';
+let preview=null; // remito recién parseado, todavía no guardado
+let historial=[];
+let detalle=null; // {remito, items} cuando se abre uno del historial
+let filtroHist='';
+
+function irVista(v){
+  vistaActual=v;
+  document.getElementById('tab-subir').classList.toggle('active',v==='subir');
+  document.getElementById('tab-historial').classList.toggle('active',v==='historial');
+  document.getElementById('tab-config').classList.toggle('active',v==='config');
+  if(v==='historial'){detalle=null;cargarHistorial();}
+  if(v==='config'){cargarCatalogoCodigos().then(render);cargarCategoriaMap().then(render);}
+  render();
+}
+
+function render(){
+  const main=document.getElementById('main');
+  if(vistaActual==='subir')main.innerHTML=renderSubir();
+  else if(vistaActual==='config')main.innerHTML=renderConfiguracion();
+  else if(detalle)main.innerHTML=renderDetalle();
+  else main.innerHTML=renderHistorial();
+}
+
+function renderSubir(){
+  if(!preview){
+    return `
+    <div class="card">
+      <h2><i class="ti ti-upload"></i> Subir remito (PDF)</h2>
+      <label class="upload-zone" for="file-input">
+        <i class="ti ti-file-upload"></i>
+        Tocar para elegir el PDF del remito<br/>
+        <span style="font-size:11px">Las empanadas se convierten a bandejas de 24u · burritos y pizzetas quedan en unidades</span>
+      </label>
+      <input type="file" id="file-input" accept="application/pdf" onchange="manejarArchivoSeleccionado(this.files[0])"/>
+    </div>`;
+  }
+  const seccionesContenido=seccionesHtml(preview.items,{toggle:'togglearRecibidoPreview',cantidad:'setCantidadRecibidaPreview'});
+  return `
+  <div class="card">
+    <h2><i class="ti ti-file-text"></i> Remito leído</h2>
+    ${cabeceraHtml(preview)}
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <button class="btn primary" onclick="guardarRemito()" id="btn-guardar"><i class="ti ti-device-floppy"></i> Guardar</button>
+      <button class="btn" onclick="preview=null;render();"><i class="ti ti-x"></i> Descartar</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2><i class="ti ti-list"></i> Ítems (${preview.items.length})</h2>
+    ${seccionesContenido}
+  </div>
+  ${resumenDiferenciasHtml(preview.items)}`;
+}
+
+function renderHistorial(){
+  const lista=historial.filter(r=>!filtroHist||`${r.numero} ${r.cliente}`.toLowerCase().includes(filtroHist.toLowerCase()));
+  if(!historial.length)return `<div class="card"><div class="empty"><i class="ti ti-inbox" style="font-size:26px;display:block;margin-bottom:6px"></i>Todavía no guardaste ningún remito</div></div>`;
+  return `
+  <div class="toolbar"><input type="text" placeholder="Buscar por número o cliente..." value="${esc(filtroHist)}" oninput="filtroHist=this.value;render();"/></div>
+  <div class="card">
+    ${lista.map(r=>`
+      <div class="hist-item" onclick="abrirRemito('${r.id}')">
+        <div>
+          <div class="hist-main">${esc(r.numero)} · ${esc(r.cliente||'')}</div>
+          <div class="hist-sub">${esc(r.fecha||'')} ${esc(r.hora||'')}</div>
+        </div>
+        <span class="hist-badge">${r._pendientes>0?`${r._pendientes} sin recibir`:'completo'}</span>
+      </div>`).join('')||`<div class="empty">Sin resultados</div>`}
+  </div>`;
+}
+
+function renderDetalle(){
+  const{remito,items}=detalle;
+  const seccionesContenido=seccionesHtml(items,{toggle:'togglearRecibido',cantidad:'setCantidadRecibida'});
+  return `
+  <div class="backlink" onclick="detalle=null;render();"><i class="ti ti-arrow-left"></i> Volver al historial</div>
+  <div class="card">
+    <h2><i class="ti ti-file-text"></i> Remito</h2>
+    ${cabeceraHtml(remito)}
+  </div>
+  <div class="card">
+    <h2><i class="ti ti-list"></i> Ítems (${items.length})</h2>
+    ${seccionesContenido}
+  </div>
+  ${resumenDiferenciasHtml(items)}`;
+}
+
+function renderConfiguracion(){
+  if(!catalogoCodigos.length)return `<div class="card"><div class="empty"><i class="ti ti-tag" style="font-size:26px;display:block;margin-bottom:6px"></i>Todavía no hay productos para categorizar.<br/>Subí o guardá al menos un remito primero.</div></div>`;
+  return `
+  <div class="card">
+    <h2><i class="ti ti-adjustments"></i> Categorías por producto</h2>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:8px">Asignale una categoría a cada producto para que el remito se divida en secciones (Burritos, Pizzetas Rellenas, Premium, etc). Podés escribir una categoría nueva o elegir una ya usada -- no está limitado a una lista fija.</div>
+    ${catalogoCodigos.map(c=>{
+      const info=aliasMap[c.codigo]||{};
+      return `
+      <div class="cfg-row">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600"><span style="font-family:monospace;color:var(--blue)">${esc(c.codigo)}</span>${info.alias?(' · '+esc(info.alias)):''}</div>
+          <div style="font-size:11px;color:var(--text2)">${esc(c.descripcion)}</div>
+        </div>
+        <input type="text" list="categorias-dl" class="cfg-input" placeholder="Sin categoría" value="${esc(categoriaMap[c.codigo]||'')}" onchange="asignarCategoria('${c.codigo}',this.value)"/>
+      </div>`;
+    }).join('')}
+  </div>
+  <datalist id="categorias-dl">${CATEGORIAS_SUGERIDAS.map(c=>`<option value="${esc(c)}"></option>`).join('')}</datalist>`;
+}
+
+// ===================== Acciones =====================
+async function manejarArchivoSeleccionado(file){
+  if(!file)return;
+  ss('saving','Leyendo PDF...');
+  try{
+    const texto=await extraerTextoPdf(file);
+    const r=procesarRemito(texto);
+    if(!r.items.length){
+      alert('No se pudo leer ningún ítem de este PDF. Probá con otro archivo o avisale a Juan Pablo.');
+      ss('online','Conectado');
+      return;
+    }
+    preview=r;
+    render();
+    ss('online','Conectado');
+  }catch(e){
+    console.error(e);
+    alert('Error leyendo el PDF: '+e.message);
+    ss('error','Error leyendo PDF');
+  }
+}
+
+async function guardarRemito(){
+  if(!preview)return;
+  const btn=document.getElementById('btn-guardar');
+  if(btn)btn.disabled=true;
+  ss('saving','Guardando...');
+  try{
+    const[remitoIns]=await ins('remitos',{numero:preview.numero,fecha:preview.fecha,hora:preview.hora,cliente:preview.cliente,direccion:preview.direccion,cuit:preview.cuit});
+    const itemsPayload=preview.items.map(it=>({
+      remito_id:remitoIns.id,orden:it.orden,codigo:it.codigo,descripcion:it.descripcion,
+      cantidad_original:it.cantidad_original,unidades_reales:it.unidades_reales,tipo:it.tipo,
+      cantidad_mostrada:it.cantidad_mostrada,unidad_mostrada:it.unidad_mostrada,texto:it.texto,recibido:it.recibido,
+      cantidad_recibida:it.cantidad_recibida!=null?it.cantidad_recibida:null
+    }));
+    await ins('remito_items',itemsPayload);
+    preview=null;
+    ss('online','Conectado');
+  }catch(e){
+    console.error(e);
+    alert('Error guardando el remito: '+e.message);
+    ss('error','Error al guardar');
+    return;
+  }finally{
+    if(btn)btn.disabled=false;
+  }
+  irVista('historial');
+}
+
+async function cargarHistorial(){
+  ss('saving','Cargando...');
+  try{
+    const remitos=await get('remitos','select=*&order=creado_en.desc');
+    const items=await get('remito_items','select=remito_id,recibido');
+    const pendPorRemito={};
+    items.forEach(it=>{if(!it.recibido)pendPorRemito[it.remito_id]=(pendPorRemito[it.remito_id]||0)+1;});
+    historial=remitos.map(r=>({...r,_pendientes:pendPorRemito[r.id]||0}));
+    ss('online','Conectado');
+    if(vistaActual==='historial'&&!detalle)render();
+  }catch(e){
+    console.error(e);
+    ss('error','Error cargando historial');
+  }
+}
+
+async function abrirRemito(id){
+  ss('saving','Cargando...');
+  try{
+    const[remito]=await get('remitos',`select=*&id=eq.${id}`);
+    const items=await get('remito_items',`select=*&remito_id=eq.${id}&order=orden.asc`);
+    detalle={remito,items};
+    ss('online','Conectado');
+    render();
+  }catch(e){
+    console.error(e);
+    ss('error','Error abriendo remito');
+  }
+}
+
+function togglearRecibidoPreview(orden,checked){
+  if(!preview)return;
+  const it=preview.items.find(x=>x.orden===orden);
+  if(it){it.recibido=checked;if(checked)it.cantidad_recibida=null;}
+  render();
+}
+
+async function togglearRecibido(itemId,checked){
+  try{
+    const patch={recibido:checked};
+    if(checked)patch.cantidad_recibida=null;
+    await pat('remito_items',itemId,patch);
+    const it=detalle.items.find(x=>x.id===itemId);
+    if(it){it.recibido=checked;if(checked)it.cantidad_recibida=null;}
+    render();
+  }catch(e){
+    console.error(e);
+    alert('No se pudo guardar el cambio: '+e.message);
+  }
+}
+
+function setCantidadRecibidaPreview(orden,valor){
+  if(!preview)return;
+  const it=preview.items.find(x=>x.orden===orden);
+  if(it)it.cantidad_recibida=valor===''?null:parseFloat(valor);
+  render();
+}
+
+async function setCantidadRecibida(itemId,valor){
+  const v=valor===''?null:parseFloat(valor);
+  try{
+    await pat('remito_items',itemId,{cantidad_recibida:v});
+    const it=detalle.items.find(x=>x.id===itemId);
+    if(it)it.cantidad_recibida=v;
+    render();
+  }catch(e){
+    console.error(e);
+    alert('No se pudo guardar la cantidad: '+e.message);
+  }
+}
+
+// ===================== Inicio =====================
+(async()=>{
+  ss('saving','Conectando...');
+  await Promise.all([cargarAliasMap(),cargarCategoriaMap()]);
+  ss('online','Conectado');
+  render();
+  if('serviceWorker' in navigator){
+    window.addEventListener('load',()=>{
+      navigator.serviceWorker.register('/plan-de-produccion/sw-remitos.js').catch(e=>console.log('SW error:',e));
+    });
+  }
+})();
+</script>
+</body>
+</html>
