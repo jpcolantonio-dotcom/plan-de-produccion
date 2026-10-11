@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1"/>
-<title>¿Comés?</title>
+<title>A comer</title>
 <link rel="manifest" href="comeda-manifest.json"/>
 <meta name="theme-color" content="#1B3A6B"/>
 <style>
@@ -102,7 +102,7 @@ let filtroSel='';
 function renderSelector(){
   const lista=usuarios.filter(u=>!filtroSel||u.nombre.toLowerCase().includes(filtroSel.toLowerCase()));
   document.getElementById('app').innerHTML=`
-    <div class="top"><h1>¿Comés?</h1></div>
+    <div class="top"><h1>A comer</h1></div>
     <div class="selector">
       <h2>¿Quién sos?</h2>
       <p>Elegí tu nombre de la lista para marcar si vas a comer esta semana.</p>
@@ -150,7 +150,7 @@ function pintarSemana(){
   const dias=diasSemana();
   const html=`
     <div class="top">
-      <div><h1>¿Comés?</h1><div class="who">${usuarioActual.nombre}</div></div>
+      <div><h1>A comer</h1><div class="who">${usuarioActual.nombre}</div></div>
       <button onclick="cambiarPersona()">Cambiar</button>
     </div>
     <div class="content">
