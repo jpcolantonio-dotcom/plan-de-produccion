@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.254</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.255</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -271,6 +271,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('cfg')"><i class="ti ti-settings"></i>Configuración</button>
   <button class="tab" onclick="T('etq')"><i class="ti ti-qrcode"></i>Etiquetas</button>
   <button class="tab" onclick="T('rem')"><i class="ti ti-truck-delivery"></i>Remitos</button>
+  <button class="tab" onclick="T('comes')"><i class="ti ti-tools-kitchen-2"></i>Comés</button>
   <button class="tab" onclick="T('planillas')"><i class="ti ti-file-text"></i>Planillas</button>
 </div>
 <div class="pad">
@@ -1568,6 +1569,21 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   </div>
   <div id="rem-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
 </div>
+<!-- COMÉS: habilitación de personas + lista diaria para cocina de "¿Comés?" (app aparte para el
+     celular de cada empleado, que lee/escribe las mismas tablas comeda_usuarios/comeda_respuestas). -->
+<div id="tab-comes" class="section">
+  <div class="toolbar">
+    <div>
+      <div style="font-size:16px;font-weight:600">¿Comés?</div>
+      <div style="font-size:13px;color:var(--text2)">Quién está habilitado a marcar si come, y la lista del día para cocina (la app "¿Comés?" la usa cada empleado desde su celular)</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1.25rem">
+    <button class="proy-tab active" id="comestab-lista" onclick="comesIrVista('lista')"><i class="ti ti-clipboard-list"></i> Lista del día</button>
+    <button class="proy-tab" id="comestab-personas" onclick="comesIrVista('personas')"><i class="ti ti-users"></i> Personas</button>
+  </div>
+  <div id="comes-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
+</div>
 <!-- PLANILLAS -->
 <div id="tab-planillas" class="section">
   <div class="toolbar">
@@ -1864,6 +1880,7 @@ function T(t){
   if(t==='ped')initPedidos();
   if(t==='etq')initEtiquetas();
   if(t==='rem')initRemitos();
+  if(t==='comes')initComes();
   if(t==='planillas')initPlanillas();
 }
 // Sub-pestaña activa dentro de Informes (Desvíos/Dashboard/Rendimiento/Producción del Día, unificadas
@@ -16685,6 +16702,208 @@ function remImprimir(remito,items){
   const w=window.open(url,'_blank');
   setTimeout(()=>URL.revokeObjectURL(url),15000);
   if(!w)alert('Habilitá popups para este sitio para poder imprimir.');
+}
+
+// ── COMÉS (v4.255): "necesito una app que salga del papo, que es pedido de comida ... tiene hasta
+// las 10 de la mañana para poder cambiarlo. cada uno que se baja la app tiene que generarle un
+// usuario, y va a ser el nombre de la persona y el area" -- la app "¿Comés?" en sí (donde cada
+// empleado marca sí/no por día desde su celular, lunes a sábado, hasta las 10:00 de ese mismo día)
+// es un archivo aparte (comeda.html) conectado a la MISMA base de Supabase que PAPO -- acá adentro
+// solo vive (1) habilitar personas y darles o no permiso de invitados ("ciertas personas pueden
+// tener la posibilidad de tener invitados") y (2) imprimir la lista del día para cocina. Si alguien
+// no marcó nada, se asume que SÍ come ("si no pidió que no va a comer"); los invitados no llevan
+// nombre propio, son solo una cantidad por persona, pero en la lista impresa cada uno sale como su
+// propia línea "Invitado de <nombre>" para que cocina los cuente como comensales individuales.
+let comesVista='lista';
+let comesUsuarios=[];
+let comesFilas=[];
+
+function comesEsc(s){return(s==null?'':String(s)).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
+async function comesCargarUsuarios(){
+  try{ comesUsuarios=await get('comeda_usuarios','order=nombre.asc'); }
+  catch(e){ comesUsuarios=[]; console.error(e); }
+}
+
+function initComes(){
+  comesCargarUsuarios().then(comesRender);
+  comesRender();
+}
+
+function comesIrVista(v){
+  comesVista=v;
+  document.getElementById('comestab-lista').classList.toggle('active',v==='lista');
+  document.getElementById('comestab-personas').classList.toggle('active',v==='personas');
+  comesRender();
+}
+
+function comesRender(){
+  const el=document.getElementById('comes-content');
+  if(!el)return;
+  if(comesVista==='lista')comesRenderLista();
+  else comesRenderPersonas();
+}
+
+function comesRenderLista(){
+  const el=document.getElementById('comes-content');
+  const fecha=document.getElementById('comes-fecha')?document.getElementById('comes-fecha').value:hoyLocal();
+  el.innerHTML=`
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--text2)">Fecha:</label>
+      <input type="date" id="comes-fecha" value="${fecha}" onchange="comesRenderLista()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <button class="btn btn-sm" onclick="comesRenderLista()"><i class="ti ti-refresh"></i> Actualizar</button>
+      <button class="btn btn-pdf btn-sm" onclick="comesImprimirLista()"><i class="ti ti-printer"></i> Imprimir</button>
+    </div>
+    <div id="comes-lista-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>`;
+  comesCargarLista(fecha);
+}
+
+async function comesCargarLista(fecha){
+  const el=document.getElementById('comes-lista-content');
+  if(!el)return;
+  try{
+    if(!comesUsuarios.length)await comesCargarUsuarios();
+    const habilitados=comesUsuarios.filter(u=>u.habilitado);
+    const respuestas=await get('comeda_respuestas',`fecha=eq.${fecha}`);
+    const porUsuario=new Map(respuestas.map(r=>[r.usuario_id,r]));
+    comesFilas=habilitados.map(u=>{
+      const r=porUsuario.get(u.id);
+      const come=r?r.come:true; // sin marcar => se asume que sí
+      const invitados=(r&&u.puede_invitados)?(r.invitados||0):0;
+      return{usuario:u,come,invitados,marcado:!!r};
+    });
+    el.innerHTML=comesHtmlLista(comesFilas);
+  }catch(e){ el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> Error: ${e.message}</div>`; console.error(e); }
+}
+
+function comesHtmlLista(filas){
+  const vienen=filas.filter(f=>f.come);
+  const noVienen=filas.filter(f=>!f.come);
+  const totalInvitados=vienen.reduce((s,f)=>s+(f.invitados||0),0);
+  const total=vienen.length+totalInvitados;
+  let h=`<div class="stock-card"><table class="stock-tbl"><thead><tr>
+    <th style="text-align:left">Comensal</th><th style="text-align:left">Área</th><th style="text-align:left">Estado</th>
+  </tr></thead><tbody>`;
+  vienen.forEach(f=>{
+    h+=`<tr><td style="font-weight:500">${comesEsc(f.usuario.nombre)}</td><td class="muted">${comesEsc(f.usuario.area)}</td><td>${f.marcado?'<span style="color:var(--green)">Sí</span>':'<span style="color:var(--text3)">Sí (sin marcar)</span>'}</td></tr>`;
+    for(let i=0;i<(f.invitados||0);i++){
+      h+=`<tr><td style="font-style:italic;color:var(--text2)">Invitado de ${comesEsc(f.usuario.nombre)}</td><td class="muted">—</td><td><span style="color:var(--blue)">Invitado</span></td></tr>`;
+    }
+  });
+  h+=`<tr style="background:var(--bg2)"><td colspan="3" style="font-weight:700">Total comensales: ${total} <span style="font-weight:400;color:var(--text2);font-size:12px">(${vienen.length} personas + ${totalInvitados} invitados)</span></td></tr>`;
+  h+='</tbody></table></div>';
+  if(noVienen.length){
+    h+=`<div style="margin-top:1rem;font-size:13px;color:var(--text2)">No vienen: ${noVienen.map(f=>comesEsc(f.usuario.nombre)).join(', ')}</div>`;
+  }
+  if(!filas.length)h='<div class="empty"><i class="ti ti-tools-kitchen-2"></i>No hay personas habilitadas todavía. Agregalas en la pestaña "Personas".</div>';
+  return h;
+}
+
+function comesImprimirLista(){
+  if(!comesFilas.length){alert('No hay nada para imprimir en esta fecha.');return}
+  const fecha=document.getElementById('comes-fecha').value;
+  const fechaTxt=new Date(fecha+'T00:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
+  const vienen=comesFilas.filter(f=>f.come);
+  const totalInvitados=vienen.reduce((s,f)=>s+(f.invitados||0),0);
+  const total=vienen.length+totalInvitados;
+  let filasHtml='';
+  vienen.forEach(f=>{
+    filasHtml+=`<tr><td>${comesEsc(f.usuario.nombre)}</td><td>${comesEsc(f.usuario.area)}</td></tr>`;
+    for(let i=0;i<(f.invitados||0);i++)filasHtml+=`<tr><td class="inv">Invitado de ${comesEsc(f.usuario.nombre)}</td><td>—</td></tr>`;
+  });
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>¿Comés? — ${fecha}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;padding:10mm;font-size:10pt;color:#111}
+    h1{font-size:15pt;margin-bottom:2px}
+    .sub{font-size:10pt;color:#555;margin-bottom:10px}
+    table{width:100%;border-collapse:collapse;font-size:10pt;margin-top:8px}
+    th,td{border:1px solid #999;padding:4px 8px;text-align:left}
+    th{background:#1B3A6B;color:#fff}
+    td.inv{font-style:italic;color:#555}
+    .tot{margin-top:10px;font-size:11pt;font-weight:bold;border-top:2px solid #333;padding-top:8px}
+    @media print{@page{size:A4 portrait;margin:10mm}body{padding:0}}
+  </style></head><body>
+    <h1>¿Comés? — Lista del día</h1>
+    <div class="sub">${fechaTxt}</div>
+    <table><thead><tr><th>Comensal</th><th>Área</th></tr></thead><tbody>${filasHtml}</tbody></table>
+    <div class="tot">Total comensales: ${total} (${vienen.length} personas + ${totalInvitados} invitados)</div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
+  </body></html>`;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para poder imprimir.');
+}
+
+function comesRenderPersonas(){
+  const el=document.getElementById('comes-content');
+  el.innerHTML=`
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Cada persona que agregués acá va a poder elegir su nombre en la app "¿Comés?" desde su celular. Tildá "Invitados" solo para quienes puedan sumar invitados a su pedido.</div>
+    <div class="grid-card" style="margin-bottom:1rem">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <input type="text" id="comes-nuevo-nombre" placeholder="Nombre" style="flex:1;min-width:160px;padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        <input type="text" id="comes-nuevo-area" placeholder="Área" style="width:160px;padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        <button class="btn btn-primary btn-sm" onclick="comesGuardarNuevoUsuario()"><i class="ti ti-plus"></i> Agregar</button>
+      </div>
+    </div>
+    <div id="comes-personas-content"></div>`;
+  comesRenderListaPersonas();
+}
+
+function comesRenderListaPersonas(){
+  const el=document.getElementById('comes-personas-content');
+  if(!el)return;
+  if(!comesUsuarios.length){el.innerHTML='<div class="empty"><i class="ti ti-users"></i>Todavía no agregaste a nadie.</div>';return}
+  let h='<div class="stock-card"><table class="stock-tbl"><thead><tr>'+
+    '<th style="text-align:left">Nombre</th><th style="text-align:left">Área</th>'+
+    '<th style="text-align:center">Habilitado</th><th style="text-align:center">Invitados</th><th></th>'+
+    '</tr></thead><tbody>';
+  comesUsuarios.forEach(u=>{
+    h+=`<tr>
+      <td style="font-weight:500">${comesEsc(u.nombre)}</td>
+      <td class="muted">${comesEsc(u.area)}</td>
+      <td style="text-align:center"><input type="checkbox" ${u.habilitado?'checked':''} onchange="comesToggleCampo('${u.id}','habilitado',this.checked)"/></td>
+      <td style="text-align:center"><input type="checkbox" ${u.puede_invitados?'checked':''} onchange="comesToggleCampo('${u.id}','puede_invitados',this.checked)"/></td>
+      <td style="text-align:right"><button class="btn btn-xs btn-danger" onclick="comesEliminarUsuario('${u.id}','${comesEsc(u.nombre)}')"><i class="ti ti-trash"></i></button></td>
+    </tr>`;
+  });
+  h+='</tbody></table></div>';
+  el.innerHTML=h;
+}
+
+async function comesGuardarNuevoUsuario(){
+  const nombreEl=document.getElementById('comes-nuevo-nombre');
+  const areaEl=document.getElementById('comes-nuevo-area');
+  const nombre=(nombreEl.value||'').trim();
+  const area=(areaEl.value||'').trim();
+  if(!nombre){alert('Poné un nombre.');return}
+  try{
+    const[nuevo]=await ins('comeda_usuarios',{nombre,area,habilitado:true,puede_invitados:false});
+    comesUsuarios.push(nuevo);
+    comesUsuarios.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+    nombreEl.value='';areaEl.value='';
+    comesRenderListaPersonas();
+  }catch(e){alert('Error al agregar: '+e.message);console.error(e)}
+}
+
+async function comesToggleCampo(id,campo,valor){
+  try{
+    await pat('comeda_usuarios',id,{[campo]:valor});
+    const u=comesUsuarios.find(x=>x.id===id);
+    if(u)u[campo]=valor;
+  }catch(e){alert('Error al guardar: '+e.message);console.error(e);comesRenderListaPersonas();}
+}
+
+async function comesEliminarUsuario(id,nombre){
+  if(!confirm(`¿Eliminar a ${nombre} de "¿Comés?"? También se borran sus respuestas guardadas.`))return;
+  try{
+    await del('comeda_usuarios',id);
+    comesUsuarios=comesUsuarios.filter(u=>u.id!==id);
+    comesRenderListaPersonas();
+  }catch(e){alert('Error al eliminar: '+e.message);console.error(e)}
 }
 
 init();
