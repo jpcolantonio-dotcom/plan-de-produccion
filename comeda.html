@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1"/>
+<title>¿Comés?</title>
+<link rel="manifest" href="comeda-manifest.json"/>
+<meta name="theme-color" content="#1B3A6B"/>
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:#f2f3f5;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#1a1a1a}
+  .wrap{max-width:480px;margin:0 auto;min-height:100vh;background:#fff;display:flex;flex-direction:column}
+  .top{background:#1B3A6B;color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between}
+  .top h1{font-size:17px;margin:0;font-weight:700}
+  .top .who{font-size:12px;opacity:.85}
+  .top button{background:rgba(255,255,255,.15);border:none;color:#fff;font-size:11px;padding:6px 10px;border-radius:14px}
+  .content{padding:14px 14px 40px;flex:1}
+  .hint{font-size:12.5px;color:#666;background:#eef3fa;border-radius:10px;padding:10px 12px;margin-bottom:14px;line-height:1.4}
+  .daycard{border:1px solid #e3e3e3;border-radius:12px;padding:12px 14px;margin-bottom:10px;background:#fff}
+  .daycard.locked{background:#f7f7f7}
+  .daytitle{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+  .dayname{font-size:14.5px;font-weight:700;text-transform:capitalize}
+  .daydate{font-size:12px;color:#888}
+  .lockbadge{font-size:11px;color:#a66;background:#fbeaea;border-radius:8px;padding:2px 7px;display:flex;align-items:center;gap:4px}
+  .btnrow{display:flex;gap:8px}
+  .btnsino{flex:1;padding:11px 0;border-radius:9px;border:1.5px solid #d8d8d8;background:#fafafa;font-size:14.5px;font-weight:700;color:#999}
+  .btnsino.si.sel{background:#1f8a5c;border-color:#1f8a5c;color:#fff}
+  .btnsino.no.sel{background:#c0392b;border-color:#c0392b;color:#fff}
+  .btnsino:disabled{opacity:.7}
+  .asumido{font-size:11.5px;color:#999;margin-top:6px;text-align:center}
+  .invrow{display:flex;align-items:center;justify-content:center;gap:12px;margin-top:10px;padding-top:10px;border-top:1px dashed #e3e3e3}
+  .invrow .lbl{font-size:12.5px;color:#555}
+  .stepbtn{width:30px;height:30px;border-radius:50%;border:1.5px solid #ccc;background:#fff;font-size:17px;font-weight:700;color:#444;line-height:1}
+  .stepval{font-size:16px;font-weight:700;min-width:22px;text-align:center}
+  .selector{padding:18px 16px}
+  .selector h2{font-size:15px;margin:0 0 6px}
+  .selector p{font-size:12.5px;color:#666;margin:0 0 14px}
+  .search{width:100%;padding:11px 12px;font-size:14px;border:1.5px solid #ddd;border-radius:10px;margin-bottom:10px}
+  .ulist{display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow-y:auto}
+  .uitem{padding:12px 14px;border:1px solid #e3e3e3;border-radius:10px;font-size:14.5px;font-weight:600;background:#fff}
+  .uitem small{display:block;font-size:11.5px;color:#888;font-weight:400;margin-top:2px}
+  .empty{text-align:center;color:#999;font-size:13px;padding:30px 10px}
+  .spin{border:3px solid #eee;border-top-color:#1B3A6B;border-radius:50%;width:22px;height:22px;animation:sp 0.8s linear infinite;margin:30px auto}
+  @keyframes sp{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="spin"></div>
+</div>
+<script>
+const SB='https://ugmjfvgjumpnvbfskcgl.supabase.co';
+const SK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnbWpmdmdqdW1wbnZiZnNrY2dsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1MjU4OTIsImV4cCI6MjA5NDEwMTg5Mn0.fmf7Isp5rDi10mq0VjahWRCgl6J4mD8-ib89DKWtPLs';
+const H={'Content-Type':'application/json','apikey':SK,'Authorization':'Bearer '+SK};
+const get=async(t,f='')=>{const r=await fetch(`${SB}/rest/v1/${t}?${f}`,{headers:H});if(!r.ok)throw new Error(await r.text());return r.json()};
+const upsertRespuesta=async(usuario_id,fecha,come,invitados)=>{
+  const r=await fetch(`${SB}/rest/v1/comeda_respuestas?on_conflict=usuario_id,fecha`,{
+    method:'POST',
+    headers:{...H,'Prefer':'resolution=merge-duplicates,return=representation'},
+    body:JSON.stringify([{usuario_id,fecha,come,invitados,updated_at:new Date().toISOString()}])
+  });
+  if(!r.ok)throw new Error(await r.text());
+  return r.json();
+};
+
+const DIAS=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+function fmtFecha(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return`${y}-${m}-${day}`}
+function hoy(){const d=new Date();d.setHours(0,0,0,0);return d}
+function lunesDeSemana(d){const r=new Date(d);const diff=(r.getDay()+6)%7;r.setDate(r.getDate()-diff);return r}
+// Lunes a sábado (6 días) de la semana que contiene "hoy".
+function diasSemana(){
+  const lunes=lunesDeSemana(hoy());
+  const out=[];
+  for(let i=0;i<6;i++){const d=new Date(lunes);d.setDate(lunes.getDate()+i);out.push(d)}
+  return out;
+}
+// Cada día se puede marcar/cambiar hasta las 10:00 de ESE día -- pasada esa hora (o si el día ya
+// pasó) queda bloqueado. Un día futuro de la semana nunca está bloqueado todavía.
+function bloqueado(d){
+  const limite=new Date(d);limite.setHours(10,0,0,0);
+  return new Date()>=limite;
+}
+
+let usuarios=[];
+let usuarioActual=null; // {id,nombre,area,puede_invitados}
+let respuestasPorFecha={}; // fecha -> {come,invitados}
+
+async function init(){
+  try{ usuarios=await get('comeda_usuarios','habilitado=eq.true&order=nombre.asc'); }
+  catch(e){ renderError(e); return }
+  const guardadoId=localStorage.getItem('comeda_usuario_id');
+  const encontrado=guardadoId?usuarios.find(u=>u.id===guardadoId):null;
+  if(encontrado){ usuarioActual=encontrado; await renderSemana(); }
+  else{ localStorage.removeItem('comeda_usuario_id'); renderSelector(); }
+}
+
+function renderError(e){
+  document.getElementById('app').innerHTML=`<div class="empty">No se pudo conectar.<br>${(e&&e.message)||''}</div>`;
+}
+
+let filtroSel='';
+function renderSelector(){
+  const lista=usuarios.filter(u=>!filtroSel||u.nombre.toLowerCase().includes(filtroSel.toLowerCase()));
+  document.getElementById('app').innerHTML=`
+    <div class="top"><h1>¿Comés?</h1></div>
+    <div class="selector">
+      <h2>¿Quién sos?</h2>
+      <p>Elegí tu nombre de la lista para marcar si vas a comer esta semana.</p>
+      <input class="search" id="sel-filtro" placeholder="🔍 Buscar tu nombre..." value="${filtroSel}"/>
+      <div class="ulist" id="sel-lista"></div>
+    </div>`;
+  const cont=document.getElementById('sel-lista');
+  if(!lista.length){ cont.innerHTML='<div class="empty">No encontré a nadie con ese nombre.</div>'; }
+  else{
+    cont.innerHTML=lista.map(u=>`<button class="uitem" data-id="${u.id}" style="text-align:left">${u.nombre}<small>${u.area||''}</small></button>`).join('');
+    cont.querySelectorAll('.uitem').forEach(b=>b.onclick=()=>elegirUsuario(b.dataset.id));
+  }
+  const inp=document.getElementById('sel-filtro');
+  inp.oninput=()=>{filtroSel=inp.value;renderSelector();inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length)};
+}
+
+async function elegirUsuario(id){
+  const u=usuarios.find(x=>x.id===id);
+  if(!u)return;
+  usuarioActual=u;
+  localStorage.setItem('comeda_usuario_id',u.id);
+  await renderSemana();
+}
+
+function cambiarPersona(){
+  localStorage.removeItem('comeda_usuario_id');
+  usuarioActual=null;
+  filtroSel='';
+  renderSelector();
+}
+
+async function renderSemana(){
+  document.getElementById('app').innerHTML='<div class="spin"></div>';
+  const dias=diasSemana();
+  const desde=fmtFecha(dias[0]), hasta=fmtFecha(dias[dias.length-1]);
+  try{
+    const filas=await get('comeda_respuestas',`usuario_id=eq.${usuarioActual.id}&fecha=gte.${desde}&fecha=lte.${hasta}`);
+    respuestasPorFecha={};
+    filas.forEach(f=>{respuestasPorFecha[f.fecha]={come:f.come,invitados:f.invitados||0}});
+  }catch(e){ renderError(e); return }
+  pintarSemana();
+}
+
+function pintarSemana(){
+  const dias=diasSemana();
+  const html=`
+    <div class="top">
+      <div><h1>¿Comés?</h1><div class="who">${usuarioActual.nombre}</div></div>
+      <button onclick="cambiarPersona()">Cambiar</button>
+    </div>
+    <div class="content">
+      <div class="hint">Marcá si vas a comer cada día. Podés cambiarlo hasta las <b>10:00</b> de ese mismo día. Si no marcás nada, se asume que SÍ vas a comer.</div>
+      <div id="dias"></div>
+    </div>`;
+  document.getElementById('app').innerHTML=html;
+  const cont=document.getElementById('dias');
+  cont.innerHTML=dias.map(d=>tarjetaDia(d)).join('');
+  dias.forEach(d=>{
+    const f=fmtFecha(d);
+    if(bloqueado(d))return;
+    const elSi=document.getElementById('si-'+f), elNo=document.getElementById('no-'+f);
+    if(elSi)elSi.onclick=()=>marcar(f,true);
+    if(elNo)elNo.onclick=()=>marcar(f,false);
+    const menos=document.getElementById('inv-menos-'+f), mas=document.getElementById('inv-mas-'+f);
+    if(menos)menos.onclick=()=>cambiarInvitados(f,-1);
+    if(mas)mas.onclick=()=>cambiarInvitados(f,1);
+  });
+}
+
+function tarjetaDia(d){
+  const f=fmtFecha(d);
+  const resp=respuestasPorFecha[f];
+  const come=resp?resp.come:true; // sin marcar => se asume que sí
+  const invitados=resp?(resp.invitados||0):0;
+  const locked=bloqueado(d);
+  const esHoy=f===fmtFecha(hoy());
+  const nombreDia=DIAS[d.getDay()];
+  const fechaTxt=`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+  const mostrarInv=usuarioActual.puede_invitados&&come;
+  return`<div class="daycard ${locked?'locked':''}">
+    <div class="daytitle">
+      <div><span class="dayname">${nombreDia}${esHoy?' (hoy)':''}</span> <span class="daydate">${fechaTxt}</span></div>
+      ${locked?'<span class="lockbadge">🔒 cerrado</span>':''}
+    </div>
+    <div class="btnrow">
+      <button class="btnsino si ${come?'sel':''}" id="si-${f}" ${locked?'disabled':''}>Sí como</button>
+      <button class="btnsino no ${!come?'sel':''}" id="no-${f}" ${locked?'disabled':''}>No como</button>
+    </div>
+    ${!resp&&!locked?'<div class="asumido">Todavía no marcaste -- por ahora cuenta como "Sí"</div>':''}
+    ${mostrarInv?`<div class="invrow">
+      <span class="lbl">Invitados</span>
+      <button class="stepbtn" id="inv-menos-${f}" ${locked?'disabled':''}>−</button>
+      <span class="stepval" id="inv-val-${f}">${invitados}</span>
+      <button class="stepbtn" id="inv-mas-${f}" ${locked?'disabled':''}>+</button>
+    </div>`:''}
+  </div>`;
+}
+
+async function marcar(fecha,come){
+  if(bloqueado(new Date(fecha+'T00:00:00')))return;
+  const actual=respuestasPorFecha[fecha]||{come:true,invitados:0};
+  const invitados=come?actual.invitados:0;
+  respuestasPorFecha[fecha]={come,invitados};
+  pintarSemana();
+  try{ await upsertRespuesta(usuarioActual.id,fecha,come,invitados); }
+  catch(e){ alert('No se pudo guardar: '+e.message); }
+}
+
+async function cambiarInvitados(fecha,delta){
+  if(bloqueado(new Date(fecha+'T00:00:00')))return;
+  const actual=respuestasPorFecha[fecha]||{come:true,invitados:0};
+  const invitados=Math.max(0,(actual.invitados||0)+delta);
+  respuestasPorFecha[fecha]={come:actual.come,invitados};
+  const span=document.getElementById('inv-val-'+fecha);
+  if(span)span.textContent=invitados;
+  try{ await upsertRespuesta(usuarioActual.id,fecha,actual.come,invitados); }
+  catch(e){ alert('No se pudo guardar: '+e.message); }
+}
+
+init();
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('comeda-sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
