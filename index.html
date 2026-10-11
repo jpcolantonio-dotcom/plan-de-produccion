@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.255</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.256</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -271,7 +271,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('cfg')"><i class="ti ti-settings"></i>Configuración</button>
   <button class="tab" onclick="T('etq')"><i class="ti ti-qrcode"></i>Etiquetas</button>
   <button class="tab" onclick="T('rem')"><i class="ti ti-truck-delivery"></i>Remitos</button>
-  <button class="tab" onclick="T('comes')"><i class="ti ti-tools-kitchen-2"></i>Comés</button>
+  <button class="tab" onclick="T('comes')"><i class="ti ti-tools-kitchen-2"></i>A comer</button>
   <button class="tab" onclick="T('planillas')"><i class="ti ti-file-text"></i>Planillas</button>
 </div>
 <div class="pad">
@@ -1569,13 +1569,13 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   </div>
   <div id="rem-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
 </div>
-<!-- COMÉS: habilitación de personas + lista diaria para cocina de "¿Comés?" (app aparte para el
+<!-- COMÉS: habilitación de personas + lista diaria para cocina de "A comer" (app aparte para el
      celular de cada empleado, que lee/escribe las mismas tablas comeda_usuarios/comeda_respuestas). -->
 <div id="tab-comes" class="section">
   <div class="toolbar">
     <div>
-      <div style="font-size:16px;font-weight:600">¿Comés?</div>
-      <div style="font-size:13px;color:var(--text2)">Quién está habilitado a marcar si come, y la lista del día para cocina (la app "¿Comés?" la usa cada empleado desde su celular)</div>
+      <div style="font-size:16px;font-weight:600">A comer</div>
+      <div style="font-size:13px;color:var(--text2)">Quién está habilitado a marcar si come, y la lista del día para cocina (la app "A comer" la usa cada empleado desde su celular)</div>
     </div>
   </div>
   <div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1.25rem">
@@ -16706,7 +16706,7 @@ function remImprimir(remito,items){
 
 // ── COMÉS (v4.255): "necesito una app que salga del papo, que es pedido de comida ... tiene hasta
 // las 10 de la mañana para poder cambiarlo. cada uno que se baja la app tiene que generarle un
-// usuario, y va a ser el nombre de la persona y el area" -- la app "¿Comés?" en sí (donde cada
+// usuario, y va a ser el nombre de la persona y el area" -- la app "A comer" en sí (donde cada
 // empleado marca sí/no por día desde su celular, lunes a sábado, hasta las 10:00 de ese mismo día)
 // es un archivo aparte (comeda.html) conectado a la MISMA base de Supabase que PAPO -- acá adentro
 // solo vive (1) habilitar personas y darles o no permiso de invitados ("ciertas personas pueden
@@ -16812,7 +16812,7 @@ function comesImprimirLista(){
     for(let i=0;i<(f.invitados||0);i++)filasHtml+=`<tr><td class="inv">Invitado de ${comesEsc(f.usuario.nombre)}</td><td>—</td></tr>`;
   });
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
-  <title>¿Comés? — ${fecha}</title>
+  <title>A comer — ${fecha}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:Arial,sans-serif;padding:10mm;font-size:10pt;color:#111}
@@ -16825,7 +16825,7 @@ function comesImprimirLista(){
     .tot{margin-top:10px;font-size:11pt;font-weight:bold;border-top:2px solid #333;padding-top:8px}
     @media print{@page{size:A4 portrait;margin:10mm}body{padding:0}}
   </style></head><body>
-    <h1>¿Comés? — Lista del día</h1>
+    <h1>A comer — Lista del día</h1>
     <div class="sub">${fechaTxt}</div>
     <table><thead><tr><th>Comensal</th><th>Área</th></tr></thead><tbody>${filasHtml}</tbody></table>
     <div class="tot">Total comensales: ${total} (${vienen.length} personas + ${totalInvitados} invitados)</div>
@@ -16841,7 +16841,7 @@ function comesImprimirLista(){
 function comesRenderPersonas(){
   const el=document.getElementById('comes-content');
   el.innerHTML=`
-    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Cada persona que agregués acá va a poder elegir su nombre en la app "¿Comés?" desde su celular. Tildá "Invitados" solo para quienes puedan sumar invitados a su pedido.</div>
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Cada persona que agregués acá va a poder elegir su nombre en la app "A comer" desde su celular. Tildá "Invitados" solo para quienes puedan sumar invitados a su pedido.</div>
     <div class="grid-card" style="margin-bottom:1rem">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <input type="text" id="comes-nuevo-nombre" placeholder="Nombre" style="flex:1;min-width:160px;padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
@@ -16898,7 +16898,7 @@ async function comesToggleCampo(id,campo,valor){
 }
 
 async function comesEliminarUsuario(id,nombre){
-  if(!confirm(`¿Eliminar a ${nombre} de "¿Comés?"? También se borran sus respuestas guardadas.`))return;
+  if(!confirm(`¿Eliminar a ${nombre} de "A comer"? También se borran sus respuestas guardadas.`))return;
   try{
     await del('comeda_usuarios',id);
     comesUsuarios=comesUsuarios.filter(u=>u.id!==id);
