@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.258</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.259</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -16220,8 +16220,13 @@ function parseRemitoTexto(texto){
   const FECHAHORA_RE=/^(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2})$/;
   const REMITO_RE=/^REMITO\s+(\S+)/i;
   const HEADER_TABLA_RE=/^codigo\s+cant\.?\s+descripcion/i;
-  const ITEM_RE=/^(\d{4,})\s+([\d.,]+)\s+(.+)$/;
-  const SOLO_CODIGO_CANT_RE=/^(\d{4,})\s+([\d.,]+)$/;
+  // v4 (12/10/2026): el "Cant." admite signo negativo -- así es como Flexxus representa una nota de
+  // crédito (mismo formato de REMITO/tabla que uno normal, sin ningún texto que diga "NOTA DE
+  // CRÉDITO" en ningún lado -- la única señal es la cantidad en negativo, ver PDF real de ejemplo
+  // "Remito_..._NC_PATAGONIA.pdf", línea "60500213 -1 BURRITO DE OSOBUCO CAJA POR 48U."). Antes esta
+  // regex no aceptaba el "-" y esas líneas simplemente no se parseaban (el ítem se perdía entero).
+  const ITEM_RE=/^(\d{4,})\s+(-?[\d.,]+)\s+(.+)$/;
+  const SOLO_CODIGO_CANT_RE=/^(\d{4,})\s+(-?[\d.,]+)$/;
 
   let idxFecha=-1,idxCuit=-1,idxHeaderTabla=-1;
   let numero=null,fecha=null,hora=null,cuit=null;
@@ -16269,11 +16274,49 @@ function clasificarItem(descripcion){
 }
 function convertirParaMostrar(unidadesReales,tipo){
   if(tipo==='empanada'){
-    const bandejasEnteras=Math.floor(unidadesReales/24);
-    const resto=Math.round((unidadesReales-bandejasEnteras*24)*100)/100;
-    return{cantidad_mostrada:Math.round((unidadesReales/24)*100)/100,unidad_mostrada:'bandejas',texto:resto>0?`${bandejasEnteras} bandejas + ${resto}u`:`${bandejasEnteras} bandejas`};
+    // v4: la descomposición en bandejas+resto se hace sobre el VALOR ABSOLUTO y el signo se vuelve a
+    // aplicar al final -- así una nota de crédito (unidadesReales negativo) también queda legible
+    // (ej. -30 => "-1 bandejas + -6u") en vez de que Math.floor de un negativo tire cualquier cosa.
+    const signo=unidadesReales<0?-1:1;
+    const abs=Math.abs(unidadesReales);
+    const bandejasAbs=Math.floor(abs/24);
+    const restoAbs=Math.round((abs-bandejasAbs*24)*100)/100;
+    const bandejasEnteras=signo*bandejasAbs;
+    const resto=signo*restoAbs;
+    return{cantidad_mostrada:Math.round((unidadesReales/24)*100)/100,unidad_mostrada:'bandejas',texto:restoAbs>0?`${bandejasEnteras} bandejas + ${resto}u`:`${bandejasEnteras} bandejas`};
   }
   return{cantidad_mostrada:unidadesReales,unidad_mostrada:'unidades',texto:`${unidadesReales} unidades`};
+}
+// v4: una nota de crédito de Flexxus NO se distingue por ningún texto en el PDF (no dice "NOTA DE
+// CRÉDITO" en ningún lado) -- la única señal es que TODAS las cantidades de la tabla vienen en
+// negativo. Se usa solo para mostrar un cartel/badge informativo; la resta en sí ya la hace sumar
+// normalmente, porque la cantidad ya viene negativa desde el PDF.
+function remEsNotaCredito(items){
+  return!!(items&&items.length&&items.every(it=>(it.cantidad_original!=null?it.cantidad_original:it.unidades_reales)<0));
+}
+// v4: junta los ítems de varios documentos (remitos + notas de crédito) del mismo cliente/día en uno
+// solo por código, sumando unidades_reales -- como las notas de crédito ya vienen con cantidad
+// negativa en el PDF, sumar ya resta solo, sin ningún caso especial. Recalcula cantidad_mostrada/
+// unidad_mostrada/texto desde el NETO (no suma los textos ya convertidos de cada documento por
+// separado, para no arrastrar redondeos). Un código cuyo neto da 0 se saca del resultado -- no hay
+// nada que entregar ni chequear para ese producto.
+function remConsolidarItems(docs){
+  const porCodigo=new Map();
+  (docs||[]).forEach(doc=>{
+    (doc.items||[]).forEach(it=>{
+      let acc=porCodigo.get(it.codigo);
+      if(!acc){acc={codigo:it.codigo,descripcion:it.descripcion,tipo:it.tipo,unidades_reales:0};porCodigo.set(it.codigo,acc);}
+      acc.unidades_reales+=it.unidades_reales;
+    });
+  });
+  const out=[];
+  let orden=0;
+  porCodigo.forEach(acc=>{
+    if(Math.abs(acc.unidades_reales)<1e-9)return;
+    const conv=convertirParaMostrar(acc.unidades_reales,acc.tipo);
+    out.push({orden:orden++,codigo:acc.codigo,descripcion:acc.descripcion,unidades_reales:acc.unidades_reales,tipo:acc.tipo,...conv,recibido:false,cantidad_recibida:null});
+  });
+  return out;
 }
 function procesarRemito(texto){
   const{numero,fecha,hora,cliente,direccion,cuit,items}=parseRemitoTexto(texto);
@@ -16352,7 +16395,7 @@ function remBuildCatalogoCodigos(rowsHistoricos,itemsPreview){
 async function remCargarCatalogoCodigos(){
   try{
     const rows=await get('remito_items','select=codigo,descripcion&order=codigo.asc');
-    remCatalogoCodigos=remBuildCatalogoCodigos(rows,remPreview?remPreview.items:[]);
+    remCatalogoCodigos=remBuildCatalogoCodigos(rows,remPendientes.flatMap(d=>d.items||[]));
   }catch(e){remCatalogoCodigos=[];}
 }
 async function remAsignarCategoria(codigo,categoria){
@@ -16399,7 +16442,11 @@ function remEsc(s){
 
 // ---------- Pantalla (dentro de PAPO) ----------
 let remVista='subir';
-let remPreview=null; // remito recién leído, todavía no guardado
+// v4 (12/10/2026): reemplaza al viejo remPreview (un solo documento) -- ahora es una lista de
+// documentos recién leídos pero todavía NO guardados ("pendiente de imprimir"). Permite cargar varios
+// remitos (y notas de crédito) del mismo cliente/día antes de guardar e imprimir UNA sola hoja
+// combinada (ver remProcesarDocumentoNuevo/remConsolidarItems/remImprimirCombinado más abajo).
+let remPendientes=[];
 let remHistorial=[];
 let remDetalle=null; // {remito,items} cuando se abre uno del historial
 let remFiltroHist='';
@@ -16478,25 +16525,54 @@ function remResumenDiferenciasHtml(items){
 }
 
 function remRenderSubir(){
-  if(!remPreview){
-    return `
-    <label for="rem-file-input" style="display:block;border:1.5px dashed var(--border2);border-radius:var(--radius-lg);padding:32px 14px;text-align:center;cursor:pointer;color:var(--text2);font-size:13px">
-      <i class="ti ti-file-upload" style="font-size:28px;color:var(--blue);display:block;margin-bottom:6px"></i>
-      Tocá para elegir el PDF del remito que manda Flexxus<br/>
+  const uploader=`
+    <label for="rem-file-input" style="display:block;border:1.5px dashed var(--border2);border-radius:var(--radius-lg);padding:${remPendientes.length?'16px 14px':'32px 14px'};text-align:center;cursor:pointer;color:var(--text2);font-size:13px;margin-bottom:${remPendientes.length?'14px':'0'}">
+      <i class="ti ti-file-upload" style="font-size:${remPendientes.length?'20px':'28px'};color:var(--blue);display:block;margin-bottom:6px"></i>
+      ${remPendientes.length?'Tocá para agregar otro PDF (remito o nota de crédito)':'Tocá para elegir el PDF del remito que manda Flexxus'}<br/>
       <span style="font-size:11px">Se arma la hoja de reparto agrupada por categoría, lista para imprimir</span>
     </label>
-    <input type="file" id="rem-file-input" accept="application/pdf" style="display:none" onchange="remManejarArchivoSeleccionado(this.files[0])"/>`;
-  }
-  const seccionesContenido=remSeccionesHtml(remPreview.items,'remTogglearRecibidoPreview','remSetCantidadRecibidaPreview');
+    <input type="file" id="rem-file-input" accept="application/pdf" style="display:none" onchange="remManejarArchivoSeleccionado(this.files[0]);this.value=''"/>`;
+  if(!remPendientes.length)return uploader;
+
+  const badgeNC=`<span style="margin-left:6px;font-size:10.5px;font-weight:700;color:var(--amber);background:var(--bg2);border-radius:20px;padding:2px 8px">NOTA DE CRÉDITO</span>`;
+  const docsHtml=remPendientes.map((doc,idx)=>`
+    <div style="border:.5px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:13px;font-weight:600">${remEsc(doc.numero||'-')} · ${remEsc(doc.cliente||'-')}${doc.esNC?badgeNC:''}</div>
+        <span style="font-size:11.5px;color:var(--text2);cursor:pointer" onclick="remQuitarPendiente(${idx})"><i class="ti ti-x"></i> Quitar</span>
+      </div>
+      <div style="font-size:11.5px;color:var(--text2);margin-bottom:8px">${remEsc(doc.fecha||'-')} ${remEsc(doc.hora||'')} · ${doc.items.length} ítem(s)</div>
+      ${remSeccionesHtml(doc.items,null,null)}
+    </div>`).join('');
+
+  const resumenHtml=remPendientes.length>1?`
+    <div style="margin-top:4px;margin-bottom:14px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:6px">Resumen combinado (${remPendientes.length} documentos, ya sumado/restado)</div>
+      ${remSeccionesHtml(remConsolidarItems(remPendientes),null,null)}
+    </div>`:'';
+
   return `
-  ${remCabeceraHtml(remPreview)}
+  ${uploader}
+  <div style="font-size:13px;font-weight:600;margin-bottom:4px">Pendiente de imprimir (${remPendientes.length})</div>
+  ${docsHtml}
+  ${resumenHtml}
   <div style="display:flex;gap:8px;margin-bottom:14px">
-    <button class="btn btn-primary" onclick="remGuardarEImprimir()" id="rem-btn-guardar"><i class="ti ti-printer"></i> Guardar e imprimir</button>
-    <button class="btn" onclick="remPreview=null;remRender();"><i class="ti ti-x"></i> Descartar</button>
-  </div>
-  <div style="font-size:13px;font-weight:600;margin-bottom:4px">Ítems (${remPreview.items.length})</div>
-  ${seccionesContenido}
-  ${remResumenDiferenciasHtml(remPreview.items)}`;
+    <button class="btn btn-primary" onclick="remFinalizarPendientes()" id="rem-btn-guardar"><i class="ti ti-printer"></i> Guardar e imprimir${remPendientes.length>1?' (combinado)':''}</button>
+    <button class="btn" onclick="remDescartarPendientes()"><i class="ti ti-x"></i> Descartar todo</button>
+  </div>`;
+}
+function remQuitarPendiente(idx){
+  remPendientes.splice(idx,1);
+  remRender();
+}
+function remDescartarPendientes(){
+  if(remPendientes.length&&!confirm('¿Descartar todo lo pendiente?\n\nNo se guardó nada todavía, así que no se pierde ningún remito ya ingresado al sistema -- solo vas a tener que volver a subir estos PDF si los necesitás.'))return;
+  remPendientes=[];
+  remRender();
+}
+async function remFinalizarPendientes(){
+  if(!remPendientes.length)return;
+  await remGuardarEImprimirDocs(remPendientes.slice());
 }
 
 function remRenderHistorial(){
@@ -16508,7 +16584,7 @@ function remRenderHistorial(){
     ${lista.map(r=>`
       <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:.5px solid var(--border);cursor:pointer" onclick="remAbrirRemito('${r.id}')">
         <div>
-          <div style="font-size:13px;font-weight:600">${remEsc(r.numero)} · ${remEsc(r.cliente||'')}</div>
+          <div style="font-size:13px;font-weight:600">${remEsc(r.numero)} · ${remEsc(r.cliente||'')}${r._esNC?' <span style="font-size:10px;font-weight:700;color:var(--amber);background:var(--bg2);border-radius:20px;padding:1px 7px">NC</span>':''}</div>
           <div style="font-size:11.5px;color:var(--text2)">${remEsc(r.fecha||'')} ${remEsc(r.hora||'')}</div>
         </div>
         <span style="font-size:11px;color:var(--text2);background:var(--bg2);border-radius:20px;padding:3px 9px">${r._pendientes>0?`${r._pendientes} sin recibir`:'completo'}</span>
@@ -16518,9 +16594,11 @@ function remRenderHistorial(){
 
 function remRenderDetalle(){
   const{remito,items}=remDetalle;
+  const esNC=remEsNotaCredito(items);
   const seccionesContenido=remSeccionesHtml(items,'remTogglearRecibido','remSetCantidadRecibida');
   return `
   <div style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--blue);cursor:pointer;margin-bottom:10px;font-weight:600" onclick="remDetalle=null;remRender();"><i class="ti ti-arrow-left"></i> Volver al historial</div>
+  ${esNC?'<div style="display:inline-block;font-size:11px;font-weight:700;color:var(--amber);background:var(--bg2);border-radius:20px;padding:3px 10px;margin-bottom:8px">NOTA DE CRÉDITO</div>':''}
   ${remCabeceraHtml(remito)}
   <div style="margin-bottom:14px"><button class="btn" onclick="remImprimir(remDetalle.remito,remDetalle.items)"><i class="ti ti-printer"></i> Imprimir</button></div>
   <div style="font-size:13px;font-weight:600;margin-bottom:4px">Ítems (${items.length})</div>
@@ -16558,8 +16636,7 @@ async function remManejarArchivoSeleccionado(file){
       ss('online','Conectado');
       return;
     }
-    remPreview=r;
-    remRender();
+    await remProcesarDocumentoNuevo(r);
     ss('online','Conectado');
   }catch(e){
     console.error(e);
@@ -16567,45 +16644,85 @@ async function remManejarArchivoSeleccionado(file){
     ss('error','Error leyendo PDF');
   }
 }
+// v4: decide qué hacer con un documento recién parseado (remito o nota de crédito) -- separado de
+// remManejarArchivoSeleccionado para poder probarlo sin pasar por pdf.js. Si no hay nada pendiente
+// todavía, simplemente lo agrega. Si ya hay un grupo pendiente del MISMO cliente+fecha, pregunta si
+// sumarlo (se queda pendiente, sin imprimir) o guardarlo e imprimirlo aparte sin tocar el pendiente.
+// Si es de OTRO cliente o fecha, no se puede mezclar -- pregunta si cerrar (guardar e imprimir) el
+// pendiente actual antes de seguir, o descartarlo (nada se perdió, no estaba guardado todavía).
+async function remProcesarDocumentoNuevo(r){
+  r.esNC=remEsNotaCredito(r.items);
+  if(remPendientes.length){
+    const base=remPendientes[0];
+    const mismoCliente=normTxt(base.cliente||'')===normTxt(r.cliente||'');
+    const mismaFecha=(base.fecha||'')===(r.fecha||'');
+    if(mismoCliente&&mismaFecha){
+      const sumar=confirm(`Ya tenés ${remPendientes.length} documento(s) pendiente(s) de imprimir para ${r.cliente||'este cliente'} del ${r.fecha||''}.\n\n¿Sumar este${r.esNC?' (nota de crédito)':''} al mismo grupo?\n\nOK = sumar al pendiente (se imprime todo junto después)\nCancelar = guardar e imprimir este aparte, sin tocar el grupo pendiente`);
+      if(sumar){remPendientes.push(r);remRender();return;}
+      await remGuardarEImprimirDocs([r],{irHistorial:false});
+      return;
+    }
+    const guardarPendiente=confirm(`Tenés pendiente de imprimir ${remPendientes.length} documento(s) de ${base.cliente||'otro cliente'} del ${base.fecha||''}, todavía sin guardar.\n\nEste PDF nuevo es de ${r.cliente||'otro cliente'} / ${r.fecha||''}, no se puede sumar al grupo.\n\nOK = guardar e imprimir el pendiente ahora, y seguir con este\nCancelar = descartar el pendiente (no se había guardado nada) y empezar con este`);
+    if(guardarPendiente)await remGuardarEImprimirDocs(remPendientes.slice(),{irHistorial:false});
+    else remPendientes=[];
+  }
+  remPendientes.push(r);
+  remRender();
+}
 
-async function remGuardarEImprimir(){
-  if(!remPreview)return;
+// v4: guarda uno o varios documentos (remitos/notas de crédito) y después imprime -- una sola hoja
+// por documento si es uno solo (comportamiento de siempre), o una hoja COMBINADA (neto por producto,
+// ver remConsolidarItems) si son varios. Va sacando de remPendientes cada documento a medida que se
+// guarda con éxito, así un error a mitad de camino no duplica ni pierde los que ya entraron.
+async function remGuardarEImprimirDocs(docs,opts){
+  opts=opts||{};
+  const irHistorial=opts.irHistorial!==false;
+  if(!docs||!docs.length)return;
   const btn=document.getElementById('rem-btn-guardar');
   if(btn)btn.disabled=true;
   ss('saving','Guardando...');
-  let guardado=null;
+  const guardados=[];
   try{
-    const[remitoIns]=await ins('remitos',{numero:remPreview.numero,fecha:remPreview.fecha,hora:remPreview.hora,cliente:remPreview.cliente,direccion:remPreview.direccion,cuit:remPreview.cuit});
-    const itemsPayload=remPreview.items.map(it=>({
-      remito_id:remitoIns.id,orden:it.orden,codigo:it.codigo,descripcion:it.descripcion,
-      cantidad_original:it.cantidad_original,unidades_reales:it.unidades_reales,tipo:it.tipo,
-      cantidad_mostrada:it.cantidad_mostrada,unidad_mostrada:it.unidad_mostrada,texto:it.texto,recibido:it.recibido,
-      cantidad_recibida:it.cantidad_recibida!=null?it.cantidad_recibida:null
-    }));
-    const itemsIns=await ins('remito_items',itemsPayload);
-    guardado={remito:remitoIns,items:itemsIns};
-    remPreview=null;
+    for(const doc of docs){
+      const[remitoIns]=await ins('remitos',{numero:doc.numero,fecha:doc.fecha,hora:doc.hora,cliente:doc.cliente,direccion:doc.direccion,cuit:doc.cuit});
+      const itemsPayload=doc.items.map(it=>({
+        remito_id:remitoIns.id,orden:it.orden,codigo:it.codigo,descripcion:it.descripcion,
+        cantidad_original:it.cantidad_original,unidades_reales:it.unidades_reales,tipo:it.tipo,
+        cantidad_mostrada:it.cantidad_mostrada,unidad_mostrada:it.unidad_mostrada,texto:it.texto,recibido:it.recibido,
+        cantidad_recibida:it.cantidad_recibida!=null?it.cantidad_recibida:null
+      }));
+      const itemsIns=await ins('remito_items',itemsPayload);
+      guardados.push({remito:remitoIns,items:itemsIns,doc});
+      const i=remPendientes.indexOf(doc);if(i!==-1)remPendientes.splice(i,1);
+    }
     ss('online','Conectado');
   }catch(e){
     console.error(e);
-    alert('Error guardando el remito: '+e.message);
+    alert('Error guardando: '+e.message+(guardados.length?`\n\nYa se guardaron ${guardados.length} de ${docs.length} documento(s) antes del error -- revisalos en el Historial. Los que faltan siguen pendientes para reintentar.`:''));
     ss('error','Error al guardar');
-    return;
-  }finally{
     if(btn)btn.disabled=false;
+    remRender();
+    return;
   }
-  remIrVista('historial');
-  if(guardado)remImprimir(guardado.remito,guardado.items);
+  if(btn)btn.disabled=false;
+  if(guardados.length===1)remImprimir(guardados[0].remito,guardados[0].items);
+  else remImprimirCombinado(guardados);
+  if(irHistorial)remIrVista('historial');
+  else remRender();
 }
 
 async function remCargarHistorial(){
   ss('saving','Cargando...');
   try{
     const remitos=await get('remitos','select=*&order=creado_en.desc');
-    const items=await get('remito_items','select=remito_id,recibido');
+    const items=await get('remito_items','select=remito_id,recibido,cantidad_original');
     const pendPorRemito={};
-    items.forEach(it=>{if(!it.recibido)pendPorRemito[it.remito_id]=(pendPorRemito[it.remito_id]||0)+1;});
-    remHistorial=remitos.map(r=>({...r,_pendientes:pendPorRemito[r.id]||0}));
+    const itemsPorRemito={};
+    items.forEach(it=>{
+      if(!it.recibido)pendPorRemito[it.remito_id]=(pendPorRemito[it.remito_id]||0)+1;
+      (itemsPorRemito[it.remito_id]=itemsPorRemito[it.remito_id]||[]).push(it);
+    });
+    remHistorial=remitos.map(r=>({...r,_pendientes:pendPorRemito[r.id]||0,_esNC:remEsNotaCredito(itemsPorRemito[r.id]||[])}));
     ss('online','Conectado');
     if(remVista==='historial'&&!remDetalle)remRender();
   }catch(e){
@@ -16626,12 +16743,6 @@ async function remAbrirRemito(id){
     ss('error','Error abriendo remito');
   }
 }
-function remTogglearRecibidoPreview(orden,checked){
-  if(!remPreview)return;
-  const it=remPreview.items.find(x=>x.orden===orden);
-  if(it){it.recibido=checked;if(checked)it.cantidad_recibida=null;}
-  remRender();
-}
 async function remTogglearRecibido(itemId,checked){
   try{
     const patch={recibido:checked};
@@ -16644,12 +16755,6 @@ async function remTogglearRecibido(itemId,checked){
     console.error(e);
     alert('No se pudo guardar el cambio: '+e.message);
   }
-}
-function remSetCantidadRecibidaPreview(orden,valor){
-  if(!remPreview)return;
-  const it=remPreview.items.find(x=>x.orden===orden);
-  if(it)it.cantidad_recibida=valor===''?null:parseFloat(valor);
-  remRender();
 }
 async function remSetCantidadRecibida(itemId,valor){
   const v=valor===''?null:parseFloat(valor);
@@ -16667,24 +16772,26 @@ async function remSetCantidadRecibida(itemId,valor){
 // ---------- Impresión: una sola hoja A4 vertical, agrupada por categoría + resumen abajo (mismo
 // mecanismo que ya usa PAPO para las otras planillas: Blob + window.open + auto window.print()) ----------
 function remImprimir(remito,items){
+  const esNC=remEsNotaCredito(items);
   const grupos=remAgruparPorCategoria(items);
   const resumen=remResumenPorCategoria(items);
+  // v4: se sacó la columna "Cód." del impreso a pedido de Juan Pablo -- queda solo Producto/Cantidad.
   const bloquesHtml=grupos.map(g=>`
     <div class="catblock">
       <div class="cath">${remEsc(g.categoria)}</div>
       <table>
-        <tr><th>Cód.</th><th>Producto</th><th class="num">Cant.</th></tr>
+        <tr><th>Producto</th><th class="num">Cant.</th></tr>
         ${g.items.map(it=>{
           const info=remAliasInfo(it.codigo);
           const nombre=info.alias||it.descripcion;
-          return `<tr><td class="cod">${remEsc(it.codigo)}</td><td>${remEsc(nombre)}</td><td class="num">${remEsc(it.texto)}</td></tr>`;
+          return `<tr><td>${remEsc(nombre)}</td><td class="num">${remEsc(it.texto)}</td></tr>`;
         }).join('')}
       </table>
     </div>`).join('');
   const resumenFilas=resumen.map(r=>`<tr><td>${remEsc(r.categoria)}</td><td class="num">${r.bandejas?r.bandejas.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}):'0'}</td><td class="num">${r.unidades||0}</td></tr>`).join('');
   const fechaImpresion=new Date().toLocaleString('es-AR');
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
-  <title>Remito ${remEsc(remito.numero||'')}</title>
+  <title>${esNC?'Nota de crédito':'Remito'} ${remEsc(remito.numero||'')}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:Arial,sans-serif;padding:8mm;font-size:8.5pt;color:#111}
@@ -16698,7 +16805,6 @@ function remImprimir(remito,items){
     table{width:100%;border-collapse:collapse;font-size:8pt}
     th,td{border:1px solid #999;padding:2px 5px;text-align:left}
     th{background:#eee;font-size:7.5pt;text-transform:uppercase}
-    td.cod{font-family:monospace;white-space:nowrap}
     td.num,th.num{text-align:right;white-space:nowrap}
     .resumen{margin-top:10px;break-before:avoid}
     .resumen h2{font-size:10pt;margin:0 0 4px;border-top:2px solid #333;padding-top:6px}
@@ -16708,12 +16814,82 @@ function remImprimir(remito,items){
     @media print{@page{size:A4 portrait;margin:8mm}body{padding:0}}
   </style></head>
   <body>
-    <h1>Remito de reparto — Planeta Empanada</h1>
+    <h1>${esNC?'Nota de crédito':'Remito de reparto'} — Planeta Empanada</h1>
     <div class="sub">Agrupado por categoría · Impreso ${fechaImpresion}</div>
     <div class="cab">
       <div><span style="color:#666">N° remito</span><b>${remEsc(remito.numero||'-')}</b></div>
       <div><span style="color:#666">Fecha y hora</span><b>${remEsc(remito.fecha||'-')} ${remEsc(remito.hora||'')}</b></div>
       <div><span style="color:#666">Cliente</span><b>${remEsc(remito.cliente||'-')}</b></div>
+    </div>
+    <div class="catgrid">${bloquesHtml}</div>
+    <div class="resumen">
+      <h2>Resumen por categoría</h2>
+      <table><tr><th>Categoría</th><th class="num">Bandejas</th><th class="num">Unidades sueltas</th></tr>${resumenFilas}</table>
+    </div>
+    <div class="firma"><div>Entregó</div><div>Recibió</div></div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
+  </body></html>`;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para poder imprimir.');
+}
+// v4: imprime UNA hoja combinada para varios documentos (remitos + notas de crédito) del mismo
+// cliente/día -- misma pinta que remImprimir, pero con los ítems ya netos (remConsolidarItems) y la
+// cabecera listando todos los N° de remito incluidos en vez de uno solo.
+function remImprimirCombinado(guardados){
+  const docs=guardados.map(g=>g.doc);
+  const itemsCombinados=remConsolidarItems(docs);
+  const grupos=remAgruparPorCategoria(itemsCombinados);
+  const resumen=remResumenPorCategoria(itemsCombinados);
+  const bloquesHtml=grupos.map(g=>`
+    <div class="catblock">
+      <div class="cath">${remEsc(g.categoria)}</div>
+      <table>
+        <tr><th>Producto</th><th class="num">Cant.</th></tr>
+        ${g.items.map(it=>{
+          const info=remAliasInfo(it.codigo);
+          const nombre=info.alias||it.descripcion;
+          return `<tr><td>${remEsc(nombre)}</td><td class="num">${remEsc(it.texto)}</td></tr>`;
+        }).join('')}
+      </table>
+    </div>`).join('');
+  const resumenFilas=resumen.map(r=>`<tr><td>${remEsc(r.categoria)}</td><td class="num">${r.bandejas?r.bandejas.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}):'0'}</td><td class="num">${r.unidades||0}</td></tr>`).join('');
+  const fechaImpresion=new Date().toLocaleString('es-AR');
+  const primero=guardados[0].remito;
+  const numerosHtml=guardados.map(g=>`${remEsc(g.remito.numero||'-')}${g.doc.esNC?' (NC)':''}`).join(', ');
+  const horas=[...new Set(guardados.map(g=>g.remito.hora).filter(Boolean))].join(' / ');
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Remito combinado ${remEsc(primero.cliente||'')}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;padding:8mm;font-size:8.5pt;color:#111}
+    h1{font-size:13pt;margin-bottom:2px}
+    .sub{font-size:9pt;color:#555;margin-bottom:8px}
+    .cab{display:flex;gap:18px;font-size:9pt;border:1px solid #999;padding:6px 10px;margin-bottom:10px}
+    .cab b{display:block;font-size:10.5pt}
+    .catgrid{column-count:2;column-gap:12px}
+    .catblock{break-inside:avoid;margin-bottom:8px}
+    .cath{background:#dbe9f8;font-weight:bold;font-size:8.5pt;padding:3px 6px;border:1px solid #999;border-bottom:none}
+    table{width:100%;border-collapse:collapse;font-size:8pt}
+    th,td{border:1px solid #999;padding:2px 5px;text-align:left}
+    th{background:#eee;font-size:7.5pt;text-transform:uppercase}
+    td.num,th.num{text-align:right;white-space:nowrap}
+    .resumen{margin-top:10px;break-before:avoid}
+    .resumen h2{font-size:10pt;margin:0 0 4px;border-top:2px solid #333;padding-top:6px}
+    .resumen table th{background:#333;color:#fff}
+    .firma{margin-top:16px;font-size:9pt;display:flex;justify-content:space-between}
+    .firma div{border-top:1px solid #333;width:200px;padding-top:3px;text-align:center}
+    @media print{@page{size:A4 portrait;margin:8mm}body{padding:0}}
+  </style></head>
+  <body>
+    <h1>Remito de reparto combinado — Planeta Empanada</h1>
+    <div class="sub">${guardados.length} documentos sumados (restando notas de crédito) · agrupado por categoría · Impreso ${fechaImpresion}</div>
+    <div class="cab">
+      <div><span style="color:#666">N° remitos</span><b>${numerosHtml}</b></div>
+      <div><span style="color:#666">Fecha</span><b>${remEsc(primero.fecha||'-')}${horas?' · '+remEsc(horas):''}</b></div>
+      <div><span style="color:#666">Cliente</span><b>${remEsc(primero.cliente||'-')}</b></div>
     </div>
     <div class="catgrid">${bloquesHtml}</div>
     <div class="resumen">
