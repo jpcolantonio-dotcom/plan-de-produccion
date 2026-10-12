@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.256</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.258</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1680,6 +1680,11 @@ const en=eid=>{const e=st.E.find(x=>x.id===eid);return e?e.nombre:''};
 
 const W0=wk(new Date());
 const st={w:W0,P:{},R:{},Rec:{},Ed:{},Sem:[],E:[],A:[],Pr:[],ef:'all',aeid:null,aaid:null,causas:[]};
+// cargaFallida[semana]=true si la última vez que se intentó traer el plan de esa semana desde el
+// servidor, la conexión tardó demasiado o falló (ver v4.258 -- antes, en ese caso la app seguía de
+// largo con la semana en blanco y si se guardaba así se pisaban datos reales por cero). savePlan()
+// usa esto para frenar y avisar antes de guardar una semana que nunca llegó a cargar bien.
+const cargaFallida={};
 
 document.getElementById('hdate').textContent=new Date().toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 
@@ -1706,6 +1711,7 @@ async function init(){
   ss('saving','Conectando...');
   let huboTimeout=false;
   const safeGet=(t,f)=>conTimeout(get(t,f),INIT_TIMEOUT_MS).catch(e=>{if(e&&e.message==='TIMEOUT')huboTimeout=true;return[];});
+  let planTimeout=false;
   try{
     const[pl,re,rr,mp,em,ar,pr,planActual]=await Promise.all([
       safeGet('planes','select=semana&order=semana.desc'),
@@ -1715,7 +1721,7 @@ async function init(){
       safeGet('empresas','order=nombre.asc'),
       safeGet('areas','order=nombre.asc'),
       safeGet('productos','order=orden.asc,nombre.asc'),
-      safeGet('planes',`semana=eq.${W0}&select=filas`)
+      conTimeout(get('planes',`semana=eq.${W0}&select=filas`),INIT_TIMEOUT_MS).catch(e=>{if(e&&e.message==='TIMEOUT'){huboTimeout=true;planTimeout=true;}return[];})
     ]);
     if(myGen!==initGen)return; // una llamada más nueva (ej. "reintentar") ya está en curso o terminó -- no pisar sus datos con estos, más viejos
     const ss2=new Set([...pl.map(p=>p.semana),...re.map(r=>r.semana),W0]);
@@ -1725,7 +1731,12 @@ async function init(){
     st.E=em||[];st.A=ar||[];st.Pr=pr||[];
     st.P[W0]=planActual.length?planActual[0].filas:[];
     completarProductosDesdeConfig(W0,st.P[W0]);
-    if(huboTimeout)ss('error','Conectado con datos incompletos — tocá para reintentar');
+    // Si el plan de ESTA semana no llegó a confirmarse contra el servidor (timeout), lo marcamos --
+    // savePlan() va a frenar con una advertencia en vez de guardar esto en blanco por encima de datos
+    // reales que puedan existir (ver v4.258).
+    cargaFallida[W0]=planTimeout;
+    if(planTimeout)ss('error','El plan de esta semana no cargó — tocá para reintentar antes de guardar');
+    else if(huboTimeout)ss('error','Conectado con datos incompletos — tocá para reintentar');
     else ss('online','Conectado');
     uES();
   }catch(e){if(myGen===initGen){ss('error','Sin conexión — tocá para reintentar');console.error(e);}}
@@ -1816,7 +1827,7 @@ function poblarPlanWsel(){
   });
 }
 
-async function lp(k){if(st.P[k]!==undefined)return;try{const d=await get('planes',`semana=eq.${k}&select=filas`);st.P[k]=d.length?d[0].filas:[];}catch{st.P[k]=[]}completarProductosDesdeConfig(k,st.P[k]);quitarFilasAreaNoConfigurada(k,st.P[k]);}
+async function lp(k){if(st.P[k]!==undefined)return;try{const d=await get('planes',`semana=eq.${k}&select=filas`);st.P[k]=d.length?d[0].filas:[];cargaFallida[k]=false;}catch{st.P[k]=[];cargaFallida[k]=true;}completarProductosDesdeConfig(k,st.P[k]);quitarFilasAreaNoConfigurada(k,st.P[k]);}
 async function lr(k){
   if(st.R[k]!==undefined)return;
   try{
@@ -2746,7 +2757,22 @@ async function savePlan(btnId){
   try{
     const rows=JSON.parse(JSON.stringify(gE()));
     // Primero intentar update, si no existe insertar
-    const existing=await get('planes',`semana=eq.${st.w}&select=id`);
+    const existing=await get('planes',`semana=eq.${st.w}&select=id,filas`);
+    // Freno de seguridad (v4.258): si lo que estamos a punto de guardar está TODO en cero, pero lo
+    // que ya hay guardado en el servidor para esta semana tiene cantidades reales cargadas, no pisar
+    // sin preguntar. Esto es lo que pasó el 12/10: la carga inicial de la semana tuvo un timeout
+    // contra Supabase, la app siguió de largo con la semana en blanco, y "Guardar plan" pisó el plan
+    // real con ceros. Cubre esto sin importar la causa (timeout, bug futuro, etc.).
+    const existingTieneDatos=existing.length&&(existing[0].filas||[]).some(r=>(r.days||[]).some(v=>v>0));
+    const nuevoVacio=!rows.some(r=>(r.days||[]).some(v=>v>0));
+    if(existingTieneDatos&&nuevoVacio){
+      const avisoCarga=cargaFallida[st.w]?'\n\n(Esta semana tuvo un problema al cargar desde el servidor -- recargá la página con "Reintentar" y volvé a revisar antes de guardar.)':'';
+      if(!confirm(`⚠️ Estás a punto de guardar la semana ${wlb(st.w)} TODO EN CERO, pero el servidor ya tiene cantidades cargadas para esa semana.\n\nSi confirmás, esas cantidades se van a borrar y quedar en cero.${avisoCarga}\n\n¿Guardar igual?`)){
+        ss('error','Guardado cancelado');
+        if(btn){btn.innerHTML='<i class="ti ti-device-floppy"></i> Guardar plan';btn.disabled=false;}
+        return;
+      }
+    }
     if(existing.length){
       await fetch(`${SB}/rest/v1/planes?semana=eq.${st.w}`,{
         method:'PATCH',
@@ -16711,9 +16737,10 @@ function remImprimir(remito,items){
 // es un archivo aparte (comeda.html) conectado a la MISMA base de Supabase que PAPO -- acá adentro
 // solo vive (1) habilitar personas y darles o no permiso de invitados ("ciertas personas pueden
 // tener la posibilidad de tener invitados") y (2) imprimir la lista del día para cocina. Si alguien
-// no marcó nada, se asume que SÍ come ("si no pidió que no va a comer"); los invitados no llevan
-// nombre propio, son solo una cantidad por persona, pero en la lista impresa cada uno sale como su
-// propia línea "Invitado de <nombre>" para que cocina los cuente como comensales individuales.
+// no marcó nada, se asume que NO come (v4.257: "por defecto se debe poner que no come" -- cambiado
+// desde la versión anterior, que asumía que sí); los invitados no llevan nombre propio, son solo una
+// cantidad por persona, pero en la lista impresa cada uno sale como su propia línea "Invitado de
+// <nombre>" para que cocina los cuente como comensales individuales.
 let comesVista='lista';
 let comesUsuarios=[];
 let comesFilas=[];
@@ -16768,7 +16795,7 @@ async function comesCargarLista(fecha){
     const porUsuario=new Map(respuestas.map(r=>[r.usuario_id,r]));
     comesFilas=habilitados.map(u=>{
       const r=porUsuario.get(u.id);
-      const come=r?r.come:true; // sin marcar => se asume que sí
+      const come=r?r.come:false; // sin marcar => se asume que NO
       const invitados=(r&&u.puede_invitados)?(r.invitados||0):0;
       return{usuario:u,come,invitados,marcado:!!r};
     });
@@ -16785,15 +16812,20 @@ function comesHtmlLista(filas){
     <th style="text-align:left">Comensal</th><th style="text-align:left">Área</th><th style="text-align:left">Estado</th>
   </tr></thead><tbody>`;
   vienen.forEach(f=>{
-    h+=`<tr><td style="font-weight:500">${comesEsc(f.usuario.nombre)}</td><td class="muted">${comesEsc(f.usuario.area)}</td><td>${f.marcado?'<span style="color:var(--green)">Sí</span>':'<span style="color:var(--text3)">Sí (sin marcar)</span>'}</td></tr>`;
+    h+=`<tr><td style="font-weight:500">${comesEsc(f.usuario.nombre)}</td><td class="muted">${comesEsc(f.usuario.area)}</td><td><span style="color:var(--green)">Sí</span></td></tr>`;
     for(let i=0;i<(f.invitados||0);i++){
       h+=`<tr><td style="font-style:italic;color:var(--text2)">Invitado de ${comesEsc(f.usuario.nombre)}</td><td class="muted">—</td><td><span style="color:var(--blue)">Invitado</span></td></tr>`;
     }
   });
   h+=`<tr style="background:var(--bg2)"><td colspan="3" style="font-weight:700">Total comensales: ${total} <span style="font-weight:400;color:var(--text2);font-size:12px">(${vienen.length} personas + ${totalInvitados} invitados)</span></td></tr>`;
   h+='</tbody></table></div>';
-  if(noVienen.length){
-    h+=`<div style="margin-top:1rem;font-size:13px;color:var(--text2)">No vienen: ${noVienen.map(f=>comesEsc(f.usuario.nombre)).join(', ')}</div>`;
+  const noMarcaron=noVienen.filter(f=>!f.marcado);
+  const dijeronNo=noVienen.filter(f=>f.marcado);
+  if(dijeronNo.length){
+    h+=`<div style="margin-top:1rem;font-size:13px;color:var(--text2)">Avisaron que no vienen: ${dijeronNo.map(f=>comesEsc(f.usuario.nombre)).join(', ')}</div>`;
+  }
+  if(noMarcaron.length){
+    h+=`<div style="margin-top:.4rem;font-size:13px;color:var(--text3)">Todavía no marcaron nada (cuentan como "No"): ${noMarcaron.map(f=>comesEsc(f.usuario.nombre)).join(', ')}</div>`;
   }
   if(!filas.length)h='<div class="empty"><i class="ti ti-tools-kitchen-2"></i>No hay personas habilitadas todavía. Agregalas en la pestaña "Personas".</div>';
   return h;
