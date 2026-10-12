@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.259</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.261</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -16218,7 +16218,10 @@ function parseRemitoTexto(texto){
   const lineas=texto.split('\n').map(l=>l.trim()).filter(Boolean);
   const CUIT_RE=/^\d{2}-\d{8}-\d$/;
   const FECHAHORA_RE=/^(\d{2}\/\d{2}\/\d{4})\s+(\d{2}:\d{2})$/;
-  const REMITO_RE=/^REMITO\s+(\S+)/i;
+  // v4.261: "REMITO INTERNO0040-00000016" (traslados entre depósitos) no tiene espacio entre
+  // "INTERNO" y el número -- se acepta ese prefijo opcional para que el número capturado sea
+  // igual de limpio ("0040-00000016") que en un remito normal.
+  const REMITO_RE=/^REMITO\s+(?:INTERNO\s*)?(\d\S*)/i;
   const HEADER_TABLA_RE=/^codigo\s+cant\.?\s+descripcion/i;
   // v4 (12/10/2026): el "Cant." admite signo negativo -- así es como Flexxus representa una nota de
   // crédito (mismo formato de REMITO/tabla que uno normal, sin ningún texto que diga "NOTA DE
@@ -16227,6 +16230,15 @@ function parseRemitoTexto(texto){
   // regex no aceptaba el "-" y esas líneas simplemente no se parseaban (el ítem se perdía entero).
   const ITEM_RE=/^(\d{4,})\s+(-?[\d.,]+)\s+(.+)$/;
   const SOLO_CODIGO_CANT_RE=/^(\d{4,})\s+(-?[\d.,]+)$/;
+  // v4.261: un "Remito Interno" (traslado entre depósitos, ej. "REMITO INTERNO 0040-00000016") usa
+  // OTRO orden de columnas en la tabla -- código, DESCRIPCIÓN, cantidad, precio unitario, precio
+  // total (en vez de código, cantidad, descripción) -- y no tiene ni la fila de encabezado "Código
+  // Cant. Descripción" ni CUIT (dice "CONSUMIDOR FINAL" / "Cuenta Corriente" en su lugar). El
+  // "no-greedy" de la descripción + ancla de fin de línea hace que esto funcione aunque a veces la
+  // cantidad venga pegada al final de la descripción sin espacio (ej. "...CAJA POR 48U.1 82195,04
+  // 82195,04" -- cantidad=1), porque solo hay una forma de que el resto de la línea sean exactamente
+  // 3 números hasta el final.
+  const ITEM_INTERNO_RE=/^(\d{4,})\s+(.+?)\s*(-?\d+(?:[.,]\d+)?)\s+-?\d+(?:[.,]\d+)?\s+-?\d+(?:[.,]\d+)?$/;
 
   let idxFecha=-1,idxCuit=-1,idxHeaderTabla=-1;
   let numero=null,fecha=null,hora=null,cuit=null;
@@ -16262,6 +16274,25 @@ function parseRemitoTexto(texto){
       items.push({codigo:m[1],cantidad:parseFloat(m[2].replace(',','.')),descripcion:m[3].trim()});
     }
   }
+  // v4.261: si no se encontró nada con el formato normal (sin encabezado de tabla -> típico de un
+  // Remito Interno), probar con el otro orden de columnas, recorriendo TODAS las líneas (no hay
+  // ancla de encabezado que delimite dónde empieza la tabla). Si aparece algo así, además recalcular
+  // cliente/dirección tomando las 2 líneas después de la fecha (no hay CUIT que delimite ese bloque
+  // en este formato).
+  if(items.length===0){
+    let idxPrimerItem=-1;
+    lineas.forEach((l,i)=>{
+      const m=l.match(ITEM_INTERNO_RE);
+      if(!m)return;
+      if(idxPrimerItem===-1)idxPrimerItem=i;
+      items.push({codigo:m[1],cantidad:parseFloat(m[3].replace(',','.')),descripcion:m[2].trim()});
+    });
+    if(items.length&&idxFecha!==-1&&cliente===null){
+      const entreMedio=lineas.slice(idxFecha+1,idxPrimerItem!==-1?idxPrimerItem:lineas.length);
+      if(entreMedio.length>=2){cliente=entreMedio[0];direccion=entreMedio[1].replace(/\s*[-.]\s*$/,'').trim();}
+      else if(entreMedio.length===1){cliente=entreMedio[0];}
+    }
+  }
   return{numero,fecha,hora,cliente,direccion,cuit,items};
 }
 function resolverUnidadesReales(cantidad,descripcion){
@@ -16272,18 +16303,31 @@ function resolverUnidadesReales(cantidad,descripcion){
 function clasificarItem(descripcion){
   return /^EMPANADA/i.test(descripcion.trim())?'empanada':'unidad';
 }
-function convertirParaMostrar(unidadesReales,tipo){
+// v4.261: antes esto era un 24 fijo para TODAS las empanadas, pero no todas vienen 24 por bandeja
+// (ej. jamón y queso cruda tapa criolla viene 36 por bandeja, no 24). PAPO ya tiene esta info
+// cargada por producto en Productos ("Uds/band." = productos.unidades_bandeja), emparejando por
+// NOMBRE normalizado (igual que se hace en Planificación con mpPorProducto) porque el remito de
+// Flexxus no trae el mismo código que usa el maestro de productos. Si no se encuentra el producto o
+// no tiene el campo cargado, se usa 24 como antes (no rompe nada para los productos ya probados).
+function remUnidadesPorBandeja(descripcion){
+  const limpio=normTxt(remNombreLimpio(descripcion));
+  const p=(st.Pr||[]).find(x=>normTxt(x.nombre)===limpio);
+  const n=p&&p.unidades_bandeja?parseInt(p.unidades_bandeja):0;
+  return n>0?n:24;
+}
+function convertirParaMostrar(unidadesReales,tipo,descripcion){
   if(tipo==='empanada'){
     // v4: la descomposición en bandejas+resto se hace sobre el VALOR ABSOLUTO y el signo se vuelve a
     // aplicar al final -- así una nota de crédito (unidadesReales negativo) también queda legible
     // (ej. -30 => "-1 bandejas + -6u") en vez de que Math.floor de un negativo tire cualquier cosa.
+    const porBandeja=remUnidadesPorBandeja(descripcion);
     const signo=unidadesReales<0?-1:1;
     const abs=Math.abs(unidadesReales);
-    const bandejasAbs=Math.floor(abs/24);
-    const restoAbs=Math.round((abs-bandejasAbs*24)*100)/100;
+    const bandejasAbs=Math.floor(abs/porBandeja);
+    const restoAbs=Math.round((abs-bandejasAbs*porBandeja)*100)/100;
     const bandejasEnteras=signo*bandejasAbs;
     const resto=signo*restoAbs;
-    return{cantidad_mostrada:Math.round((unidadesReales/24)*100)/100,unidad_mostrada:'bandejas',texto:restoAbs>0?`${bandejasEnteras} bandejas + ${resto}u`:`${bandejasEnteras} bandejas`};
+    return{cantidad_mostrada:Math.round((unidadesReales/porBandeja)*100)/100,unidad_mostrada:'bandejas',texto:restoAbs>0?`${bandejasEnteras} bandejas + ${resto}u`:`${bandejasEnteras} bandejas`};
   }
   return{cantidad_mostrada:unidadesReales,unidad_mostrada:'unidades',texto:`${unidadesReales} unidades`};
 }
@@ -16313,7 +16357,7 @@ function remConsolidarItems(docs){
   let orden=0;
   porCodigo.forEach(acc=>{
     if(Math.abs(acc.unidades_reales)<1e-9)return;
-    const conv=convertirParaMostrar(acc.unidades_reales,acc.tipo);
+    const conv=convertirParaMostrar(acc.unidades_reales,acc.tipo,acc.descripcion);
     out.push({orden:orden++,codigo:acc.codigo,descripcion:acc.descripcion,unidades_reales:acc.unidades_reales,tipo:acc.tipo,...conv,recibido:false,cantidad_recibida:null});
   });
   return out;
@@ -16323,7 +16367,7 @@ function procesarRemito(texto){
   const itemsProcesados=items.map((it,idx)=>{
     const unidadesReales=resolverUnidadesReales(it.cantidad,it.descripcion);
     const tipo=clasificarItem(it.descripcion);
-    const conv=convertirParaMostrar(unidadesReales,tipo);
+    const conv=convertirParaMostrar(unidadesReales,tipo,it.descripcion);
     return{orden:idx,codigo:it.codigo,descripcion:it.descripcion,cantidad_original:it.cantidad,unidades_reales:unidadesReales,tipo,...conv,recibido:false,cantidad_recibida:null};
   });
   return{numero,fecha,hora,cliente,direccion,cuit,items:itemsProcesados};
@@ -16438,6 +16482,14 @@ function remResumenPorCategoria(items){
 
 function remEsc(s){
   return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+// v4 (12/10/2026): en el impreso, saca el "POR UNIDADES"/"CAJA POR XXU." que Flexxus agrega al final
+// de la descripción (ej. "BURRITO DE OSOBUCO CAJA POR 48U." -> "BURRITO DE OSOBUCO") -- queda
+// redundante en el papel porque esa info ya está en la columna Cant. (bandejas/unidades). Solo se
+// aplica cuando se muestra la descripción cruda del PDF -- si el producto ya tiene un alias cargado
+// en Configuración, ese alias se usa tal cual, sin tocarlo.
+function remNombreLimpio(descripcion){
+  return String(descripcion||'').replace(/\s*(CAJA\s+POR\s+\d+\s*U\.?|POR\s+UNIDADES?)\s*$/i,'').trim();
 }
 
 // ---------- Pantalla (dentro de PAPO) ----------
@@ -16783,7 +16835,7 @@ function remImprimir(remito,items){
         <tr><th>Producto</th><th class="num">Cant.</th></tr>
         ${g.items.map(it=>{
           const info=remAliasInfo(it.codigo);
-          const nombre=info.alias||it.descripcion;
+          const nombre=info.alias||remNombreLimpio(it.descripcion);
           return `<tr><td>${remEsc(nombre)}</td><td class="num">${remEsc(it.texto)}</td></tr>`;
         }).join('')}
       </table>
@@ -16850,7 +16902,7 @@ function remImprimirCombinado(guardados){
         <tr><th>Producto</th><th class="num">Cant.</th></tr>
         ${g.items.map(it=>{
           const info=remAliasInfo(it.codigo);
-          const nombre=info.alias||it.descripcion;
+          const nombre=info.alias||remNombreLimpio(it.descripcion);
           return `<tr><td>${remEsc(nombre)}</td><td class="num">${remEsc(it.texto)}</td></tr>`;
         }).join('')}
       </table>
