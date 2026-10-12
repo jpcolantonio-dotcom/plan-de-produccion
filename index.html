@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.262</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.264</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -16310,17 +16310,32 @@ function resolverUnidadesReales(cantidad,descripcion){
 function clasificarItem(descripcion){
   return /^EMPANADA/i.test(descripcion.trim())?'empanada':'unidad';
 }
+// v4.261/v4.262: empareja un ítem del remito con su producto en el Maestro (Configuración >
+// Producción > 3. Productos) por NOMBRE normalizado (el remito de Flexxus no trae el mismo código
+// que usa el maestro de productos) -- mismo criterio que mpPorProducto usa en Planificación. Se
+// reusa tanto para "Uds/band." (v4.261) como para la categoría nueva por producto (v4.262).
+function remProductoPorDescripcion(descripcion){
+  const limpio=normTxt(remNombreLimpio(descripcion));
+  return (st.Pr||[]).find(x=>normTxt(x.nombre)===limpio)||null;
+}
 // v4.261: antes esto era un 24 fijo para TODAS las empanadas, pero no todas vienen 24 por bandeja
 // (ej. jamón y queso cruda tapa criolla viene 36 por bandeja, no 24). PAPO ya tiene esta info
-// cargada por producto en Productos ("Uds/band." = productos.unidades_bandeja), emparejando por
-// NOMBRE normalizado (igual que se hace en Planificación con mpPorProducto) porque el remito de
-// Flexxus no trae el mismo código que usa el maestro de productos. Si no se encuentra el producto o
-// no tiene el campo cargado, se usa 24 como antes (no rompe nada para los productos ya probados).
+// cargada por producto en Productos ("Uds/band." = productos.unidades_bandeja). Si no se encuentra
+// el producto o no tiene el campo cargado, se usa 24 como antes (no rompe nada ya probado).
 function remUnidadesPorBandeja(descripcion){
-  const limpio=normTxt(remNombreLimpio(descripcion));
-  const p=(st.Pr||[]).find(x=>normTxt(x.nombre)===limpio);
+  const p=remProductoPorDescripcion(descripcion);
   const n=p&&p.unidades_bandeja?parseInt(p.unidades_bandeja):0;
   return n>0?n:24;
+}
+// v4.262: "hay que hacer el resumen en base a las categorias que te pase" -- el agrupado por
+// categoría del resumen/impreso ahora prioriza la categoría cargada en el Maestro de Productos
+// (productos.categoria, por NOMBRE) y, si ese producto no tiene categoría cargada ahí, cae al
+// sistema viejo por CÓDIGO (remCategoriaMap/remito_categorias_producto, configurado en la pestaña
+// Categorías de Remitos) para no perder nada de lo que ya tenía clasificado ahí. Si ninguno de los
+// dos tiene nada, "Sin categoría asignada" como siempre.
+function remCategoriaDeItem(it){
+  const p=remProductoPorDescripcion(it.descripcion);
+  return (p&&p.categoria)||remCategoriaMap[it.codigo]||'Sin categoría asignada';
 }
 function convertirParaMostrar(unidadesReales,tipo,descripcion){
   if(tipo==='empanada'){
@@ -16474,7 +16489,7 @@ async function remAsignarCategoria(codigo,categoria){
 function remAgruparPorCategoria(items){
   const grupos={};
   (items||[]).forEach(it=>{
-    const cat=remCategoriaMap[it.codigo]||'Sin categoría asignada';
+    const cat=remCategoriaDeItem(it);
     if(!grupos[cat])grupos[cat]=[];
     grupos[cat].push(it);
   });
@@ -16490,6 +16505,34 @@ function remResumenPorCategoria(items){
     return{categoria:g.categoria,bandejas,unidades};
   });
 }
+// v4.264: "tenemos dos partes del remito, una que seria la parte de cantidad y descripcion y otra
+// que es el resumen, el resumen esta perfecto" -- esto es SOLO para la primera parte (el listado de
+// productos del impreso, los bloques "catgrid"), el resumen de abajo sigue usando
+// remAgruparPorCategoria/remResumenPorCategoria (las categorías finas) sin tocar nada. El listado en
+// cambio ahora va en 4 grupos amplios nomás, sin discriminar variedad (todos los burritos juntos,
+// todas las empanadas juntas, etc.), clasificando por la palabra inicial de la descripción del PDF
+// (más confiable que depender de que cada producto tenga categoría cargada en el Maestro). Lo que no
+// matchea ninguno de los 4 (ej. Salsas) va a un grupo "Otros" al final, para no perder nada.
+function remGrupoAmplio(it){
+  const d=String(it.descripcion||'').trim().toUpperCase();
+  if(/^BURRITO\b/.test(d))return'Burritos';
+  if(/^EMPANADA\b/.test(d))return'Empanadas';
+  if(/^PIZZETA\b/.test(d))return'Pizzetas';
+  if(/^PIZZA\s+ZEN\b/.test(d))return'Pizza ZEN';
+  return null;
+}
+function remAgruparAmplio(items){
+  const ORDEN=['Burritos','Empanadas','Pizzetas','Pizza ZEN'];
+  const grupos={};
+  (items||[]).forEach(it=>{
+    const g=remGrupoAmplio(it)||'Otros';
+    if(!grupos[g])grupos[g]=[];
+    grupos[g].push(it);
+  });
+  const nombres=ORDEN.filter(n=>grupos[n]);
+  if(grupos['Otros'])nombres.push('Otros');
+  return nombres.map(categoria=>({categoria,items:grupos[categoria]}));
+}
 
 function remEsc(s){
   return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -16501,6 +16544,15 @@ function remEsc(s){
 // en Configuración, ese alias se usa tal cual, sin tocarlo.
 function remNombreLimpio(descripcion){
   return String(descripcion||'').replace(/\s*(CAJA\s+POR\s+\d+\s*U\.?|POR\s+UNIDADES?)\s*$/i,'').trim();
+}
+// v4.264: "acordate de borrar donde dice C-Unidad la parte de unidad" -- el alias cargado en
+// Configuración para algunos productos quedó con el sufijo "Unidad"/"- Unidad" pegado (ej. "C -
+// Unidad", "BJ Unidad" -- distinguía la variante "por unidad" de la variante "caja" de un mismo
+// producto en Materias Primas). En el impreso de Remitos ese sufijo ya no suma nada (la unidad real
+// la muestra la columna Cant.), así que se saca solo para mostrar, igual que remNombreLimpio hace
+// con la descripción cruda del PDF -- no toca el alias guardado en Configuración.
+function remAliasLimpio(alias){
+  return String(alias||'').replace(/\s*-?\s*unidad\s*$/i,'').trim();
 }
 
 // ---------- Pantalla (dentro de PAPO) ----------
@@ -16836,7 +16888,7 @@ async function remSetCantidadRecibida(itemId,valor){
 // mecanismo que ya usa PAPO para las otras planillas: Blob + window.open + auto window.print()) ----------
 function remImprimir(remito,items){
   const esNC=remEsNotaCredito(items);
-  const grupos=remAgruparPorCategoria(items);
+  const grupos=remAgruparAmplio(items);
   const resumen=remResumenPorCategoria(items);
   // v4: se sacó la columna "Cód." del impreso a pedido de Juan Pablo -- queda solo Producto/Cantidad.
   const bloquesHtml=grupos.map(g=>`
@@ -16846,7 +16898,7 @@ function remImprimir(remito,items){
         <tr><th>Producto</th><th class="num">Cant.</th></tr>
         ${g.items.map(it=>{
           const info=remAliasInfo(it.codigo);
-          const nombre=info.alias||remNombreLimpio(it.descripcion);
+          const nombre=remAliasLimpio(info.alias)||remNombreLimpio(it.descripcion);
           return `<tr><td>${remEsc(nombre)}</td><td class="num">${remEsc(it.texto)}</td></tr>`;
         }).join('')}
       </table>
@@ -16872,7 +16924,7 @@ function remImprimir(remito,items){
     .resumen{margin-top:10px;break-before:avoid}
     .resumen h2{font-size:10pt;margin:0 0 4px;border-top:2px solid #333;padding-top:6px}
     .resumen table th{background:#333;color:#fff}
-    .firma{margin-top:16px;font-size:9pt;display:flex;justify-content:space-between}
+    .firma{margin-top:48px;font-size:9pt;display:flex;justify-content:flex-end}
     .firma div{border-top:1px solid #333;width:200px;padding-top:3px;text-align:center}
     @media print{@page{size:A4 portrait;margin:8mm}body{padding:0}}
   </style></head>
@@ -16889,7 +16941,7 @@ function remImprimir(remito,items){
       <h2>Resumen por categoría</h2>
       <table><tr><th>Categoría</th><th class="num">Bandejas</th><th class="num">Unidades sueltas</th></tr>${resumenFilas}</table>
     </div>
-    <div class="firma"><div>Entregó</div><div>Recibió</div></div>
+    <div class="firma"><div>Recibió</div></div>
   <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
   </body></html>`;
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
@@ -16904,7 +16956,7 @@ function remImprimir(remito,items){
 function remImprimirCombinado(guardados){
   const docs=guardados.map(g=>g.doc);
   const itemsCombinados=remConsolidarItems(docs);
-  const grupos=remAgruparPorCategoria(itemsCombinados);
+  const grupos=remAgruparAmplio(itemsCombinados);
   const resumen=remResumenPorCategoria(itemsCombinados);
   const bloquesHtml=grupos.map(g=>`
     <div class="catblock">
@@ -16913,7 +16965,7 @@ function remImprimirCombinado(guardados){
         <tr><th>Producto</th><th class="num">Cant.</th></tr>
         ${g.items.map(it=>{
           const info=remAliasInfo(it.codigo);
-          const nombre=info.alias||remNombreLimpio(it.descripcion);
+          const nombre=remAliasLimpio(info.alias)||remNombreLimpio(it.descripcion);
           return `<tr><td>${remEsc(nombre)}</td><td class="num">${remEsc(it.texto)}</td></tr>`;
         }).join('')}
       </table>
@@ -16942,7 +16994,7 @@ function remImprimirCombinado(guardados){
     .resumen{margin-top:10px;break-before:avoid}
     .resumen h2{font-size:10pt;margin:0 0 4px;border-top:2px solid #333;padding-top:6px}
     .resumen table th{background:#333;color:#fff}
-    .firma{margin-top:16px;font-size:9pt;display:flex;justify-content:space-between}
+    .firma{margin-top:48px;font-size:9pt;display:flex;justify-content:flex-end}
     .firma div{border-top:1px solid #333;width:200px;padding-top:3px;text-align:center}
     @media print{@page{size:A4 portrait;margin:8mm}body{padding:0}}
   </style></head>
@@ -16959,7 +17011,7 @@ function remImprimirCombinado(guardados){
       <h2>Resumen por categoría</h2>
       <table><tr><th>Categoría</th><th class="num">Bandejas</th><th class="num">Unidades sueltas</th></tr>${resumenFilas}</table>
     </div>
-    <div class="firma"><div>Entregó</div><div>Recibió</div></div>
+    <div class="firma"><div>Recibió</div></div>
   <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
   </body></html>`;
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
