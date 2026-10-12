@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.265</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.266</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -16313,9 +16313,23 @@ function clasificarItem(descripcion){
 // Producción > 3. Productos) por NOMBRE normalizado (el remito de Flexxus no trae el mismo código
 // que usa el maestro de productos) -- mismo criterio que mpPorProducto usa en Planificación. Se
 // reusa tanto para "Uds/band." (v4.261) como para la categoría nueva por producto (v4.262).
+// v4.266: "me dice que no tengo la categoria asignada y ya lo hice en configuracion" -- el Maestro
+// de Productos tiene productos DUPLICADOS para una misma variedad (ya documentado en [[papo]]
+// v4.250: una fila "pelada" tipo "EMPANADA DE JAMÓN Y QUESO CRUDA TAPA HOJALDRE 15" y otra con el
+// sufijo de venta "... CAJA POR 48U.", cada una con su propio id). Antes esto comparaba el nombre
+// del remito (ya limpio de sufijo) SOLO contra el nombre del producto tal cual, así que si Juan
+// Pablo cargaba la categoría en la fila "CAJA POR 48U." pero el remito matcheaba contra la fila
+// pelada (que suele ser la única con área asignada, la "real"), quedaba "Sin categoría asignada"
+// aunque él sí la hubiera cargado -- en productos sin fila pelada (ej. Napolitana criolla) ni
+// siquiera encontraba nada. Ahora se limpia el sufijo de AMBOS lados antes de comparar (mismo
+// `remNombreLimpio` que ya se usa para mostrar), así las dos filas duplicadas matchean igual; y si
+// hay más de una, se prioriza la que tenga categoria o unidades_bandeja cargados (los dos campos
+// que usa esta función) en vez de la primera que aparezca, para no perder lo que él ya cargó.
 function remProductoPorDescripcion(descripcion){
   const limpio=normTxt(remNombreLimpio(descripcion));
-  return (st.Pr||[]).find(x=>normTxt(x.nombre)===limpio)||null;
+  const candidatos=(st.Pr||[]).filter(x=>normTxt(remNombreLimpio(x.nombre))===limpio);
+  if(candidatos.length<=1) return candidatos[0]||null;
+  return candidatos.find(x=>x.categoria||x.unidades_bandeja)||candidatos[0];
 }
 // v4.261: antes esto era un 24 fijo para TODAS las empanadas, pero no todas vienen 24 por bandeja
 // (ej. jamón y queso cruda tapa criolla viene 36 por bandeja, no 24). PAPO ya tiene esta info
@@ -16442,6 +16456,14 @@ function remAliasInfo(codigo){
 // PRODUCTO, campo nuevo productos.categoria) así que el nombre ya no es solo de Remitos. Se le
 // agregaron "Napolitana Clásica"/"Napolitana Especial" a pedido de Juan Pablo (12/10/2026).
 const CATEGORIAS_PRODUCTO_SUGERIDAS=['Clásicas','Especiales','Planetarias','Premium','Deluxe','Burritos Clásicos','Burritos Especiales','Pizzetas Clásicas','Pizzetas Especiales','Pizzetas Premium','Napolitana Clásica','Napolitana Especial','Salsas'];
+// v4.266: "te paso como debe ir el orden en el resumen" -- mandó una foto de su planilla en papel
+// (Cantidades: Clásicas, Especiales, Planetarias, Premium, Deluxe, Burritos Clásicos, Burritos
+// Especiales, Pizzetas Clásicas, Pizzetas Especiales, Pizzetas Premium, Napolitana Clásica,
+// Napolitana Especial, Salsas) -- antes el resumen/listado ordenaba las categorías alfabéticamente,
+// que no coincide con ese orden (ej. alfabético ponía "Burritos Clásicos" antes que "Clásicas").
+// Ahora usa el orden fijo de CATEGORIAS_PRODUCTO_SUGERIDAS, que es exactamente ese orden. Una
+// categoría que no esté en esa lista (p. ej. tipeada a mano, distinta a las sugeridas) se agrega al
+// final, ordenada alfabéticamente entre sí, antes de "Sin categoría asignada" -- para no perderla.
 function remAgruparPorCategoria(items){
   const grupos={};
   (items||[]).forEach(it=>{
@@ -16449,7 +16471,9 @@ function remAgruparPorCategoria(items){
     if(!grupos[cat])grupos[cat]=[];
     grupos[cat].push(it);
   });
-  const nombres=Object.keys(grupos).filter(c=>c!=='Sin categoría asignada').sort((a,b)=>a.localeCompare(b));
+  const conocidas=CATEGORIAS_PRODUCTO_SUGERIDAS.filter(c=>grupos[c]);
+  const otras=Object.keys(grupos).filter(c=>c!=='Sin categoría asignada'&&!CATEGORIAS_PRODUCTO_SUGERIDAS.includes(c)).sort((a,b)=>a.localeCompare(b));
+  const nombres=[...conocidas,...otras];
   if(grupos['Sin categoría asignada'])nombres.push('Sin categoría asignada');
   return nombres.map(categoria=>({categoria,items:grupos[categoria]}));
 }
