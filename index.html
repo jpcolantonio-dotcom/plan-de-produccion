@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.264</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.265</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1565,7 +1565,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1.25rem">
     <button class="proy-tab active" id="remtab-subir" onclick="remIrVista('subir')"><i class="ti ti-upload"></i> Subir remito</button>
     <button class="proy-tab" id="remtab-historial" onclick="remIrVista('historial')"><i class="ti ti-history"></i> Historial</button>
-    <button class="proy-tab" id="remtab-config" onclick="remIrVista('config')"><i class="ti ti-adjustments"></i> Categorías</button>
   </div>
   <div id="rem-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
 </div>
@@ -16328,14 +16327,15 @@ function remUnidadesPorBandeja(descripcion){
   return n>0?n:24;
 }
 // v4.262: "hay que hacer el resumen en base a las categorias que te pase" -- el agrupado por
-// categoría del resumen/impreso ahora prioriza la categoría cargada en el Maestro de Productos
-// (productos.categoria, por NOMBRE) y, si ese producto no tiene categoría cargada ahí, cae al
-// sistema viejo por CÓDIGO (remCategoriaMap/remito_categorias_producto, configurado en la pestaña
-// Categorías de Remitos) para no perder nada de lo que ya tenía clasificado ahí. Si ninguno de los
-// dos tiene nada, "Sin categoría asignada" como siempre.
+// categoría del resumen/impreso sale de la categoría cargada en el Maestro de Productos
+// (productos.categoria, por NOMBRE). v4.265: se sacó el sistema viejo por CÓDIGO
+// (remCategoriaMap/remito_categorias_producto, la pestaña "Categorías" de Remitos) a pedido de Juan
+// Pablo ("borra lo que dice categoria, dejame todo en limpio la base de datos") -- el Maestro de
+// Productos es ahora la ÚNICA fuente. Un producto sin categoría cargada ahí queda "Sin categoría
+// asignada", sin fallback.
 function remCategoriaDeItem(it){
   const p=remProductoPorDescripcion(it.descripcion);
-  return (p&&p.categoria)||remCategoriaMap[it.codigo]||'Sin categoría asignada';
+  return (p&&p.categoria)||'Sin categoría asignada';
 }
 function convertirParaMostrar(unidadesReales,tipo,descripcion){
   if(tipo==='empanada'){
@@ -16442,50 +16442,6 @@ function remAliasInfo(codigo){
 // PRODUCTO, campo nuevo productos.categoria) así que el nombre ya no es solo de Remitos. Se le
 // agregaron "Napolitana Clásica"/"Napolitana Especial" a pedido de Juan Pablo (12/10/2026).
 const CATEGORIAS_PRODUCTO_SUGERIDAS=['Clásicas','Especiales','Planetarias','Premium','Deluxe','Burritos Clásicos','Burritos Especiales','Pizzetas Clásicas','Pizzetas Especiales','Pizzetas Premium','Napolitana Clásica','Napolitana Especial','Salsas'];
-let remCategoriaMap={}; // codigo -> categoria
-let remCatalogoCodigos=[]; // [{codigo,descripcion}] -- todos los códigos vistos hasta ahora
-
-function remBuildCategoriaMap(rows){
-  const map={};
-  (rows||[]).forEach(r=>{if(r.codigo)map[r.codigo]=r.categoria;});
-  return map;
-}
-async function remCargarCategoriaMap(){
-  try{
-    const rows=await get('remito_categorias_producto','select=codigo,categoria');
-    remCategoriaMap=remBuildCategoriaMap(rows);
-  }catch(e){remCategoriaMap={};}
-}
-function remBuildCatalogoCodigos(rowsHistoricos,itemsPreview){
-  const map={};
-  (rowsHistoricos||[]).forEach(r=>{if(r.codigo&&!map[r.codigo])map[r.codigo]=r.descripcion;});
-  (itemsPreview||[]).forEach(it=>{if(it.codigo&&!map[it.codigo])map[it.codigo]=it.descripcion;});
-  return Object.entries(map).map(([codigo,descripcion])=>({codigo,descripcion})).sort((a,b)=>a.codigo.localeCompare(b.codigo));
-}
-async function remCargarCatalogoCodigos(){
-  try{
-    const rows=await get('remito_items','select=codigo,descripcion&order=codigo.asc');
-    remCatalogoCodigos=remBuildCatalogoCodigos(rows,remPendientes.flatMap(d=>d.items||[]));
-  }catch(e){remCatalogoCodigos=[];}
-}
-async function remAsignarCategoria(codigo,categoria){
-  categoria=(categoria||'').trim();
-  try{
-    if(!categoria){
-      const r=await fetch(`${SB}/rest/v1/remito_categorias_producto?codigo=eq.${encodeURIComponent(codigo)}`,{method:'DELETE',headers:H});
-      if(!r.ok)throw new Error('DELETE remito_categorias_producto '+r.status);
-      delete remCategoriaMap[codigo];
-    }else{
-      const r=await fetch(`${SB}/rest/v1/remito_categorias_producto?on_conflict=codigo`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates'},body:JSON.stringify([{codigo,categoria}])});
-      if(!r.ok)throw new Error('UPSERT remito_categorias_producto '+r.status);
-      remCategoriaMap[codigo]=categoria;
-    }
-    remRender();
-  }catch(e){
-    console.error(e);
-    alert('No se pudo guardar la categoría: '+e.message);
-  }
-}
 function remAgruparPorCategoria(items){
   const grupos={};
   (items||[]).forEach(it=>{
@@ -16567,21 +16523,18 @@ let remDetalle=null; // {remito,items} cuando se abre uno del historial
 let remFiltroHist='';
 
 function initRemitos(){
-  Promise.all([remCargarCategoriaMap()]).then(remRender);
   remRender();
 }
 function remIrVista(v){
   remVista=v;
-  ['subir','historial','config'].forEach(x=>document.getElementById('remtab-'+x).classList.toggle('active',x===v));
+  ['subir','historial'].forEach(x=>document.getElementById('remtab-'+x).classList.toggle('active',x===v));
   if(v==='historial'){remDetalle=null;remCargarHistorial();}
-  if(v==='config'){remCargarCatalogoCodigos().then(remRender);remCargarCategoriaMap().then(remRender);}
   remRender();
 }
 function remRender(){
   const cont=document.getElementById('rem-content');
   if(!cont)return;
   if(remVista==='subir')cont.innerHTML=remRenderSubir();
-  else if(remVista==='config')cont.innerHTML=remRenderConfiguracion();
   else if(remDetalle)cont.innerHTML=remRenderDetalle();
   else cont.innerHTML=remRenderHistorial();
 }
@@ -16721,23 +16674,6 @@ function remRenderDetalle(){
   ${remResumenDiferenciasHtml(items)}`;
 }
 
-function remRenderConfiguracion(){
-  if(!remCatalogoCodigos.length)return `<div class="empty"><i class="ti ti-tag" style="font-size:26px;display:block;margin-bottom:6px"></i>Todavía no hay productos para categorizar.<br/>Subí o guardá al menos un remito primero.</div>`;
-  return `
-  <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Asignale una categoría a cada producto para que el remito se divida en secciones (Clásicas, Premium, Burritos, etc). Podés escribir una categoría nueva o elegir una ya usada -- no está limitado a una lista fija.</div>
-  ${remCatalogoCodigos.map(c=>{
-    const info=remAliasInfo(c.codigo);
-    return `
-    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:.5px solid var(--border)">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:600"><span style="font-family:monospace;color:var(--blue)">${remEsc(c.codigo)}</span>${info.alias?(' · '+remEsc(info.alias)):''}</div>
-        <div style="font-size:11px;color:var(--text2)">${remEsc(c.descripcion)}</div>
-      </div>
-      <input type="text" list="rem-categorias-dl" placeholder="Sin categoría" style="width:180px;border:.5px solid var(--border2);border-radius:6px;padding:5px 8px;font-size:12px;background:var(--bg);color:var(--text)" value="${remEsc(remCategoriaMap[c.codigo]||'')}" onchange="remAsignarCategoria('${c.codigo}',this.value)"/>
-    </div>`;
-  }).join('')}
-  <datalist id="rem-categorias-dl">${CATEGORIAS_PRODUCTO_SUGERIDAS.map(c=>`<option value="${remEsc(c)}"></option>`).join('')}</datalist>`;
-}
 
 // ---------- Acciones ----------
 async function remManejarArchivoSeleccionado(file){
