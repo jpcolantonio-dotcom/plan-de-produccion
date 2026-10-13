@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.266</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.268</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -5870,6 +5870,16 @@ function showRecTab(t){
 // por nombre exacto (case/espacios insensible), igual que el resto de Recetas (rRecDet) ya hace para
 // mostrar el código de MP de cada ingrediente.
 let rbmpSel=null;
+// v4.268: "necesito que aca se puedar ordendar de mayor a menor, cantid. por tanda, y por
+// alfabatecamente" -- encabezados de la tabla de resultados clickeables para ordenar: "Producto"
+// (alfabético) y "Cant. x tanda" (numérico). Un click alterna asc/desc; el de cantidad arranca en
+// "mayor a menor" por ser lo que más pidió.
+let rbmpOrdenCol='producto', rbmpOrdenDir=1; // 'producto'|'cantidad', 1=asc, -1=desc
+function rBuscarMPOrdenar(col){
+  if(rbmpOrdenCol===col){rbmpOrdenDir*=-1}
+  else{rbmpOrdenCol=col;rbmpOrdenDir=col==='cantidad'?-1:1}
+  rBuscarMPDetail();
+}
 function rBuscarMPList(){
   const list=document.getElementById('rbmplist');
   if(!list)return;
@@ -5911,7 +5921,11 @@ function rBuscarMPDetail(){
       }
     });
   });
-  usos.sort((a,b)=>a.recKey.localeCompare(b.recKey,'es'));
+  if(rbmpOrdenCol==='cantidad'){
+    usos.sort((a,b)=>rbmpOrdenDir*((a.cantidad||0)-(b.cantidad||0)));
+  }else{
+    usos.sort((a,b)=>rbmpOrdenDir*a.recKey.localeCompare(b.recKey,'es'));
+  }
   let h=`<div style="font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px;margin-bottom:1rem">
     <i class="ti ti-flask" style="color:var(--purple)"></i>${mp.nombre}${mp.codigo?`<span style="font-size:11px;font-weight:400;color:var(--text2);font-family:monospace;background:var(--bg2);border-radius:4px;padding:2px 7px">${mp.codigo}</span>`:''}
   </div>`;
@@ -5920,11 +5934,13 @@ function rBuscarMPDetail(){
     wrap.innerHTML=h;
     return;
   }
+  const flechaProd=rbmpOrdenCol==='producto'?`<i class="ti ti-arrow-${rbmpOrdenDir===1?'up':'down'}" style="font-size:12px"></i>`:'';
+  const flechaCant=rbmpOrdenCol==='cantidad'?`<i class="ti ti-arrow-${rbmpOrdenDir===1?'up':'down'}" style="font-size:12px"></i>`:'';
   h+=`<table class="itbl"><thead><tr>
-    <th>Producto</th>
+    <th style="cursor:pointer;user-select:none" onclick="rBuscarMPOrdenar('producto')" title="Ordenar alfabéticamente">Producto ${flechaProd}</th>
     <th style="width:120px">Empresa</th>
     <th style="width:120px">Área</th>
-    <th style="width:150px">Cant. x tanda</th>
+    <th style="width:150px;text-align:right;cursor:pointer;user-select:none" onclick="rBuscarMPOrdenar('cantidad')" title="Ordenar por cantidad">Cant. x tanda ${flechaCant}</th>
   </tr></thead><tbody>`;
   usos.forEach(u=>{
     const pr=st.Pr.find(x=>x.nombre===u.recKey);
@@ -16477,12 +16493,28 @@ function remAgruparPorCategoria(items){
   if(grupos['Sin categoría asignada'])nombres.push('Sin categoría asignada');
   return nombres.map(categoria=>({categoria,items:grupos[categoria]}));
 }
-// resumen por categoría: suma bandejas (empanadas) y unidades sueltas (el resto) de cada grupo
+// v4.267: "donde dice bandejas, sean en docenas ... eso si solo acepta numero entero, y si quedan
+// algunas unidades lo pones al lado en unidades sueltas" -- la columna "Bandejas" del resumen sumaba
+// la cantidad YA convertida a bandeja de cada ítem (cantidad_mostrada), pero el tamaño de bandeja es
+// por PRODUCTO (24, 36, etc. -- productos.unidades_bandeja), así que sumar esas cantidades no da un
+// número con sentido físico (serían bandejas de distinto tamaño mezcladas). Una docena en cambio es
+// siempre 12 unidades, sea cual sea el producto, así que ahora se vuelve a las unidades REALES de
+// cada ítem "empanada" (it.unidades_reales, antes de convertir a bandeja) y se convierten a docenas
+// ENTERAS (Math.floor) -- lo que sobra (siempre < 12) se suma a "unidades sueltas" junto con los
+// ítems que ya se mostraban en unidades (burritos, pizzetas, etc.), sin tocar esos. Sign-safe para
+// notas de crédito (unidades_reales negativas), mismo criterio que convertirParaMostrar.
 function remResumenPorCategoria(items){
   return remAgruparPorCategoria(items).map(g=>{
-    let bandejas=0,unidades=0;
-    g.items.forEach(it=>{if(it.unidad_mostrada==='bandejas')bandejas+=it.cantidad_mostrada;else unidades+=it.cantidad_mostrada;});
-    return{categoria:g.categoria,bandejas,unidades};
+    let unidadesEmpanadas=0,unidades=0;
+    g.items.forEach(it=>{
+      if(it.unidad_mostrada==='bandejas')unidadesEmpanadas+=(it.unidades_reales!=null?it.unidades_reales:0);
+      else unidades+=it.cantidad_mostrada;
+    });
+    const signo=unidadesEmpanadas<0?-1:1;
+    const abs=Math.abs(unidadesEmpanadas);
+    const docenas=signo*Math.floor(abs/12);
+    const sueltasEmpanadas=signo*Math.round((abs-Math.floor(abs/12)*12)*100)/100;
+    return{categoria:g.categoria,docenas,unidades:Math.round((unidades+sueltasEmpanadas)*100)/100};
   });
 }
 // v4.264: "tenemos dos partes del remito, una que seria la parte de cantidad y descripcion y otra
@@ -16863,7 +16895,7 @@ function remImprimir(remito,items){
         }).join('')}
       </table>
     </div>`).join('');
-  const resumenFilas=resumen.map(r=>`<tr><td>${remEsc(r.categoria)}</td><td class="num">${r.bandejas?r.bandejas.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}):'0'}</td><td class="num">${r.unidades||0}</td></tr>`).join('');
+  const resumenFilas=resumen.map(r=>`<tr><td>${remEsc(r.categoria)}</td><td class="num">${r.docenas||0}</td><td class="num">${r.unidades||0}</td></tr>`).join('');
   const fechaImpresion=new Date().toLocaleString('es-AR');
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
   <title>${esNC?'Nota de crédito':'Remito'} ${remEsc(remito.numero||'')}</title>
@@ -16899,7 +16931,7 @@ function remImprimir(remito,items){
     <div class="catgrid">${bloquesHtml}</div>
     <div class="resumen">
       <h2>Resumen por categoría</h2>
-      <table><tr><th>Categoría</th><th class="num">Bandejas</th><th class="num">Unidades sueltas</th></tr>${resumenFilas}</table>
+      <table><tr><th>Categoría</th><th class="num">Docenas</th><th class="num">Unidades sueltas</th></tr>${resumenFilas}</table>
     </div>
     <div class="firma"><div>Recibió</div></div>
   <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
@@ -16930,7 +16962,7 @@ function remImprimirCombinado(guardados){
         }).join('')}
       </table>
     </div>`).join('');
-  const resumenFilas=resumen.map(r=>`<tr><td>${remEsc(r.categoria)}</td><td class="num">${r.bandejas?r.bandejas.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2}):'0'}</td><td class="num">${r.unidades||0}</td></tr>`).join('');
+  const resumenFilas=resumen.map(r=>`<tr><td>${remEsc(r.categoria)}</td><td class="num">${r.docenas||0}</td><td class="num">${r.unidades||0}</td></tr>`).join('');
   const fechaImpresion=new Date().toLocaleString('es-AR');
   const primero=guardados[0].remito;
   const numerosHtml=guardados.map(g=>`${remEsc(g.remito.numero||'-')}${g.doc.esNC?' (NC)':''}`).join(', ');
@@ -16969,7 +17001,7 @@ function remImprimirCombinado(guardados){
     <div class="catgrid">${bloquesHtml}</div>
     <div class="resumen">
       <h2>Resumen por categoría</h2>
-      <table><tr><th>Categoría</th><th class="num">Bandejas</th><th class="num">Unidades sueltas</th></tr>${resumenFilas}</table>
+      <table><tr><th>Categoría</th><th class="num">Docenas</th><th class="num">Unidades sueltas</th></tr>${resumenFilas}</table>
     </div>
     <div class="firma"><div>Recibió</div></div>
   <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
