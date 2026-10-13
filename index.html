@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.268</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.269</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -5492,6 +5492,37 @@ function filtrarConsumoStockProceso(){
   });
 }
 
+// v4.269: "es importante desarmar la estructura del producto, es decir una empanada de atun calibre
+// 15 lleva una masa de criolla calibre 15 (lo dice la receta) y un XXX kg de relleno de atún ... ahora
+// cuando hago el calculo de consumo de MP, desarmando el relleno que se necesita y a los componentes
+// de la masa" -- Consumo MP sumaba cada "ingrediente" de la receta tal cual, aunque ese ingrediente
+// fuera en realidad OTRO semielaborado con receta propia (ej. "TAPA CRIOLLA 15" o "RELLENO A" dentro
+// de una empanada, o "Cebolla Cubeteada" dentro de un relleno) -- confirmado en vivo contra la base
+// real que esto pasa en 303 de las 439 recetas cargadas. Ahora, si un ingrediente tiene a su vez su
+// propia receta cargada (existe como key en st.Rec), se sigue bajando recursivamente hasta llegar a
+// las materias primas reales, multiplicando la proporción de cada nivel (misma lógica de tanda que ya
+// usa el resto de la app -- idéntica a la de calcularConsumoMpSemana más abajo, pero sin pararse en un
+// solo nivel). Guard contra referencias circulares (A contiene B, B contiene A) con un set de
+// "visitados" por rama, y un tope de profundidad como respaldo.
+// OJO (aviso para Juan Pablo, no para el código): algunas recetas viejas ya traen los componentes de
+// un semielaborado "desarmados a mano" sueltos, ADEMÁS de la línea resumen del semielaborado -- en
+// esos casos la explosión automática los va a contar DOBLE hasta que se limpie esa receta a mano
+// (ej. "EMPANADA DE ATÚN CRUDA TAPA CRIOLLA 15" todavía tiene esta mezcla al momento de este cambio).
+function explotarIngredientesReceta(recKey,unidad,cantidadPorUnidadFinal,visitados,cb,depth){
+  depth=depth||0;
+  if(depth>15||visitados.has(recKey))return; // corta ciclos y cadenas anormalmente largas
+  const subRec=st.Rec[recKey];
+  if(subRec&&subRec.length){
+    const nuevosVisitados=new Set(visitados);nuevosVisitados.add(recKey);
+    const subTanda=(st.RecTanda&&st.RecTanda[recKey])||1;
+    subRec.forEach(si=>{
+      const cantXUnidadSub=subTanda>0?si.cantidad/subTanda:si.cantidad;
+      explotarIngredientesReceta(si.ingrediente,si.unidad,cantidadPorUnidadFinal*cantXUnidadSub,nuevosVisitados,cb,depth+1);
+    });
+  }else{
+    cb(recKey,unidad,cantidadPorUnidadFinal); // hoja: materia prima real (sin receta propia cargada)
+  }
+}
 async function renderConsumoMP(){
   const ef=document.getElementById('rcon-esel').value;
   const desde=document.getElementById('rcon-desde').value;
@@ -5522,14 +5553,16 @@ async function renderConsumoMP(){
       if(!total)return;
       const tanda=(st.RecTanda&&st.RecTanda[r.producto])||1;
       (st.Rec[r.producto]||[]).forEach(ing=>{
-        const key=ing.ingrediente+'||'+ing.unidad;
-        if(!cm[key])cm[key]={ingrediente:ing.ingrediente,unidad:ing.unidad,total:0,det:{}};
         // cantidad x unidad = cantidad x tanda / unidades x tanda
         const cantXUnidad=tanda>0?ing.cantidad/tanda:ing.cantidad;
-        const c=cantXUnidad*total;
-        cm[key].total=fn(cm[key].total+c);
-        if(!cm[key].det[r.producto])cm[key].det[r.producto]=0;
-        cm[key].det[r.producto]=fn(cm[key].det[r.producto]+c);
+        explotarIngredientesReceta(ing.ingrediente,ing.unidad,cantXUnidad,new Set([r.producto]),(nombreFinal,unidadFinal,cantPorUnidadFinal)=>{
+          const key=nombreFinal+'||'+unidadFinal;
+          if(!cm[key])cm[key]={ingrediente:nombreFinal,unidad:unidadFinal,total:0,det:{}};
+          const c=cantPorUnidadFinal*total;
+          cm[key].total=fn(cm[key].total+c);
+          if(!cm[key].det[r.producto])cm[key].det[r.producto]=0;
+          cm[key].det[r.producto]=fn(cm[key].det[r.producto]+c);
+        });
       });
     });
   });
