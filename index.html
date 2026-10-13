@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.269</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.271</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -430,6 +430,11 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <!-- Sub-tab Consumo MP -->
   <div id="rsub-consumo" style="display:none">
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--text2)">Fuente:</label>
+      <select id="rcon-fuente" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)">
+        <option value="plan">Plan de Producción</option>
+        <option value="real">Producción Real</option>
+      </select>
       <label style="font-size:13px;color:var(--text2)">Empresa:</label>
       <select id="rcon-esel" style="padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"><option value="all">Todas</option></select>
       <label style="font-size:13px;color:var(--text2)">Desde:</label>
@@ -812,7 +817,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab" id="stab-flexxus" onclick="showStockSubTab('flexxus')"><i class="ti ti-file-spreadsheet"></i> Conteo stock Flexxus</button>
     <button class="proy-tab" id="stab-hist" onclick="showStockSubTab('hist')"><i class="ti ti-history"></i> Historial</button>
     <button class="proy-tab" id="stab-config" onclick="showStockSubTab('config')"><i class="ti ti-settings"></i> Configuración stock</button>
-    <button class="proy-tab" id="stab-consumomp" onclick="showStockSubTab('consumomp')"><i class="ti ti-calculator"></i> Consumo MP según stock</button>
     <button class="proy-tab" id="stab-objetivo" onclick="showStockSubTab('objetivo')"><i class="ti ti-target-arrow"></i> Objetivo de stock</button>
   </div>
   <!-- CONTEO DE STOCK MANUAL: el flujo de siempre (completar a mano por depósito) + la hoja de
@@ -971,36 +975,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <button class="btn btn-primary" onclick="guardarCajas()"><i class="ti ti-device-floppy"></i> Guardar cajas</button>
       </div>
       <div id="stock-cajas-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> Cajas guardado.</div>
-    </div>
-  </div>
-
-  <!-- CONSUMO MP SEGÚN STOCK: elegís qué Productos en Proceso (rellenos y demás) tomar del conteo
-       de una fecha, y calcula cuánta materia prima virgen se consumió/está atada en esos valores. -->
-  <div id="stock-sub-consumomp" style="display:none">
-    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Elegí la fecha y tildá los Productos en Proceso y/o Terminados que quieras incluir. Para cada uno toma el stock cargado en Stock (conteo manual o Flexxus) y lo traduce a materia prima usando su receta.</div>
-    <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-      <label style="font-size:13px;color:var(--text2)">Fecha:</label>
-      <input type="date" id="scmp-fecha" onchange="loadConsumoMPStock()" style="padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius)"/>
-      <button class="btn btn-sm" onclick="loadConsumoMPStock()"><i class="ti ti-refresh"></i> Actualizar</button>
-    </div>
-    <div style="display:grid;grid-template-columns:340px 1fr;gap:1.5rem;align-items:start">
-      <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-          <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px">Productos con stock</div>
-        </div>
-        <div style="display:flex;gap:8px;margin-bottom:8px">
-          <button class="btn btn-xs" onclick="scmpSelAll(true)">Todos</button>
-          <button class="btn btn-xs" onclick="scmpSelAll(false)">Ninguno</button>
-        </div>
-        <div id="scmp-lista" class="rlist"><div class="empty"><i class="ti ti-package-off"></i>Elegí una fecha.</div></div>
-      </div>
-      <div>
-        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
-          <button class="btn btn-primary" onclick="renderConsumoMPStockSel()"><i class="ti ti-calculator"></i> Calcular consumo de los tildados</button>
-          <button class="btn" onclick="exportarMigracionStockExcel()"><i class="ti ti-file-spreadsheet"></i> Exportar Excel (migración)</button>
-        </div>
-        <div id="scmp-content"><div class="empty"><i class="ti ti-package"></i> Tildá uno o más productos y calculá.</div></div>
-      </div>
     </div>
   </div>
 
@@ -5473,11 +5447,11 @@ async function renderConsumoStockProceso(){
 
   if(rawItems.length){
     h+=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin:14px 0 6px">Materias primas</div>`;
-    h+=scmpTablaHtml(rawItems,'Detalle por producto en proceso');
+    h+=consumoStockTablaHtml(rawItems,'Detalle por producto en proceso');
   }
   if(subItems.length){
     h+=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin:14px 0 6px">Sub-productos con stock propio</div>`;
-    h+=scmpTablaSubproductosHtml(subItems);
+    h+=consumoStockTablaSubproductosHtml(subItems);
   }
   el.innerHTML=h;
 }
@@ -5527,6 +5501,12 @@ async function renderConsumoMP(){
   const ef=document.getElementById('rcon-esel').value;
   const desde=document.getElementById('rcon-desde').value;
   const hasta=document.getElementById('rcon-hasta').value;
+  // v4.270: "necesito que el consumo de MP, me deje elegir si es sobre el plan de produccion o sobre
+  // lo real proeducido" -- antes solo usaba r.days (lo planificado). Ahora un selector de "Fuente"
+  // elige entre Plan de Producción (de siempre) y Producción Real (st.R, cargado/editado en la
+  // sub-pestaña "Prod. Real", mismo criterio de lectura -- realArr -- que ya usa esa pantalla para
+  // combinar clave por ID/nombre/índice legacy).
+  const fuente=(document.getElementById('rcon-fuente')?.value)||'plan';
   const el=document.getElementById('rcon-content');
   if(!desde||!hasta){el.innerHTML='<div class="alert alert-info">Seleccioná el rango de fechas.</div>';return}
   if(desde>hasta){el.innerHTML='<div class="alert alert-info">La fecha desde debe ser anterior a hasta.</div>';return}
@@ -5535,20 +5515,22 @@ async function renderConsumoMP(){
   // Get all semanas in range
   const sems=[];let cur=wk(new Date(desde+'T00:00:00'));const wHasta=wk(new Date(hasta+'T00:00:00'));
   while(cur<=wHasta){sems.push(cur);cur=addW(cur,1);}
-  await Promise.all(sems.map(w=>lp(w)));
+  await Promise.all(sems.map(w=>fuente==='real'?Promise.all([lp(w),lr(w)]):lp(w)));
 
-  // For each semana, get days in range and sum plan
+  // For each semana, get days in range and sum plan o real según la fuente elegida
   const cm={};
   sems.forEach(semKey=>{
     let plan=st.P[semKey]||[];
     if(ef!=='all')plan=plan.filter(r=>r.empresa_id===ef);
+    const real=fuente==='real'?(st.R[semKey]||{}):null;
     plan.forEach(r=>{
+      const realDias=real?realArr(real,r):null;
       // Calculate which days of this semana fall within desde-hasta
       let total=0;
       for(let di=0;di<7;di++){
         const d=new Date(semKey+'T00:00:00');d.setDate(d.getDate()+di);
         const dStr=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-        if(dStr>=desde&&dStr<=hasta)total+=(r.days&&r.days[di])||0;
+        if(dStr>=desde&&dStr<=hasta)total+=realDias?(realDias[di]||0):((r.days&&r.days[di])||0);
       }
       if(!total)return;
       const tanda=(st.RecTanda&&st.RecTanda[r.producto])||1;
@@ -5569,7 +5551,7 @@ async function renderConsumoMP(){
 
   const items=Object.values(cm).sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente));
   if(!items.length){
-    el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i> Sin consumo para ese rango. Verificá que haya plan y recetas cargadas.</div>';
+    el.innerHTML=`<div class="empty"><i class="ti ti-package-off"></i> Sin consumo para ese rango. Verificá que haya ${fuente==='real'?'producción real cargada':'plan'} y recetas cargadas.</div>`;
     return;
   }
 
@@ -5577,6 +5559,7 @@ async function renderConsumoMP(){
   const fHasta=new Date(hasta+'T00:00:00').toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
 
   let h=`<div class="metric-grid">
+    <div class="metric"><div class="metric-label">Fuente</div><div style="font-size:13px;font-weight:600;margin-top:2px">${fuente==='real'?'Producción Real':'Plan de Producción'}</div></div>
     <div class="metric"><div class="metric-label">Período</div><div style="font-size:13px;font-weight:600;margin-top:2px">${fDesde} → ${fHasta}</div></div>
     <div class="metric"><div class="metric-label">Semanas</div><div class="metric-val">${sems.length}</div></div>
     <div class="metric"><div class="metric-label">Ingredientes</div><div class="metric-val">${items.length}</div></div>
@@ -9722,7 +9705,7 @@ async function buscarCongHistorial(){
 // "Configuración stock" (Stock seguridad + Mix ventas + Depositos + Cantidad de producto por caja,
 // cosas que se configuran una vez y no todos los días).
 function showStockSubTab(t){
-  ['conteomanual','flexxus','hist','config','consumomp','objetivo'].forEach(id=>{
+  ['conteomanual','flexxus','hist','config','objetivo'].forEach(id=>{
     document.getElementById('stock-sub-'+id).style.display=id===t?'block':'none';
     document.getElementById('stab-'+id).classList.toggle('active',id===t);
   });
@@ -9733,11 +9716,6 @@ function showStockSubTab(t){
     loadFlexxusStock();
   }
   if(t==='config')showConfigStockTab('seg');
-  if(t==='consumomp'){
-    const fEl=document.getElementById('scmp-fecha');
-    if(!fEl.value)fEl.value=hoyLocal();
-    loadConsumoMPStock();
-  }
   if(t==='objetivo')initObjetivoStock();
 }
 
@@ -9866,77 +9844,7 @@ function imprimirDeposito(depositoId){
   if(!w)alert('Habilitá popups para este sitio para imprimir.');
 }
 
-// CONSUMO MP SEGÚN STOCK (Stock > Consumo MP según stock): a diferencia de "MP en Stock de Proceso"
-// en Recetas (que suma TODOS los Productos en Proceso con stock automáticamente), acá el usuario
-// tilda a mano cuáles quiere incluir antes de calcular — útil para mirar el consumo de un
-// subconjunto puntual (ej. sólo los rellenos de una línea) en vez de todo junto.
-let scmpSelected=new Set(); // mp_id de items tildados (proceso y/o terminado)
-let scmpStockPorMp=new Map(); // mp_id -> stock, para la fecha cargada
-let scmpItemList=[]; // filas de mpData (tipo=proceso o terminado) con stock>0 para la fecha cargada
-let scmpLastRaw=[]; // último cálculo: materias primas puras (para exportar a Excel)
-let scmpLastSub=[]; // último cálculo: sub-productos con stock propio (para exportar a Excel)
-
-async function loadConsumoMPStock(){
-  const fecha=document.getElementById('scmp-fecha').value||hoyLocal();
-  const listEl=document.getElementById('scmp-lista');
-  listEl.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando...</div>';
-  let conteo=[];
-  try{ conteo=await get('mp_conteo',`fecha=eq.${fecha}`); }catch{conteo=[]}
-  scmpStockPorMp=new Map();
-  conteo.forEach(c=>{ if(c.stock>0)scmpStockPorMp.set(c.mp_id,(scmpStockPorMp.get(c.mp_id)||0)+c.stock); }); // suma entre depósitos si el mismo producto tiene más de uno
-  scmpItemList=mpData.filter(m=>(tipoMpDe(m)==='proceso'||(tipoMpDe(m)==='terminado'&&m.unidad_tipo!=='unidad'))&&scmpStockPorMp.has(m.id))
-    .sort((a,b)=>{ const ta=tipoMpDe(a),tb=tipoMpDe(b); if(ta!==tb)return ta==='proceso'?-1:1; return a.nombre.localeCompare(b.nombre,'es'); });
-
-  if(!scmpItemList.length){
-    listEl.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin stock de Producto en Proceso ni Producto Terminado cargado para esta fecha. Cargalo primero en Conteo de stock.</div>';
-    scmpSelected=new Set();
-    document.getElementById('scmp-content').innerHTML='<div class="empty"><i class="ti ti-package"></i> Tildá uno o más productos y calculá.</div>';
-    return;
-  }
-  // Primera carga (o si quedó vacía): tildar todos por default
-  if(scmpSelected.size===0)scmpItemList.forEach(m=>scmpSelected.add(m.id));
-  else scmpSelected=new Set([...scmpSelected].filter(id=>scmpStockPorMp.has(id))); // sacar los que ya no tienen stock hoy
-  renderScmpLista();
-}
-
-function renderScmpLista(){
-  const listEl=document.getElementById('scmp-lista');
-  let h='';
-  let lastTipo=null;
-  scmpItemList.forEach(m=>{
-    const tipo=tipoMpDe(m);
-    if(tipo!==lastTipo){
-      h+=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin:${lastTipo?'12px':'0'} 0 6px">${tipo==='proceso'?'Productos en proceso':'Productos terminados'}</div>`;
-      lastTipo=tipo;
-    }
-    const checked=scmpSelected.has(m.id);
-    const recKey=recKeyForMp(m);
-    const sinReceta=!recKey||!(st.Rec[recKey]||[]).length;
-    h+=`<label class="rrow" style="cursor:pointer;gap:8px">
-      <input type="checkbox" ${checked?'checked':''} onchange="scmpToggle('${m.id}',this.checked)" style="flex-shrink:0"/>
-      <div style="min-width:0;flex:1">
-        <div style="font-size:13px;font-weight:500;display:flex;align-items:center;gap:6px;white-space:nowrap">
-          <span style="font-size:10px;color:var(--text2);font-family:monospace;flex-shrink:0">${m.codigo||''}</span>
-          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis" title="${m.nombre}">${m.nombre}</span>
-          ${sinReceta?'<span class="badge" style="font-size:10px;padding:1px 6px;flex-shrink:0;background:var(--bg3);color:var(--text2)" title="Sin receta cargada, no entra en el cálculo">sin receta</span>':''}
-        </div>
-        <div style="font-size:12px;color:var(--text2)">Stock: ${scmpStockPorMp.get(m.id)} ${m.unidad||''}</div>
-      </div>
-    </label>`;
-  });
-  listEl.innerHTML=h;
-}
-
-function scmpToggle(mpId,checked){
-  if(checked)scmpSelected.add(mpId);else scmpSelected.delete(mpId);
-}
-function scmpSelAll(all){
-  if(all)scmpItemList.forEach(m=>scmpSelected.add(m.id));
-  else scmpSelected=new Set();
-  renderScmpLista();
-}
-
-function scmpTablaHtml(items,detLabel){
+function consumoStockTablaHtml(items,detLabel){
   let h=`<div class="grid-card"><table class="stock-tbl"><thead><tr>
     <th>#</th><th>Ingrediente</th>
     <th style="text-align:right">Consumido en recetas</th>
@@ -9962,7 +9870,7 @@ function scmpTablaHtml(items,detLabel){
   return h;
 }
 
-function scmpTablaSubproductosHtml(items){
+function consumoStockTablaSubproductosHtml(items){
   let h=`<div class="grid-card"><table class="stock-tbl"><thead><tr>
     <th>#</th><th>Sub-producto</th>
     <th style="text-align:right">Consumido en recetas</th>
@@ -9988,148 +9896,6 @@ function scmpTablaSubproductosHtml(items){
   });
   h+=`</tbody></table></div>`;
   return h;
-}
-
-function renderConsumoMPStockSel(){
-  const el=document.getElementById('scmp-content');
-  const seleccionados=scmpItemList.filter(m=>scmpSelected.has(m.id));
-  if(!seleccionados.length){
-    el.innerHTML='<div class="empty"><i class="ti ti-package"></i> Tildá al menos un producto.</div>';
-    return;
-  }
-  const cm={};
-  const sinReceta=[];
-  const conReceta=[];
-  seleccionados.forEach(m=>{
-    const stock=scmpStockPorMp.get(m.id);
-    const recKey=recKeyForMp(m);
-    const ings=recKey?(st.Rec[recKey]||[]):[];
-    if(!ings.length){sinReceta.push(m.nombre);return}
-    conReceta.push(m.nombre);
-    const tanda=(recKey&&st.RecTanda&&st.RecTanda[recKey])||1;
-    ings.forEach(ing=>{
-      const key=ing.ingrediente+'||'+ing.unidad;
-      if(!cm[key])cm[key]={ingrediente:ing.ingrediente,unidad:ing.unidad,total:0,det:{}};
-      const cantXUnidad=tanda>0?ing.cantidad/tanda:ing.cantidad;
-      const c=cantXUnidad*stock;
-      cm[key].total=fn(cm[key].total+c);
-      if(!cm[key].det[m.nombre])cm[key].det[m.nombre]=0;
-      cm[key].det[m.nombre]=fn(cm[key].det[m.nombre]+c);
-    });
-  });
-  const allItems=Object.values(cm).sort((a,b)=>a.ingrediente.localeCompare(b.ingrediente,'es'));
-  if(!allItems.length){
-    el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i> Ninguno de los productos tildados tiene receta cargada, así que no se pudo calcular nada.</div>';
-    return;
-  }
-  // Separar: ingredientes que son a su vez un producto con stock propio cargado
-  // (ej: "Salsa blanca" que está en la cámara Y también entra en la receta de RELLENO V)
-  // de las materias primas puras, para no mezclar ambas cosas en un mismo total.
-  const rawItems=[];
-  const subItems=[];
-  allItems.forEach(item=>{
-    const matchMp=mpData.find(m=>normTxt(m.nombre)===normTxt(item.ingrediente));
-    if(matchMp&&scmpStockPorMp.has(matchMp.id)){
-      item.stockPropio=scmpStockPorMp.get(matchMp.id);
-      subItems.push(item);
-    }else{
-      rawItems.push(item);
-    }
-  });
-  let h=`<div class="metric-grid">
-    <div class="metric"><div class="metric-label">Productos tildados con receta</div><div class="metric-val">${conReceta.length}</div></div>
-    <div class="metric"><div class="metric-label">Materias primas</div><div class="metric-val">${rawItems.length}</div></div>
-    <div class="metric"><div class="metric-label">Sub-productos con stock propio</div><div class="metric-val">${subItems.length}</div></div>
-  </div>`;
-  if(sinReceta.length){
-    h+=`<div class="alert alert-info" style="margin:10px 0"><i class="ti ti-alert-circle"></i> ${sinReceta.length} de los tildados no tiene receta cargada, se ignoraron: <b>${sinReceta.join(', ')}</b>.</div>`;
-  }
-  if(subItems.length){
-    h+=`<div class="alert alert-info" style="margin:10px 0"><i class="ti ti-info-circle"></i> ${subItems.length} ingrediente(s) también tienen su propio stock cargado aparte (ej. en cámara). Se separaron abajo para no mezclarlos con las materias primas puras: la columna "Consumido en recetas" es lo que está atado dentro de los productos tildados, y "Stock propio (aparte)" es lo que tenés cargado directamente para ese ítem.</div>`;
-  }
-  if(rawItems.length){
-    h+=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin:14px 0 6px">Materias primas</div>`;
-    h+=scmpTablaHtml(rawItems,'Detalle por producto');
-  }
-  if(subItems.length){
-    h+=`<div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.6px;margin:14px 0 6px">Sub-productos con stock propio</div>`;
-    h+=scmpTablaSubproductosHtml(subItems);
-  }
-  el.innerHTML=h;
-  scmpLastRaw=rawItems;
-  scmpLastSub=subItems;
-}
-
-// Arma el excel de migración combinando TODAS las Materias Primas (tipo='mp', con su stock
-// propio cargado en Conteo de stock) con lo calculado antes en pantalla (consumo dentro de las
-// recetas tildadas). Por cada fila: columna A = código, columna B = nombre del artículo,
-// columna J = cantidad total. Para una MP que además es ingrediente de alguna receta tildada,
-// la cantidad es su stock propio + lo consumido en esa(s) receta(s), sumados en un solo número
-// (para no tener que exportar y sumar a mano dos veces la misma materia prima). El resto de las
-// Materias Primas con stock propio pero que no entran en ninguna receta tildada se agregan tal
-// cual, con su stock solo. Mantiene el resto de las columnas del formato de migración vacías.
-async function exportarMigracionStockExcel(){
-  if(!scmpLastRaw.length&&!scmpLastSub.length){alert('Primero calculá el consumo de los tildados (botón "Calcular consumo de los tildados").');return}
-  if(!window.XLSX){
-    await new Promise((res,rej)=>{
-      const s=document.createElement('script');
-      s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-      s.onload=res;s.onerror=rej;document.head.appendChild(s);
-    });
-  }
-  const fecha=document.getElementById('scmp-fecha').value||hoyLocal();
-  let conteo=[];
-  try{ conteo=await get('mp_conteo',`fecha=eq.${fecha}`); }catch{conteo=[]}
-  const stockPorMp=new Map();
-  conteo.forEach(c=>{ if(c.stock>0)stockPorMp.set(c.mp_id,(stockPorMp.get(c.mp_id)||0)+c.stock); }); // suma entre depósitos si el mismo producto tiene más de uno
-
-  const filas=[];
-  const usadosMpIds=new Set(); // para no duplicar estas MP en el paso de "el resto de las MP" de abajo
-  scmpLastRaw.forEach(item=>{
-    const m=mpData.find(x=>normTxt(x.nombre)===normTxt(item.ingrediente));
-    if(m)usadosMpIds.add(m.id);
-    const stockPropio=m&&stockPorMp.has(m.id)?stockPorMp.get(m.id):0;
-    filas.push({codigo:m?(m.codigo||''):'', nombre:m?m.nombre:item.ingrediente, cantidad:fn(item.total+stockPropio)});
-  });
-  scmpLastSub.forEach(item=>{
-    const m=mpData.find(x=>normTxt(x.nombre)===normTxt(item.ingrediente));
-    if(m)usadosMpIds.add(m.id);
-    filas.push({codigo:m?(m.codigo||''):'', nombre:m?m.nombre:item.ingrediente, cantidad:fn(item.total+item.stockPropio)});
-  });
-  // El resto de las Materias Primas con stock propio cargado que no son ingrediente de ninguna
-  // receta tildada, para que la migración de MP salga completa y no solo la parte usada arriba.
-  mpData.filter(m=>tipoMpDe(m)==='mp'&&m.codigo&&!usadosMpIds.has(m.id)&&stockPorMp.has(m.id))
-    .forEach(m=>{
-      filas.push({codigo:m.codigo||'', nombre:m.nombre, cantidad:stockPorMp.get(m.id)});
-    });
-
-  // Un mismo código puede aparecer más de una vez en "filas" (ej. el ingrediente está escrito
-  // con distinta mayúscula/minúscula en dos recetas distintas: "Sal Fina" en una y "SAL FINA"
-  // en otra, cada una arma su propia fila más arriba). Se agrupan por código (o por nombre
-  // normalizado cuando no hay código) dejando una sola fila con la cantidad sumada.
-  const porClave={};
-  const ordenClaves=[];
-  filas.forEach(f=>{
-    const clave=f.codigo?('c:'+f.codigo):('n:'+normTxt(f.nombre));
-    if(!porClave[clave]){porClave[clave]={codigo:f.codigo,nombre:f.nombre,cantidad:0};ordenClaves.push(clave)}
-    porClave[clave].cantidad=fn(porClave[clave].cantidad+f.cantidad);
-  });
-  const filasFinal=ordenClaves.map(k=>porClave[k]);
-
-  const headers=['Codigo Articulo','Lote','Codigo Deposito','Deposito','Stock','Stock Minimo','Stock Optimo','Stock Maximo','Despacho','Stock Inicial','Pais Origen','Aduana'];
-  const aoa=[headers];
-  filasFinal.forEach(f=>{
-    const row=new Array(headers.length).fill('');
-    row[0]=f.codigo;   // columna A: código del MP
-    row[1]=f.nombre;   // columna B: nombre del artículo
-    row[9]=f.cantidad; // columna J: cantidad (Stock Inicial)
-    aoa.push(row);
-  });
-  const ws=window.XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:14},{wch:38},{wch:14},{wch:14},{wch:10},{wch:12},{wch:12},{wch:12},{wch:10},{wch:12},{wch:12},{wch:10}];
-  const wb=window.XLSX.utils.book_new();
-  window.XLSX.utils.book_append_sheet(wb,ws,'Sheet1');
-  window.XLSX.writeFile(wb,`migracion_stock_${fecha}.xlsx`);
 }
 
 // Mismo formato de migración (A=código, B=nombre, J=Stock Inicial) pero para el stock de
