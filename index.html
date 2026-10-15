@@ -1347,7 +1347,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       </div>
     </div>
 
-    <div class="alert alert-info" style="margin-bottom:10px"><i class="ti ti-info-circle"></i> La columna "Tipo" clasifica cada fila: <b>MP</b> es materia prima real (aparece en Stock &gt; Materias Primas para el conteo). <b>P. Terminado</b>/<b>P. Proceso</b> son en realidad productos que se colaron acá (por ejemplo al importar el CSV) — vinculalos desde Configuración &gt; Producción. <b>Insumos</b> es para lo que no es materia prima de receta (packaging, limpieza, etc.). Ninguna de estas tres últimas se cuenta como MP en el conteo de Stock.</div>
+    <div class="alert alert-info" style="margin-bottom:10px"><i class="ti ti-info-circle"></i> La columna "Tipo" clasifica cada fila: <b>MP</b> es materia prima real (aparece en Stock &gt; Materias Primas para el conteo). <b>P. Terminado</b>/<b>P. Proceso</b> son en realidad productos que se colaron acá (por ejemplo al importar el CSV) — vinculalos desde Configuración &gt; Producción. <b>Insumos</b> es para lo que no es materia prima de receta (packaging, limpieza, etc.). Ninguna de estas tres últimas se cuenta como MP en el conteo de Stock. La columna "Stock mín." es el piso de stock que debería haber de esa materia prima (en su unidad) — por ahora solo se carga acá; más adelante se va a usar para avisar cuando el stock teórico de Flexxus caiga por debajo.</div>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
       <input type="text" id="mp-list-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="filtrarMPList()"
         style="flex:1;min-width:200px;max-width:320px;padding:7px 12px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
@@ -5589,7 +5589,7 @@ let mpSort={field:'nombre',dir:'asc'}; // orden actual de la tabla Maestro > Con
 // Anchos de columna de la tabla de Configuración > ID / Descripción / Depósito, ajustables a mano
 // arrastrando el borde de cada columna (mpColResizeStart) -- se guardan acá (no en mpData) para que
 // sobrevivan a los re-renders de la tabla (que pasan seguido, en cada edición de una fila).
-let mpColWidths={codigo:110,nombre:260,unidad:100,tipo:120,depositos:190,alias:150};
+let mpColWidths={codigo:110,nombre:260,unidad:100,tipo:120,depositos:190,alias:150,stock_minimo:110};
 function mpColResizeStart(e,col){
   e.preventDefault();e.stopPropagation();
   const startX=e.clientX;
@@ -6002,11 +6002,13 @@ async function renderMPList(){
       <col id="mpcol-tipo" style="width:${mpColWidths.tipo}px">
       <col id="mpcol-depositos" style="width:${mpColWidths.depositos}px">
       <col id="mpcol-alias" style="width:${mpColWidths.alias}px">
+      <col id="mpcol-stock_minimo" style="width:${mpColWidths.stock_minimo}px">
       <col style="width:60px">
     </colgroup>
     <thead><tr><th style="width:34px"></th>`
     +th('codigo','Código','codigo')+th('nombre','Nombre','nombre')+th('unidad','Unidad','unidad')
     +th('tipo','Tipo','tipo')+thPlain('Depósitos','depositos')+th('alias','Alias','alias')
+    +th('stock_minimo','Stock mín.','stock_minimo')
     +'<th style="width:60px"></th></tr></thead><tbody>';
   mpOrdenados().forEach(mp=>{
     const sug=sugerenciaMp(mp);
@@ -6035,6 +6037,9 @@ async function renderMPList(){
         onchange="updateMP('${mp.id}','alias',this.value)"/>
         <button type="button" class="btn btn-xs" onclick="aliasCopiarNombre('${mp.id}')" title="Copiar el nombre real del producto como alias"><i class="ti ti-copy"></i></button>
       </div></td>
+      <td><input type="number" min="0" step="any" value="${mp.stock_minimo==null?'':mp.stock_minimo}" placeholder="—" title="Stock mínimo de ${mp.unidad||'referencia'} -- para la futura alerta contra el stock teórico de Flexxus"
+        style="width:100%;padding:4px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"
+        onchange="updateMP('${mp.id}','stock_minimo',this.value)"/></td>
       <td style="text-align:center"><button class="btn btn-xs btn-danger" onclick="deleteMP('${mp.id}','${mp.nombre.replace(/'/g,"\'")}')"><i class="ti ti-trash"></i></button></td>
     </tr>`;
   });
@@ -6121,17 +6126,19 @@ async function updateMP(id,field,value){
   value=value.trim();
   const mp=mpData.find(m=>m.id===id);
   if(!mp)return;
-  if(field!=='codigo' && field!=='unidad_tipo' && field!=='alias' && !value)return; // codigo, unidad_tipo y alias se pueden vaciar (unidad_tipo = "sin clasificar"); nombre/unidad no
-  if((mp[field]||'')===value)return;
+  if(field!=='codigo' && field!=='unidad_tipo' && field!=='alias' && field!=='stock_minimo' && !value)return; // codigo, unidad_tipo, alias y stock_minimo se pueden vaciar (unidad_tipo = "sin clasificar"); nombre/unidad no
+  const valorAGuardar=field==='stock_minimo'?(value===''?null:parseFloat(value)):(value||null);
+  if(field==='stock_minimo'){ if((mp[field]??null)===valorAGuardar)return; }
+  else if((mp[field]||'')===value)return;
   ss('saving','Guardando...');
   try{
     const res=await fetch(`${SB}/rest/v1/materias_primas?id=eq.${id}`,{
       method:'PATCH',headers:{...H,'Content-Type':'application/json'},
-      body:JSON.stringify({[field]:value||null})
+      body:JSON.stringify({[field]:valorAGuardar})
     });
     if(!res.ok)throw new Error(await res.text());
     const nombreViejo=mp.nombre;
-    mp[field]=value;
+    mp[field]=field==='stock_minimo'?valorAGuardar:value;
     if(field==='nombre'){
       mpData.sort((a,b)=>a.nombre.localeCompare(b.nombre));
       // Propagar el nuevo nombre a las recetas que usan esta MP como ingrediente (en memoria; falta "Guardar recetas")
@@ -6145,7 +6152,7 @@ async function updateMP(id,field,value){
     if(field==='alias')renderMPList();
     ss('online','MP actualizada');
   }catch(e){
-    const hint=hintFaltaColumna(e.message,'codigo','materias_primas')||hintFaltaColumna(e.message,'tipo','materias_primas')||hintFaltaColumna(e.message,'alias','materias_primas');
+    const hint=hintFaltaColumna(e.message,'codigo','materias_primas')||hintFaltaColumna(e.message,'tipo','materias_primas')||hintFaltaColumna(e.message,'alias','materias_primas')||hintFaltaColumna(e.message,'stock_minimo','materias_primas');
     ss('error','Error: '+e.message+hint);renderMPList();
   }
 }
