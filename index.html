@@ -292,8 +292,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <select id="plan-wsel" onchange="onPlanSemana()"></select>
         <button class="btn btn-sm" onclick="onPlanSemana()" title="Recargar"><i class="ti ti-refresh"></i></button>
         <button class="btn btn-sm" onclick="crearNuevaSemana()" title="Crear plan para la semana siguiente" style="gap:5px"><i class="ti ti-calendar-plus"></i> Nueva semana</button>
-        <button class="btn btn-sm" onclick="corregirAreasSemana()" title="Si algún producto quedó guardado con el nombre de área escrito distinto al de Maestro > Áreas (ej. otra mayúscula/minúscula), esto lo corrige para que se agrupe bien en la pestaña de esa área" style="gap:5px"><i class="ti ti-wand"></i> Corregir áreas</button>
-        <button class="btn btn-sm" onclick="quitarAreasNoConfiguradasSemana()" title="Elimina de esta semana las filas de áreas que ya no existen en Configuración > Producción (ej. quedaron de una reorganización vieja). Sólo quita filas en 0 -- si alguna tiene cantidad cargada, la deja sin tocar y te avisa." style="gap:5px"><i class="ti ti-eraser"></i> Quitar áreas viejas</button>
       </div>
       <div class="btns">
         <button class="btn btn-pdf" id="btnpdf" onclick="genPDF()"><i class="ti ti-file-type-pdf"></i> PDF</button>
