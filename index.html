@@ -5053,6 +5053,27 @@ function rRec(){
   list.innerHTML=h;if(arec)rRecDet(arec);
 }
 function selRec(p){arec=p;rRec()}
+// v4.277: "necesito que me abajo en la cantidad me sume el total tanto por tanda como por canti
+// unidad" -- fila de totales al pie de la tabla de ingredientes de una receta. Como cada ingrediente
+// puede tener su propia Unidad (Kg/Gr/Litros/CC/Unidad, columna editable fila por fila), sumar todo
+// junto sin distinguir unidad daría un número sin sentido (ej. Kg + Litros) -- así que agrupa por
+// unidad y suma cada grupo aparte; si todos los ingredientes están en la misma unidad (el caso más
+// común) el resultado es un solo total, como pidió.
+function recTotalesPorUnidad(ings,tanda,porUnidad){
+  const totales={};
+  (ings||[]).forEach(ing=>{
+    const u=ing.unidad||'(sin unidad)';
+    const valor=porUnidad?(tanda>0?(ing.cantidad||0)/tanda:0):(ing.cantidad||0);
+    totales[u]=(totales[u]||0)+valor;
+  });
+  return totales;
+}
+function recTotalesHtml(totales){
+  const unidades=Object.keys(totales);
+  if(!unidades.length)return'—';
+  const fmt=n=>n.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:6});
+  return unidades.map(u=>`${fmt(totales[u])} <span style="font-size:10px;font-weight:400;color:var(--text3)">${u}</span>`).join('<br>');
+}
 function rRecDet(p){
   const ings=st.Rec[p]||[];const wrap=document.getElementById('rdetail');
   const k=p.replace(/[\s']/g,'_');
@@ -5115,6 +5136,17 @@ function rRecDet(p){
       <td><button class="btn btn-xs btn-danger" onclick="delIng('${p.replace(/'/g,"\'")}',${i})"><i class="ti ti-trash"></i></button></td>
     </tr>`;
   });
+  if(ings.length){
+    const totXTanda=recTotalesHtml(recTotalesPorUnidad(ings,tanda,false));
+    const totXUnidad=recTotalesHtml(recTotalesPorUnidad(ings,tanda,true));
+    h+=`<tr style="border-top:2px solid var(--border2);font-weight:700">
+      <td></td>
+      <td style="text-align:right">Total</td>
+      <td style="text-align:right">${totXTanda}</td>
+      <td style="text-align:right;color:var(--green)">${totXUnidad}</td>
+      <td></td><td></td><td></td>
+    </tr>`;
+  }
   h+=`</tbody></table>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
       <div style="position:relative">
