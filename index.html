@@ -16083,9 +16083,37 @@ function remUnidadesPorBandeja(descripcion){
 // (productos.categoria, por NOMBRE). v4.265: se sacó el sistema viejo por CÓDIGO
 // (remCategoriaMap/remito_categorias_producto, la pestaña "Categorías" de Remitos) a pedido de Juan
 // Pablo ("borra lo que dice categoria, dejame todo en limpio la base de datos") -- el Maestro de
-// Productos es ahora la ÚNICA fuente. Un producto sin categoría cargada ahí queda "Sin categoría
-// asignada", sin fallback.
+// Productos era la ÚNICA fuente.
+// v4.280 (17/10/2026): mandó el orden de empanadas organizado EXPLÍCITAMENTE por categoría (ya no una
+// lista plana) para confirmar/corregir las 5 categorías de empanadas -- de paso quedó claro el motivo
+// real del bug de "JH" (v4.278: aparecía en Clásicas cuando debía estar en Especiales): dependía
+// 100% de que `productos.categoria` estuviera bien tipeado a mano en Configuración para cada
+// producto, uno por uno, y ese campo es fácil de cargar mal (exactamente lo que pasó). Confirmó que
+// Burritos/Pizzetas "estaban bien" (no las tocó, siguen sin cambios). Para las 5 categorías de
+// empanadas, ahora el alias (código corto, el mismo que ya usa `ORDEN_ALIAS_REMITO` para el orden) es
+// la fuente de la verdad -- `CATEGORIAS_EMPANADA_POR_ALIAS` -- y gana sobre `productos.categoria`
+// cuando el alias está en esa lista. Un alias que no está ahí (producto nuevo, o Burritos/Pizzetas/
+// Zen/Salsas, que siguen sin tocar) cae al comportamiento de siempre: `productos.categoria` del
+// Maestro, o "Sin categoría asignada" si tampoco hay nada cargado ahí.
+const CATEGORIAS_EMPANADA_POR_ALIAS={
+  'Clásicas':['C','CH','S','J'],
+  'Especiales':['E','JH','LT','V'],
+  'Planetarias':['KS','H','P'],
+  'Premium':['CS','T','JA','PC','RA','RJ','SP'],
+  'Deluxe':['A','CC','CE','CL','FC','HM','MP','OS','PL','PV','PM','SM','VA'],
+};
+function remCategoriaPorAliasConocido(alias){
+  const limpio=normTxt(alias||'');
+  if(!limpio)return null;
+  for(const cat in CATEGORIAS_EMPANADA_POR_ALIAS){
+    if(CATEGORIAS_EMPANADA_POR_ALIAS[cat].some(c=>normTxt(c)===limpio))return cat;
+  }
+  return null;
+}
 function remCategoriaDeItem(it){
+  const aliasLimpio=remAliasLimpio(remAliasInfo(it.codigo).alias);
+  const porAlias=remCategoriaPorAliasConocido(aliasLimpio);
+  if(porAlias)return porAlias;
   const p=remProductoPorDescripcion(it.descripcion);
   return (p&&p.categoria)||'Sin categoría asignada';
 }
@@ -16204,19 +16232,31 @@ const CATEGORIAS_PRODUCTO_SUGERIDAS=['Clásicas','Especiales','Planetarias','Pre
 // final, ordenada alfabéticamente entre sí, antes de "Sin categoría asignada" -- para no perderla.
 // v4.278: "necesito que en el resumen salga así con este orden, toma el alias como referencia" --
 // mandó foto de su planilla en papel con un orden de productos (por alias/código corto) distinto al
-// orden en que vienen en el PDF de Flexxus. En vez de tipear a mano el orden leído de la foto (mismo
-// riesgo que v4.244/v4.260: adivinar mapeos de códigos a mano y clasificar mal datos reales), se
-// reusa el orden manual que PAPO YA tiene por producto (productos.orden -- las flechas ↑↓ de
-// Configuración > Producción > 3. Productos, lo mismo que ordena la lista ahí). Dentro de cada
-// categoría, los ítems del remito quedan ordenados por ese orden; si dos empatan o no hay producto
-// vinculado, se ordena por alias (y si falta, por el nombre) para que el orden quede estable.
+// orden en que vienen en el PDF de Flexxus. Primer intento (v4.278): en vez de tipear a mano el orden
+// leído de la foto (mismo riesgo que v4.244/v4.260: adivinar mapeos de códigos y clasificar mal datos
+// reales), se reusaba el orden manual de Configuración > Producción (productos.orden) -- "no funciona
+// bien", lo mantener sincronizado ahí no le sirvió.
+// v4.279 (17/10/2026): "para los remitos por favor usa el orden que te doy" -- esta vez mandó la lista
+// completa en una grilla prolija (no una foto de letra a mano ambigua), así que el riesgo de
+// malinterpretar códigos ya no aplica -- se tipea DIRECTO como `ORDEN_ALIAS_REMITO`, en el orden
+// exacto que mandó: primero todas las empanadas (31 códigos), después Burritos (9), Pizzetas (5),
+// Zen/Napolitana (5) y por último Salsas (3). Dentro de cada categoría del listado, los ítems se
+// ordenan por la posición de su alias (limpio, sin "- Unidad") en esa lista -- lo que no está en la
+// lista (producto nuevo que todavía no le pasó código, o sin alias cargado) cae al final del grupo,
+// ordenado alfabéticamente, para no perderlo en silencio.
+const ORDEN_ALIAS_REMITO=['C','CH','S','J','E','JH','LT','V','KS','H','P','CS','T','JA','PC','RA','RJ','SP','A','CC','CE','CL','FC','HM','MP','OS','PL','PV','PM','SM','VA','BJ','BP','BCA','BHD','BM','BOQ','BR','BIV','BG','PZM','PZC','PZP','PZR','PZB','ZMZ','ZFZ','ZML','ZPP','ZPS','SAAL','SAPRO','Sesamo'];
+function remOrdenAliasIndex(alias){
+  const limpio=normTxt(alias||'');
+  if(!limpio)return Infinity;
+  const idx=ORDEN_ALIAS_REMITO.findIndex(c=>normTxt(c)===limpio);
+  return idx===-1?Infinity:idx;
+}
 function remOrdenarItemsGrupo(items){
   return [...items].sort((a,b)=>{
-    const pa=remProductoPorDescripcion(a.descripcion),pb=remProductoPorDescripcion(b.descripcion);
-    const oa=pa&&pa.orden!=null?pa.orden:Infinity,ob=pb&&pb.orden!=null?pb.orden:Infinity;
-    if(oa!==ob)return oa-ob;
     const aliasA=remAliasLimpio(remAliasInfo(a.codigo).alias)||remNombreLimpio(a.descripcion);
     const aliasB=remAliasLimpio(remAliasInfo(b.codigo).alias)||remNombreLimpio(b.descripcion);
+    const ia=remOrdenAliasIndex(aliasA),ib=remOrdenAliasIndex(aliasB);
+    if(ia!==ib)return ia-ib;
     return aliasA.localeCompare(aliasB,'es',{numeric:true});
   });
 }
