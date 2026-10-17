@@ -16101,9 +16101,9 @@ function convertirParaMostrar(unidadesReales,tipo,descripcion){
     const restoAbs=Math.round((abs-bandejasAbs*porBandeja)*100)/100;
     const bandejasEnteras=signo*bandejasAbs;
     const resto=signo*restoAbs;
-    return{cantidad_mostrada:Math.round((unidadesReales/porBandeja)*100)/100,unidad_mostrada:'bandejas',texto:restoAbs>0?`${bandejasEnteras} bandejas + ${resto}u`:`${bandejasEnteras} bandejas`};
+    return{cantidad_mostrada:Math.round((unidadesReales/porBandeja)*100)/100,unidad_mostrada:'bandejas',texto:restoAbs>0?`${bandejasEnteras} bandejas + ${resto}u`:`${bandejasEnteras} bandejas`,bandejas:bandejasEnteras,sueltas:resto};
   }
-  return{cantidad_mostrada:unidadesReales,unidad_mostrada:'unidades',texto:`${unidadesReales} unidades`};
+  return{cantidad_mostrada:unidadesReales,unidad_mostrada:'unidades',texto:`${unidadesReales} unidades`,bandejas:0,sueltas:unidadesReales};
 }
 // v4: una nota de crédito de Flexxus NO se distingue por ningún texto en el PDF (no dice "NOTA DE
 // CRÉDITO" en ningún lado) -- la única señal es que TODAS las cantidades de la tabla vienen en
@@ -16202,6 +16202,24 @@ const CATEGORIAS_PRODUCTO_SUGERIDAS=['Clásicas','Especiales','Planetarias','Pre
 // Ahora usa el orden fijo de CATEGORIAS_PRODUCTO_SUGERIDAS, que es exactamente ese orden. Una
 // categoría que no esté en esa lista (p. ej. tipeada a mano, distinta a las sugeridas) se agrega al
 // final, ordenada alfabéticamente entre sí, antes de "Sin categoría asignada" -- para no perderla.
+// v4.278: "necesito que en el resumen salga así con este orden, toma el alias como referencia" --
+// mandó foto de su planilla en papel con un orden de productos (por alias/código corto) distinto al
+// orden en que vienen en el PDF de Flexxus. En vez de tipear a mano el orden leído de la foto (mismo
+// riesgo que v4.244/v4.260: adivinar mapeos de códigos a mano y clasificar mal datos reales), se
+// reusa el orden manual que PAPO YA tiene por producto (productos.orden -- las flechas ↑↓ de
+// Configuración > Producción > 3. Productos, lo mismo que ordena la lista ahí). Dentro de cada
+// categoría, los ítems del remito quedan ordenados por ese orden; si dos empatan o no hay producto
+// vinculado, se ordena por alias (y si falta, por el nombre) para que el orden quede estable.
+function remOrdenarItemsGrupo(items){
+  return [...items].sort((a,b)=>{
+    const pa=remProductoPorDescripcion(a.descripcion),pb=remProductoPorDescripcion(b.descripcion);
+    const oa=pa&&pa.orden!=null?pa.orden:Infinity,ob=pb&&pb.orden!=null?pb.orden:Infinity;
+    if(oa!==ob)return oa-ob;
+    const aliasA=remAliasLimpio(remAliasInfo(a.codigo).alias)||remNombreLimpio(a.descripcion);
+    const aliasB=remAliasLimpio(remAliasInfo(b.codigo).alias)||remNombreLimpio(b.descripcion);
+    return aliasA.localeCompare(aliasB,'es',{numeric:true});
+  });
+}
 function remAgruparPorCategoria(items){
   const grupos={};
   (items||[]).forEach(it=>{
@@ -16213,7 +16231,7 @@ function remAgruparPorCategoria(items){
   const otras=Object.keys(grupos).filter(c=>c!=='Sin categoría asignada'&&!CATEGORIAS_PRODUCTO_SUGERIDAS.includes(c)).sort((a,b)=>a.localeCompare(b));
   const nombres=[...conocidas,...otras];
   if(grupos['Sin categoría asignada'])nombres.push('Sin categoría asignada');
-  return nombres.map(categoria=>({categoria,items:grupos[categoria]}));
+  return nombres.map(categoria=>({categoria,items:remOrdenarItemsGrupo(grupos[categoria])}));
 }
 // v4.267: "donde dice bandejas, sean en docenas ... eso si solo acepta numero entero, y si quedan
 // algunas unidades lo pones al lado en unidades sueltas" -- la columna "Bandejas" del resumen sumaba
@@ -16613,11 +16631,11 @@ function remImprimir(remito,items){
     <div class="catblock">
       <div class="cath">${remEsc(g.categoria)}</div>
       <table>
-        <tr><th>Producto</th><th class="num">Cant.</th></tr>
+        <tr><th>Producto</th><th class="num">Bandejas</th><th class="num">Unidades</th></tr>
         ${g.items.map(it=>{
           const info=remAliasInfo(it.codigo);
           const nombre=remAliasLimpio(info.alias)||remNombreLimpio(it.descripcion);
-          return `<tr><td>${remEsc(nombre)}</td><td class="num">${remEsc(it.texto)}</td></tr>`;
+          return `<tr><td>${remEsc(nombre)}</td><td class="num">${it.bandejas?it.bandejas:''}</td><td class="num">${it.sueltas?it.sueltas:''}</td></tr>`;
         }).join('')}
       </table>
     </div>`).join('');
@@ -16684,11 +16702,11 @@ function remImprimirCombinado(guardados){
     <div class="catblock">
       <div class="cath">${remEsc(g.categoria)}</div>
       <table>
-        <tr><th>Producto</th><th class="num">Cant.</th></tr>
+        <tr><th>Producto</th><th class="num">Bandejas</th><th class="num">Unidades</th></tr>
         ${g.items.map(it=>{
           const info=remAliasInfo(it.codigo);
           const nombre=remAliasLimpio(info.alias)||remNombreLimpio(it.descripcion);
-          return `<tr><td>${remEsc(nombre)}</td><td class="num">${remEsc(it.texto)}</td></tr>`;
+          return `<tr><td>${remEsc(nombre)}</td><td class="num">${it.bandejas?it.bandejas:''}</td><td class="num">${it.sueltas?it.sueltas:''}</td></tr>`;
         }).join('')}
       </table>
     </div>`).join('');
