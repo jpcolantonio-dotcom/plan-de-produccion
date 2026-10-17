@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.271</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.281</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -16110,10 +16110,21 @@ function remCategoriaPorAliasConocido(alias){
   }
   return null;
 }
+// v4.281 (17/10/2026): "fijate que dice MP a la pizza no esta en orden con el orden que te pase
+// recien" -- el alias "MP" (Deluxe en CATEGORIAS_EMPANADA_POR_ALIAS) resultó estar TAMBIÉN usado
+// como alias de un producto de pizza en el Maestro (dos productos distintos comparten el mismo
+// alias corto). v4.280 aplicaba el override por alias a cualquier ítem, sin importar si era o no
+// una empanada, así que la pizza con alias "MP" quedaba agarrada por error dentro de "Deluxe".
+// Ahora el override por alias SOLO se intenta cuando el ítem es efectivamente una empanada (mismo
+// chequeo de prefijo "EMPANADA" que ya usa clasificarItem) -- Burritos/Pizzetas/Zen/Salsas siguen
+// cayendo siempre a productos.categoria, nunca a esta lista, aunque su alias coincida por azar con
+// uno de la lista de empanadas.
 function remCategoriaDeItem(it){
-  const aliasLimpio=remAliasLimpio(remAliasInfo(it.codigo).alias);
-  const porAlias=remCategoriaPorAliasConocido(aliasLimpio);
-  if(porAlias)return porAlias;
+  if(/^EMPANADA/i.test((it.descripcion||'').trim())){
+    const aliasLimpio=remAliasLimpio(remAliasInfo(it.codigo).alias);
+    const porAlias=remCategoriaPorAliasConocido(aliasLimpio);
+    if(porAlias)return porAlias;
+  }
   const p=remProductoPorDescripcion(it.descripcion);
   return (p&&p.categoria)||'Sin categoría asignada';
 }
