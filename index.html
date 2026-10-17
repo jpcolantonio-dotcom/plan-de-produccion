@@ -16220,6 +16220,22 @@ function remOrdenarItemsGrupo(items){
     return aliasA.localeCompare(aliasB,'es',{numeric:true});
   });
 }
+// v4.278 bugfix (17/10/2026): "no me parece la cantidad" -- el listado imprimía Bandejas/Unidades
+// en blanco para TODOS los productos, tanto en remitos recién subidos como reimpresos desde
+// Historial. Causa: `it.bandejas`/`it.sueltas` solo existían en el objeto en memoria recién salido
+// de `convertirParaMostrar` (procesarRemito/remConsolidarItems) -- apenas el ítem se guarda en
+// Supabase (remito_items) y se vuelve a leer (el insert hace eco de las columnas reales, e igual
+// recargando desde Historial), esos dos campos NO están entre las columnas persistidas
+// (`itemsPayload` en remGuardarEImprimirDocs solo manda cantidad_mostrada/unidad_mostrada/texto/
+// unidades_reales/tipo), así que quedaban undefined y la celda salía vacía siempre que se imprimía
+// después de guardar (que es el camino normal, no solo el de reimprimir uno viejo). Fix: en vez de
+// leer `it.bandejas`/`it.sueltas` directo, se recalculan acá con `convertirParaMostrar` a partir de
+// `unidades_reales`+`tipo`+`descripcion`, que SÍ están siempre persistidos -- funciona igual recién
+// parseado, recién guardado, o reimpreso desde Historial.
+function remBandejasUnidades(it){
+  const conv=convertirParaMostrar(it.unidades_reales!=null?it.unidades_reales:(it.cantidad_mostrada||0),it.tipo,it.descripcion);
+  return{bandejas:conv.bandejas,sueltas:conv.sueltas};
+}
 function remAgruparPorCategoria(items){
   const grupos={};
   (items||[]).forEach(it=>{
@@ -16635,7 +16651,8 @@ function remImprimir(remito,items){
         ${g.items.map(it=>{
           const info=remAliasInfo(it.codigo);
           const nombre=remAliasLimpio(info.alias)||remNombreLimpio(it.descripcion);
-          return `<tr><td>${remEsc(nombre)}</td><td class="num">${it.bandejas?it.bandejas:''}</td><td class="num">${it.sueltas?it.sueltas:''}</td></tr>`;
+          const bu=remBandejasUnidades(it);
+          return `<tr><td>${remEsc(nombre)}</td><td class="num">${bu.bandejas?bu.bandejas:''}</td><td class="num">${bu.sueltas?bu.sueltas:''}</td></tr>`;
         }).join('')}
       </table>
     </div>`).join('');
@@ -16706,7 +16723,8 @@ function remImprimirCombinado(guardados){
         ${g.items.map(it=>{
           const info=remAliasInfo(it.codigo);
           const nombre=remAliasLimpio(info.alias)||remNombreLimpio(it.descripcion);
-          return `<tr><td>${remEsc(nombre)}</td><td class="num">${it.bandejas?it.bandejas:''}</td><td class="num">${it.sueltas?it.sueltas:''}</td></tr>`;
+          const bu=remBandejasUnidades(it);
+          return `<tr><td>${remEsc(nombre)}</td><td class="num">${bu.bandejas?bu.bandejas:''}</td><td class="num">${bu.sueltas?bu.sueltas:''}</td></tr>`;
         }).join('')}
       </table>
     </div>`).join('');
