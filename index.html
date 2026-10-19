@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.281</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.282</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -16287,6 +16287,43 @@ function remBandejasUnidades(it){
   const conv=convertirParaMostrar(it.unidades_reales!=null?it.unidades_reales:(it.cantidad_mostrada||0),it.tipo,it.descripcion);
   return{bandejas:conv.bandejas,sueltas:conv.sueltas};
 }
+// v4.282 (19/10/2026): "necesito que en el resumen pongas todas las variedades, aunque estén en
+// cero, cuando veamos el remito, en el orden que te lo pasé anteriormente" -- confirmó por
+// AskUserQuestion que es el LISTADO de arriba (por producto, Bandejas/Unidades) el que tiene que
+// mostrar siempre las 53 variedades de ORDEN_ALIAS_REMITO, no la tabla de resumen de abajo (esa
+// sigue sin tocar, solo suma lo que realmente vino). Busca, para un alias dado, el producto de
+// Materias Primas que le corresponde -- si hay más de una fila con ese mismo alias (el caso real
+// de colisión "MP" de v4.281: una empanada Deluxe y una pizza distinta compartían el mismo alias
+// corto), prioriza la fila cuyo nombre es/no-es una EMPANADA según si ese alias está en la lista
+// de 31 códigos de empanada conocidos (CATEGORIAS_EMPANADA_POR_ALIAS) -- mismo criterio que ya
+// usa remCategoriaDeItem, para no repetir el bug de MP acá.
+function remProductoConocidoPorAlias(alias){
+  const limpio=normTxt(alias||'');
+  if(!limpio)return null;
+  const candidatos=mpData.filter(m=>normTxt(remAliasLimpio(m.alias||''))===limpio);
+  if(!candidatos.length)return null;
+  const esperaEmpanada=!!remCategoriaPorAliasConocido(alias);
+  return candidatos.find(m=>/^EMPANADA/i.test((m.nombre||'').trim())===esperaEmpanada)||candidatos[0];
+}
+// Completa `items` con un renglón en cero por cada alias de ORDEN_ALIAS_REMITO que no vino en
+// ESTE remito -- un alias sin ningún producto cargado todavía en Materias Primas se omite (no se
+// puede armar un renglón sin nombre, no se inventa nada). Solo se usa para el LISTADO (catgrid);
+// el resumen de abajo sigue recibiendo los `items` reales, sin completar, sin cambios.
+function remCompletarVariedades(items){
+  const presentes=new Set((items||[]).map(it=>{
+    const alias=remAliasLimpio(remAliasInfo(it.codigo).alias)||remNombreLimpio(it.descripcion);
+    return normTxt(alias);
+  }));
+  const faltantes=ORDEN_ALIAS_REMITO.filter(alias=>!presentes.has(normTxt(alias)));
+  const placeholders=faltantes.map(alias=>{
+    const prod=remProductoConocidoPorAlias(alias);
+    if(!prod)return null;
+    const tipo=clasificarItem(prod.nombre);
+    const conv=convertirParaMostrar(0,tipo,prod.nombre);
+    return{codigo:prod.codigo,descripcion:prod.nombre,unidades_reales:0,cantidad_mostrada:0,unidad_mostrada:conv.unidad_mostrada,texto:conv.texto,tipo,bandejas:0,sueltas:0};
+  }).filter(Boolean);
+  return[...(items||[]),...placeholders];
+}
 function remAgruparPorCategoria(items){
   const grupos={};
   (items||[]).forEach(it=>{
@@ -16691,7 +16728,11 @@ function remImprimir(remito,items){
   // que el resumen de abajo -- revierte el agrupado "amplio" sin discriminar de v4.264. Usa el mismo
   // orden fijo de CATEGORIAS_PRODUCTO_SUGERIDAS (empanadas primero, después burritos, después
   // pizzetas/pizzas, salsas al final), que es justo el orden que pidió.
-  const grupos=remAgruparPorCategoria(items);
+  // v4.282: el LISTADO (grupos, abajo) se arma con remCompletarVariedades(items) -- muestra las 53
+  // variedades siempre, en cero si no vinieron en este remito. El RESUMEN de abajo sigue recibiendo
+  // los `items` reales sin completar (confirmado por AskUserQuestion: solo pidió esto para el
+  // listado de arriba, el resumen de Cantidades sigue sumando solo lo que vino).
+  const grupos=remAgruparPorCategoria(remCompletarVariedades(items));
   const resumen=remResumenPorCategoria(items);
   // v4: se sacó la columna "Cód." del impreso a pedido de Juan Pablo -- queda solo Producto/Cantidad.
   const bloquesHtml=grupos.map(g=>`
@@ -16764,7 +16805,9 @@ function remImprimir(remito,items){
 function remImprimirCombinado(guardados){
   const docs=guardados.map(g=>g.doc);
   const itemsCombinados=remConsolidarItems(docs);
-  const grupos=remAgruparPorCategoria(itemsCombinados);
+  // v4.282: mismo criterio que remImprimir -- el listado de arriba se completa con las variedades
+  // en cero, el resumen de abajo sigue recibiendo los ítems reales netos sin completar.
+  const grupos=remAgruparPorCategoria(remCompletarVariedades(itemsCombinados));
   const resumen=remResumenPorCategoria(itemsCombinados);
   const bloquesHtml=grupos.map(g=>`
     <div class="catblock">
