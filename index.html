@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.282</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.283</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -16297,13 +16297,30 @@ function remBandejasUnidades(it){
 // corto), prioriza la fila cuyo nombre es/no-es una EMPANADA según si ese alias está en la lista
 // de 31 códigos de empanada conocidos (CATEGORIAS_EMPANADA_POR_ALIAS) -- mismo criterio que ya
 // usa remCategoriaDeItem, para no repetir el bug de MP acá.
+// v4.283 (20/10/2026): "ya se cual es el error, fijate que flexxus toma cajas y nosotros tenemos
+// unidades, dejalo solo en cajas" -- en Burritos/Pizzetas, Materias Primas tiene DOS filas para el
+// mismo producto: una "por unidad" (alias limpio "BJ") y otra "por caja" (alias "BJ Caja", que ahora
+// remAliasLimpio también limpia a "BJ") -- Flexxus siempre entrega por caja, la fila "por unidad"
+// no se usa nunca en la práctica. Cuando hay más de un candidato con el mismo alias limpio, prioriza
+// el que tiene "Caja" en el alias CRUDO (sin limpiar) -- es la fila real que se usa.
 function remProductoConocidoPorAlias(alias){
   const limpio=normTxt(alias||'');
   if(!limpio)return null;
   const candidatos=mpData.filter(m=>normTxt(remAliasLimpio(m.alias||''))===limpio);
   if(!candidatos.length)return null;
   const esperaEmpanada=!!remCategoriaPorAliasConocido(alias);
-  return candidatos.find(m=>/^EMPANADA/i.test((m.nombre||'').trim())===esperaEmpanada)||candidatos[0];
+  const porTipo=candidatos.filter(m=>/^EMPANADA/i.test((m.nombre||'').trim())===esperaEmpanada);
+  const pool=porTipo.length?porTipo:candidatos;
+  const porCaja=pool.find(m=>/\bcaja\b/i.test(m.alias||''));
+  return porCaja||pool[0];
+}
+// Para productos que Flexxus vende por caja (no empanadas -- esas ya muestran su propia columna
+// "Bandejas"), saca cuántas unidades trae cada caja desde el texto "CAJA POR XXU." que Flexxus
+// agrega a la descripción (mismo patrón que ya usa resolverUnidadesReales) -- para mostrarlo al
+// lado del nombre en el listado, así queda claro el tamaño de la caja sin adivinar nada nuevo.
+function remCantidadPorCajaTexto(descripcion){
+  const m=String(descripcion||'').match(/CAJA\s+POR\s+(\d+)\s*U\.?/i);
+  return m?` (caja x${m[1]}u)`:'';
 }
 // Completa `items` con un renglón en cero por cada alias de ORDEN_ALIAS_REMITO que no vino en
 // ESTE remito -- un alias sin ningún producto cargado todavía en Materias Primas se omite (no se
@@ -16384,8 +16401,19 @@ function remNombreLimpio(descripcion){
 // producto en Materias Primas). En el impreso de Remitos ese sufijo ya no suma nada (la unidad real
 // la muestra la columna Cant.), así que se saca solo para mostrar, igual que remNombreLimpio hace
 // con la descripción cruda del PDF -- no toca el alias guardado en Configuración.
+// v4.283 (20/10/2026): "en burritos y pizzeta duplica el pedido y llama a los unitarios y a las
+// cajas" -- mandó captura real: en Burritos Clásicos aparecían CUATRO renglones para dos burritos
+// (BJ, BP, BJ Caja, BP Caja) -- BJ/BP en cero (el placeholder de v4.282) Y BJ Caja/BP Caja con la
+// cantidad real (48/72), duplicado. Causa: Materias Primas tiene, para estos productos, el MISMO
+// patrón de duplicado ya visto con "Unidad" pero con un sufijo "Caja"/"- Caja" en el alias (ej. "BJ
+// Caja") para la fila que se vende por caja -- `remAliasLimpio` no lo sacaba, así que esa fila
+// quedaba con un alias "BJ Caja" que `remCompletarVariedades` no reconocía como el mismo "BJ" de
+// `ORDEN_ALIAS_REMITO`, y agregaba un placeholder en cero para "BJ" por separado. Ahora
+// `remAliasLimpio` saca TANTO "Unidad" COMO "Caja" (mismo criterio, los dos son sufijos de canal de
+// venta, no parte del nombre de la variedad) -- de paso corrige también el ORDEN de estos productos
+// (antes "BJ Caja" no matcheaba ningún código de ORDEN_ALIAS_REMITO y caía al final del grupo).
 function remAliasLimpio(alias){
-  return String(alias||'').replace(/\s*-?\s*unidad\s*$/i,'').trim();
+  return String(alias||'').replace(/\s*-?\s*(unidad|caja)\s*$/i,'').trim();
 }
 
 // ---------- Pantalla (dentro de PAPO) ----------
@@ -16743,8 +16771,9 @@ function remImprimir(remito,items){
         ${g.items.map(it=>{
           const info=remAliasInfo(it.codigo);
           const nombre=remAliasLimpio(info.alias)||remNombreLimpio(it.descripcion);
+          const porCaja=it.tipo==='empanada'?'':remCantidadPorCajaTexto(it.descripcion);
           const bu=remBandejasUnidades(it);
-          return `<tr><td>${remEsc(nombre)}</td><td class="num">${bu.bandejas?bu.bandejas:''}</td><td class="num">${bu.sueltas?bu.sueltas:''}</td></tr>`;
+          return `<tr><td>${remEsc(nombre+porCaja)}</td><td class="num">${bu.bandejas?bu.bandejas:''}</td><td class="num">${bu.sueltas?bu.sueltas:''}</td></tr>`;
         }).join('')}
       </table>
     </div>`).join('');
@@ -16817,8 +16846,9 @@ function remImprimirCombinado(guardados){
         ${g.items.map(it=>{
           const info=remAliasInfo(it.codigo);
           const nombre=remAliasLimpio(info.alias)||remNombreLimpio(it.descripcion);
+          const porCaja=it.tipo==='empanada'?'':remCantidadPorCajaTexto(it.descripcion);
           const bu=remBandejasUnidades(it);
-          return `<tr><td>${remEsc(nombre)}</td><td class="num">${bu.bandejas?bu.bandejas:''}</td><td class="num">${bu.sueltas?bu.sueltas:''}</td></tr>`;
+          return `<tr><td>${remEsc(nombre+porCaja)}</td><td class="num">${bu.bandejas?bu.bandejas:''}</td><td class="num">${bu.sueltas?bu.sueltas:''}</td></tr>`;
         }).join('')}
       </table>
     </div>`).join('');
