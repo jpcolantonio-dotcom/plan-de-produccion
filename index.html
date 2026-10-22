@@ -214,6 +214,21 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 .dash-progress-bar{height:100%;transition:width .3s}
 .dash-ticker{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2);justify-content:flex-end;margin-bottom:8px}
 .dash-ticker-dot{width:7px;height:7px;border-radius:50%;background:var(--green);animation:pulse .8s infinite}
+.dash-layout{display:flex;gap:16px;align-items:flex-start}
+.dash-main-col{flex:1;min-width:0}
+.dash-fotos-panel{width:300px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;max-height:calc(100vh - 230px);overflow-y:auto;position:sticky;top:12px}
+@media(max-width:980px){.dash-layout{flex-direction:column}.dash-fotos-panel{width:100%;max-height:none;overflow-y:visible;position:static}}
+.dash-fotos-head{font-size:13px;font-weight:700;padding:2px 2px 4px}
+.dash-foto-card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.dash-foto-img{width:100%;height:160px;object-fit:cover;display:block;background:var(--bg3)}
+.dash-foto-body{padding:9px 11px}
+.dash-foto-prod{font-size:12.5px;font-weight:700;color:var(--text)}
+.dash-foto-fecha{font-size:11.5px;color:var(--text2);margin-top:4px;display:flex;justify-content:space-between;gap:8px}
+.dash-foto-fecha b{color:var(--text);font-weight:600}
+.dash-foto-match{font-size:10.5px;margin-top:6px;padding:3px 8px;border-radius:6px;display:inline-flex;align-items:center;gap:4px}
+.dash-foto-match.ok{background:var(--green-bg,#E1F5EE);color:#0F6E56}
+.dash-foto-match.warn{background:#FFE3E3;color:#A32D2D}
+.dash-foto-match.na{background:var(--bg2);color:var(--text2)}
 /* STOCK */
 .stock-card{background:var(--bg);border:.5px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:1rem}
 .stock-tbl{width:100%;border-collapse:collapse;font-size:13px}
@@ -254,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.288</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.289</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -542,24 +557,29 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     </div>
     <!-- PANEL FIJO CUMPLIMIENTO POR EMPRESA -->
     <div id="dash-cumplimiento" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:var(--bg2);border-radius:var(--radius-lg);border:.5px solid var(--border)"></div>
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
-      <div style="display:flex;align-items:center;gap:8px">
-        <button class="btn btn-sm" onclick="navDash(-1)" id="dash-prev"><i class="ti ti-chevron-left"></i></button>
-        <button class="btn btn-sm" onclick="navDash(1)" id="dash-next"><i class="ti ti-chevron-right"></i></button>
-        <span id="dash-page-info" style="font-size:12px;color:var(--text2)"></span>
+    <div class="dash-layout">
+      <div class="dash-main-col">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <button class="btn btn-sm" onclick="navDash(-1)" id="dash-prev"><i class="ti ti-chevron-left"></i></button>
+            <button class="btn btn-sm" onclick="navDash(1)" id="dash-next"><i class="ti ti-chevron-right"></i></button>
+            <span id="dash-page-info" style="font-size:12px;color:var(--text2)"></span>
+          </div>
+          <div class="dash-ticker">
+            <span class="dash-ticker-dot"></span>
+            <span id="dash-ticker-txt">Actualizando...</span>
+            <span id="dash-countdown" style="font-weight:500;color:var(--text);min-width:28px;text-align:right"></span>
+          </div>
+        </div>
+        <div id="dash-grid" class="dash-grid"></div>
+        <div style="display:flex;gap:16px;margin-top:.75rem;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:#1D9E75;display:inline-block"></span> 100% o mas</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:#FAC775;display:inline-block"></span> 90–99%</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:#F7C1C1;display:inline-block"></span> Menos de 90%</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:var(--bg2);border:.5px solid var(--border);display:inline-block"></span> Sin produccion registrada</div>
+        </div>
       </div>
-      <div class="dash-ticker">
-        <span class="dash-ticker-dot"></span>
-        <span id="dash-ticker-txt">Actualizando...</span>
-        <span id="dash-countdown" style="font-weight:500;color:var(--text);min-width:28px;text-align:right"></span>
-      </div>
-    </div>
-    <div id="dash-grid" class="dash-grid"></div>
-    <div style="display:flex;gap:16px;margin-top:.75rem;flex-wrap:wrap">
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:#1D9E75;display:inline-block"></span> 100% o mas</div>
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:#FAC775;display:inline-block"></span> 90–99%</div>
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:#F7C1C1;display:inline-block"></span> Menos de 90%</div>
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)"><span style="width:12px;height:12px;border-radius:2px;background:var(--bg2);border:.5px solid var(--border);display:inline-block"></span> Sin produccion registrada</div>
+      <div id="dash-fotos-panel" class="dash-fotos-panel"></div>
     </div>
   </div>
 
@@ -7518,20 +7538,80 @@ let dashTimer=null,dashCountdown=0,dashPage=0,dashItems=[],dashPages=[],dashTota
 // nuevo cada vez que el Dashboard recarga datos (initDash y el refresco automático de 45s) --
 // si la tabla no existe todavía o no hay fotos para ese día, el dashboard sigue funcionando
 // normal, simplemente sin miniaturas.
-let dashFotos={};
+// v4.289: "que las fotos aparezcan a la derecha como listado, 4 veces más grande, para sacar la
+// fecha de envase y de vencimiento" -- dashFotosLista guarda el registro completo de cada foto
+// del día (no solo la miniatura) para el panel lateral. Fecha de envase = la fecha cargada en
+// Trazabilidad para esa foto (f.fecha). Fecha de vencimiento = esa fecha de envase + "Días vto."
+// del producto (Configuración > Productos, v4.286, mismo cálculo día-1 que ya usa la planilla de
+// Envase/Pastas). Esto es justo el "paso para comparar después" que motivó cargar los días de
+// vencimiento por producto: el panel muestra la fecha calculada al lado de la fecha que la OCR
+// leyó en la propia foto (fecha_detectada) y avisa si no coinciden.
+let dashFotos={},dashFotosLista=[];
+function buscarDiasVtoProducto(empresaId,nombre){
+  const n=normTxt(nombre);
+  const p=st.Pr.find(x=>x.empresa_id===empresaId&&normTxt(x.nombre)===n);
+  return p&&p.dias_vencimiento?p.dias_vencimiento:null;
+}
 async function cargarDashFotos(k,dia){
-  dashFotos={};
+  dashFotos={};dashFotosLista=[];
   if(dia==null||dia<0||dia>6)return;
   const d=new Date(k+'T00:00:00');d.setDate(d.getDate()+dia);
   const fechaISO=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
   try{
-    const rows=await get('trazabilidad_fotos',`fecha=eq.${fechaISO}&select=producto,foto_url,empresa_id&order=created_at.desc`);
+    const rows=await get('trazabilidad_fotos',`fecha=eq.${fechaISO}&select=producto,foto_url,empresa_id,fecha,fecha_detectada&order=created_at.desc`);
     rows.forEach(r=>{
-      if(!r.foto_url)return;
-      const key=r.empresa_id+'||'+normTxt(r.producto);
-      if(!dashFotos[key])dashFotos[key]=r.foto_url; // ya viene ordenado desc -- la primera que llega es la más reciente
+      if(r.foto_url){
+        const key=r.empresa_id+'||'+normTxt(r.producto);
+        if(!dashFotos[key])dashFotos[key]=r.foto_url; // ya viene ordenado desc -- la primera que llega es la más reciente
+      }
+      const dias=buscarDiasVtoProducto(r.empresa_id,r.producto);
+      let fechaVtoCalc=null;
+      if(dias){
+        const dv=new Date(r.fecha+'T00:00:00');dv.setDate(dv.getDate()+dias-1); // hoy cuenta como dia 1, mismo criterio que imprimirPlanillaEnvasePastas
+        fechaVtoCalc=dv.getFullYear()+'-'+String(dv.getMonth()+1).padStart(2,'0')+'-'+String(dv.getDate()).padStart(2,'0');
+      }
+      dashFotosLista.push({...r,diasVto:dias,fechaVtoCalc});
     });
-  }catch(e){dashFotos={}}
+  }catch(e){dashFotos={};dashFotosLista=[]}
+}
+
+function renderDashFotosPanel(){
+  const panel=document.getElementById('dash-fotos-panel');
+  if(!panel)return;
+  const ef=document.getElementById('dash-esel')?.value||'all';
+  const lista=dashFotosLista.filter(f=>ef==='all'||f.empresa_id===ef);
+  if(!lista.length){
+    panel.innerHTML=`<div class="dash-fotos-head">Fotos del día</div><div class="empty" style="padding:1.5rem 1rem;font-size:12.5px"><i class="ti ti-camera-off"></i>Sin fotos cargadas en Trazabilidad para este día.</div>`;
+    return;
+  }
+  let h=`<div class="dash-fotos-head">Fotos del día <span style="font-weight:400;color:var(--text2);font-size:11.5px">(${lista.length})</span></div>`;
+  lista.forEach(f=>{
+    const envaseTxt=fmtFechaCorta(f.fecha)||'--';
+    const vtoCalcTxt=fmtFechaCorta(f.fechaVtoCalc);
+    const detTxt=fmtFechaCorta(f.fecha_detectada);
+    let matchHtml;
+    if(!f.diasVto){
+      matchHtml=`<span class="dash-foto-match na"><i class="ti ti-alert-triangle"></i> falta cargar "Días vto." en Productos</span>`;
+    }else if(!f.fecha_detectada){
+      matchHtml=`<span class="dash-foto-match na">sin fecha leída en la foto</span>`;
+    }else{
+      const diffDias=Math.round((new Date(f.fecha_detectada+'T00:00:00')-new Date(f.fechaVtoCalc+'T00:00:00'))/86400000);
+      const ok=Math.abs(diffDias)<=1;
+      matchHtml=ok?`<span class="dash-foto-match ok"><i class="ti ti-check"></i> coincide con lo calculado</span>`:`<span class="dash-foto-match warn"><i class="ti ti-alert-triangle"></i> no coincide (calculado: ${vtoCalcTxt})</span>`;
+    }
+    const img=f.foto_url?`<a href="${f.foto_url}" target="_blank" title="Ver foto completa"><img class="dash-foto-img" src="${f.foto_url}"/></a>`:`<div class="dash-foto-img" style="display:flex;align-items:center;justify-content:center;color:var(--text3)"><i class="ti ti-photo-off"></i></div>`;
+    h+=`<div class="dash-foto-card">
+      ${img}
+      <div class="dash-foto-body">
+        <div class="dash-foto-prod">${f.producto}</div>
+        <div class="dash-foto-fecha"><span>Envase</span><b>${envaseTxt}</b></div>
+        <div class="dash-foto-fecha"><span>Vencimiento</span><b>${vtoCalcTxt||'--'}</b></div>
+        ${f.fecha_detectada?`<div class="dash-foto-fecha"><span>Leída en la foto</span><b>${detTxt}</b></div>`:''}
+        ${matchHtml}
+      </div>
+    </div>`;
+  });
+  panel.innerHTML=h;
 }
 
 function getDashDia(){
@@ -7550,11 +7630,15 @@ async function initDash(){
   const ef=document.getElementById('dash-esel')?.value||'all';
   delete st.P[k]; delete st.R[k];
   await lp(k); await lr(k);
+  if(!st.Pr.length){
+    try{const[ar,pr]=await Promise.all([get('areas','order=nombre.asc'),get('productos','order=nombre.asc')]);st.A=ar||[];st.Pr=pr||[];}catch{}
+  }
   buildDashItems(k,ef);
   await cargarDashFotos(k,getDashDia());
   dashPage=0;
   renderCumplimientoEmpresas(k);
   renderDashPage(false);
+  renderDashFotosPanel();
   startDashTimer(k,ef);
 }
 
@@ -7671,6 +7755,7 @@ function startDashTimer(k,ef){
       await cargarDashFotos(k,getDashDia());
       renderCumplimientoEmpresas(k);
       renderDashPage(true);
+      renderDashFotosPanel();
     }
   },1000);
 }
