@@ -252,7 +252,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.285</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.286</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -4108,6 +4108,12 @@ function rProdDetail(aid){
             <input type="text" list="prod-categoria-dl" value="${p.categoria||''}" placeholder="—"
               onchange="updP('${p.id}','categoria',this.value.trim()||null)"
               style="width:140px;padding:3px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+          </label>
+          <label style="display:flex;align-items:center;gap:5px" title="Vida útil del producto terminado, en días (desde que se elabora/envasa hasta que vence). Usado para calcular la fecha de vencimiento en planillas y en Trazabilidad.">
+            <span style="font-size:11px;color:var(--text2);white-space:nowrap">Días vto.</span>
+            <input type="number" min="0" step="1" value="${p.dias_vencimiento||''}" placeholder="—"
+              onchange="updP('${p.id}','dias_vencimiento',this.value?parseInt(this.value):null)"
+              style="width:56px;padding:3px 6px;font-size:12px;text-align:right;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
           </label>
         </div>
       </div>`;
@@ -15212,13 +15218,10 @@ async function imprimirPlanillaEnvasePastas(){
   const hoy=new Date(hoyISO+'T00:00:00');
   const hoyStr=fmtFecha(hoy);
 
-  // Días de vencimiento según tipo de producto
-  function diasVenc(nombre){
-    const n=nombre.toLowerCase();
-    if(n.includes('tallar'))return 21;
-    if(n.includes('fuccil')||n.includes('ñoqui')||n.includes('noqui')||n.includes('mostachol'))return 15;
-    return 21; // default para el resto de envase
-  }
+  // v4.286: antes los días de vencimiento salían de una regla fija por nombre (diasVenc()).
+  // Ahora se cargan por producto en Configuración > Productos ("Días vto."), un número de días
+  // que representa la vida útil real de ESE producto -- se usa el valor cargado ahí (p.dias_vencimiento),
+  // sin ninguna regla por nombre de respaldo.
 
   // Forzar recarga del plan de esta semana (por si el que estaba en memoria es viejo)
   const semKey=wk(hoy);
@@ -15265,10 +15268,16 @@ async function imprimirPlanillaEnvasePastas(){
 
   let filasEnvase='';
   prodsEnvase.forEach(p=>{
-    const dias=diasVenc(p.nombre);
-    const venc=new Date(hoy);venc.setDate(venc.getDate()+dias-1); // hoy cuenta como dia 1
+    const dias=p.dias_vencimiento;
     const unidadTxt=p.unidad?p.unidad:'<span class="sinunidad">(falta unidad)</span>';
-    filasEnvase+=`<tr><td class="prod">${p.nombre}</td><td class="cant">${p.cant.toLocaleString('es-AR')} ${unidadTxt}</td><td class="fecha">${hoyStr}</td><td class="fecha venc">${fmtFecha(venc)}</td></tr>`;
+    let vencTxt;
+    if(dias){
+      const venc=new Date(hoy);venc.setDate(venc.getDate()+dias-1); // hoy cuenta como dia 1
+      vencTxt=fmtFecha(venc);
+    }else{
+      vencTxt='<span class="sinunidad">(falta cargar días de vto. en Productos)</span>';
+    }
+    filasEnvase+=`<tr><td class="prod">${p.nombre}</td><td class="cant">${p.cant.toLocaleString('es-AR')} ${unidadTxt}</td><td class="fecha">${hoyStr}</td><td class="fecha venc">${vencTxt}</td></tr>`;
   });
   if(!prodsEnvase.length)filasEnvase='<tr><td colspan="4" class="vacio">Sin producción planificada para hoy en Envase.</td></tr>';
 
