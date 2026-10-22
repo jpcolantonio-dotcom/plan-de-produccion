@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.289</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.290</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -16249,9 +16249,11 @@ function remUnidadesPorBandeja(descripcion){
 // cuando el alias está en esa lista. Un alias que no está ahí (producto nuevo, o Burritos/Pizzetas/
 // Zen/Salsas, que siguen sin tocar) cae al comportamiento de siempre: `productos.categoria` del
 // Maestro, o "Sin categoría asignada" si tampoco hay nada cargado ahí.
+// v4.290: "CH me sigue apareciendo como clásica y es especial" -- CH (EMPANADA DE CARNE CRUDA
+// TAPA HOJALDRE 15) estaba mal tipeado acá desde v4.280, movido de Clásicas a Especiales.
 const CATEGORIAS_EMPANADA_POR_ALIAS={
-  'Clásicas':['C','CH','S','J'],
-  'Especiales':['E','JH','LT','V'],
+  'Clásicas':['C','S','J'],
+  'Especiales':['E','JH','LT','V','CH'],
   'Planetarias':['KS','H','P'],
   'Premium':['CS','T','JA','PC','RA','RJ','SP'],
   'Deluxe':['A','CC','CE','CL','FC','HM','MP','OS','PL','PV','PM','SM','VA'],
