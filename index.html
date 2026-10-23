@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.292</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.293</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -16778,31 +16778,45 @@ function remAgruparPorCategoria(items){
 // algunas unidades lo pones al lado en unidades sueltas" -- la columna "Bandejas" del resumen sumaba
 // la cantidad YA convertida a bandeja de cada ítem (cantidad_mostrada), pero el tamaño de bandeja es
 // por PRODUCTO (24, 36, etc. -- productos.unidades_bandeja), así que sumar esas cantidades no da un
-// número con sentido físico (serían bandejas de distinto tamaño mezcladas). Una docena en cambio es
-// siempre 12 unidades, sea cual sea el producto, así que ahora se vuelve a las unidades REALES de
-// cada ítem "empanada" (it.unidades_reales, antes de convertir a bandeja) y se convierten a docenas
-// ENTERAS (Math.floor). Sign-safe para notas de crédito (unidades_reales negativas), mismo criterio
-// que convertirParaMostrar.
+// número con sentido físico (serían bandejas de distinto tamaño mezcladas). Fix de ese momento: volver
+// a las unidades REALES de cada ítem "empanada" (it.unidades_reales) y convertir el TOTAL del subgrupo
+// a docenas enteras (Math.floor(total/12)).
 // v4.285 (21/10/2026): "bandejas de las variedades solo sumes bandejas y lo transformes en docenas,
 // lo que es unidades solo sumes unidades, aunque te de multiplo de docenas lo dejes como unidades" --
-// separación TOTAL entre las dos columnas, sin mezclarlas: Docenas sale SOLO de lo que es empanada
-// (bandeja), Unidades sale SOLO de lo que se vende por unidad (burritos, pizzetas, etc.) -- nunca al
-// revés, aunque el total de unidades dé justo un múltiplo de 12. Antes (desde v4.267) lo que sobraba
-// de la conversión a docenas de las empanadas (siempre <12) se sumaba DENTRO de la misma columna
-// Unidades -- eso quedó sacado: esa columna ahora es exclusiva de los productos que de verdad se
-// venden por unidad, el resto de la conversión a docenas no se agrega a ningún lado acá (el detalle
-// de ese resto, por producto, ya se ve arriba en el listado de Bandejas/Unidades de cada variedad).
+// separación TOTAL entre las dos columnas: Docenas sale SOLO de lo que es empanada (bandeja), Unidades
+// SOLO de lo que se vende por unidad (burritos, pizzetas, etc.).
+// v4.293 (23/10/2026): mensaje de WhatsApp de Nicolás Sanchez Alduvino, reenviado por Juan Pablo:
+// "dentro de cada subgrupo en la columna docenas sume las bandejas y las multiplique por 2 y en el
+// caso de clásicas las de jamón las multiplique por 3 ya que traen 2 y 3 docenas respectivamente" +
+// "en la columna unidades simplemente sume las unidades según subgrupo ... sean 10, 12 o 90". Esto
+// destapó el bug real de v4.267/v4.285: sumar el TOTAL de unidades reales del subgrupo (mezclando
+// productos de 24 y de 36 por bandeja, como jamón y queso) y dividir por 12 entero no reparte bien
+// entre Docenas y Unidades -- con dos productos de distinto tamaño de bandeja puede dar MÁS docenas de
+// las que realmente salieron en bandejas completas, y el sobrante de cada producto (sueltas) quedaba
+// descartado del todo (Unidades daba siempre 0 para las categorías de empanada, tal cual se veía en la
+// captura que mandó: Clásicas/Especiales/Planetarias/Premium/Deluxe con "0" en Unidades). Fix: ahora
+// se arma POR ÍTEM -- bandejas y sueltas de cada producto (`remBandejasUnidades`, mismo recálculo a
+// prueba de campos no persistidos que ya usa el listado) y el tamaño de bandeja REAL de ESE producto
+// (`remUnidadesPorBandeja`, ya trae 36 para jamón vía productos.unidades_bandeja desde v4.261, no hace
+// falta ningún ×3 a mano por nombre) para convertir SUS bandejas a docenas (bandejas × porBandeja/12,
+// ×2 para 24/bandeja, ×3 para 36/bandeja) antes de sumar -- así no se mezclan bandejas de distinto
+// tamaño entre sí (el error real de v4.267) y nada se pierde: Unidades pasa a ser la suma de las
+// sueltas reales de cada ítem del subgrupo, se queden en lo que se queden (10, 12 o 90), sin
+// redondearlas nunca a una docena más.
 function remResumenPorCategoria(items){
   return remAgruparPorCategoria(items).map(g=>{
-    let unidadesEmpanadas=0,unidades=0;
+    let docenas=0,unidades=0;
     g.items.forEach(it=>{
-      if(it.unidad_mostrada==='bandejas')unidadesEmpanadas+=(it.unidades_reales!=null?it.unidades_reales:0);
-      else unidades+=it.cantidad_mostrada;
+      if(it.unidad_mostrada==='bandejas'){
+        const{bandejas,sueltas}=remBandejasUnidades(it);
+        const porBandeja=remUnidadesPorBandeja(it.descripcion);
+        docenas+=bandejas*(porBandeja/12);
+        unidades+=sueltas;
+      }else{
+        unidades+=it.cantidad_mostrada;
+      }
     });
-    const signo=unidadesEmpanadas<0?-1:1;
-    const abs=Math.abs(unidadesEmpanadas);
-    const docenas=signo*Math.floor(abs/12);
-    return{categoria:g.categoria,docenas,unidades:Math.round(unidades*100)/100};
+    return{categoria:g.categoria,docenas:Math.round(docenas*100)/100,unidades:Math.round(unidades*100)/100};
   });
 }
 // v4.264 agrupó el listado (catgrid) "amplio" sin discriminar variedad (todos los burritos juntos,
