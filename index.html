@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.293</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.294</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -16996,9 +16996,9 @@ function remRenderHistorial(){
   <input type="text" placeholder="Buscar por número o cliente..." value="${remEsc(remFiltroHist)}" style="width:100%;max-width:340px;padding:7px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);margin-bottom:12px" oninput="remFiltroHist=this.value;remRender();"/>
   <div>
     ${lista.map(r=>`
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:.5px solid var(--border);cursor:pointer" onclick="remAbrirRemito('${r.id}')">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:.5px solid var(--border);cursor:pointer" onclick="${r.esGrupo?`remAbrirGrupoHistorial('${r.grupoId}')`:`remAbrirRemito('${r.id}')`}">
         <div>
-          <div style="font-size:13px;font-weight:600">${remEsc(r.numero)} · ${remEsc(r.cliente||'')}${r._esNC?' <span style="font-size:10px;font-weight:700;color:var(--amber);background:var(--bg2);border-radius:20px;padding:1px 7px">NC</span>':''}</div>
+          <div style="font-size:13px;font-weight:600">${remEsc(r.numero)} · ${remEsc(r.cliente||'')}${r._esNC?' <span style="font-size:10px;font-weight:700;color:var(--amber);background:var(--bg2);border-radius:20px;padding:1px 7px">NC</span>':''}${r.esGrupo?` <span style="font-size:10px;font-weight:700;color:var(--blue);background:var(--bg2);border-radius:20px;padding:1px 7px">COMBINADO · ${r.miembros.length} docs</span>`:''}</div>
           <div style="font-size:11.5px;color:var(--text2)">${remEsc(r.fecha||'')} ${remEsc(r.hora||'')}</div>
         </div>
         <span style="font-size:11px;color:var(--text2);background:var(--bg2);border-radius:20px;padding:3px 9px">${r._pendientes>0?`${r._pendientes} sin recibir`:'completo'}</span>
@@ -17006,7 +17006,28 @@ function remRenderHistorial(){
   </div>`;
 }
 
+// v4.294: vista de un GRUPO combinado (ver remAbrirGrupoHistorial) -- de solo lectura (sin toggle de
+// "Recibido": son cantidades netas de varios documentos, no se puede marcar qué parte llegó de cuál),
+// con el botón Imprimir reimprimiendo la MISMA hoja combinada, y un link por documento individual del
+// grupo para entrar a marcar "Recibido" ahí si hace falta.
+function remRenderDetalleGrupo(){
+  const{remito,items,guardados}=remDetalle;
+  const seccionesContenido=remSeccionesHtml(items,null,null);
+  const miembrosHtml=guardados.map(g=>`
+    <span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--blue);cursor:pointer;margin-right:12px" onclick="remAbrirRemito('${g.remito.id}')">
+      <i class="ti ti-file-text"></i> ${remEsc(g.remito.numero||'-')}${g.doc.esNC?' (NC)':''}
+    </span>`).join('');
+  return `
+  <div style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--blue);cursor:pointer;margin-bottom:10px;font-weight:600" onclick="remDetalle=null;remRender();"><i class="ti ti-arrow-left"></i> Volver al historial</div>
+  <div style="display:inline-block;font-size:11px;font-weight:700;color:var(--blue);background:var(--bg2);border-radius:20px;padding:3px 10px;margin-bottom:8px">COMBINADO · ${guardados.length} documentos</div>
+  ${remCabeceraHtml(remito)}
+  <div style="margin-bottom:10px"><button class="btn" onclick="remImprimirCombinado(remDetalle.guardados)"><i class="ti ti-printer"></i> Imprimir (combinado)</button></div>
+  <div style="font-size:12px;color:var(--text2);margin-bottom:14px">Documentos de este grupo (abrí uno para marcar "Recibido" item por item): ${miembrosHtml}</div>
+  <div style="font-size:13px;font-weight:600;margin-bottom:4px">Ítems netos (${items.length})</div>
+  ${seccionesContenido}`;
+}
 function remRenderDetalle(){
+  if(remDetalle.esGrupo)return remRenderDetalleGrupo();
   const{remito,items}=remDetalle;
   const esNC=remEsNotaCredito(items);
   const seccionesContenido=remSeccionesHtml(items,'remTogglearRecibido','remSetCantidadRecibida');
@@ -17071,6 +17092,13 @@ async function remProcesarDocumentoNuevo(r){
 // por documento si es uno solo (comportamiento de siempre), o una hoja COMBINADA (neto por producto,
 // ver remConsolidarItems) si son varios. Va sacando de remPendientes cada documento a medida que se
 // guarda con éxito, así un error a mitad de camino no duplica ni pierde los que ya entraron.
+// v4.294 (23/10/2026): "aca deberia estar el que se imprime el resumen no cada uno" -- en Historial
+// aparecía cada documento combinado por separado (ej. 234 y 227 impresos juntos como UNA hoja
+// combinada, pero listados como DOS remitos sueltos sin ninguna relación entre sí). Cuando se guarda
+// más de un documento junto, ahora se les asigna el mismo `grupo_id` (columna nueva en `remitos`) para
+// poder agruparlos después en el Historial (ver remCargarHistorial/remAbrirGrupoHistorial más abajo).
+// Un documento guardado SOLO (el caso de siempre, más común) no manda grupo_id -- sigue funcionando
+// igual aunque todavía no se haya corrido el SQL de la columna nueva.
 async function remGuardarEImprimirDocs(docs,opts){
   opts=opts||{};
   const irHistorial=opts.irHistorial!==false;
@@ -17079,9 +17107,12 @@ async function remGuardarEImprimirDocs(docs,opts){
   if(btn)btn.disabled=true;
   ss('saving','Guardando...');
   const guardados=[];
+  const grupoId=docs.length>1?('g'+Date.now().toString(36)+Math.random().toString(36).slice(2,8)):null;
   try{
     for(const doc of docs){
-      const[remitoIns]=await ins('remitos',{numero:doc.numero,fecha:doc.fecha,hora:doc.hora,cliente:doc.cliente,direccion:doc.direccion,cuit:doc.cuit});
+      const remitoPayload={numero:doc.numero,fecha:doc.fecha,hora:doc.hora,cliente:doc.cliente,direccion:doc.direccion,cuit:doc.cuit};
+      if(grupoId)remitoPayload.grupo_id=grupoId;
+      const[remitoIns]=await ins('remitos',remitoPayload);
       const itemsPayload=doc.items.map(it=>({
         remito_id:remitoIns.id,orden:it.orden,codigo:it.codigo,descripcion:it.descripcion,
         cantidad_original:it.cantidad_original,unidades_reales:it.unidades_reales,tipo:it.tipo,
@@ -17108,6 +17139,34 @@ async function remGuardarEImprimirDocs(docs,opts){
   else remRender();
 }
 
+// v4.294: arma remHistorial mezclando documentos sueltos (grupo_id vacío, un renglón cada uno, igual
+// que siempre) con GRUPOS (varios documentos guardados juntos con el mismo grupo_id -- ver
+// remGuardarEImprimirDocs) colapsados en un único renglón sintético ({esGrupo:true}, sin id propio).
+// `creado_en` del grupo es el más nuevo de sus miembros, para que el orden de la lista (más reciente
+// primero) no cambie. Si todavía no se corrió el SQL de la columna `grupo_id`, PostgREST simplemente
+// no la trae en el select=* (queda undefined en cada fila) -- todo cae al camino de "documento suelto"
+// de siempre, sin romper nada.
+function remAgruparHistorial(remitos,itemsPorRemito,pendPorRemito){
+  const sueltos=[],porGrupo={};
+  remitos.forEach(r=>{
+    if(r.grupo_id){(porGrupo[r.grupo_id]=porGrupo[r.grupo_id]||[]).push(r);}
+    else sueltos.push({...r,_pendientes:pendPorRemito[r.id]||0,_esNC:remEsNotaCredito(itemsPorRemito[r.id]||[])});
+  });
+  const grupos=Object.entries(porGrupo).map(([grupoId,miembros])=>{
+    miembros.sort((a,b)=>(a.creado_en||'').localeCompare(b.creado_en||''));
+    const pendientes=miembros.reduce((s,m)=>s+(pendPorRemito[m.id]||0),0);
+    const esNC=miembros.every(m=>remEsNotaCredito(itemsPorRemito[m.id]||[]));
+    const creadoEn=miembros.reduce((max,m)=>(m.creado_en||'')>max?(m.creado_en||''):max,'');
+    return{
+      id:null,grupoId,esGrupo:true,miembros,
+      numero:miembros.map(m=>m.numero||'-').join(' + '),
+      cliente:miembros[0].cliente,fecha:miembros[0].fecha,
+      hora:[...new Set(miembros.map(m=>m.hora).filter(Boolean))].join(' / '),
+      creado_en:creadoEn,_pendientes:pendientes,_esNC:esNC
+    };
+  });
+  return[...sueltos,...grupos].sort((a,b)=>(b.creado_en||'').localeCompare(a.creado_en||''));
+}
 async function remCargarHistorial(){
   ss('saving','Cargando...');
   try{
@@ -17119,7 +17178,7 @@ async function remCargarHistorial(){
       if(!it.recibido)pendPorRemito[it.remito_id]=(pendPorRemito[it.remito_id]||0)+1;
       (itemsPorRemito[it.remito_id]=itemsPorRemito[it.remito_id]||[]).push(it);
     });
-    remHistorial=remitos.map(r=>({...r,_pendientes:pendPorRemito[r.id]||0,_esNC:remEsNotaCredito(itemsPorRemito[r.id]||[])}));
+    remHistorial=remAgruparHistorial(remitos,itemsPorRemito,pendPorRemito);
     ss('online','Conectado');
     if(remVista==='historial'&&!remDetalle)remRender();
   }catch(e){
@@ -17138,6 +17197,34 @@ async function remAbrirRemito(id){
   }catch(e){
     console.error(e);
     ss('error','Error abriendo remito');
+  }
+}
+// v4.294: abre el detalle de un GRUPO de documentos combinados (ver remAgruparHistorial) -- arma la
+// misma vista neta que ya se usaba antes de guardar (remConsolidarItems), de solo lectura (sin
+// checkbox de "Recibido": una cantidad neta de dos documentos no se puede repartir de vuelta entre
+// ellos para marcar qué llegó de cuál). El botón Imprimir reimprime la MISMA hoja combinada
+// (remImprimirCombinado), y cada documento individual del grupo queda igual accesible con su propio
+// N° por si hace falta marcar "Recibido" item por item en uno puntual.
+async function remAbrirGrupoHistorial(grupoId){
+  ss('saving','Cargando...');
+  try{
+    const miembros=await get('remitos',`select=*&grupo_id=eq.${grupoId}&order=creado_en.asc`);
+    const itemsPorMiembro={};
+    await Promise.all(miembros.map(async r=>{
+      itemsPorMiembro[r.id]=await get('remito_items',`select=*&remito_id=eq.${r.id}&order=orden.asc`);
+    }));
+    const guardados=miembros.map(r=>({remito:r,items:itemsPorMiembro[r.id]||[],doc:{items:itemsPorMiembro[r.id]||[],esNC:remEsNotaCredito(itemsPorMiembro[r.id]||[])}}));
+    const itemsCombinados=remConsolidarItems(guardados.map(g=>g.doc));
+    remDetalle={esGrupo:true,guardados,items:itemsCombinados,remito:{
+      numero:miembros.map(m=>m.numero||'-').join(' + '),
+      cliente:miembros[0].cliente,fecha:miembros[0].fecha,
+      hora:[...new Set(miembros.map(m=>m.hora).filter(Boolean))].join(' / ')
+    }};
+    ss('online','Conectado');
+    remRender();
+  }catch(e){
+    console.error(e);
+    ss('error','Error abriendo el grupo');
   }
 }
 async function remTogglearRecibido(itemId,checked){
