@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.290</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.291</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1617,6 +1617,16 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       </div>
       <div class="planilla-info" id="pi-consumo_mp" style="display:none">Por cada producto elegido: primero cuántos kilos de relleno hacen falta esa semana (calculado solo con la receta propia del producto y lo planificado, sin configurar nada aparte), desglosado por día; y abajo, la materia prima que corresponde a esos kilos según la receta propia del relleno. Elegís los productos con el lápiz.</div>
       <button class="btn btn-primary" style="width:100%" onclick="imprimirPlanillaConsumoMpSemanal()"><i class="ti ti-printer"></i> Imprimir</button>
+    </div>
+    <div class="grid-card" style="padding:1.25rem;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <i class="ti ti-package" style="font-size:20px;color:var(--purple)"></i>
+        <div class="planilla-title" id="pt-tapas" onclick="renombrarPlanilla('tapas','Producción de Tapas')" title="Click para cambiar el nombre">Producción de Tapas</div>
+        <button class="btn btn-xs" onclick="togglePlanillaInfo('tapas')" title="Ver descripción"><i class="ti ti-help"></i></button>
+        <button class="btn btn-xs" onclick="cambiarDivisorCajonesTapas()" title="Cambiar cuántas unidades entran por cajón"><i class="ti ti-pencil"></i></button>
+      </div>
+      <div class="planilla-info" id="pi-tapas" style="display:none">Lo planificado para hoy del área Tapas (Joselito): cantidad planificada, cajones (planificado ÷ <span id="tapas-divisor-txt">20</span> unidades por cajón — cambiá el número con el lápiz), fecha de envase (hoy) y fecha de vencimiento según los días cargados en Configuración &gt; Productos. "Real" y "Dif." quedan en blanco para completar a mano.</div>
+      <button class="btn btn-primary" style="width:100%" onclick="imprimirPlanillaTapas()"><i class="ti ti-printer"></i> Imprimir</button>
     </div>
   </div>
 </div>
@@ -16045,6 +16055,7 @@ const PLANILLA_SLUGS=[
   {slug:'envase_pastas',defecto:'Envase / Pastas Especiales'},
   {slug:'distribucion_planeta',defecto:'Distribución Planeta'},
   {slug:'consumo_mp',defecto:'Consumo de MP Semanal'},
+  {slug:'tapas',defecto:'Producción de Tapas'},
 ];
 let planillaNombres={}; // slug -> nombre custom (solo los que el usuario cambió)
 let planillaNombresCargados=false;
@@ -16067,6 +16078,7 @@ function renderPlanillaTitles(){
     const el=document.getElementById('pt-'+slug);
     if(el)el.textContent=nombrePlanilla(slug,defecto);
   });
+  renderDivisorCajonesTapasTxt();
 }
 async function initPlanillas(){
   await cargarPlanillaNombres();
@@ -16085,6 +16097,159 @@ async function renombrarPlanilla(slug,porDefecto){
   }catch(e){
     alert('No pude guardar el nombre nuevo. Si todavía no creaste la tabla "planilla_config" en Supabase, corré el SQL que te pasé y volvé a intentar.\n\n'+e.message);
   }
+}
+
+// Planilla "Producción de Tapas" (v4.291, a pedido de "necesito que lo agregues en una pestaña en
+// planillas, donde cargue la producion automatica dle dia de tapas, y que pongan en cajones divada la
+// produccion en 20 que son las cantidades que entran de prodcuto por cajones..."): hoja que lista lo
+// planificado para HOY del área "Tapas" (Joselito), con cajones = planificado ÷ N (N configurable con
+// el lápiz, default 20 -- confirmado por Juan Pablo como número fijo editable en pantalla, no algo por
+// producto), fecha de envase (hoy) y vencimiento calculado con el mismo mecanismo de "Días vto." de
+// v4.286 (reutilizado también en Envase/Pastas Especiales y en el panel de fotos del Dashboard). "Real"
+// y "Dif." quedan en blanco para completar a mano en fábrica, igual que el resto de las planillas de
+// esta sección. El divisor se guarda en la misma tabla "planilla_config" que ya existe para los nombres
+// de las tarjetas (no hace falta ninguna tabla nueva ni SQL nuevo), con el slug reservado
+// "tapas_divisor_cajones" -- se carga solo porque cargarPlanillaNombres() ya trae TODAS las filas de esa
+// tabla, sin filtrar por slug.
+const TAPAS_DIVISOR_SLUG='tapas_divisor_cajones';
+const TAPAS_DIVISOR_DEFECTO=20;
+function divisorCajonesTapas(){
+  const v=parseFloat(planillaNombres[TAPAS_DIVISOR_SLUG]);
+  return(v&&v>0)?v:TAPAS_DIVISOR_DEFECTO;
+}
+function renderDivisorCajonesTapasTxt(){
+  const el=document.getElementById('tapas-divisor-txt');
+  if(el)el.textContent=divisorCajonesTapas().toLocaleString('es-AR');
+}
+async function cambiarDivisorCajonesTapas(){
+  const actual=divisorCajonesTapas();
+  const nuevo=prompt('¿Cuántas unidades de Tapas entran por cajón?\n\n(Se usa para calcular la columna "Cajones" = Planificado ÷ este número, en la planilla de Producción de Tapas.)',actual);
+  if(nuevo===null)return; // cancelado
+  const n=parseFloat(nuevo.toString().replace(',','.'));
+  if(!n||n<=0){alert('Ingresá un número mayor que cero.');return}
+  try{
+    await upsert('planilla_config',{slug:TAPAS_DIVISOR_SLUG,nombre:String(n),updated_at:new Date().toISOString()});
+    planillaNombres[TAPAS_DIVISOR_SLUG]=String(n);
+    renderDivisorCajonesTapasTxt();
+  }catch(e){
+    alert('No pude guardar el número nuevo. Si todavía no creaste la tabla "planilla_config" en Supabase, corré el SQL que te pasé y volvé a intentar.\n\n'+e.message);
+  }
+}
+async function imprimirPlanillaTapas(){
+  if(!st.E.length||!st.Pr.length)await init();
+  const joselito=st.E.find(e=>e.nombre.toLowerCase().includes('joselito'))||st.E[0];
+  if(!joselito){alert('No se encontró ninguna empresa cargada.');return}
+
+  const fmtFecha=d=>`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  const hoyISO=hoyLocal();
+  const hoy=new Date(hoyISO+'T00:00:00');
+  const hoyStr=fmtFecha(hoy);
+  const divisor=divisorCajonesTapas();
+
+  // Forzar recarga del plan de esta semana (por si el que estaba en memoria es viejo)
+  const semKey=wk(hoy);
+  delete st.P[semKey];
+  await lp(semKey);
+  const diIdx=(hoy.getDay()+6)%7; // 0=lunes
+  const planHoy=st.P[semKey]||[];
+
+  function cantidadHoy(p,areaNombre){
+    const norm=s=>(s||'').trim().toLowerCase();
+    let row=planHoy.find(r=>r.empresa_id===joselito.id&&norm(r.area)===norm(areaNombre)&&norm(r.producto)===norm(p.nombre));
+    if(!row){
+      row=planHoy.find(r=>r.empresa_id===joselito.id&&norm(r.producto)===norm(p.nombre));
+    }
+    return(row&&row.days&&row.days[diIdx])||0;
+  }
+
+  // Productos del área TAPAS (Joselito) -- cualquier área cuyo nombre contenga "tapa", para no depender
+  // de que esté escrita exactamente igual ("Tapas", "TAPAS", etc.)
+  const prodsTapas=st.Pr.filter(p=>{
+    const a=st.A.find(x=>x.id===p.area_id);
+    return p.empresa_id===joselito.id&&a&&a.nombre.trim().toLowerCase().includes('tapa');
+  }).map(p=>{
+    const a=st.A.find(x=>x.id===p.area_id);
+    return{...p,cant:cantidadHoy(p,a.nombre)};
+  }).filter(p=>p.cant>0).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+
+  if(!prodsTapas.length){alert('No hay producción planificada para hoy en el área Tapas (Joselito).');return}
+
+  const fmtCajones=n=>{
+    const r=Math.round(n*10)/10;
+    return Number.isInteger(r)?r.toLocaleString('es-AR'):r.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1});
+  };
+
+  let filas='';
+  prodsTapas.forEach(p=>{
+    const dias=p.dias_vencimiento;
+    const unidadTxt=p.unidad?p.unidad:'<span class="sinunidad">(falta unidad)</span>';
+    let vencTxt;
+    if(dias){
+      const venc=new Date(hoy);venc.setDate(venc.getDate()+dias-1); // hoy cuenta como dia 1
+      vencTxt=`${fmtFecha(venc)} <span class="diasvto">(${dias}d)</span>`;
+    }else{
+      vencTxt='<span class="sinunidad">(falta cargar días de vto. en Productos)</span>';
+    }
+    const cajones=fmtCajones(p.cant/divisor);
+    filas+=`<tr>
+      <td class="prod">${p.nombre}</td>
+      <td class="cant">${p.cant.toLocaleString('es-AR')} ${unidadTxt}</td>
+      <td class="cant cajones">${cajones}</td>
+      <td class="blanco"></td>
+      <td class="blanco"></td>
+      <td class="fecha">${hoyStr}</td>
+      <td class="fecha venc">${vencTxt}</td>
+    </tr>`;
+  });
+
+  const ahora=new Date();
+  const p2=n=>String(n).padStart(2,'0');
+  const fechaImpresion=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()} ${p2(ahora.getHours())}:${p2(ahora.getMinutes())}`;
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Producción de Tapas — ${hoyStr}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;color:#111;padding:8mm}
+    h1{font-size:16pt;text-align:center;margin-bottom:2mm;text-transform:uppercase;letter-spacing:.5px}
+    .sub{font-size:11pt;text-align:center;color:#444;margin-bottom:6mm}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
+    col.c-prod{width:28%}
+    col.c-plan{width:16%}
+    col.c-caj{width:11%}
+    col.c-real{width:11%}
+    col.c-dif{width:11%}
+    col.c-env{width:11.5%}
+    col.c-venc{width:11.5%}
+    th{background:#1B3A6B;color:#fff;padding:6px 5px;font-size:11pt;text-align:center;border:1px solid #1B3A6B;word-break:break-word}
+    td{border:1px solid #999;padding:7px 5px;font-size:13pt;text-align:center;word-break:break-word;height:10mm}
+    td.prod{font-weight:700;text-align:left}
+    td.fecha{font-size:11.5pt}
+    td.fecha.venc{color:#A32D2D;font-weight:700}
+    td.cant{font-weight:700;color:#0F6E56}
+    td.cajones{color:#534AB7}
+    td.blanco{background:#fff}
+    .diasvto{font-size:8.5pt;font-weight:400;color:#777}
+    .sinunidad{color:#A32D2D;font-weight:400;font-size:9pt;font-style:italic}
+    tr:nth-child(even) td{background:#fafafa}
+    tr:nth-child(even) td.blanco{background:#fff}
+    @media print{@page{size:A4 landscape;margin:8mm}body{padding:0}}
+  </style></head>
+  <body>
+    <h1>Producción de Tapas</h1>
+    <div class="sub">${hoyStr} · Cajones = Planificado ÷ ${divisor.toLocaleString('es-AR')} · Impreso ${fechaImpresion}</div>
+    <table>
+      <colgroup><col class="c-prod"><col class="c-plan"><col class="c-caj"><col class="c-real"><col class="c-dif"><col class="c-env"><col class="c-venc"></colgroup>
+      <thead><tr><th>Producto</th><th>Planificado</th><th>Cajones</th><th>Real</th><th>Dif.</th><th>Envasado</th><th>Vencimiento</th></tr></thead>
+      <tbody>${filas}</tbody>
+    </table>
+  <script>window.onload=function(){setTimeout(function(){window.print()},350)};<\/script>
+  </body></html>`;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para imprimir.');
 }
 function togglePlanillaInfo(slug){
   const el=document.getElementById('pi-'+slug);
