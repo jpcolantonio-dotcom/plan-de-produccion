@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.295</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.296</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -10227,15 +10227,26 @@ async function renderObjetivoStock(){
   }catch(e){el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> Error: ${e.message}</div>`;console.error(e)}
 }
 
+// v4.296: "necesito que el sistema me diga en la columna de falta, el porcentaje de utilizacion
+// de la capacitdad maxima" -- % de ocupación = Stock Real / Stock Máximo. Se agrega al lado del
+// valor que ya mostraba la columna (completo/faltante), no lo reemplaza. Sin dato de Flexxus no
+// hay con qué calcularlo, así que ahí sigue mostrando solo "s/d" como antes.
+function objPctOcupacion(realCajas,stockMax){
+  if(realCajas==null||!stockMax)return null;
+  return Math.round((realCajas/stockMax)*1000)/10;
+}
+
 function objHtmlFalta(f){
   if(f.realCajas==null){
     const motivo=f.real&&f.real.sinCodigo?'sin código vinculado':(f.real&&f.real.sinUjc?'falta unidades por caja':'sin dato de Flexxus');
     return`<span style="color:var(--text3)" title="${motivo}">s/d</span>`;
   }
+  const pct=objPctOcupacion(f.realCajas,f.stockMax);
+  const pctTxt=pct!=null?` <span style="font-size:10px;font-weight:400;color:var(--text2)">(${pct.toLocaleString('es-AR')}% ocup.)</span>`:'';
   if(f.falta<=0){
-    return`<span style="color:var(--green);font-weight:700">✓ completo</span>`+(f.falta<0?` <span style="font-size:10px;color:var(--text2)">(+${Math.abs(f.falta).toLocaleString('es-AR')})</span>`:'');
+    return`<span style="color:var(--green);font-weight:700">✓ completo</span>`+(f.falta<0?` <span style="font-size:10px;color:var(--text2)">(+${Math.abs(f.falta).toLocaleString('es-AR')})</span>`:'')+pctTxt;
   }
-  return`<span style="color:var(--red);font-weight:700">${f.falta.toLocaleString('es-AR')}</span>`;
+  return`<span style="color:var(--red);font-weight:700">${f.falta.toLocaleString('es-AR')}</span>`+pctTxt;
 }
 
 // v4.287: "necesito que aca me aparezca separado por area de producto" -- antes era una sola
@@ -10279,19 +10290,20 @@ function objHtmlTabla(filas){
         <th style="text-align:left">Producto</th>
         <th style="text-align:right">Stock Máximo</th>
         <th style="text-align:right">Stock Real (Flexxus)</th>
-        <th style="text-align:right">Falta</th>
+        <th style="text-align:right">Falta (% ocup.)</th>
       </tr></thead><tbody>`;
     g.filas.forEach(f=>{
       const realTxt=f.realCajas!=null?f.realCajas.toLocaleString('es-AR'):'<span style="color:var(--text3)">s/d</span>';
       const advertencia=f.real&&f.real.enUnidades&&f.real.sinUjc?' <span title="Solo hay stock por unidad y falta configurar cuántas unidades entran por caja (Stock → Configuración → Cantidad de producto por caja)" style="color:var(--amber)">⚠</span>':'';
       h+=`<tr><td style="font-family:monospace;font-size:12px;color:var(--text2)">${f.codigo||''}</td><td style="font-weight:500">${f.producto}</td><td style="text-align:right">${f.stockMax.toLocaleString('es-AR')}</td><td style="text-align:right">${realTxt}${advertencia}</td><td style="text-align:right">${objHtmlFalta(f)}</td></tr>`;
     });
+    const totalPct=objPctOcupacion(t.totalReal,t.totalMax);
     h+=`<tr style="font-weight:700;background:var(--bg2);border-top:1.5px solid var(--border)">
       <td></td>
       <td style="text-align:left">Total</td>
       <td style="text-align:right">${t.totalMax.toLocaleString('es-AR')}</td>
       <td style="text-align:right">${t.totalReal.toLocaleString('es-AR')}${t.sinDato?` <span style="font-size:10px;font-weight:400;color:var(--text3)" title="${t.sinDato} producto(s) sin dato de Flexxus, no entran en este total">(${t.sinDato} s/d)</span>`:''}</td>
-      <td></td>
+      <td style="text-align:right">${totalPct!=null?totalPct.toLocaleString('es-AR')+'% ocup.':''}</td>
     </tr>`;
     h+='</tbody></table></div>';
   });
@@ -10333,17 +10345,20 @@ function pdfObjetivoStock(){
   ${objAgruparPorArea(filas).map(g=>{
     const t=objTotalesArea(g.filas);
     const totalRealTxt=t.totalReal.toLocaleString('es-AR')+(t.sinDato?` (${t.sinDato} s/d)`:'');
+    const totalPct=objPctOcupacion(t.totalReal,t.totalMax);
     return`
   <div class="area-block">
     <div class="area-tit">${g.area} (${g.filas.length})</div>
-    <table><thead><tr><th style="width:90px">Código</th><th>Producto</th><th class="r">Stock Máximo</th><th class="r">Stock Real</th><th class="r">Falta</th></tr></thead><tbody>
+    <table><thead><tr><th style="width:90px">Código</th><th>Producto</th><th class="r">Stock Máximo</th><th class="r">Stock Real</th><th class="r">Falta (% ocup.)</th></tr></thead><tbody>
     ${g.filas.map(f=>{
+      const pct=objPctOcupacion(f.realCajas,f.stockMax);
+      const pctTxt=pct!=null?` (${pct.toLocaleString('es-AR')}%)`:'';
       const realTxt=f.realCajas!=null?f.realCajas.toLocaleString('es-AR'):'s/d';
-      const faltaTxt=f.realCajas==null?'s/d':(f.falta<=0?'✓ completo':f.falta.toLocaleString('es-AR'));
+      const faltaTxt=f.realCajas==null?'s/d':(f.falta<=0?'✓ completo'+pctTxt:f.falta.toLocaleString('es-AR')+pctTxt);
       const faltaCls=f.realCajas!=null&&f.falta<=0?'verde':(f.realCajas!=null?'rojo':'');
       return`<tr><td>${f.codigo||''}</td><td>${f.producto}</td><td class="r">${f.stockMax.toLocaleString('es-AR')}</td><td class="r">${realTxt}</td><td class="r ${faltaCls}">${faltaTxt}</td></tr>`;
     }).join('')}
-    <tr style="font-weight:700;background:#eef1f6"><td></td><td>Total</td><td class="r">${t.totalMax.toLocaleString('es-AR')}</td><td class="r">${totalRealTxt}</td><td></td></tr>
+    <tr style="font-weight:700;background:#eef1f6"><td></td><td>Total</td><td class="r">${t.totalMax.toLocaleString('es-AR')}</td><td class="r">${totalRealTxt}</td><td class="r">${totalPct!=null?totalPct.toLocaleString('es-AR')+'%':''}</td></tr>
     </tbody></table>
   </div>`;
   }).join('')}
