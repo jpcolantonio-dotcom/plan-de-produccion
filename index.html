@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.294</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.295</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -10253,10 +10253,23 @@ function objAgruparPorArea(filas){
   return grupos;
 }
 
+// v4.295: "necesito que me pongas los totales por area tanto de stock maximo como stock flexxus"
+// -- suma, por cada bloque de área, el Stock Máximo de todos los productos y el Stock Real de
+// los que tienen dato de Flexxus cargado (los "s/d" no suman, porque no hay número real para
+// sumar -- se avisa cuántos quedaron afuera para que el total no parezca completo sin serlo).
+function objTotalesArea(filas){
+  const totalMax=Math.round(filas.reduce((s,f)=>s+f.stockMax,0)*100)/100;
+  const conDato=filas.filter(f=>f.realCajas!=null);
+  const totalReal=Math.round(conDato.reduce((s,f)=>s+f.realCajas,0)*100)/100;
+  const sinDato=filas.length-conDato.length;
+  return{totalMax,totalReal,sinDato};
+}
+
 function objHtmlTabla(filas){
   const grupos=objAgruparPorArea(filas);
   let h='';
   grupos.forEach(g=>{
+    const t=objTotalesArea(g.filas);
     h+=`<div class="stock-card">
       <div style="padding:9px 12px;font-weight:700;font-size:13px;background:var(--bg2);border-bottom:.5px solid var(--border);display:flex;align-items:center;gap:8px">
         ${g.area} <span style="font-weight:400;color:var(--text2);font-size:11.5px">(${g.filas.length})</span>
@@ -10273,6 +10286,13 @@ function objHtmlTabla(filas){
       const advertencia=f.real&&f.real.enUnidades&&f.real.sinUjc?' <span title="Solo hay stock por unidad y falta configurar cuántas unidades entran por caja (Stock → Configuración → Cantidad de producto por caja)" style="color:var(--amber)">⚠</span>':'';
       h+=`<tr><td style="font-family:monospace;font-size:12px;color:var(--text2)">${f.codigo||''}</td><td style="font-weight:500">${f.producto}</td><td style="text-align:right">${f.stockMax.toLocaleString('es-AR')}</td><td style="text-align:right">${realTxt}${advertencia}</td><td style="text-align:right">${objHtmlFalta(f)}</td></tr>`;
     });
+    h+=`<tr style="font-weight:700;background:var(--bg2);border-top:1.5px solid var(--border)">
+      <td></td>
+      <td style="text-align:left">Total</td>
+      <td style="text-align:right">${t.totalMax.toLocaleString('es-AR')}</td>
+      <td style="text-align:right">${t.totalReal.toLocaleString('es-AR')}${t.sinDato?` <span style="font-size:10px;font-weight:400;color:var(--text3)" title="${t.sinDato} producto(s) sin dato de Flexxus, no entran en este total">(${t.sinDato} s/d)</span>`:''}</td>
+      <td></td>
+    </tr>`;
     h+='</tbody></table></div>';
   });
   return h;
@@ -10310,7 +10330,10 @@ function pdfObjetivoStock(){
     <div><div class="hdr-title">🎯 Objetivo de stock</div><div class="hdr-sub">${nm}</div></div>
     <div class="hdr-fecha">Stock real al: ${fechaTxt}</div>
   </div>
-  ${objAgruparPorArea(filas).map(g=>`
+  ${objAgruparPorArea(filas).map(g=>{
+    const t=objTotalesArea(g.filas);
+    const totalRealTxt=t.totalReal.toLocaleString('es-AR')+(t.sinDato?` (${t.sinDato} s/d)`:'');
+    return`
   <div class="area-block">
     <div class="area-tit">${g.area} (${g.filas.length})</div>
     <table><thead><tr><th style="width:90px">Código</th><th>Producto</th><th class="r">Stock Máximo</th><th class="r">Stock Real</th><th class="r">Falta</th></tr></thead><tbody>
@@ -10320,8 +10343,10 @@ function pdfObjetivoStock(){
       const faltaCls=f.realCajas!=null&&f.falta<=0?'verde':(f.realCajas!=null?'rojo':'');
       return`<tr><td>${f.codigo||''}</td><td>${f.producto}</td><td class="r">${f.stockMax.toLocaleString('es-AR')}</td><td class="r">${realTxt}</td><td class="r ${faltaCls}">${faltaTxt}</td></tr>`;
     }).join('')}
+    <tr style="font-weight:700;background:#eef1f6"><td></td><td>Total</td><td class="r">${t.totalMax.toLocaleString('es-AR')}</td><td class="r">${totalRealTxt}</td><td></td></tr>
     </tbody></table>
-  </div>`).join('')}
+  </div>`;
+  }).join('')}
   <script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script>
   </body></html>`;
   const w=window.open('','_blank','width=900,height=700');
