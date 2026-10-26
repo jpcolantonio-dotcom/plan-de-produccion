@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.299</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.301</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2184,6 +2184,13 @@ const wlbCorta=k=>{const d=new Date(k+'T00:00:00');const f=x=>x.toLocaleDateStri
 
 let infPdadGrupos=[];
 let infPdadMeta={semanas:[],empresaLabel:''};
+let infPdadResumen=null;
+// Horas consumidas por semana, guardadas en Supabase (tabla nueva `productividad_horas`) -- caché
+// de la combinación semana+filtro de empresa actual (ef: 'all' o un empresa_id), se recarga cada
+// vez que se renderiza Productividad. Separado por filtro de empresa a propósito: las horas de
+// "Planeta" y las de "Joselito" no tienen por qué ser las mismas, y con "Todas" se puede cargar un
+// tercer número aparte si se lleva la cuenta combinada.
+let horasProdCache={};
 
 function initInformeProductividad(){
   pS('inf-pdad-wsel');
@@ -2242,6 +2249,57 @@ function pdadAgrupar(semanas,ef,planPorSemana,realPorSemana){
   return grupos;
 }
 
+// v4.300: "aca en productividad, tiene que haber otro que sea reusmen, donde ponga el total de
+// cada semana por area, y despues abajo el total de todas las areas, y me de la posibilidad de
+// poner la horas consumidas por semana (deben quedar guardadas para cada vez que las necesito), y
+// abajo hacer le KPI de productividad que sea en relacion a los kilos de productos vs horas" --
+// puro (no toca document/Supabase): a partir de los `grupos` que ya arma `pdadAgrupar` (que ya
+// trae el Kg de cada área por semana) y de las horas cargadas por semana, calcula el total general
+// en Kg por semana, y el KPI Kg/hora. Las áreas sin ningún producto con peso cargado ya aportan 0
+// en `totalesSemanaKg`/`totalKgGeneral` (ver pdadAgrupar), así que sumarlas directamente es seguro.
+function pdadResumen(grupos,semanas,horasPorSemana){
+  const totalPorSemana={};
+  semanas.forEach(k=>{totalPorSemana[k]=Math.round(grupos.reduce((s,g)=>s+(g.totalesSemanaKg[k]||0),0)*100)/100});
+  const totalGeneral=Math.round(grupos.reduce((s,g)=>s+(g.totalKgGeneral||0),0)*100)/100;
+  const kpiPorSemana={};
+  semanas.forEach(k=>{
+    const h=horasPorSemana[k];
+    kpiPorSemana[k]=(h!=null&&h>0)?Math.round(totalPorSemana[k]/h*100)/100:null;
+  });
+  const horasTotal=semanas.reduce((s,k)=>s+(horasPorSemana[k]||0),0);
+  const kpiTotal=horasTotal>0?Math.round(totalGeneral/horasTotal*100)/100:null;
+  return{totalPorSemana,totalGeneral,kpiPorSemana,kpiTotal,horasTotal,horasPorSemana};
+}
+
+// Carga las horas guardadas para estas semanas + este filtro de empresa (tabla nueva
+// `productividad_horas`, SQL en la entrega). Guarda la fila completa (con su id) en caché para
+// que guardarHorasSemana sepa si tiene que hacer PATCH o INSERT.
+async function cargarHorasProductividad(semanas,ef){
+  horasProdCache={};
+  try{
+    const rows=await get('productividad_horas',`semana=in.(${semanas.join(',')})&empresa_filtro=eq.${ef}`);
+    rows.forEach(r=>{horasProdCache[r.semana]=r;});
+  }catch(e){console.error('No se pudieron cargar las horas de productividad:',e);}
+}
+
+async function guardarHorasSemana(semana,ef,valor){
+  const horas=valor===''?null:parseFloat(valor);
+  try{
+    const existente=horasProdCache[semana];
+    if(existente&&existente.id){
+      await pat('productividad_horas',existente.id,{horas});
+      existente.horas=horas;
+    }else{
+      const[row]=await ins('productividad_horas',{semana,empresa_filtro:ef,horas});
+      horasProdCache[semana]=row;
+    }
+    renderInformeProductividad();
+  }catch(e){
+    console.error(e);
+    alert('No se pudieron guardar las horas: '+e.message);
+  }
+}
+
 const fmtKg=v=>v==null?'':(v<1?v.toFixed(2):v.toFixed(1));
 // Celda de cantidad + Kg entre paréntesis cuando el producto tiene peso cargado -- mismo formato
 // que ya usa el PDF de Desvíos para Kg Plan/Kg Real, pero acá siempre al lado de la cantidad, no
@@ -2263,16 +2321,50 @@ async function renderInformeProductividad(){
   const semanas=idxHasta===-1?st.Sem.slice(-4):st.Sem.slice(Math.max(0,idxHasta-3),idxHasta+1);
   if(!semanas.length){el.innerHTML='<div class="empty">No hay semanas cargadas todavía.</div>';if(btnImp)btnImp.disabled=true;return}
   el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando...</div>';
-  await Promise.all(semanas.flatMap(k=>[lp(k),lr(k)]));
+  await Promise.all([...semanas.flatMap(k=>[lp(k),lr(k)]),cargarHorasProductividad(semanas,ef)]);
   const grupos=pdadAgrupar(semanas,ef,st.P,st.R);
   infPdadGrupos=grupos;
   const empSel=st.E.find(e=>e.id===ef);
   infPdadMeta={semanas,empresaLabel:ef==='all'?'Todas las empresas':(empSel?empSel.nombre:'')};
-  if(btnImp)btnImp.disabled=!grupos.length;
-  if(!grupos.length){el.innerHTML='<div class="empty"><i class="ti ti-chart-bar"></i>No hay producción real cargada en estas 4 semanas.</div>';return}
+  // v4.301: "donde esta el resumen??" -- mandó screenshot de Productividad con "No hay producción
+  // real cargada en estas 4 semanas", que hasta acá cortaba TODO antes de armar el Resumen (incluso
+  // las Horas consumidas, que tiene sentido poder cargar YA aunque la producción de esa semana
+  // todavía no esté asentada). El Resumen (y el botón Imprimir) ahora se arman siempre que haya
+  // semanas elegidas, independientemente de si hay producción real cargada o no -- el bloque por
+  // área de abajo sí se reemplaza por un aviso cuando no hay nada que mostrar.
+  if(btnImp)btnImp.disabled=false;
+  const horasPorSemana={};semanas.forEach(k=>{horasPorSemana[k]=horasProdCache[k]?horasProdCache[k].horas:null});
+  const resumen=pdadResumen(grupos,semanas,horasPorSemana);
+  infPdadResumen=resumen;
   const thSemanas=semanas.map(k=>`<th style="text-align:right">${wlbCorta(k)}</th>`).join('');
-  el.innerHTML=`<div style="font-size:12px;color:var(--text2);margin-bottom:10px">${semanas.length} semana${semanas.length!==1?'s':''}: ${semanas.map(wlbCorta).join(' · ')}</div>
-  ${grupos.map(g=>`<div class="stock-card" style="margin-bottom:14px">
+  const resumenHtml=`<div class="stock-card" style="margin-bottom:14px">
+    <div style="padding:9px 12px;font-weight:700;font-size:13px;background:var(--bg2);border-bottom:.5px solid var(--border)">Resumen</div>
+    <div class="grid-scroll">
+    <table class="stock-tbl"><thead><tr>
+      <th style="text-align:left">Área</th>
+      ${thSemanas}
+      <th style="text-align:right">Total</th>
+    </tr></thead><tbody>
+      ${grupos.map(g=>`<tr><td style="font-weight:500">${g.area}</td>${semanas.map(k=>`<td style="text-align:right">${g.totalesSemanaKg[k]?fmtKg(g.totalesSemanaKg[k])+' kg':'—'}</td>`).join('')}<td style="text-align:right;font-weight:600">${g.totalKgGeneral?fmtKg(g.totalKgGeneral)+' kg':'—'}</td></tr>`).join('')}
+      <tr style="font-weight:700;background:var(--bg2);border-top:1.5px solid var(--border)">
+        <td style="text-align:left">Total general</td>
+        ${semanas.map(k=>`<td style="text-align:right">${resumen.totalPorSemana[k]?fmtKg(resumen.totalPorSemana[k])+' kg':'—'}</td>`).join('')}
+        <td style="text-align:right">${resumen.totalGeneral?fmtKg(resumen.totalGeneral)+' kg':'—'}</td>
+      </tr>
+      <tr>
+        <td style="text-align:left;font-weight:500">Horas consumidas</td>
+        ${semanas.map(k=>`<td style="text-align:right"><input type="number" min="0" step="0.5" value="${horasPorSemana[k]!=null?horasPorSemana[k]:''}" placeholder="—" onchange="guardarHorasSemana('${k}','${ef}',this.value)" style="width:72px;padding:3px 6px;font-size:12px;text-align:right;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`).join('')}
+        <td style="text-align:right;font-size:11px;color:var(--text2)">${resumen.horasTotal?resumen.horasTotal.toLocaleString('es-AR')+' hs':''}</td>
+      </tr>
+      <tr style="font-weight:700;background:var(--bg2);border-top:1.5px solid var(--border)">
+        <td style="text-align:left">Productividad (Kg/hora)</td>
+        ${semanas.map(k=>`<td style="text-align:right">${resumen.kpiPorSemana[k]!=null?resumen.kpiPorSemana[k].toLocaleString('es-AR')+' kg/h':'—'}</td>`).join('')}
+        <td style="text-align:right">${resumen.kpiTotal!=null?resumen.kpiTotal.toLocaleString('es-AR')+' kg/h':'—'}</td>
+      </tr>
+    </tbody></table>
+    </div>
+  </div>`;
+  const detalleHtml=grupos.length?grupos.map(g=>`<div class="stock-card" style="margin-bottom:14px">
     <div style="padding:9px 12px;font-weight:700;font-size:13px;background:var(--bg2);border-bottom:.5px solid var(--border);display:flex;align-items:center;gap:8px">
       ${g.area} <span style="font-weight:400;color:var(--text2);font-size:11.5px">(${g.filas.length})</span>
     </div>
@@ -2290,11 +2382,17 @@ async function renderInformeProductividad(){
       </tr>
     </tbody></table>
     </div>
-  </div>`).join('')}`;
+  </div>`).join(''):'<div class="empty"><i class="ti ti-chart-bar"></i>No hay producción real cargada en estas 4 semanas todavía — igual podés cargar las horas consumidas arriba.</div>';
+  el.innerHTML=`<div style="font-size:12px;color:var(--text2);margin-bottom:10px">${semanas.length} semana${semanas.length!==1?'s':''}: ${semanas.map(wlbCorta).join(' · ')}</div>
+  ${resumenHtml}
+  ${detalleHtml}`;
 }
 
 function imprimirInformeProductividad(){
-  if(!infPdadGrupos.length)return;
+  // v4.301: antes exigía infPdadGrupos.length (producción real cargada) para poder imprimir -- pero
+  // el Resumen (Horas consumidas/KPI) ahora se arma igual sin producción cargada, así que el único
+  // requisito real es que haya semanas elegidas.
+  if(!infPdadMeta.semanas.length)return;
   const semanas=infPdadMeta.semanas;
   const ahora=new Date();
   const p2=n=>String(n).padStart(2,'0');
@@ -2313,6 +2411,18 @@ function imprimirInformeProductividad(){
     <table><thead><tr><th>Producto</th>${thSemanas}<th class="r">Total</th></tr></thead><tbody>${filas}${totalRow}</tbody></table>
   </div>`;
   }).join('');
+  const bloqueResumen=(()=>{
+    if(!infPdadResumen)return'';
+    const r=infPdadResumen;
+    const filasArea=infPdadGrupos.map(g=>`<tr><td>${g.area}</td>${semanas.map(k=>`<td class="r">${g.totalesSemanaKg[k]?fmtKg(g.totalesSemanaKg[k])+' kg':'—'}</td>`).join('')}<td class="r tot">${g.totalKgGeneral?fmtKg(g.totalKgGeneral)+' kg':'—'}</td></tr>`).join('');
+    const totalRow=`<tr style="font-weight:700;background:#eef1f6"><td>Total general</td>${semanas.map(k=>`<td class="r">${r.totalPorSemana[k]?fmtKg(r.totalPorSemana[k])+' kg':'—'}</td>`).join('')}<td class="r tot">${r.totalGeneral?fmtKg(r.totalGeneral)+' kg':'—'}</td></tr>`;
+    const horasRow=`<tr><td>Horas consumidas</td>${semanas.map(k=>`<td class="r">${r.horasPorSemana[k]!=null?r.horasPorSemana[k].toLocaleString('es-AR'):'—'}</td>`).join('')}<td class="r tot">${r.horasTotal?r.horasTotal.toLocaleString('es-AR'):''}</td></tr>`;
+    const kpiRow=`<tr style="font-weight:700;background:#eef1f6"><td>Productividad (Kg/hora)</td>${semanas.map(k=>`<td class="r">${r.kpiPorSemana[k]!=null?r.kpiPorSemana[k].toLocaleString('es-AR'):'—'}</td>`).join('')}<td class="r tot">${r.kpiTotal!=null?r.kpiTotal.toLocaleString('es-AR'):'—'}</td></tr>`;
+    return`<div class="area-block">
+    <div class="area-tit">Resumen</div>
+    <table><thead><tr><th>Área</th>${thSemanas}<th class="r">Total</th></tr></thead><tbody>${filasArea}${totalRow}${horasRow}${kpiRow}</tbody></table>
+  </div>`;
+  })();
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
   <title>Productividad — ${infPdadMeta.empresaLabel}</title>
   <style>
@@ -2333,6 +2443,7 @@ function imprimirInformeProductividad(){
   <body>
     <h1>PRODUCTIVIDAD</h1>
     <div class="sub">${infPdadMeta.empresaLabel} · Impreso ${fechaImpresion} · ${semanas.length} semanas: ${semanas.map(wlbCorta).join(' · ')}</div>
+    ${bloqueResumen}
     ${bloques}
   <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
   </body></html>`;
@@ -17898,3 +18009,5 @@ init();
 </script>
 </body>
 </html>
+
+        
