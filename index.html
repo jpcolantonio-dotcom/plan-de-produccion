@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.301</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.302</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -651,11 +651,18 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div class="toolbar">
       <div>
         <div style="font-size:16px;font-weight:600">Productividad</div>
-        <div style="font-size:13px;color:var(--text2)">Producción real total por semana, un producto por fila, agrupado por área (últimas 4 semanas hasta la elegida)</div>
+        <div style="font-size:13px;color:var(--text2)" id="inf-pdad-subt">Producción real total por semana, un producto por fila, agrupado por área (últimas 4 semanas hasta la elegida)</div>
       </div>
     </div>
+    <!-- v4.302: "quiero que en una pestaña separada estén la producción total de la semana de
+    criollo 13, criollo 15, hojaldre 13, hojaldre 15, pizzetas rellenas y burritos" -- confirmado
+    que es una sub-pestaña ACÁ adentro (no una pestaña aparte del todo), y que es fija a Planeta. -->
+    <div style="display:flex;gap:4px;margin-bottom:12px;border-bottom:.5px solid var(--border)">
+      <button class="proy-tab active" id="pdadvtab-areas" onclick="pdadSetVista('areas')"><i class="ti ti-building-factory-2"></i> Por área</button>
+      <button class="proy-tab" id="pdadvtab-foco" onclick="pdadSetVista('foco')"><i class="ti ti-stack-2"></i> Planeta: Tapas y Burritos</button>
+    </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
-      <label style="font-size:13px;color:var(--text2)">Empresa:</label>
+      <label style="font-size:13px;color:var(--text2)" id="inf-pdad-esel-lbl">Empresa:</label>
       <select id="inf-pdad-esel" onchange="renderInformeProductividad()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas</option></select>
       <label style="font-size:13px;color:var(--text2)">Hasta la semana:</label>
       <select id="inf-pdad-wsel" onchange="renderInformeProductividad()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
@@ -2192,6 +2199,39 @@ let infPdadResumen=null;
 // tercer número aparte si se lleva la cuenta combinada.
 let horasProdCache={};
 
+// v4.302: "las horas es por empresa y por el total de producto, por eso quiero que en una pestaña
+// separada estén las producción total de la semana de criollo 13, criollo 15, hojaldre 13,
+// hojaldre 15, pizzetas rellenas y burritos" -- confirmado por AskUserQuestion: (1) va como
+// sub-pestaña nueva ACÁ en Productividad (no una pestaña aparte de Informes), (2) "pizzetas
+// rellenas" = área PIZZETA (no existe ningún área con ese nombre exacto), (3) "las horas son solo
+// planeta" -- esta vista queda fija a Planeta Empanada, sin selector de empresa. Las 6 áreas son
+// todas de Planeta (confirmadas contra las áreas reales desde v4.232). `pdadVista` guarda cuál de
+// las dos vistas está activa; la general "Por área" (con selector de empresa) sigue igual que
+// antes. Las horas de esta vista se guardan con su propia clave de filtro ('foco_planeta_tapas')
+// para no mezclarse con las horas que ya se cargaban para "Planeta" en la vista general.
+const PDAD_AREAS_FOCO_PLANETA=['CRIOLLO 13','CRIOLLO 15','HOJALDRE 13','HOJALDRE 15','PIZZETA','BURRITOS'];
+const PDAD_HORAS_KEY_FOCO='foco_planeta_tapas';
+let pdadVista='areas'; // 'areas' | 'foco'
+
+function pdadSetVista(v){
+  pdadVista=v;
+  document.getElementById('pdadvtab-areas').classList.toggle('active',v==='areas');
+  document.getElementById('pdadvtab-foco').classList.toggle('active',v==='foco');
+  const esel=document.getElementById('inf-pdad-esel');
+  const eselLbl=document.getElementById('inf-pdad-esel-lbl');
+  const subt=document.getElementById('inf-pdad-subt');
+  if(v==='foco'){
+    const planeta=congGetPlaneta();
+    if(planeta)esel.value=planeta.id;
+    esel.disabled=true;eselLbl.style.opacity=.5;
+    subt.textContent='Producción total por semana de Criollo 13, Criollo 15, Hojaldre 13, Hojaldre 15, Pizzeta y Burritos (Planeta Empanada) -- para relacionar contra las horas consumidas de esta línea';
+  }else{
+    esel.disabled=false;eselLbl.style.opacity=1;
+    subt.textContent='Producción real total por semana, un producto por fila, agrupado por área (últimas 4 semanas hasta la elegida)';
+  }
+  renderInformeProductividad();
+}
+
 function initInformeProductividad(){
   pS('inf-pdad-wsel');
   renderInformeProductividad();
@@ -2313,7 +2353,12 @@ function pdadCelda(unidades,pesoGramos){
 
 async function renderInformeProductividad(){
   const el=document.getElementById('inf-pdad-content');
-  const ef=document.getElementById('inf-pdad-esel').value;
+  // v4.302: en la vista "foco" (Planeta: Tapas y Burritos) la empresa queda fija a Planeta,
+  // ignorando el selector (que además queda deshabilitado por pdadSetVista) -- y las horas de esta
+  // vista se guardan aparte, con su propia clave, para no mezclarse con las de la vista general.
+  const planeta=congGetPlaneta();
+  const ef=pdadVista==='foco'?(planeta?planeta.id:'all'):document.getElementById('inf-pdad-esel').value;
+  const horasKey=pdadVista==='foco'?PDAD_HORAS_KEY_FOCO:ef;
   const hastaK=document.getElementById('inf-pdad-wsel').value||st.w;
   const btnImp=document.getElementById('btnImprimirInfPdad');
   if(!el)return;
@@ -2321,11 +2366,12 @@ async function renderInformeProductividad(){
   const semanas=idxHasta===-1?st.Sem.slice(-4):st.Sem.slice(Math.max(0,idxHasta-3),idxHasta+1);
   if(!semanas.length){el.innerHTML='<div class="empty">No hay semanas cargadas todavía.</div>';if(btnImp)btnImp.disabled=true;return}
   el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando...</div>';
-  await Promise.all([...semanas.flatMap(k=>[lp(k),lr(k)]),cargarHorasProductividad(semanas,ef)]);
-  const grupos=pdadAgrupar(semanas,ef,st.P,st.R);
+  await Promise.all([...semanas.flatMap(k=>[lp(k),lr(k)]),cargarHorasProductividad(semanas,horasKey)]);
+  let grupos=pdadAgrupar(semanas,ef,st.P,st.R);
+  if(pdadVista==='foco')grupos=grupos.filter(g=>PDAD_AREAS_FOCO_PLANETA.includes((g.area||'').toUpperCase().trim()));
   infPdadGrupos=grupos;
   const empSel=st.E.find(e=>e.id===ef);
-  infPdadMeta={semanas,empresaLabel:ef==='all'?'Todas las empresas':(empSel?empSel.nombre:'')};
+  infPdadMeta={semanas,empresaLabel:pdadVista==='foco'?'Planeta Empanada — Tapas y Burritos':(ef==='all'?'Todas las empresas':(empSel?empSel.nombre:''))};
   // v4.301: "donde esta el resumen??" -- mandó screenshot de Productividad con "No hay producción
   // real cargada en estas 4 semanas", que hasta acá cortaba TODO antes de armar el Resumen (incluso
   // las Horas consumidas, que tiene sentido poder cargar YA aunque la producción de esa semana
@@ -2353,7 +2399,7 @@ async function renderInformeProductividad(){
       </tr>
       <tr>
         <td style="text-align:left;font-weight:500">Horas consumidas</td>
-        ${semanas.map(k=>`<td style="text-align:right"><input type="number" min="0" step="0.5" value="${horasPorSemana[k]!=null?horasPorSemana[k]:''}" placeholder="—" onchange="guardarHorasSemana('${k}','${ef}',this.value)" style="width:72px;padding:3px 6px;font-size:12px;text-align:right;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`).join('')}
+        ${semanas.map(k=>`<td style="text-align:right"><input type="number" min="0" step="0.5" value="${horasPorSemana[k]!=null?horasPorSemana[k]:''}" placeholder="—" onchange="guardarHorasSemana('${k}','${horasKey}',this.value)" style="width:72px;padding:3px 6px;font-size:12px;text-align:right;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`).join('')}
         <td style="text-align:right;font-size:11px;color:var(--text2)">${resumen.horasTotal?resumen.horasTotal.toLocaleString('es-AR')+' hs':''}</td>
       </tr>
       <tr style="font-weight:700;background:var(--bg2);border-top:1.5px solid var(--border)">
@@ -18009,5 +18055,3 @@ init();
 </script>
 </body>
 </html>
-
-        
