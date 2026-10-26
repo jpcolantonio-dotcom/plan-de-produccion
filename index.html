@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.296</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.299</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -514,6 +514,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab" id="inftab-rend" onclick="showInfSubTab('rend')"><i class="ti ti-speedometer"></i> Rendimiento</button>
     <button class="proy-tab" id="inftab-diario" onclick="showInfSubTab('diario')"><i class="ti ti-list-check"></i> Producción del Día</button>
     <button class="proy-tab" id="inftab-rango" onclick="showInfSubTab('rango')"><i class="ti ti-calendar-stats"></i> Producción por Rango</button>
+    <button class="proy-tab" id="inftab-pdad" onclick="showInfSubTab('pdad')"><i class="ti ti-chart-bar"></i> Productividad</button>
   </div>
 
   <!-- SUB-TAB DESVIOS -->
@@ -643,6 +644,24 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <button class="btn btn-sm" id="btnImprimirInfRango" onclick="imprimirInformeRango()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
     </div>
     <div id="inf-rango-content"></div>
+  </div>
+
+  <!-- SUB-TAB PRODUCTIVIDAD (nueva v4.297) -->
+  <div id="tab-pdad" style="display:none">
+    <div class="toolbar">
+      <div>
+        <div style="font-size:16px;font-weight:600">Productividad</div>
+        <div style="font-size:13px;color:var(--text2)">Producción real total por semana, un producto por fila, agrupado por área (últimas 4 semanas hasta la elegida)</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--text2)">Empresa:</label>
+      <select id="inf-pdad-esel" onchange="renderInformeProductividad()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas</option></select>
+      <label style="font-size:13px;color:var(--text2)">Hasta la semana:</label>
+      <select id="inf-pdad-wsel" onchange="renderInformeProductividad()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
+      <button class="btn btn-sm" id="btnImprimirInfPdad" onclick="imprimirInformeProductividad()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
+    </div>
+    <div id="inf-pdad-content"></div>
   </div>
 </div>
 
@@ -1897,7 +1916,7 @@ function T(t){
 let infActiveSubTab='desv';
 function showInfSubTab(t){
   infActiveSubTab=t;
-  ['desv','dash','rend','diario','rango'].forEach(x=>{
+  ['desv','dash','rend','diario','rango','pdad'].forEach(x=>{
     document.getElementById('tab-'+x).style.display=x===t?'':'none';
     document.getElementById('inftab-'+x).classList.toggle('active',x===t);
   });
@@ -1906,6 +1925,7 @@ function showInfSubTab(t){
   if(t==='rend')initRend();
   if(t==='diario')initInformeDiario();
   if(t==='rango')initInformeRango();
+  if(t==='pdad')initInformeProductividad();
 }
 
 // "Producción del Día" (Informes): lista plana de todos los productos con producción real cargada en
@@ -2138,6 +2158,182 @@ function imprimirInformeRango(){
       <thead><tr><th>ID</th><th>Alias</th><th>Unidad</th>${thDias}<th>Total</th></tr></thead>
       <tbody>${filas}</tbody>
     </table>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
+  </body></html>`;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para imprimir.');
+}
+
+// v4.297 (24/10/2026): "en informe, necesito que me agregues una nueva pestaña que se llame
+// productividad, donde me deberian aparecer la produccion de todos los productos de planeta y de
+// joselito (que se pueda elegir), es el total por semana, deberia quedar una columna donde este el
+// nombre del producto, la cuatro columnas con las cantidades una para cada semana. el total abajo
+// de cada area" -- nueva sub-pestaña "Productividad". A diferencia de "Producción por Rango" (una
+// columna por DÍA, elegido a mano con desde/hasta), acá cada columna es el TOTAL de una SEMANA
+// completa (suma de los 7 días vía realArr, mismo mecanismo que usa el total de Producción Real) y
+// son siempre 4 semanas fijas: las que terminan en la semana elegida en el selector "Hasta la
+// semana" (por defecto la semana actual), tomadas de st.Sem que ya viene ordenado cronológicamente.
+// Filas agrupadas por área (como Objetivo de Stock desde v4.287) con una fila "Total" al pie de
+// cada área sumando sus 4 columnas -- mismo criterio de match producto↔código de Maestro que usa
+// Producción por Rango (mpParaProducto/codigoParaProducto), así los productos quedan identificados
+// aunque el nombre libre del plan haya cambiado de una semana a otra.
+const wlbCorta=k=>{const d=new Date(k+'T00:00:00');const f=x=>x.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'});return`Sem ${wnum(d)} (${f(d)})`};
+
+let infPdadGrupos=[];
+let infPdadMeta={semanas:[],empresaLabel:''};
+
+function initInformeProductividad(){
+  pS('inf-pdad-wsel');
+  renderInformeProductividad();
+}
+
+// v4.298: "a cada uno de los productos vas a poner el peso en kg, para poder sacar el kg final de
+// produccion" -- el peso por producto YA existía (Configuración > Productos > "Peso (g)",
+// `productos.peso_gramos`, gramos por unidad de planificación), usado hasta ahora solo en
+// Informes > Desvíos para los KPIs de Kg Plan/Kg Real. Acá se reutiliza el mismo criterio de
+// búsqueda que usa esa pantalla (empresa+área+nombre exacto, con dos niveles de fallback por si el
+// área no matchea) para traer el peso de cada producto y convertir sus cantidades a Kg.
+function pesoGramosProducto(r){
+  const prod=st.Pr.find(px=>px.nombre===r.producto&&String(px.empresa_id)===String(r.empresa_id)&&(st.A.find(a=>a.id===px.area_id)?.nombre||'')===(r.area||''))
+    ||st.Pr.find(px=>px.nombre===r.producto&&String(px.empresa_id)===String(r.empresa_id))
+    ||st.Pr.find(px=>px.nombre===r.producto);
+  return prod?.peso_gramos!=null?parseFloat(prod.peso_gramos):null;
+}
+
+// Puro (sin tocar document/st.P/st.R) para poder testearlo aparte: arma los grupos por área a
+// partir de los planes/reales ya cargados de cada semana. `planPorSemana`/`realPorSemana` son
+// objetos {semana: [...]}/{semana: {...}} con la misma forma que st.P/st.R.
+function pdadAgrupar(semanas,ef,planPorSemana,realPorSemana){
+  const porArea={};
+  semanas.forEach(k=>{
+    const plan=planPorSemana[k]||[];
+    const real=realPorSemana[k]||{};
+    plan.forEach((r,oi)=>{
+      if(ef!=='all'&&r.empresa_id!==ef)return;
+      const val=realArr(real,r,oi).reduce((s,x)=>s+(x||0),0);
+      const mp=mpParaProducto(r);
+      const codigo=(mp&&mp.codigo)?mp.codigo:codigoParaProducto(r);
+      const alias=(mp&&(mp.alias||mp.nombre))||r.producto;
+      const areaLbl=(r.area||'Sin área')+(ef==='all'?` — ${en(r.empresa_id)}`:'');
+      const key=`${r.empresa_id}||${codigo||('_'+normTxt(alias))}`;
+      if(!porArea[areaLbl])porArea[areaLbl]={area:areaLbl,filas:{}};
+      if(!porArea[areaLbl].filas[key])porArea[areaLbl].filas[key]={codigo,alias,unidad:r.unidad,pesoGramos:pesoGramosProducto(r),porSemana:{}};
+      porArea[areaLbl].filas[key].porSemana[k]=(porArea[areaLbl].filas[key].porSemana[k]||0)+val;
+    });
+  });
+  const grupos=Object.values(porArea).map(g=>{
+    const filas=Object.values(g.filas).map(f=>{
+      const total=semanas.reduce((s,k)=>s+(f.porSemana[k]||0),0);
+      const totalKg=f.pesoGramos!=null?Math.round(total*f.pesoGramos/1000*100)/100:null;
+      return{...f,total,totalKg};
+    }).filter(f=>f.total>0);
+    filas.sort((a,b)=>a.alias.localeCompare(b.alias,'es'));
+    const totalesSemana={};semanas.forEach(k=>{totalesSemana[k]=filas.reduce((s,f)=>s+(f.porSemana[k]||0),0)});
+    const totalGeneral=semanas.reduce((s,k)=>s+totalesSemana[k],0);
+    const hayKg=filas.some(f=>f.pesoGramos!=null);
+    const totalesSemanaKg={};semanas.forEach(k=>{totalesSemanaKg[k]=Math.round(filas.reduce((s,f)=>s+(f.pesoGramos!=null?(f.porSemana[k]||0)*f.pesoGramos/1000:0),0)*100)/100});
+    const totalKgGeneral=Math.round(filas.reduce((s,f)=>s+(f.totalKg||0),0)*100)/100;
+    return{area:g.area,filas,totalesSemana,totalGeneral,hayKg,totalesSemanaKg,totalKgGeneral};
+  }).filter(g=>g.filas.length);
+  grupos.sort((a,b)=>a.area.localeCompare(b.area,'es'));
+  return grupos;
+}
+
+const fmtKg=v=>v==null?'':(v<1?v.toFixed(2):v.toFixed(1));
+// Celda de cantidad + Kg entre paréntesis cuando el producto tiene peso cargado -- mismo formato
+// que ya usa el PDF de Desvíos para Kg Plan/Kg Real, pero acá siempre al lado de la cantidad, no
+// en una columna aparte.
+function pdadCelda(unidades,pesoGramos){
+  if(!unidades)return'—';
+  const txt=unidades.toLocaleString('es-AR');
+  if(pesoGramos==null)return txt;
+  return`${txt} <span style="font-size:10px;color:var(--text2)">(${fmtKg(unidades*pesoGramos/1000)} kg)</span>`;
+}
+
+async function renderInformeProductividad(){
+  const el=document.getElementById('inf-pdad-content');
+  const ef=document.getElementById('inf-pdad-esel').value;
+  const hastaK=document.getElementById('inf-pdad-wsel').value||st.w;
+  const btnImp=document.getElementById('btnImprimirInfPdad');
+  if(!el)return;
+  const idxHasta=st.Sem.indexOf(hastaK);
+  const semanas=idxHasta===-1?st.Sem.slice(-4):st.Sem.slice(Math.max(0,idxHasta-3),idxHasta+1);
+  if(!semanas.length){el.innerHTML='<div class="empty">No hay semanas cargadas todavía.</div>';if(btnImp)btnImp.disabled=true;return}
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando...</div>';
+  await Promise.all(semanas.flatMap(k=>[lp(k),lr(k)]));
+  const grupos=pdadAgrupar(semanas,ef,st.P,st.R);
+  infPdadGrupos=grupos;
+  const empSel=st.E.find(e=>e.id===ef);
+  infPdadMeta={semanas,empresaLabel:ef==='all'?'Todas las empresas':(empSel?empSel.nombre:'')};
+  if(btnImp)btnImp.disabled=!grupos.length;
+  if(!grupos.length){el.innerHTML='<div class="empty"><i class="ti ti-chart-bar"></i>No hay producción real cargada en estas 4 semanas.</div>';return}
+  const thSemanas=semanas.map(k=>`<th style="text-align:right">${wlbCorta(k)}</th>`).join('');
+  el.innerHTML=`<div style="font-size:12px;color:var(--text2);margin-bottom:10px">${semanas.length} semana${semanas.length!==1?'s':''}: ${semanas.map(wlbCorta).join(' · ')}</div>
+  ${grupos.map(g=>`<div class="stock-card" style="margin-bottom:14px">
+    <div style="padding:9px 12px;font-weight:700;font-size:13px;background:var(--bg2);border-bottom:.5px solid var(--border);display:flex;align-items:center;gap:8px">
+      ${g.area} <span style="font-weight:400;color:var(--text2);font-size:11.5px">(${g.filas.length})</span>
+    </div>
+    <div class="grid-scroll">
+    <table class="stock-tbl"><thead><tr>
+      <th style="text-align:left">Producto</th>
+      ${thSemanas}
+      <th style="text-align:right">Total</th>
+    </tr></thead><tbody>
+      ${g.filas.map(f=>`<tr><td style="font-weight:500">${f.alias}${f.unidad?` <span style="font-size:10px;color:var(--text3)">(${f.unidad})</span>`:''}</td>${semanas.map(k=>`<td style="text-align:right">${pdadCelda(f.porSemana[k],f.pesoGramos)}</td>`).join('')}<td style="text-align:right;font-weight:600">${pdadCelda(f.total,f.pesoGramos)}</td></tr>`).join('')}
+      <tr style="font-weight:700;background:var(--bg2);border-top:1.5px solid var(--border)">
+        <td style="text-align:left">Total ${g.area}</td>
+        ${semanas.map(k=>`<td style="text-align:right">${g.totalesSemana[k]?g.totalesSemana[k].toLocaleString('es-AR'):'—'}${g.hayKg&&g.totalesSemanaKg[k]?` <span style="font-size:10px;font-weight:400;color:var(--text2)">(${fmtKg(g.totalesSemanaKg[k])} kg)</span>`:''}</td>`).join('')}
+        <td style="text-align:right">${g.totalGeneral?g.totalGeneral.toLocaleString('es-AR'):'—'}${g.hayKg?` <span style="font-size:10px;font-weight:400;color:var(--text2)">(${fmtKg(g.totalKgGeneral)} kg)</span>`:''}</td>
+      </tr>
+    </tbody></table>
+    </div>
+  </div>`).join('')}`;
+}
+
+function imprimirInformeProductividad(){
+  if(!infPdadGrupos.length)return;
+  const semanas=infPdadMeta.semanas;
+  const ahora=new Date();
+  const p2=n=>String(n).padStart(2,'0');
+  const fechaImpresion=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()} ${p2(ahora.getHours())}:${p2(ahora.getMinutes())}`;
+  const thSemanas=semanas.map(k=>`<th class="r">${wlbCorta(k)}</th>`).join('');
+  const celdaPDF=(unidades,pg)=>{
+    if(!unidades)return'—';
+    const txt=unidades.toLocaleString('es-AR');
+    return pg==null?txt:`${txt} (${fmtKg(unidades*pg/1000)} kg)`;
+  };
+  const bloques=infPdadGrupos.map(g=>{
+    const filas=g.filas.map(f=>`<tr><td>${f.alias}${f.unidad?' ('+f.unidad+')':''}</td>${semanas.map(k=>`<td class="r">${celdaPDF(f.porSemana[k],f.pesoGramos)}</td>`).join('')}<td class="r tot">${celdaPDF(f.total,f.pesoGramos)}</td></tr>`).join('');
+    const totalRow=`<tr style="font-weight:700;background:#eef1f6"><td>Total ${g.area}</td>${semanas.map(k=>`<td class="r">${g.totalesSemana[k]?g.totalesSemana[k].toLocaleString('es-AR'):'—'}${g.hayKg&&g.totalesSemanaKg[k]?` (${fmtKg(g.totalesSemanaKg[k])} kg)`:''}</td>`).join('')}<td class="r tot">${g.totalGeneral?g.totalGeneral.toLocaleString('es-AR'):'—'}${g.hayKg?` (${fmtKg(g.totalKgGeneral)} kg)`:''}</td></tr>`;
+    return`<div class="area-block">
+    <div class="area-tit">${g.area} (${g.filas.length})</div>
+    <table><thead><tr><th>Producto</th>${thSemanas}<th class="r">Total</th></tr></thead><tbody>${filas}${totalRow}</tbody></table>
+  </div>`;
+  }).join('');
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Productividad — ${infPdadMeta.empresaLabel}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;padding:8mm;font-size:10pt}
+    h1{font-size:15pt;margin-bottom:2px}
+    .sub{font-size:10pt;color:#555;margin-bottom:10px}
+    table{width:100%;border-collapse:collapse;margin-bottom:4px}
+    th{text-align:center;padding:5px 6px;font-size:9pt;border-bottom:2px solid #333;white-space:nowrap}
+    th:first-child{text-align:left}
+    td{padding:5px 6px;font-size:9.5pt;border-bottom:1px solid #ccc;text-align:center;white-space:nowrap}
+    td:first-child{text-align:left;font-weight:600}
+    td.tot{font-weight:700;border-left:1px solid #ccc}
+    .area-tit{font-size:10.5pt;font-weight:700;color:#1B3A6B;margin:12px 0 4px;padding-bottom:2px;border-bottom:1px solid #1B3A6B}
+    .area-tit:first-of-type{margin-top:0}
+    @media print{@page{size:A4 landscape;margin:8mm}body{padding:0}.area-block{break-inside:avoid}}
+  </style></head>
+  <body>
+    <h1>PRODUCTIVIDAD</h1>
+    <div class="sub">${infPdadMeta.empresaLabel} · Impreso ${fechaImpresion} · ${semanas.length} semanas: ${semanas.map(wlbCorta).join(' · ')}</div>
+    ${bloques}
   <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
   </body></html>`;
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
@@ -7775,7 +7971,7 @@ function clearDashTimer(){
 }
 
 function uES(){
-  ['resel','cesel','ceesel','desv-esel','dash-esel','inf-diario-esel','inf-rango-esel'].forEach(id=>{
+  ['resel','cesel','ceesel','desv-esel','dash-esel','inf-diario-esel','inf-rango-esel','inf-pdad-esel'].forEach(id=>{
     const s=document.getElementById(id);if(!s)return;
     const c=s.value;s.innerHTML='<option value="all">Todas</option>';
     if(id==='dash-esel')s.options[0].text='Todas las empresas';
@@ -16843,8 +17039,20 @@ function remAgruparPorCategoria(items){
 // tamaño entre sí (el error real de v4.267) y nada se pierde: Unidades pasa a ser la suma de las
 // sueltas reales de cada ítem del subgrupo, se queden en lo que se queden (10, 12 o 90), sin
 // redondearlas nunca a una docena más.
+// v4.299 (26/10/2026): screenshot del "Resumen de recepción" (la tabla de Cantidades) con
+// "necesito que aparezca todos los titulos de las conceptos en el resumen aunque este en cero,
+// obviamente con este orden" -- hasta acá, una categoría que no tuviera NINGÚN ítem en ese remito
+// puntual directamente no aparecía en la tabla (remAgruparPorCategoria solo agrupa lo que vino).
+// Ahora las 13 categorías conocidas de CATEGORIAS_PRODUCTO_SUGERIDAS SIEMPRE salen, en ese mismo
+// orden fijo, con 0/0 cuando no hubo nada de esa categoría en el remito -- así la hoja impresa
+// queda con la misma estructura de renglones siempre, sea cual sea el pedido. Las categorías
+// "extra" (texto libre que no matchea ninguna de las 13, o "Sin categoría asignada") siguen
+// apareciendo DESPUÉS, pero esas sí solo si de verdad tienen ítems -- no tendría sentido inventar
+// un renglón en cero para una categoría personalizada que nadie cargó en este remito.
 function remResumenPorCategoria(items){
-  return remAgruparPorCategoria(items).map(g=>{
+  const agrupado=remAgruparPorCategoria(items);
+  const valoresPorCategoria={};
+  agrupado.forEach(g=>{
     let docenas=0,unidades=0;
     g.items.forEach(it=>{
       if(it.unidad_mostrada==='bandejas'){
@@ -16856,8 +17064,11 @@ function remResumenPorCategoria(items){
         unidades+=it.cantidad_mostrada;
       }
     });
-    return{categoria:g.categoria,docenas:Math.round(docenas*100)/100,unidades:Math.round(unidades*100)/100};
+    valoresPorCategoria[g.categoria]={docenas:Math.round(docenas*100)/100,unidades:Math.round(unidades*100)/100};
   });
+  const filasConocidas=CATEGORIAS_PRODUCTO_SUGERIDAS.map(categoria=>({categoria,...(valoresPorCategoria[categoria]||{docenas:0,unidades:0})}));
+  const filasExtra=agrupado.filter(g=>!CATEGORIAS_PRODUCTO_SUGERIDAS.includes(g.categoria)).map(g=>({categoria:g.categoria,...valoresPorCategoria[g.categoria]}));
+  return[...filasConocidas,...filasExtra];
 }
 // v4.264 agrupó el listado (catgrid) "amplio" sin discriminar variedad (todos los burritos juntos,
 // todas las empanadas juntas, etc. -- remGrupoAmplio/remAgruparAmplio, ya sacadas). v4.273 volvió
