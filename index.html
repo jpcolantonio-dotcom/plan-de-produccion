@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.302</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.307</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -654,13 +654,8 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <div style="font-size:13px;color:var(--text2)" id="inf-pdad-subt">Producción real total por semana, un producto por fila, agrupado por área (últimas 4 semanas hasta la elegida)</div>
       </div>
     </div>
-    <!-- v4.302: "quiero que en una pestaña separada estén la producción total de la semana de
-    criollo 13, criollo 15, hojaldre 13, hojaldre 15, pizzetas rellenas y burritos" -- confirmado
-    que es una sub-pestaña ACÁ adentro (no una pestaña aparte del todo), y que es fija a Planeta. -->
-    <div style="display:flex;gap:4px;margin-bottom:12px;border-bottom:.5px solid var(--border)">
-      <button class="proy-tab active" id="pdadvtab-areas" onclick="pdadSetVista('areas')"><i class="ti ti-building-factory-2"></i> Por área</button>
-      <button class="proy-tab" id="pdadvtab-foco" onclick="pdadSetVista('foco')"><i class="ti ti-stack-2"></i> Planeta: Tapas y Burritos</button>
-    </div>
+    <!-- v4.306: "borra el que dice Planeta Tapas y Burritos" -- se sacó el toggle de vista "foco"
+    (v4.302), queda solo la vista general "Por área" con selector de empresa. -->
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
       <label style="font-size:13px;color:var(--text2)" id="inf-pdad-esel-lbl">Empresa:</label>
       <select id="inf-pdad-esel" onchange="renderInformeProductividad()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas</option></select>
@@ -2199,38 +2194,9 @@ let infPdadResumen=null;
 // tercer número aparte si se lleva la cuenta combinada.
 let horasProdCache={};
 
-// v4.302: "las horas es por empresa y por el total de producto, por eso quiero que en una pestaña
-// separada estén las producción total de la semana de criollo 13, criollo 15, hojaldre 13,
-// hojaldre 15, pizzetas rellenas y burritos" -- confirmado por AskUserQuestion: (1) va como
-// sub-pestaña nueva ACÁ en Productividad (no una pestaña aparte de Informes), (2) "pizzetas
-// rellenas" = área PIZZETA (no existe ningún área con ese nombre exacto), (3) "las horas son solo
-// planeta" -- esta vista queda fija a Planeta Empanada, sin selector de empresa. Las 6 áreas son
-// todas de Planeta (confirmadas contra las áreas reales desde v4.232). `pdadVista` guarda cuál de
-// las dos vistas está activa; la general "Por área" (con selector de empresa) sigue igual que
-// antes. Las horas de esta vista se guardan con su propia clave de filtro ('foco_planeta_tapas')
-// para no mezclarse con las horas que ya se cargaban para "Planeta" en la vista general.
-const PDAD_AREAS_FOCO_PLANETA=['CRIOLLO 13','CRIOLLO 15','HOJALDRE 13','HOJALDRE 15','PIZZETA','BURRITOS'];
-const PDAD_HORAS_KEY_FOCO='foco_planeta_tapas';
-let pdadVista='areas'; // 'areas' | 'foco'
-
-function pdadSetVista(v){
-  pdadVista=v;
-  document.getElementById('pdadvtab-areas').classList.toggle('active',v==='areas');
-  document.getElementById('pdadvtab-foco').classList.toggle('active',v==='foco');
-  const esel=document.getElementById('inf-pdad-esel');
-  const eselLbl=document.getElementById('inf-pdad-esel-lbl');
-  const subt=document.getElementById('inf-pdad-subt');
-  if(v==='foco'){
-    const planeta=congGetPlaneta();
-    if(planeta)esel.value=planeta.id;
-    esel.disabled=true;eselLbl.style.opacity=.5;
-    subt.textContent='Producción total por semana de Criollo 13, Criollo 15, Hojaldre 13, Hojaldre 15, Pizzeta y Burritos (Planeta Empanada) -- para relacionar contra las horas consumidas de esta línea';
-  }else{
-    esel.disabled=false;eselLbl.style.opacity=1;
-    subt.textContent='Producción real total por semana, un producto por fila, agrupado por área (últimas 4 semanas hasta la elegida)';
-  }
-  renderInformeProductividad();
-}
+// v4.302 había agregado una vista "foco" fija a Planeta (toggle "Por área"/"Planeta: Tapas y
+// Burritos"). v4.306: "borra el que dice Planeta Tapas y Burritos" -- se sacó el toggle y queda
+// solo esta vista general, con selector de empresa.
 
 function initInformeProductividad(){
   pS('inf-pdad-wsel');
@@ -2340,6 +2306,213 @@ async function guardarHorasSemana(semana,ef,valor){
   }
 }
 
+// v4.303: "te voy a subir este tipo de archivo, necesito que lo agregues para subir en
+// productividad, ponele como titulos 'horas', donde puedo subir el archivo y lo leo" -- mandó un
+// "Informe de Liquidación" (xls viejo formato BIFF, exportado del sistema de RRHH): una fila de
+// encabezado con FNT/HS. TRAB./EXCEDENTE/EXT50, y debajo un bloque de 3 filas por persona (nombre
+// en la primera, dos filas en blanco de separación) con las horas en formato texto "046:48"
+// (HHH:MM). A mitad de turno agregó: "que me pongan por persona la cantidad de horas que hizo y
+// que me deje elegir si quiero que todas las personas me contabilicen las horas para el
+// indicador, de aca salen las horas para el indicador" -- por eso el total no se calcula solo: se
+// arma primero una lista por persona (HS. TRAB. + EXCEDENTE + EXT50, todo lo que son horas
+// realmente trabajadas, a propósito se deja afuera FNT que no es una columna de horas) y un modal
+// deja tildar/destildar a cada persona antes de confirmar a qué semana se aplica el total
+// resultante -- usando el mismo guardarHorasSemana/productividad_horas que ya existía desde
+// v4.300 para la carga manual, sin tabla nueva.
+const PDAD_LIQ_COLUMNAS_HORAS=['HSTRAB','EXCEDENTE','EXT50']; // normalizado (sin puntos/espacios)
+function horasHHMMaDecimal(txt){
+  if(typeof txt!=='string')return 0;
+  const m=txt.trim().match(/^(\d{1,3}):(\d{2})$/);
+  if(!m)return 0;
+  return parseInt(m[1],10)+parseInt(m[2],10)/60;
+}
+// Puro (sin tocar document) para poder testearlo con datos reales del archivo que mandó. `rows` es
+// el array-of-arrays que da XLSX.utils.sheet_to_json(ws,{header:1}). Busca la primera fila que
+// tenga alguna columna de horas conocida (HS. TRAB./EXCEDENTE/EXT50) para ubicar el encabezado y
+// las columnas a sumar, después recorre fila por fila: si la columna 0 tiene un nombre (texto no
+// vacío) Y al menos una de las columnas de horas tiene un valor con pinta de HH:MM, es una persona.
+function pdadParsearLiquidacion(rows){
+  const normCab=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  let headerIdx=-1,colsHoras=[];
+  for(let i=0;i<(rows||[]).length;i++){
+    const row=rows[i]||[];
+    const cols=[];
+    row.forEach((v,ci)=>{if(PDAD_LIQ_COLUMNAS_HORAS.includes(normCab(v)))cols.push(ci);});
+    if(cols.length){headerIdx=i;colsHoras=cols;break;}
+  }
+  if(headerIdx===-1)return[];
+  const personas=[];
+  for(let i=headerIdx+1;i<rows.length;i++){
+    const row=rows[i]||[];
+    const nombre=row[0];
+    if(typeof nombre!=='string'||!nombre.trim())continue;
+    let horas=0,tieneDato=false;
+    colsHoras.forEach(ci=>{
+      const v=row[ci];
+      if(typeof v==='string'&&/^\d{1,3}:\d{2}$/.test(v.trim())){tieneDato=true;horas+=horasHHMMaDecimal(v);}
+    });
+    if(!tieneDato)continue;
+    personas.push({nombre:nombre.trim(),horas:Math.round(horas*100)/100});
+  }
+  return personas;
+}
+
+function pdadAbrirSubirHoras(horasKey){
+  const input=document.createElement('input');
+  input.type='file';
+  input.accept='.xls,.xlsx';
+  input.style.display='none';
+  input.onchange=()=>pdadProcesarArchivoHoras(input,horasKey);
+  document.body.appendChild(input);
+  input.click();
+  setTimeout(()=>{if(input.parentNode)input.remove();},60000);
+}
+
+async function pdadProcesarArchivoHoras(input,horasKey){
+  const file=input.files[0];
+  if(!file){input.remove();return}
+  try{
+    if(!window.XLSX){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+        s.onload=res;s.onerror=rej;document.head.appendChild(s);
+      });
+    }
+    const buf=await file.arrayBuffer();
+    const wb=window.XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=window.XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
+    const personas=pdadParsearLiquidacion(rows);
+    if(!personas.length){alert('No pude encontrar datos de horas por persona en este archivo. Revisá que sea un "Informe de Liquidación" con la columna HS. TRAB.');input.remove();return}
+    // v4.306: "cuando subo el archivo me borra las horas de la semana anterior y pone la nueva, no
+    // me lo carga por la semana" -- acá se pasaba `null` como semana por defecto, y el <select> de
+    // HTML sin ninguna opción marcada "selected" cae solo en la PRIMERA opción de la lista (la
+    // semana más vieja de las 4 mostradas), sin importar la semana del archivo que subiste. Si no
+    // tocabas el combo a mano, siempre guardaba en esa primera semana, pisando lo que hubiera. Ahora
+    // arranca preseleccionado en la última semana del rango (la que tenías elegida en "Hasta la
+    // semana" arriba), que es la que normalmente corresponde al informe que acabás de subir --
+    // igual podés cambiarla vos antes de confirmar.
+    const semDefault=infPdadMeta.semanas[infPdadMeta.semanas.length-1]||null;
+    renderModalHorasPersonas(personas,horasKey,infPdadMeta.semanas,semDefault);
+  }catch(e){
+    console.error(e);
+    alert('No pude leer el archivo: '+e.message);
+  }finally{
+    input.remove();
+  }
+}
+
+// v4.304: "si por ejemplo me equivoqué en el archivo... quiero que el nuevo archivo aplaste la
+// info anterior, además necesito en algún lugar ver las horas por empleados en la lista según
+// semana" -- hasta acá solo se guardaba el TOTAL ya sumado (productividad_horas); ahora también se
+// guarda el detalle por persona en una tabla nueva (`productividad_horas_empleado`, SQL en la
+// entrega), reemplazando SIEMPRE el contenido anterior de esa semana+filtro (borra todo lo que
+// había para esa semana y vuelve a insertar la lista completa -- "aplasta", no mezcla ni duplica).
+// El ojito de la fila "Horas consumidas" (`pdadVerHorasPersonas`) abre este mismo modal pero
+// cargando lo ya guardado para esa semana en vez de un archivo nuevo, así sirve tanto para subir
+// como para consultar/corregir después.
+async function cargarHorasEmpleados(semana,ef){
+  try{
+    const rows=await get('productividad_horas_empleado',`semana=eq.${semana}&empresa_filtro=eq.${encodeURIComponent(ef)}&order=nombre.asc`);
+    return(rows||[]).map(r=>({nombre:r.nombre,horas:r.horas!=null?parseFloat(r.horas):0,incluido:r.incluido!==false}));
+  }catch(e){
+    console.error('No se pudo cargar el detalle de horas por persona:',e);
+    return[];
+  }
+}
+
+async function pdadVerHorasPersonas(semana,horasKey){
+  const personas=await cargarHorasEmpleados(semana,horasKey);
+  if(!personas.length){alert('Todavía no hay horas por persona guardadas para esta semana. Subí un informe de liquidación con "Subir informe de horas".');return}
+  renderModalHorasPersonas(personas,horasKey,infPdadMeta.semanas,semana);
+}
+
+function renderModalHorasPersonas(personas,horasKey,semanas,semanaDefault){
+  let overlay=document.getElementById('modal-horas-personas');
+  if(!overlay){
+    overlay=document.createElement('div');
+    overlay.className='modal-overlay';overlay.id='modal-horas-personas';
+    overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove();});
+    document.body.appendChild(overlay);
+  }
+  // v4.306: si no vino semanaDefault o no está entre las semanas mostradas, el <select> de HTML cae
+  // solo en la PRIMERA opción apenas ninguna tiene "selected" -- forzamos acá la última semana del
+  // rango como respaldo, para no volver a depender de ese comportamiento implícito del navegador.
+  const semEfectiva=(semanas||[]).includes(semanaDefault)?semanaDefault:(semanas&&semanas.length?semanas[semanas.length-1]:null);
+  const semOpts=(semanas||[]).map(k=>`<option value="${k}"${k===semEfectiva?' selected':''}>${wlbCorta(k)}</option>`).join('');
+  const filas=personas.map((p,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:.5px solid var(--border)" data-nombre="${remEsc(p.nombre)}">
+    <input type="checkbox" id="hp-chk-${i}" ${p.incluido!==false?'checked':''} onchange="pdadRecalcTotalHoras()" style="width:16px;height:16px"/>
+    <span style="font-size:12.5px;flex:1">${remEsc(p.nombre)}</span>
+    <span style="font-size:12.5px;font-weight:600;width:70px;text-align:right" id="hp-val-${i}" data-horas="${p.horas}">${p.horas.toLocaleString('es-AR')} hs</span>
+  </div>`).join('');
+  overlay.innerHTML=`<div class="modal" style="width:480px;max-height:85vh;overflow-y:auto;display:flex;flex-direction:column">
+    <div class="modal-title"><i class="ti ti-clock-hour-4"></i> Horas por persona</div>
+    <div class="modal-sub">${personas.length} personas (HS. TRAB. + Excedente + Extra 50%). Destildá a quien no quieras que sume al total del indicador. Al confirmar, esto reemplaza lo que hubiera guardado antes para la semana elegida.</div>
+    <div id="hp-lista" style="margin-top:8px;max-height:40vh;overflow-y:auto">${filas}</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-weight:700">
+      <span>Total seleccionado</span>
+      <span id="hp-total">-- hs</span>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+      <label style="font-size:13px;color:var(--text2)">Semana:</label>
+      <select id="hp-semana" style="flex:1;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">${semOpts}</select>
+    </div>
+    <div class="modal-btns" style="margin-top:16px">
+      <button class="btn" onclick="document.getElementById('modal-horas-personas').remove()">Cancelar</button>
+      <button class="btn btn-primary" onclick="pdadConfirmarHoras('${horasKey}')">Guardar</button>
+    </div>
+  </div>`;
+  pdadRecalcTotalHoras();
+}
+
+function pdadListaPersonasActual(){
+  const lista=document.getElementById('hp-lista');
+  if(!lista)return[];
+  return Array.from(lista.children).map(fila=>{
+    const chk=fila.querySelector('input[type=checkbox]');
+    const val=fila.querySelector('[id^="hp-val-"]');
+    return{
+      nombre:fila.getAttribute('data-nombre')||'',
+      horas:val?parseFloat(val.getAttribute('data-horas'))||0:0,
+      incluido:chk?chk.checked:true,
+    };
+  });
+}
+
+function pdadSumaHorasSeleccionadas(){
+  return Math.round(pdadListaPersonasActual().filter(p=>p.incluido).reduce((s,p)=>s+p.horas,0)*100)/100;
+}
+
+function pdadRecalcTotalHoras(){
+  const totalEl=document.getElementById('hp-total');
+  if(!totalEl)return;
+  totalEl.textContent=pdadSumaHorasSeleccionadas().toLocaleString('es-AR')+' hs';
+}
+
+async function pdadConfirmarHoras(horasKey){
+  const semEl=document.getElementById('hp-semana');
+  if(!semEl||!semEl.value)return;
+  const semana=semEl.value;
+  const personas=pdadListaPersonasActual();
+  const total=pdadSumaHorasSeleccionadas();
+  const overlay=document.getElementById('modal-horas-personas');
+  if(overlay)overlay.remove();
+  try{
+    // "aplasta" lo que hubiera antes para esta semana+filtro: borra todo y vuelve a insertar la
+    // lista completa (incluidas las personas destildadas, para no perder el detalle de quién se
+    // excluyó si vuelve a mirarlo después).
+    await fetch(`${SB}/rest/v1/productividad_horas_empleado?semana=eq.${semana}&empresa_filtro=eq.${encodeURIComponent(horasKey)}`,{method:'DELETE',headers:H});
+    if(personas.length){
+      await ins('productividad_horas_empleado',personas.map(p=>({semana,empresa_filtro:horasKey,nombre:p.nombre,horas:p.horas,incluido:p.incluido})));
+    }
+  }catch(e){
+    console.error(e);
+    alert('No se pudo guardar el detalle por persona (el total igual se va a guardar): '+e.message);
+  }
+  await guardarHorasSemana(semana,horasKey,String(total));
+}
+
 const fmtKg=v=>v==null?'':(v<1?v.toFixed(2):v.toFixed(1));
 // Celda de cantidad + Kg entre paréntesis cuando el producto tiene peso cargado -- mismo formato
 // que ya usa el PDF de Desvíos para Kg Plan/Kg Real, pero acá siempre al lado de la cantidad, no
@@ -2353,12 +2526,11 @@ function pdadCelda(unidades,pesoGramos){
 
 async function renderInformeProductividad(){
   const el=document.getElementById('inf-pdad-content');
-  // v4.302: en la vista "foco" (Planeta: Tapas y Burritos) la empresa queda fija a Planeta,
-  // ignorando el selector (que además queda deshabilitado por pdadSetVista) -- y las horas de esta
-  // vista se guardan aparte, con su propia clave, para no mezclarse con las de la vista general.
-  const planeta=congGetPlaneta();
-  const ef=pdadVista==='foco'?(planeta?planeta.id:'all'):document.getElementById('inf-pdad-esel').value;
-  const horasKey=pdadVista==='foco'?PDAD_HORAS_KEY_FOCO:ef;
+  // v4.306: se sacó la vista "foco" (toggle "Planeta: Tapas y Burritos", v4.302-305) a pedido de
+  // Juan Pablo. Queda solo esta vista general con selector de empresa; `horasKey` sigue siendo `ef`
+  // (decisión de v4.305, sin cambios).
+  const ef=document.getElementById('inf-pdad-esel').value;
+  const horasKey=ef;
   const hastaK=document.getElementById('inf-pdad-wsel').value||st.w;
   const btnImp=document.getElementById('btnImprimirInfPdad');
   if(!el)return;
@@ -2368,10 +2540,9 @@ async function renderInformeProductividad(){
   el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando...</div>';
   await Promise.all([...semanas.flatMap(k=>[lp(k),lr(k)]),cargarHorasProductividad(semanas,horasKey)]);
   let grupos=pdadAgrupar(semanas,ef,st.P,st.R);
-  if(pdadVista==='foco')grupos=grupos.filter(g=>PDAD_AREAS_FOCO_PLANETA.includes((g.area||'').toUpperCase().trim()));
   infPdadGrupos=grupos;
   const empSel=st.E.find(e=>e.id===ef);
-  infPdadMeta={semanas,empresaLabel:pdadVista==='foco'?'Planeta Empanada — Tapas y Burritos':(ef==='all'?'Todas las empresas':(empSel?empSel.nombre:''))};
+  infPdadMeta={semanas,empresaLabel:ef==='all'?'Todas las empresas':(empSel?empSel.nombre:'')};
   // v4.301: "donde esta el resumen??" -- mandó screenshot de Productividad con "No hay producción
   // real cargada en estas 4 semanas", que hasta acá cortaba TODO antes de armar el Resumen (incluso
   // las Horas consumidas, que tiene sentido poder cargar YA aunque la producción de esa semana
@@ -2384,7 +2555,10 @@ async function renderInformeProductividad(){
   infPdadResumen=resumen;
   const thSemanas=semanas.map(k=>`<th style="text-align:right">${wlbCorta(k)}</th>`).join('');
   const resumenHtml=`<div class="stock-card" style="margin-bottom:14px">
-    <div style="padding:9px 12px;font-weight:700;font-size:13px;background:var(--bg2);border-bottom:.5px solid var(--border)">Resumen</div>
+    <div style="padding:9px 12px;font-weight:700;font-size:13px;background:var(--bg2);border-bottom:.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <span>Resumen</span>
+      <button class="btn btn-sm" type="button" onclick="pdadAbrirSubirHoras('${horasKey}')" style="font-weight:500"><i class="ti ti-file-upload"></i> Subir informe de horas</button>
+    </div>
     <div class="grid-scroll">
     <table class="stock-tbl"><thead><tr>
       <th style="text-align:left">Área</th>
@@ -2399,7 +2573,7 @@ async function renderInformeProductividad(){
       </tr>
       <tr>
         <td style="text-align:left;font-weight:500">Horas consumidas</td>
-        ${semanas.map(k=>`<td style="text-align:right"><input type="number" min="0" step="0.5" value="${horasPorSemana[k]!=null?horasPorSemana[k]:''}" placeholder="—" onchange="guardarHorasSemana('${k}','${horasKey}',this.value)" style="width:72px;padding:3px 6px;font-size:12px;text-align:right;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/></td>`).join('')}
+        ${semanas.map(k=>`<td style="text-align:right"><span style="display:inline-flex;align-items:center;gap:3px"><input type="number" min="0" step="0.5" value="${horasPorSemana[k]!=null?horasPorSemana[k]:''}" placeholder="—" onchange="guardarHorasSemana('${k}','${horasKey}',this.value)" style="width:72px;padding:3px 6px;font-size:12px;text-align:right;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/><button type="button" class="btn btn-sm" title="Ver/corregir horas por persona de esta semana" onclick="pdadVerHorasPersonas('${k}','${horasKey}')" style="padding:3px 5px"><i class="ti ti-eye" style="font-size:13px"></i></button></span></td>`).join('')}
         <td style="text-align:right;font-size:11px;color:var(--text2)">${resumen.horasTotal?resumen.horasTotal.toLocaleString('es-AR')+' hs':''}</td>
       </tr>
       <tr style="font-weight:700;background:var(--bg2);border-top:1.5px solid var(--border)">
