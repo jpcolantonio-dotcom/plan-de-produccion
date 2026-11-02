@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.315</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.316</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -694,7 +694,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div class="toolbar">
       <div>
         <div style="font-size:16px;font-weight:600">Simulación</div>
-        <div style="font-size:13px;color:var(--text2)">Simulación rápida: tomá la producción real ya cargada de un día, separada por área, y mirá qué cronograma daría a partir de una hora de inicio. No se guarda nada, es solo para probar.</div>
+        <div style="font-size:13px;color:var(--text2)">Simulación rápida: tomá la producción real ya cargada de un día, separada por área, y mirá qué cronograma daría cada área a partir de su propia hora de inicio.</div>
       </div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
@@ -702,11 +702,9 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <input type="date" id="sim-fecha" onchange="renderInformeSimulacion()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
       <label style="font-size:13px;color:var(--text2)">Empresa:</label>
       <select id="sim-esel" onchange="renderInformeSimulacion()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas</option></select>
-      <label style="font-size:13px;color:var(--text2)">Hora de inicio:</label>
-      <input type="time" id="sim-hora" value="08:00" onchange="renderInformeSimulacion()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
       <button class="btn btn-sm" id="btnImprimirSim" onclick="imprimirInformeSimulacion()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
     </div>
-    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Agrupa solo automáticamente por área (cada área es una línea en paralelo, todas arrancan a la misma hora) respetando el orden del plan -- no se puede reordenar ni asignar a máquinas. El único dato que se guarda es el tiempo de cambio de variedad de cada área (queda como default para la próxima vez). Para armar el cronograma real día a día, con máquinas, personal y todo guardado, está la pestaña "Producción con tiempos".</div>
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Agrupa solo automáticamente por área (cada área es una línea en paralelo) respetando el orden del plan -- no se puede reordenar ni asignar a máquinas. Lo único que se guarda es, por área, la hora de inicio y el tiempo de cambio de variedad (quedan como default para la próxima vez, no dependen del día). Para armar el cronograma real día a día, con máquinas, personal y todo guardado, está la pestaña "Producción con tiempos".</div>
     <div id="sim-content"></div>
   </div>
 </div>
@@ -2559,7 +2557,7 @@ function imprimirInformeTiempos(){
 // Reutiliza `minToHHMM` ya definida arriba para "Producción con tiempos".
 let simAreas=[];
 let simSinDatos=[];
-let simMeta={fecha:'',empresaLabel:'',horaInicio:''};
+let simMeta={fecha:'',empresaLabel:''};
 
 function initInformeSimulacion(){
   const f=document.getElementById('sim-fecha');
@@ -2571,7 +2569,6 @@ async function renderInformeSimulacion(){
   const el=document.getElementById('sim-content');
   const fecha=document.getElementById('sim-fecha').value;
   const ef=document.getElementById('sim-esel').value;
-  const horaInicioStr=document.getElementById('sim-hora').value||'08:00';
   const btnImp=document.getElementById('btnImprimirSim');
   if(!fecha){el.innerHTML='';simAreas=[];simSinDatos=[];if(btnImp)btnImp.disabled=true;return}
   const semKey=wk(new Date(fecha+'T00:00:00'));
@@ -2607,10 +2604,14 @@ async function renderInformeSimulacion(){
   // tiempos_maquinas_dia), acá el valor es un default ESTABLE por área que no depende del día
   // (no hace falta cargarlo de nuevo cada vez que se simula), así que se guarda en tabla propia
   // `sim_tiempo_cambio` con unique(empresa_id,area) en vez de fecha+empresa+área.
+  // v4.316: "las horas de comienzo deben ser para cada área como el tiempo de cambio de
+  // variedad" -- se saca la hora de inicio única del toolbar (que hacía arrancar TODAS las áreas
+  // a la misma hora) y pasa a ser, igual que el cambio de variedad, un default por área guardado
+  // en la misma fila de `sim_tiempo_cambio` (columna `hora_inicio`).
   let cambiosData=[];
-  try{cambiosData=await get('sim_tiempo_cambio','select=empresa_id,area,tiempo_cambio_min');}catch{cambiosData=[];}
+  try{cambiosData=await get('sim_tiempo_cambio','select=empresa_id,area,tiempo_cambio_min,hora_inicio');}catch{cambiosData=[];}
   const cambiosMap={};
-  cambiosData.forEach(r=>{cambiosMap[r.empresa_id+'||'+r.area]=r.tiempo_cambio_min||0;});
+  cambiosData.forEach(r=>{cambiosMap[r.empresa_id+'||'+r.area]={tiempoCambio:r.tiempo_cambio_min||0,horaInicio:r.hora_inicio||'08:00'};});
   const plan=st.P[semKey]||[];
   const real=st.R[semKey]||{};
   const porArea={};
@@ -2635,10 +2636,11 @@ async function renderInformeSimulacion(){
       sinDatos.push(item);
     }
   });
-  const[hIni,mIni]=horaInicioStr.split(':').map(Number);
-  const inicioMin=(hIni||0)*60+(mIni||0);
   const areas=Object.values(porArea).map(grp=>{
-    const tiempoCambio=cambiosMap[grp.empresaId+'||'+grp.area]||0;
+    const cfg=cambiosMap[grp.empresaId+'||'+grp.area]||{tiempoCambio:0,horaInicio:'08:00'};
+    const tiempoCambio=cfg.tiempoCambio;
+    const[hIni,mIni]=(cfg.horaInicio||'08:00').split(':').map(Number);
+    const inicioMin=(hIni||0)*60+(mIni||0);
     let cursor=inicioMin;
     const items=grp.items.map((it,idx)=>{
       if(idx>0)cursor+=tiempoCambio; // cambio de variedad ANTES de cada producto, salvo el primero -- mismo criterio que "Producción con tiempos"
@@ -2656,7 +2658,7 @@ async function renderInformeSimulacion(){
   simAreas=areas;
   simSinDatos=sinDatos.sort((a,b)=>a.area.localeCompare(b.area)||a.alias.localeCompare(b.alias));
   const empSel=st.E.find(e=>e.id===ef);
-  simMeta={fecha,empresaLabel:ef==='all'?'Todas las empresas':(empSel?empSel.nombre:''),horaInicio:horaInicioStr};
+  simMeta={fecha,empresaLabel:ef==='all'?'Todas las empresas':(empSel?empSel.nombre:'')};
   if(!areas.length&&!sinDatos.length){
     el.innerHTML='<div class="empty"><i class="ti ti-calendar-off"></i> No hay producción real cargada para ese día.</div>';
     if(btnImp)btnImp.disabled=true;
@@ -2673,6 +2675,9 @@ async function renderInformeSimulacion(){
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span class="emp-tag" style="background:${ec(grp.empresaId)}18;color:${ec(grp.empresaId)}">${en(grp.empresaId)||''}</span>
           <span style="font-weight:700">${remEsc(grp.area)}</span>
+          <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)">Inicio:
+            <input type="time" value="${grp.horaInicio}" onchange="simSetHoraInicio(${areaIdx},this.value)" style="padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)"/>
+          </span>
           <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)">Cambio de variedad:
             <input type="number" min="0" value="${grp.tiempoCambio}" onchange="simSetCambio(${areaIdx},this.value)" style="width:56px;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)"/> min
           </span>
@@ -2733,6 +2738,22 @@ async function simSetCambio(areaIdx,val){
   renderInformeSimulacion();
 }
 
+// v4.316: "las horas de comienzo deben ser para cada área como el tiempo de cambio de variedad"
+// -- mismo patrón que simSetCambio (default estable por área en sim_tiempo_cambio, guarda y
+// vuelve a simular entero), pero para el campo hora_inicio. Sólo se manda empresa_id/area/
+// hora_inicio en el body -- el upsert de PostgREST (merge-duplicates) actualiza ÚNICAMENTE las
+// columnas presentes en el body, así que no pisa el tiempo_cambio_min ya guardado para esa área.
+async function simSetHoraInicio(areaIdx,val){
+  const grp=simAreas[areaIdx];
+  if(!grp)return;
+  const hora=val||'08:00';
+  try{
+    const res=await fetch(`${SB}/rest/v1/sim_tiempo_cambio?on_conflict=empresa_id,area`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({empresa_id:grp.empresaId,area:grp.area,hora_inicio:hora})});
+    if(!res.ok)throw new Error(await res.text());
+  }catch(e){alert('Error guardando la hora de inicio: '+e.message);return;}
+  renderInformeSimulacion();
+}
+
 function imprimirInformeSimulacion(){
   if(!simAreas.length&&!simSinDatos.length)return;
   const[y,m,d]=(simMeta.fecha||'').split('-');
@@ -2774,7 +2795,7 @@ function imprimirInformeSimulacion(){
   </style></head>
   <body>
     <h1>SIMULACIÓN DE PRODUCCIÓN — ${fechaFmt}</h1>
-    <div class="sub">${simMeta.empresaLabel} · Hora de inicio: ${simMeta.horaInicio} · Impreso ${fechaImpresion}</div>
+    <div class="sub">${simMeta.empresaLabel} · Impreso ${fechaImpresion}</div>
     <table>
       <thead><tr><th>ID</th><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Uds/h</th><th style="text-align:center">Inicio</th><th style="text-align:center">Fin</th></tr></thead>
       <tbody>${filasHtml}</tbody>
