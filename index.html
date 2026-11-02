@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.312</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.314</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -706,7 +706,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <input type="time" id="sim-hora" value="08:00" onchange="renderInformeSimulacion()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
       <button class="btn btn-sm" id="btnImprimirSim" onclick="imprimirInformeSimulacion()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
     </div>
-    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Agrupa solo automáticamente por área (cada área es una línea en paralelo, todas arrancan a la misma hora) respetando el orden del plan -- no se puede reordenar, asignar a máquinas ni guardar nada. Para armar el cronograma real día a día, con máquinas, personal y todo guardado, está la pestaña "Producción con tiempos".</div>
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Agrupa solo automáticamente por área (cada área es una línea en paralelo, todas arrancan a la misma hora) respetando el orden del plan -- no se puede reordenar ni asignar a máquinas. El único dato que se guarda es el tiempo de cambio de variedad de cada área (queda como default para la próxima vez). Para armar el cronograma real día a día, con máquinas, personal y todo guardado, está la pestaña "Producción con tiempos".</div>
     <div id="sim-content"></div>
   </div>
 </div>
@@ -2109,7 +2109,15 @@ async function cargarInformeTiempos(){
     if(!r.hora_inicio||!r.hora_fin)return;
     const[h1,m1]=r.hora_inicio.split(':').map(Number);
     const[h2,m2]=r.hora_fin.split(':').map(Number);
-    let d=(h2*60+m2)-(h1*60+m1);if(d<0)d+=1440;
+    // v4.313: "blindar" el cálculo del promedio -- antes, si hora_fin quedaba cargada antes que
+    // hora_inicio (típico error de tipeo, ej. 05:05 en vez de 06:05) se asumía que el proceso
+    // había cruzado la medianoche y se le sumaban 24hs a la duración. Un solo registro así (de
+    // minutos reales a ~23hs) arruina todo el promedio de uds/hora de ese producto. Los procesos
+    // de esta planta nunca cruzan medianoche (son turnos cortos dentro del mismo día), así que
+    // hora_fin<=hora_inicio se descarta directamente como error de carga en vez de "arreglarse"
+    // sumando un día -- no distorsiona el promedio, y el registro sigue intacto en Supabase para
+    // que se corrija a mano cuando se note.
+    let d=(h2*60+m2)-(h1*60+m1);
     if(d<=0)return;
     const k=r.empresa_id+'||'+r.area+'||'+r.producto;
     if(!hist[k])hist[k]={totCant:0,totMin:0};
@@ -2540,14 +2548,15 @@ function imprimirInformeTiempos(){
 // simulación, donde voy a poner una fecha y va a tomar la producción de ese día separado por area,
 // le voy a poder poner una hora de ocmienzo y me va a decir todo el cronograma de produccion que
 // deberia ser por area". A diferencia de "Producción con tiempos" (v4.310, por máquina, con
-// asignación manual, personal y todo guardado en Supabase), esto es una pestaña aparte, liviana y
-// sin memoria: no hay que crear nada a mano, agrupa automáticamente por ÁREA (como hacía la primera
-// versión de "Producción con tiempos" en v4.308/v4.309, antes de pasar a máquinas) con una sola
-// hora de inicio para todas las áreas (corren en paralelo), respetando el orden del plan tal cual
-// está, sin reordenar ni guardar nada -- "simulación" en el sentido de probar rápido un horario
-// hipotético para un día, no de armar el cronograma real día a día. Misma fuente de datos que
-// "Producción con tiempos" (lo PLANIFICADO del día vía r.days[diIdx], uds/hora histórico completo
-// de rendimiento_proceso) y mismo `minToHHMM` ya definido arriba.
+// asignación manual, personal y todo guardado en Supabase), esto es una pestaña aparte y liviana:
+// no hay que crear nada a mano, agrupa automáticamente por ÁREA (como hacía la primera versión de
+// "Producción con tiempos" en v4.308/v4.309, antes de pasar a máquinas) con una sola hora de
+// inicio para todas las áreas (corren en paralelo), respetando el orden del plan tal cual está,
+// sin reordenar -- "simulación" en el sentido de probar rápido un horario hipotético para un día,
+// no de armar el cronograma real día a día. v4.312: la cantidad usada es la producción REAL ya
+// cargada ese día (no lo planificado). v4.314: el único dato que SÍ se guarda es el tiempo de
+// cambio de variedad por área (ver `sim_tiempo_cambio` más abajo) -- el resto sigue sin memoria.
+// Reutiliza `minToHHMM` ya definida arriba para "Producción con tiempos".
 let simAreas=[];
 let simSinDatos=[];
 let simMeta={fecha:'',empresaLabel:'',horaInicio:''};
@@ -2576,7 +2585,11 @@ async function renderInformeSimulacion(){
     if(!r.hora_inicio||!r.hora_fin)return;
     const[h1,m1]=r.hora_inicio.split(':').map(Number);
     const[h2,m2]=r.hora_fin.split(':').map(Number);
-    let d=(h2*60+m2)-(h1*60+m1);if(d<0)d+=1440;
+    // v4.313: mismo blindaje que "Producción con tiempos" -- hora_fin<=hora_inicio es casi
+    // siempre un error de carga (turnos cortos dentro del mismo día, nunca cruzan medianoche), no
+    // un proceso que pasó la medianoche. Se descarta ese registro del promedio en vez de sumarle
+    // 24hs a la duración, para que un typo de horario no arruine el uds/hora estimado.
+    let d=(h2*60+m2)-(h1*60+m1);
     if(d<=0)return;
     const k=r.empresa_id+'||'+r.area+'||'+r.producto;
     if(!hist[k])hist[k]={totCant:0,totMin:0};
@@ -2589,6 +2602,15 @@ async function renderInformeSimulacion(){
   // necesita el índice original (oi) dentro del array completo st.P[semKey] para encontrar los datos
   // legacy por índice numérico (ver realArr), así que filtrar el array del plan antes rompería ese
   // índice (mismo cuidado que ya tiene renderInformeDiario).
+  // v4.314: "el tiempo del cambio de variedad... podria quedar grabado ya casi siempre es el
+  // mismo" -- a diferencia de "Producción con tiempos" (tiempo de cambio por fecha+área en
+  // tiempos_maquinas_dia), acá el valor es un default ESTABLE por área que no depende del día
+  // (no hace falta cargarlo de nuevo cada vez que se simula), así que se guarda en tabla propia
+  // `sim_tiempo_cambio` con unique(empresa_id,area) en vez de fecha+empresa+área.
+  let cambiosData=[];
+  try{cambiosData=await get('sim_tiempo_cambio','select=empresa_id,area,tiempo_cambio_min');}catch{cambiosData=[];}
+  const cambiosMap={};
+  cambiosData.forEach(r=>{cambiosMap[r.empresa_id+'||'+r.area]=r.tiempo_cambio_min||0;});
   const plan=st.P[semKey]||[];
   const real=st.R[semKey]||{};
   const porArea={};
@@ -2616,16 +2638,20 @@ async function renderInformeSimulacion(){
   const[hIni,mIni]=horaInicioStr.split(':').map(Number);
   const inicioMin=(hIni||0)*60+(mIni||0);
   const areas=Object.values(porArea).map(grp=>{
+    const tiempoCambio=cambiosMap[grp.empresaId+'||'+grp.area]||0;
     let cursor=inicioMin;
-    const items=grp.items.map(it=>{
+    const items=grp.items.map((it,idx)=>{
+      if(idx>0)cursor+=tiempoCambio; // cambio de variedad ANTES de cada producto, salvo el primero -- mismo criterio que "Producción con tiempos"
       const durMin=Math.max(1,Math.round(it.cantidad/it.udsHora*60));
       const horaInicioItem=minToHHMM(cursor);
       cursor+=durMin;
       const horaFinItem=minToHHMM(cursor);
       return{...it,durMin,horaInicio:horaInicioItem,horaFin:horaFinItem};
     });
-    const totalMin=items.reduce((s,i)=>s+i.durMin,0);
-    return{...grp,items,totalMin,horaInicio:minToHHMM(inicioMin),horaFin:minToHHMM(inicioMin+totalMin)};
+    const totalMin=items.reduce((s,i)=>s+i.durMin,0); // solo tiempo de producción, sin cambios
+    const totalCambios=tiempoCambio*Math.max(0,items.length-1);
+    const totalConCambios=totalMin+totalCambios;
+    return{...grp,items,totalMin,totalCambios,totalConCambios,tiempoCambio,horaInicio:minToHHMM(inicioMin),horaFin:minToHHMM(inicioMin+totalConCambios)};
   }).sort((a,b)=>a.area.localeCompare(b.area));
   simAreas=areas;
   simSinDatos=sinDatos.sort((a,b)=>a.area.localeCompare(b.area)||a.alias.localeCompare(b.alias));
@@ -2638,14 +2664,23 @@ async function renderInformeSimulacion(){
   }
   if(btnImp)btnImp.disabled=false;
   let h='';
-  areas.forEach(grp=>{
+  areas.forEach((grp,areaIdx)=>{
+    const totTxt=grp.totalCambios>0
+      ?`Producción: <b style="color:var(--text)">${Math.floor(grp.totalMin/60)}h ${grp.totalMin%60}m</b> + cambios: <b style="color:var(--text)">${Math.floor(grp.totalCambios/60)}h ${grp.totalCambios%60}m</b> = <b style="color:var(--text)">${Math.floor(grp.totalConCambios/60)}h ${grp.totalConCambios%60}m</b> en total`
+      :`<b style="color:var(--text)">${Math.floor(grp.totalMin/60)}h ${grp.totalMin%60}m</b> en total`;
     h+=`<div class="stock-card" style="margin-bottom:16px">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg2);border-bottom:.5px solid var(--border);border-radius:var(--radius-lg) var(--radius-lg) 0 0;flex-wrap:wrap;gap:8px">
-        <div style="display:flex;align-items:center;gap:10px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span class="emp-tag" style="background:${ec(grp.empresaId)}18;color:${ec(grp.empresaId)}">${en(grp.empresaId)||''}</span>
           <span style="font-weight:700">${remEsc(grp.area)}</span>
+          <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)">Cambio de variedad:
+            <input type="number" min="0" value="${grp.tiempoCambio}" onchange="simSetCambio(${areaIdx},this.value)" style="width:56px;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)"/> min
+          </span>
         </div>
-        <div style="font-size:12px;color:var(--text2)"><b style="color:var(--text)">${grp.horaInicio}</b> a <b style="color:var(--text)">${grp.horaFin}</b> · ${Math.floor(grp.totalMin/60)}h ${grp.totalMin%60}m en total</div>
+        <div style="font-size:12px;color:var(--text2);text-align:right">
+          <div><b style="color:var(--text)">${grp.horaInicio}</b> a <b style="color:var(--text)">${grp.horaFin}</b></div>
+          <div>${totTxt}</div>
+        </div>
       </div>
       <div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
         <th>ID</th><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Uds/hora</th>
@@ -2676,6 +2711,20 @@ async function renderInformeSimulacion(){
   el.innerHTML=h;
 }
 
+// v4.314: guarda el tiempo de cambio de variedad del área como default estable (no por fecha) y
+// vuelve a simular entero -- mismo criterio simple que ya usan fecha/empresa/hora de inicio acá
+// (Simulación recarga todo en cada cambio, a propósito no tiene la separación carga/recálculo
+// puro que sí tiene "Producción con tiempos", porque es una herramienta liviana de "qué pasaría si").
+async function simSetCambio(areaIdx,val){
+  const grp=simAreas[areaIdx];
+  if(!grp)return;
+  const min=Math.max(0,parseInt(val)||0);
+  try{
+    await fetch(`${SB}/rest/v1/sim_tiempo_cambio?on_conflict=empresa_id,area`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({empresa_id:grp.empresaId,area:grp.area,tiempo_cambio_min:min})});
+  }catch(e){alert('Error guardando el cambio de variedad: '+e.message);return;}
+  renderInformeSimulacion();
+}
+
 function imprimirInformeSimulacion(){
   if(!simAreas.length&&!simSinDatos.length)return;
   const[y,m,d]=(simMeta.fecha||'').split('-');
@@ -2685,7 +2734,8 @@ function imprimirInformeSimulacion(){
   const fechaImpresion=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()} ${p2(ahora.getHours())}:${p2(ahora.getMinutes())}`;
   let filasHtml='';
   simAreas.forEach(grp=>{
-    filasHtml+=`<tr class="grp"><td colspan="6">${remEsc(grp.area)} — ${grp.horaInicio} a ${grp.horaFin}</td></tr>`;
+    const totTxtImp=grp.totalCambios>0?` · ${Math.floor(grp.totalMin/60)}h ${grp.totalMin%60}m producción + ${Math.floor(grp.totalCambios/60)}h ${grp.totalCambios%60}m cambios (${grp.tiempoCambio} min c/u) = ${Math.floor(grp.totalConCambios/60)}h ${grp.totalConCambios%60}m total`:'';
+    filasHtml+=`<tr class="grp"><td colspan="6">${remEsc(grp.area)} — ${grp.horaInicio} a ${grp.horaFin}${totTxtImp}</td></tr>`;
     grp.items.forEach(it=>{
       filasHtml+=`<tr><td class="cod">${it.codigo||'—'}</td><td class="ali">${remEsc(it.alias)}</td><td class="cant">${it.cantidad.toLocaleString('es-AR')}</td><td class="uph">${Math.round(it.udsHora).toLocaleString('es-AR')}</td><td class="hor">${it.horaInicio}</td><td class="hor">${it.horaFin}</td></tr>`;
     });
