@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.307</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.310</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -281,7 +281,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <button class="tab" onclick="T('cmp')"><i class="ti ti-chart-bar"></i>Comparación</button>
   <button class="tab" onclick="T('inf')"><i class="ti ti-report"></i>Informes</button>
   <button class="tab" onclick="T('stock')"><i class="ti ti-building-warehouse"></i>Stock</button>
-  <button class="tab" onclick="T('cong')"><i class="ti ti-snowflake"></i>Congelado</button>
   <button class="tab" onclick="T('rec')"><i class="ti ti-notebook"></i>Recetas</button>
   <button class="tab" onclick="T('rrhh')"><i class="ti ti-users-group"></i>RRHH</button>
   <button class="tab" onclick="T('ped')"><i class="ti ti-shopping-cart"></i>Pedidos</button>
@@ -515,6 +514,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab" id="inftab-diario" onclick="showInfSubTab('diario')"><i class="ti ti-list-check"></i> Producción del Día</button>
     <button class="proy-tab" id="inftab-rango" onclick="showInfSubTab('rango')"><i class="ti ti-calendar-stats"></i> Producción por Rango</button>
     <button class="proy-tab" id="inftab-pdad" onclick="showInfSubTab('pdad')"><i class="ti ti-chart-bar"></i> Productividad</button>
+    <button class="proy-tab" id="inftab-tiempos" onclick="showInfSubTab('tiempos')"><i class="ti ti-clock-hour-4"></i> Producción con tiempos</button>
   </div>
 
   <!-- SUB-TAB DESVIOS -->
@@ -664,6 +664,28 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <button class="btn btn-sm" id="btnImprimirInfPdad" onclick="imprimirInformeProductividad()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
     </div>
     <div id="inf-pdad-content"></div>
+  </div>
+
+  <!-- SUB-TAB PRODUCCIÓN CON TIEMPOS (nueva v4.308, dividida por máquina en v4.310) -->
+  <div id="tab-tiempos" style="display:none">
+    <div class="toolbar">
+      <div>
+        <div style="font-size:16px;font-weight:600">Producción con tiempos</div>
+        <div style="font-size:13px;color:var(--text2)">Dividido por máquina: asigná a cada una los productos que va a cerrar ese día, con su horario, cambio de variedad y personal.</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--text2)">Día:</label>
+      <input type="date" id="inf-tiempos-fecha" onchange="cargarInformeTiempos()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <label style="font-size:13px;color:var(--text2)">Empresa:</label>
+      <select id="inf-tiempos-esel" onchange="cargarInformeTiempos()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas</option></select>
+      <label style="font-size:13px;color:var(--text2)">Hora de inicio por defecto:</label>
+      <input type="time" id="inf-tiempos-hora" value="08:00" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <button class="btn btn-sm" onclick="tiemposCopiarSemanaPasada()" title="Copia las máquinas (productos, horarios, personal) del mismo día de la semana pasada"><i class="ti ti-copy"></i> Copiar semana pasada</button>
+      <button class="btn btn-sm" id="btnImprimirInfTiempos" onclick="imprimirInformeTiempos()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
+    </div>
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Creá las máquinas que necesites y asignales productos desde "Sin asignar a máquina". Cada máquina tiene su hora de inicio, su tiempo de cambio de variedad (minutos antes de cada producto siguiente), hasta 6 personas, y se le puede marcar qué áreas NO puede producir. Con las flechas se reordena qué se cierra primero en cada máquina. Los productos sin rendimiento histórico cargado (Informes &gt; Rendimiento) no se pueden asignar (no hay con qué calcular el tiempo) y se listan aparte.</div>
+    <div id="inf-tiempos-content"></div>
   </div>
 </div>
 
@@ -1035,48 +1057,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div id="obj-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
   </div>
 
-</div>
-
-<!-- CONGELADO -->
-<div id="tab-cong" class="section">
-  <div class="toolbar">
-    <div>
-      <div style="font-size:16px;font-weight:600">Congelado</div>
-      <div style="font-size:13px;color:var(--text2)">Carga de productos de Planeta Empanada que van a congelado</div>
-    </div>
-  </div>
-  <div class="proy-subtabs">
-    <button class="proy-tab active" id="congtab-carga" onclick="showCongTab('carga')"><i class="ti ti-plus"></i> Cargar</button>
-    <button class="proy-tab" id="congtab-historial" onclick="showCongTab('historial')"><i class="ti ti-history"></i> Historial</button>
-  </div>
-
-  <!-- CARGA -->
-  <div id="cong-sub-carga">
-    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Cargá la cantidad de cada producto que va a congelado para la fecha seleccionada.</div>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
-      <label style="font-size:13px;color:var(--text2)">Fecha:</label>
-      <input type="date" id="cong-fecha" onchange="loadCongCarga()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-      <button class="btn btn-sm" onclick="loadCongCarga()"><i class="ti ti-refresh"></i> Actualizar</button>
-    </div>
-    <div id="cong-carga-content"></div>
-    <div style="display:flex;justify-content:flex-end;margin-top:1rem">
-      <button class="btn btn-primary" onclick="guardarCongCarga()"><i class="ti ti-device-floppy"></i> Guardar carga</button>
-    </div>
-    <div id="cong-msg" style="display:none;margin-top:1rem" class="alert alert-ok"><i class="ti ti-check"></i> <span id="cong-msg-txt"></span></div>
-    <div id="cong-err" style="display:none;margin-top:1rem" class="alert alert-err"><i class="ti ti-alert-circle"></i> <span id="cong-err-txt"></span></div>
-  </div>
-
-  <!-- HISTORIAL -->
-  <div id="cong-sub-historial" style="display:none">
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
-      <label style="font-size:13px;color:var(--text2)">Desde:</label>
-      <input type="date" id="cong-hist-desde" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-      <label style="font-size:13px;color:var(--text2)">Hasta:</label>
-      <input type="date" id="cong-hist-hasta" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-      <button class="btn btn-primary" onclick="buscarCongHistorial()"><i class="ti ti-search"></i> Buscar</button>
-    </div>
-    <div id="cong-hist-content"></div>
-  </div>
 </div>
 
 <!-- RRHH -->
@@ -1875,7 +1855,7 @@ async function lr(k){
 // uES definida en sección Dashboard
 
 
-const TABS=['prod','cmp','inf','stock','cong','rec','rrhh','ped','cfg','etq','rem'];
+const TABS=['prod','cmp','inf','stock','rec','rrhh','ped','cfg','etq','rem'];
 // Sub-pestaña activa dentro de Producción (Planificación/Rellenos/Prod. Real, unificadas en una sola
 // pestaña) -- se recuerda para que volver a "Producción" desde otra pestaña principal reabra la misma
 // sub-pestaña en la que el usuario estaba, en vez de resetear siempre a Planificación.
@@ -1900,7 +1880,6 @@ function T(t){
   if(t==='cmp'){pS('cwsel');loadCmp()}
   if(t==='inf')showInfSubTab(infActiveSubTab);
   if(t==='stock')initStock();
-  if(t==='cong')initCongelado();
   if(t==='proy')initProy();
   if(t==='rrhh')initRrhh();
   if(t==='rec'){if(!st.Pr.length||!Object.keys(st.Rec).length){init().then(()=>rRec());}else{rRec();}}
@@ -1918,7 +1897,7 @@ function T(t){
 let infActiveSubTab='desv';
 function showInfSubTab(t){
   infActiveSubTab=t;
-  ['desv','dash','rend','diario','rango','pdad'].forEach(x=>{
+  ['desv','dash','rend','diario','rango','pdad','tiempos'].forEach(x=>{
     document.getElementById('tab-'+x).style.display=x===t?'':'none';
     document.getElementById('inftab-'+x).classList.toggle('active',x===t);
   });
@@ -1927,6 +1906,7 @@ function showInfSubTab(t){
   if(t==='rend')initRend();
   if(t==='diario')initInformeDiario();
   if(t==='rango')initInformeRango();
+  if(t==='tiempos')initInformeTiempos();
   if(t==='pdad')initInformeProductividad();
 }
 
@@ -2021,6 +2001,508 @@ function imprimirInformeDiario(){
     <table>
       <thead><tr><th>ID</th><th>Alias</th><th>Cantidad</th><th>Unidad</th></tr></thead>
       <tbody>${filas}</tbody>
+    </table>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
+  </body></html>`;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para imprimir.');
+}
+
+// "Producción con tiempos" (Informes, v4.308): a pedido de "borra la pestaña de congelados, que
+// generemos una nueva pestaña... donde en base a lo que tengo que producir, mas los tiempos
+// promedios de todo lo que se fue cargando, me diga cuanto tiempo me llevaria cada producto" --
+// "es la base para lo que se viene". Toma lo PLANIFICADO (r.days[diIdx], no lo ya producido) para
+// el día elegido, y el rendimiento histórico completo (todas las fechas) de rendimiento_proceso
+// (misma fuente y mismo cálculo de uds/hora que Informes > Rendimiento) para estimar cuánto tiempo
+// llevaría cada producto. v4.309 le agregó hora de inicio / tiempo de cambio de variedad / orden
+// editables, en ese momento agrupado por ÁREA.
+//
+// v4.310: "vamos a dividir por maquina, en cada uno puedo poner el producto que vamos a cerrar, y
+// de ahi la hora de ocmienzo y el tiempo de limpieza o cambio de variedad... me deberia dejar...
+// poner el nombre de la personal, que pueden ser como maximo 6". Confirmado por AskUserQuestion:
+// (1) las máquinas son por DÍA (no una lista fija reutilizable), con un botón para copiar las del
+// mismo día de la semana pasada ("miércoles igual al miércoles pasado"); (2) reemplaza del todo el
+// agrupamiento por área (ya no existe esa vista); (3) algunas máquinas no pueden producir ciertas
+// áreas ("máquina 1... no puede ir burritos ni pizzetas") -- se armó como lista de áreas EXCLUIDAS
+// por máquina, no una lista de incluidas, porque así lo planteó ("puede ir cualquiera, pero no...");
+// (4) el personal se elige de la lista de empleados ya cargada en RRHH (sin preferencia explícita,
+// se tomó la opción recomendada). Rediseño completo: ya no hay agrupamiento automático por área --
+// las máquinas las crea el usuario a mano ese día (botón "+ Nueva máquina"), y los productos
+// planificados del día arrancan todos en un pool "Sin asignar a máquina" hasta que se asignan a
+// una con el selector de esa fila (una máquina excluida para el área de un producto ni aparece como
+// opción). Misma separación que v4.309 entre carga (cargarInformeTiempos, pega a Supabase: plan +
+// rendimiento_proceso + máquinas guardadas ese día + empleados) y cálculo puro en memoria
+// (recomputeInformeTiempos: aplica orden + horario + separa pool/asignados y redibuja) para que
+// mover una flecha, asignar/quitar un producto, tocar hora/cambio o personal no tenga que releer
+// todo de Supabase. Todo (nombre de máquina, hora_inicio, tiempo_cambio_min, áreas excluidas,
+// personal, orden de productos) se guarda por día+empresa+máquina en la tabla nueva
+// `tiempos_maquinas_dia` (reemplaza a `tiempos_produccion_dia` de v4.309, que queda sin uso --
+// Juan Pablo puede borrarla si ya la había creado) -- RLS deshabilitada en el create, SQL mandado
+// para que lo corra él (regla de siempre: nunca se escribe a producción directo desde acá). Guardado
+// automático con debounce de 500ms, igual que v4.309. "Copiar semana pasada" clona las máquinas de
+// fecha-7días completas (con confirm() si hoy ya hay algo cargado, mismo patrón que "Copiar horarios
+// de la semana anterior" en RRHH) -- el orden copiado tolera productos que hoy no están planificados
+// (se ignoran, misma lógica tolerante de v4.309) o que son nuevos (quedan en el pool).
+let infTiemposFecha='';
+let infTiemposEf='all';
+let infTiemposItemsAll=[]; // todo lo planificado del día con rendimiento histórico, "crudo" (antes de asignar a máquina)
+let infTiemposSinDatos=[]; // planificado del día SIN rendimiento histórico -- no asignable, solo informativo
+let infTiemposMaquinas=[]; // fuente de verdad editable: [{gk,maquina,empresaId,ordenMaquina,horaInicio,tiempoCambio,areasExcluidas:[],personal:[empleadoId,...],orden:[itemKey,...]}]
+let infTiemposComputed=[]; // resultado calculado de infTiemposMaquinas (items resueltos+horario) -- para render e imprimir
+let infTiemposPool=[]; // items de infTiemposItemsAll que no están en el orden de ninguna máquina
+let infTiemposMeta={fecha:'',empresaLabel:''};
+let infTiemposSaveTimers={};
+
+function minToHHMM(min){
+  min=((Math.round(min)%1440)+1440)%1440;
+  const h=Math.floor(min/60),m=min%60;
+  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+}
+
+function initInformeTiempos(){
+  const f=document.getElementById('inf-tiempos-fecha');
+  if(!f.value)f.value=hoyLocal();
+  cargarInformeTiempos();
+}
+
+async function cargarInformeTiempos(){
+  const el=document.getElementById('inf-tiempos-content');
+  const fecha=document.getElementById('inf-tiempos-fecha').value;
+  const ef=document.getElementById('inf-tiempos-esel').value;
+  const btnImp=document.getElementById('btnImprimirInfTiempos');
+  if(!fecha){el.innerHTML='';infTiemposComputed=[];infTiemposPool=[];infTiemposSinDatos=[];infTiemposMaquinas=[];if(btnImp)btnImp.disabled=true;return}
+  const semKey=wk(new Date(fecha+'T00:00:00'));
+  const diIdx=(new Date(fecha+'T00:00:00').getDay()+6)%7;
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando...</div>';
+  await lp(semKey);
+  if(!empleados.length)await loadEmpleados();
+  let histData=[];
+  try{histData=await get('rendimiento_proceso','select=empresa_id,area,producto,cantidad,hora_inicio,hora_fin');}catch{histData=[];}
+  const hist={};
+  histData.forEach(r=>{
+    if(!r.hora_inicio||!r.hora_fin)return;
+    const[h1,m1]=r.hora_inicio.split(':').map(Number);
+    const[h2,m2]=r.hora_fin.split(':').map(Number);
+    let d=(h2*60+m2)-(h1*60+m1);if(d<0)d+=1440;
+    if(d<=0)return;
+    const k=r.empresa_id+'||'+r.area+'||'+r.producto;
+    if(!hist[k])hist[k]={totCant:0,totMin:0};
+    hist[k].totCant+=(r.cantidad||0);
+    hist[k].totMin+=d;
+  });
+  let maqData=[];
+  try{maqData=await get('tiempos_maquinas_dia',`fecha=eq.${fecha}&order=orden_maquina.asc,maquina.asc`);}catch{maqData=[];}
+  let plan=st.P[semKey]||[];
+  if(ef!=='all')plan=plan.filter(r=>r.empresa_id===ef);
+  const itemsAll=[];
+  const sinDatos=[];
+  plan.forEach(r=>{
+    const pv=(r.days&&r.days[diIdx])||0;
+    if(pv<=0)return;
+    const mp=mpParaProducto(r);
+    const codigo=(mp&&mp.codigo)?mp.codigo:codigoParaProducto(r);
+    const alias=(mp&&(mp.alias||mp.nombre))||r.producto;
+    const areaNombre=areaCanon(r.empresa_id,r.area);
+    const k=r.empresa_id+'||'+r.area+'||'+r.producto;
+    const hd=hist[k];
+    const udsHora=hd&&hd.totMin>0?(hd.totCant/(hd.totMin/60)):0;
+    const itemKey=r.empresa_id+'||'+areaNombre+'||'+r.producto;
+    const item={itemKey,empresaId:r.empresa_id,area:areaNombre,producto:r.producto,codigo,alias,cantidad:pv,unidad:r.unidad,udsHora};
+    if(udsHora>0)itemsAll.push(item);else sinDatos.push(item);
+  });
+  infTiemposFecha=fecha;
+  infTiemposEf=ef;
+  infTiemposItemsAll=itemsAll;
+  infTiemposSinDatos=sinDatos.sort((a,b)=>a.area.localeCompare(b.area)||a.alias.localeCompare(b.alias));
+  infTiemposMaquinas=maqData.map(r=>({
+    gk:r.empresa_id+'||'+r.maquina,
+    maquina:r.maquina,
+    empresaId:r.empresa_id,
+    ordenMaquina:r.orden_maquina||0,
+    horaInicio:r.hora_inicio||'08:00',
+    tiempoCambio:r.tiempo_cambio_min||0,
+    areasExcluidas:r.areas_excluidas||[],
+    personal:r.personal||[],
+    orden:r.orden||[]
+  }));
+  const empSel=st.E.find(e=>e.id===ef);
+  infTiemposMeta={fecha,empresaLabel:ef==='all'?'Todas las empresas':(empSel?empSel.nombre:'')};
+  recomputeInformeTiempos();
+}
+
+function tiemposMaqSrc(gk){return infTiemposMaquinas.find(m=>m.gk===gk)}
+
+// Puro: resuelve el orden guardado de cada máquina contra infTiemposItemsAll, aplica hora de
+// inicio + tiempo de cambio de variedad, separa el pool de no asignados, y redibuja. No pega a
+// Supabase ni recalcula uds/hora -- eso ya está cargado desde la última cargarInformeTiempos().
+function recomputeInformeTiempos(){
+  const el=document.getElementById('inf-tiempos-content');
+  const btnImp=document.getElementById('btnImprimirInfTiempos');
+  const porKey={};
+  infTiemposItemsAll.forEach(it=>{porKey[it.itemKey]=it});
+  const asignados=new Set();
+  const maquinas=infTiemposMaquinas.map(maq=>{
+    const itemsOrd=(maq.orden||[]).map(k=>porKey[k]).filter(it=>{
+      if(!it)return false;
+      asignados.add(it.itemKey);
+      return true;
+    });
+    const[hIni,mIni]=(maq.horaInicio||'08:00').split(':').map(Number);
+    const inicioMin=(hIni||0)*60+(mIni||0);
+    const tiempoCambio=maq.tiempoCambio||0;
+    let cursor=inicioMin;
+    const items=itemsOrd.map((it,idx)=>{
+      if(idx>0)cursor+=tiempoCambio;
+      const durMin=Math.max(1,Math.round(it.cantidad/it.udsHora*60));
+      const horaInicioItem=minToHHMM(cursor);
+      cursor+=durMin;
+      const horaFinItem=minToHHMM(cursor);
+      return{...it,durMin,horaInicio:horaInicioItem,horaFin:horaFinItem};
+    });
+    const totalMin=cursor-inicioMin;
+    return{gk:maq.gk,maquina:maq.maquina,empresaId:maq.empresaId,ordenMaquina:maq.ordenMaquina||0,
+      areasExcluidas:maq.areasExcluidas||[],personal:maq.personal||[],
+      items,totalMin,horaInicio:maq.horaInicio||'08:00',tiempoCambio,horaFin:minToHHMM(inicioMin+totalMin)};
+  }).sort((a,b)=>(a.ordenMaquina-b.ordenMaquina)||a.maquina.localeCompare(b.maquina));
+  infTiemposComputed=maquinas;
+  infTiemposPool=infTiemposItemsAll.filter(it=>!asignados.has(it.itemKey)).sort((a,b)=>a.area.localeCompare(b.area)||a.alias.localeCompare(b.alias));
+
+  const hayAlgo=maquinas.some(m=>m.items.length)||infTiemposPool.length||infTiemposSinDatos.length;
+  if(!hayAlgo){
+    el.innerHTML='<div class="empty"><i class="ti ti-calendar-off"></i> No hay nada planificado para ese día.</div>';
+    if(btnImp)btnImp.disabled=true;
+    return;
+  }
+  if(btnImp)btnImp.disabled=!(maquinas.some(m=>m.items.length)||infTiemposSinDatos.length);
+
+  let h='';
+  // Pool de productos sin asignar a ninguna máquina
+  h+=`<div class="stock-card" style="margin-bottom:16px">
+    <div style="padding:10px 14px;background:var(--bg2);border-bottom:.5px solid var(--border);border-radius:var(--radius-lg) var(--radius-lg) 0 0;font-weight:700">
+      <i class="ti ti-list-check"></i> Sin asignar a máquina (${infTiemposPool.length})
+    </div>
+    ${infTiemposPool.length?`<div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
+      <th>ID</th><th>Área</th><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Uds/hora</th><th style="width:220px">Asignar a</th>
+    </tr></thead><tbody>
+    ${infTiemposPool.map((it,poolIdx)=>{
+      const opciones=maquinas.map((m,idx)=>({...m,idx})).filter(m=>m.empresaId===it.empresaId&&!(m.areasExcluidas||[]).includes(it.area));
+      const sel=opciones.length
+        ?`<select onchange="if(this.value!=='')tiemposAsignar(${poolIdx},parseInt(this.value))" style="padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)">
+            <option value="">Elegir máquina...</option>
+            ${opciones.map(m=>`<option value="${m.idx}">${remEsc(m.maquina)}</option>`).join('')}
+          </select>`
+        :`<span style="color:var(--text3);font-size:12px">Sin máquinas disponibles para esta área</span>`;
+      return `<tr>
+        <td class="muted">${it.codigo||'—'}</td>
+        <td class="muted">${remEsc(it.area)}</td>
+        <td style="font-weight:500">${remEsc(it.alias)}</td>
+        <td style="text-align:right;font-weight:600">${it.cantidad.toLocaleString('es-AR')}</td>
+        <td style="text-align:right;color:var(--blue)">${Math.round(it.udsHora).toLocaleString('es-AR')}</td>
+        <td>${sel}</td>
+      </tr>`;
+    }).join('')}
+    </tbody></table></div>`:`<div style="padding:14px;text-align:center;color:var(--text3);font-size:13px">Todo lo planificado con rendimiento histórico ya está asignado a alguna máquina.</div>`}
+  </div>`;
+
+  // Alta de máquina nueva
+  h+=`<div class="stock-card" style="margin-bottom:16px;padding:12px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <span style="font-weight:700;font-size:13px"><i class="ti ti-circle-plus"></i> Nueva máquina:</span>
+    <input type="text" id="tiempos-nueva-maquina-nombre" placeholder="Ej: Máquina 1" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:180px"/>
+    ${infTiemposEf==='all'?`<select id="tiempos-nueva-maquina-emp" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">${st.E.map(e=>`<option value="${e.id}">${remEsc(e.nombre)}</option>`).join('')}</select>`:''}
+    <button class="btn btn-sm btn-primary" onclick="tiemposNuevaMaquina()"><i class="ti ti-plus"></i> Crear</button>
+  </div>`;
+
+  // Tarjetas por máquina
+  maquinas.forEach((maq,maqIdx)=>{
+    const areasDeEmpresa=[...new Set(infTiemposItemsAll.filter(it=>it.empresaId===maq.empresaId).map(it=>it.area))].sort((a,b)=>a.localeCompare(b));
+    const personalDisponible=empleados.filter(e=>e.empresa_id===maq.empresaId&&!(maq.personal||[]).includes(e.id));
+    h+=`<div class="stock-card" style="margin-bottom:16px">
+      <div style="padding:10px 14px;background:var(--bg2);border-bottom:.5px solid var(--border);border-radius:var(--radius-lg) var(--radius-lg) 0 0;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="emp-tag" style="background:${ec(maq.empresaId)}18;color:${ec(maq.empresaId)}">${en(maq.empresaId)||''}</span>
+            <span style="font-weight:700">${remEsc(maq.maquina)}</span>
+            <button onclick="tiemposEliminarMaquina(${maqIdx})" title="Eliminar máquina" style="border:none;background:none;cursor:pointer;color:var(--text3);padding:2px"><i class="ti ti-trash"></i></button>
+          </div>
+          <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:12px">
+            <span style="display:flex;align-items:center;gap:6px;color:var(--text2)">Inicio:
+              <input type="time" value="${maq.horaInicio}" onchange="tiemposSetHora(${maqIdx},this.value)" style="padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)"/>
+            </span>
+            <span style="display:flex;align-items:center;gap:6px;color:var(--text2)">Cambio de variedad:
+              <input type="number" min="0" value="${maq.tiempoCambio}" onchange="tiemposSetCambio(${maqIdx},this.value)" style="width:52px;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)"/> min
+            </span>
+            <span style="color:var(--text2)">Termina <b style="color:var(--text)">${maq.horaFin}</b> · ${Math.floor(maq.totalMin/60)}h ${maq.totalMin%60}m en total</span>
+          </div>
+        </div>
+        ${areasDeEmpresa.length?`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px">
+          <span style="color:var(--text2)">No permitir:</span>
+          ${areasDeEmpresa.map((a,aIdx)=>{
+            const excluida=(maq.areasExcluidas||[]).includes(a);
+            return `<button onclick="tiemposToggleArea(${maqIdx},${aIdx})" style="font-size:11px;padding:3px 9px;border-radius:10px;border:.5px solid ${excluida?'var(--red)':'var(--border2)'};background:${excluida?'#e8505030':'var(--bg)'};color:${excluida?'var(--red)':'var(--text2)'};cursor:pointer">${remEsc(a)}</button>`;
+          }).join('')}
+        </div>`:''}
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px">
+          <span style="color:var(--text2)">Personal (máx. 6):</span>
+          ${(maq.personal||[]).map(eid=>{
+            const emp=empleados.find(e=>e.id===eid);
+            return `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--bg);border:.5px solid var(--border2);border-radius:12px;padding:2px 8px 2px 10px">${remEsc(emp?emp.nombre:'(empleado eliminado)')}<button onclick="tiemposQuitarPersonal(${maqIdx},'${eid}')" style="border:none;background:none;cursor:pointer;color:var(--text3);padding:0;line-height:1;font-size:14px" title="Quitar">×</button></span>`;
+          }).join('')}
+          ${(maq.personal||[]).length<6?(personalDisponible.length
+            ?`<select onchange="if(this.value){tiemposAgregarPersonal(${maqIdx},this.value);this.value=''}" style="padding:3px 6px;font-size:12px;border:.5px dashed var(--border2);border-radius:10px;background:var(--bg);color:var(--text2)">
+                <option value="">+ agregar</option>
+                ${personalDisponible.map(e=>`<option value="${e.id}">${remEsc(e.nombre)}</option>`).join('')}
+              </select>`
+            :'<span style="color:var(--text3);font-size:11px">(sin más empleados activos cargados para esta empresa en RRHH)</span>'):''}
+        </div>
+      </div>
+      <div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
+        <th style="width:76px"></th>
+        <th>ID</th><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Uds/hora</th>
+        <th style="text-align:right">Duración</th><th style="text-align:center">Inicio</th><th style="text-align:center">Fin</th>
+      </tr></thead><tbody>
+      ${maq.items.length?maq.items.map((it,idx)=>`<tr>
+        <td style="white-space:nowrap">
+          <button onclick="tiemposMover(${maqIdx},${idx},-1)" ${idx===0?'disabled':''} title="Subir" style="border:none;background:none;padding:2px 3px;cursor:${idx===0?'default':'pointer'};color:${idx===0?'var(--text3)':'var(--text2)'}"><i class="ti ti-chevron-up"></i></button>
+          <button onclick="tiemposMover(${maqIdx},${idx},1)" ${idx===maq.items.length-1?'disabled':''} title="Bajar" style="border:none;background:none;padding:2px 3px;cursor:${idx===maq.items.length-1?'default':'pointer'};color:${idx===maq.items.length-1?'var(--text3)':'var(--text2)'}"><i class="ti ti-chevron-down"></i></button>
+          <button onclick="tiemposQuitar(${maqIdx},${idx})" title="Quitar de esta máquina" style="border:none;background:none;padding:2px 3px;cursor:pointer;color:var(--text3)"><i class="ti ti-x"></i></button>
+        </td>
+        <td class="muted">${it.codigo||'—'}</td>
+        <td style="font-weight:500">${remEsc(it.alias)}</td>
+        <td style="text-align:right;font-weight:600">${it.cantidad.toLocaleString('es-AR')}</td>
+        <td style="text-align:right;color:var(--blue)">${Math.round(it.udsHora).toLocaleString('es-AR')}</td>
+        <td style="text-align:right">${Math.floor(it.durMin/60)}h ${it.durMin%60}m</td>
+        <td style="text-align:center;font-weight:600;color:var(--green)">${it.horaInicio}</td>
+        <td style="text-align:center;font-weight:600;color:var(--red)">${it.horaFin}</td>
+      </tr>`).join(''):`<tr><td colspan="8" style="padding:14px;text-align:center;color:var(--text3)">Sin productos asignados todavía</td></tr>`}
+      </tbody></table></div>
+    </div>`;
+  });
+
+  if(infTiemposSinDatos.length){
+    h+=`<div class="stock-card" style="margin-bottom:16px">
+      <div style="padding:10px 14px;background:var(--bg2);border-bottom:.5px solid var(--border);border-radius:var(--radius-lg) var(--radius-lg) 0 0;font-weight:700;color:var(--text2)">
+        <i class="ti ti-alert-triangle" style="color:var(--amber)"></i> Sin rendimiento histórico cargado (${infTiemposSinDatos.length})
+      </div>
+      <div style="overflow-x:auto"><table class="stock-tbl"><thead><tr><th>ID</th><th>Área</th><th>Producto</th><th style="text-align:right">Cantidad</th><th>Unidad</th></tr></thead><tbody>
+      ${infTiemposSinDatos.map(it=>`<tr><td class="muted">${it.codigo||'—'}</td><td class="muted">${remEsc(it.area)}</td><td style="font-weight:500">${remEsc(it.alias)}</td><td style="text-align:right;font-weight:600">${it.cantidad.toLocaleString('es-AR')}</td><td class="muted">${it.unidad||''}</td></tr>`).join('')}
+      </tbody></table></div>
+    </div>`;
+  }
+  el.innerHTML=h;
+}
+
+function tiemposAsignar(poolIdx,maqIdx){
+  const it=infTiemposPool[poolIdx];
+  const maqC=infTiemposComputed[maqIdx];
+  if(!it||!maqC)return;
+  const maq=tiemposMaqSrc(maqC.gk);
+  if(!maq)return;
+  if(!maq.orden)maq.orden=[];
+  if(!maq.orden.includes(it.itemKey))maq.orden.push(it.itemKey);
+  recomputeInformeTiempos();
+  guardarMaquinaTiempos(maq.gk);
+}
+
+function tiemposQuitar(maqIdx,itemIdx){
+  const maqC=infTiemposComputed[maqIdx];
+  if(!maqC)return;
+  const maq=tiemposMaqSrc(maqC.gk);
+  if(!maq)return;
+  const it=maqC.items[itemIdx];
+  if(!it)return;
+  maq.orden=(maq.orden||[]).filter(k=>k!==it.itemKey);
+  recomputeInformeTiempos();
+  guardarMaquinaTiempos(maq.gk);
+}
+
+function tiemposMover(maqIdx,itemIdx,dir){
+  const maqC=infTiemposComputed[maqIdx];
+  if(!maqC)return;
+  const maq=tiemposMaqSrc(maqC.gk);
+  if(!maq)return;
+  const j=itemIdx+dir;
+  if(j<0||j>=maqC.items.length)return;
+  const keys=maqC.items.map(it=>it.itemKey);
+  [keys[itemIdx],keys[j]]=[keys[j],keys[itemIdx]];
+  maq.orden=keys;
+  recomputeInformeTiempos();
+  guardarMaquinaTiempos(maq.gk);
+}
+
+function tiemposSetHora(maqIdx,val){
+  const maqC=infTiemposComputed[maqIdx];if(!maqC)return;
+  const maq=tiemposMaqSrc(maqC.gk);if(!maq)return;
+  maq.horaInicio=val||'08:00';
+  recomputeInformeTiempos();
+  guardarMaquinaTiempos(maq.gk);
+}
+
+function tiemposSetCambio(maqIdx,val){
+  const maqC=infTiemposComputed[maqIdx];if(!maqC)return;
+  const maq=tiemposMaqSrc(maqC.gk);if(!maq)return;
+  maq.tiempoCambio=Math.max(0,parseInt(val)||0);
+  recomputeInformeTiempos();
+  guardarMaquinaTiempos(maq.gk);
+}
+
+function tiemposToggleArea(maqIdx,areaIdx){
+  const maqC=infTiemposComputed[maqIdx];if(!maqC)return;
+  const maq=tiemposMaqSrc(maqC.gk);if(!maq)return;
+  const areasDeEmpresa=[...new Set(infTiemposItemsAll.filter(it=>it.empresaId===maq.empresaId).map(it=>it.area))].sort((a,b)=>a.localeCompare(b));
+  const area=areasDeEmpresa[areaIdx];
+  if(!area)return;
+  const arr=maq.areasExcluidas||[];
+  maq.areasExcluidas=arr.includes(area)?arr.filter(a=>a!==area):[...arr,area];
+  recomputeInformeTiempos();
+  guardarMaquinaTiempos(maq.gk);
+}
+
+function tiemposAgregarPersonal(maqIdx,empleadoId){
+  if(!empleadoId)return;
+  const maqC=infTiemposComputed[maqIdx];if(!maqC)return;
+  const maq=tiemposMaqSrc(maqC.gk);if(!maq)return;
+  const arr=maq.personal||[];
+  if(arr.length>=6||arr.includes(empleadoId))return;
+  maq.personal=[...arr,empleadoId];
+  recomputeInformeTiempos();
+  guardarMaquinaTiempos(maq.gk);
+}
+
+function tiemposQuitarPersonal(maqIdx,empleadoId){
+  const maqC=infTiemposComputed[maqIdx];if(!maqC)return;
+  const maq=tiemposMaqSrc(maqC.gk);if(!maq)return;
+  maq.personal=(maq.personal||[]).filter(id=>id!==empleadoId);
+  recomputeInformeTiempos();
+  guardarMaquinaTiempos(maq.gk);
+}
+
+function tiemposNuevaMaquina(){
+  const nombreEl=document.getElementById('tiempos-nueva-maquina-nombre');
+  const empEl=document.getElementById('tiempos-nueva-maquina-emp');
+  const nombre=(nombreEl.value||'').trim();
+  const empresaId=empEl?empEl.value:infTiemposEf;
+  if(!nombre){alert('Poné un nombre para la máquina.');return}
+  if(!empresaId||empresaId==='all'){alert('Elegí a qué empresa pertenece la máquina.');return}
+  if(infTiemposMaquinas.some(m=>m.empresaId===empresaId&&m.maquina.toLowerCase()===nombre.toLowerCase())){
+    alert('Ya existe una máquina con ese nombre ese día para esa empresa.');
+    return;
+  }
+  const maxOrden=infTiemposMaquinas.filter(m=>m.empresaId===empresaId).reduce((mx,m)=>Math.max(mx,m.ordenMaquina||0),0);
+  const horaDefault=document.getElementById('inf-tiempos-hora').value||'08:00';
+  const nueva={gk:empresaId+'||'+nombre,maquina:nombre,empresaId,ordenMaquina:maxOrden+1,horaInicio:horaDefault,tiempoCambio:0,areasExcluidas:[],personal:[],orden:[]};
+  infTiemposMaquinas.push(nueva);
+  nombreEl.value='';
+  recomputeInformeTiempos();
+  guardarMaquinaTiempos(nueva.gk);
+}
+
+async function tiemposEliminarMaquina(maqIdx){
+  const maqC=infTiemposComputed[maqIdx];
+  if(!maqC)return;
+  const msg=maqC.items.length
+    ?`La máquina "${maqC.maquina}" tiene ${maqC.items.length} producto(s) asignado(s), que van a volver a la lista de "Sin asignar". ¿Eliminar la máquina igual?`
+    :`¿Eliminar la máquina "${maqC.maquina}"?`;
+  if(!confirm(msg))return;
+  infTiemposMaquinas=infTiemposMaquinas.filter(m=>m.gk!==maqC.gk);
+  recomputeInformeTiempos();
+  try{
+    await fetch(`${SB}/rest/v1/tiempos_maquinas_dia?fecha=eq.${infTiemposFecha}&empresa_id=eq.${maqC.empresaId}&maquina=eq.${encodeURIComponent(maqC.maquina)}`,{method:'DELETE',headers:H});
+  }catch(e){console.error('Error eliminando máquina',e.message);}
+}
+
+function guardarMaquinaTiempos(gk){
+  clearTimeout(infTiemposSaveTimers[gk]);
+  infTiemposSaveTimers[gk]=setTimeout(async()=>{
+    const maq=tiemposMaqSrc(gk);
+    if(!maq||!infTiemposFecha)return;
+    try{
+      const res=await fetch(`${SB}/rest/v1/tiempos_maquinas_dia?on_conflict=fecha,empresa_id,maquina`,{
+        method:'POST',
+        headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},
+        body:JSON.stringify({
+          fecha:infTiemposFecha,empresa_id:maq.empresaId,maquina:maq.maquina,
+          orden_maquina:maq.ordenMaquina||0,hora_inicio:maq.horaInicio||'08:00',
+          tiempo_cambio_min:maq.tiempoCambio||0,areas_excluidas:maq.areasExcluidas||[],
+          personal:maq.personal||[],orden:maq.orden||[]
+        })
+      });
+      if(!res.ok)console.error('Error guardando máquina',gk,await res.text());
+    }catch(e){console.error('Error guardando máquina',gk,e.message);}
+  },500);
+}
+
+async function tiemposCopiarSemanaPasada(){
+  const fecha=document.getElementById('inf-tiempos-fecha').value;
+  if(!fecha){alert('Elegí primero el día.');return}
+  const fechaPrevDate=new Date(fecha+'T00:00:00');fechaPrevDate.setDate(fechaPrevDate.getDate()-7);
+  const fechaPrev=fechaPrevDate.getFullYear()+'-'+String(fechaPrevDate.getMonth()+1).padStart(2,'0')+'-'+String(fechaPrevDate.getDate()).padStart(2,'0');
+  const ef=document.getElementById('inf-tiempos-esel').value;
+  let prevData=[];
+  try{
+    let q=`fecha=eq.${fechaPrev}`;
+    if(ef!=='all')q+=`&empresa_id=eq.${ef}`;
+    prevData=await get('tiempos_maquinas_dia',q);
+  }catch(e){alert('Error buscando la semana pasada: '+e.message);return}
+  if(!prevData.length){alert(`No hay máquinas guardadas para el ${fechaPrev} (mismo día de la semana pasada).`);return}
+  if(infTiemposMaquinas.length&&!confirm(`Ya hay ${infTiemposMaquinas.length} máquina(s) cargada(s) hoy. Copiar ${fechaPrev} va a crear o pisar las máquinas con el mismo nombre. ¿Continuar?`))return;
+  prevData.forEach(r=>{
+    infTiemposMaquinas=infTiemposMaquinas.filter(m=>!(m.empresaId===r.empresa_id&&m.maquina===r.maquina));
+    const nueva={gk:r.empresa_id+'||'+r.maquina,maquina:r.maquina,empresaId:r.empresa_id,ordenMaquina:r.orden_maquina||0,horaInicio:r.hora_inicio||'08:00',tiempoCambio:r.tiempo_cambio_min||0,areasExcluidas:r.areas_excluidas||[],personal:r.personal||[],orden:r.orden||[]};
+    infTiemposMaquinas.push(nueva);
+    guardarMaquinaTiempos(nueva.gk);
+  });
+  recomputeInformeTiempos();
+}
+
+function imprimirInformeTiempos(){
+  if(!infTiemposComputed.some(m=>m.items.length)&&!infTiemposSinDatos.length)return;
+  const[y,m,d]=(infTiemposMeta.fecha||'').split('-');
+  const fechaFmt=(y&&m&&d)?`${d}/${m}/${y}`:(infTiemposMeta.fecha||'');
+  const ahora=new Date();
+  const p2=n=>String(n).padStart(2,'0');
+  const fechaImpresion=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()} ${p2(ahora.getHours())}:${p2(ahora.getMinutes())}`;
+  let filasHtml='';
+  infTiemposComputed.forEach(maq=>{
+    if(!maq.items.length)return;
+    const nombresPersonal=(maq.personal||[]).map(eid=>{const emp=empleados.find(e=>e.id===eid);return emp?emp.nombre:null}).filter(Boolean);
+    filasHtml+=`<tr class="grp"><td colspan="6">${remEsc(maq.maquina)} — ${maq.horaInicio} a ${maq.horaFin}${maq.tiempoCambio?` · cambio de variedad: ${maq.tiempoCambio} min`:''}${nombresPersonal.length?` · Personal: ${remEsc(nombresPersonal.join(', '))}`:''}</td></tr>`;
+    maq.items.forEach(it=>{
+      filasHtml+=`<tr><td class="cod">${it.codigo||'—'}</td><td class="ali">${remEsc(it.alias)}</td><td class="cant">${it.cantidad.toLocaleString('es-AR')}</td><td class="uph">${Math.round(it.udsHora).toLocaleString('es-AR')}</td><td class="hor">${it.horaInicio}</td><td class="hor">${it.horaFin}</td></tr>`;
+    });
+  });
+  if(infTiemposSinDatos.length){
+    filasHtml+=`<tr class="grp"><td colspan="6">Sin rendimiento histórico</td></tr>`;
+    infTiemposSinDatos.forEach(it=>{
+      filasHtml+=`<tr><td class="cod">${it.codigo||'—'}</td><td class="ali">${remEsc(it.alias)} (${remEsc(it.area)})</td><td class="cant">${it.cantidad.toLocaleString('es-AR')}</td><td class="uph">—</td><td class="hor">—</td><td class="hor">—</td></tr>`;
+    });
+  }
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Producción con tiempos — ${fechaFmt}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;padding:8mm;font-size:13pt}
+    h1{font-size:16pt;margin-bottom:2px}
+    .sub{font-size:11pt;color:#555;margin-bottom:10px}
+    table{width:100%;border-collapse:collapse}
+    th{text-align:left;padding:5px 7px;font-size:12pt;border-bottom:2px solid #333}
+    td{padding:5px 7px;font-size:12pt;border-bottom:1px solid #ccc}
+    tr.grp td{background:#eee;font-weight:700;border-top:2px solid #333;border-bottom:1px solid #333}
+    td.cod{width:12%;font-family:monospace}
+    td.ali{width:38%}
+    td.cant{width:15%;text-align:right;font-weight:700}
+    td.uph{width:13%;text-align:right}
+    td.hor{width:11%;text-align:center;font-weight:700}
+    @media print{@page{size:A4;margin:10mm}body{padding:0}}
+  </style></head>
+  <body>
+    <h1>PRODUCCIÓN CON TIEMPOS — ${fechaFmt}</h1>
+    <div class="sub">${infTiemposMeta.empresaLabel} · Impreso ${fechaImpresion}</div>
+    <table>
+      <thead><tr><th>ID</th><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Uds/h</th><th style="text-align:center">Inicio</th><th style="text-align:center">Fin</th></tr></thead>
+      <tbody>${filasHtml}</tbody>
     </table>
   <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
   </body></html>`;
@@ -8302,7 +8784,7 @@ function clearDashTimer(){
 }
 
 function uES(){
-  ['resel','cesel','ceesel','desv-esel','dash-esel','inf-diario-esel','inf-rango-esel','inf-pdad-esel'].forEach(id=>{
+  ['resel','cesel','ceesel','desv-esel','dash-esel','inf-diario-esel','inf-rango-esel','inf-pdad-esel','inf-tiempos-esel'].forEach(id=>{
     const s=document.getElementById(id);if(!s)return;
     const c=s.value;s.innerHTML='<option value="all">Todas</option>';
     if(id==='dash-esel')s.options[0].text='Todas las empresas';
@@ -10248,144 +10730,8 @@ async function importarExcelFlexxusStock(input){
   }
 }
 
-// ── CONGELADO (carga de productos de Planeta Empanada) ──────────
-async function initCongelado(){
-  if(!st.E.length||!st.Pr.length)await init();
-  const hoy=hoyLocal();
-  if(!document.getElementById('cong-fecha').value)document.getElementById('cong-fecha').value=hoy;
-  showCongTab('carga');
-}
-
-function showCongTab(t){
-  ['carga','historial'].forEach(id=>{
-    document.getElementById('cong-sub-'+id).style.display=id===t?'block':'none';
-    document.getElementById('congtab-'+id).classList.toggle('active',id===t);
-  });
-  if(t==='carga')loadCongCarga();
-}
-
-function congGetPlaneta(){
-  return st.E.find(e=>e.nombre.toLowerCase().includes('planeta'));
-}
-
-async function loadCongCarga(){
-  const fecha=document.getElementById('cong-fecha').value||hoyLocal();
-  const planeta=congGetPlaneta();
-  if(!planeta){
-    document.getElementById('cong-carga-content').innerHTML='<div class="empty"><i class="ti ti-alert-circle"></i> No se encontró la empresa Planeta Empanada en el maestro.</div>';
-    return;
-  }
-  let existentes=[];
-  try{existentes=await get('congelado_carga',`fecha=eq.${fecha}&empresa_id=eq.${planeta.id}`);}catch{existentes=[];}
-  renderCongCarga(planeta,existentes);
-}
-
-function renderCongCarga(planeta,existentes){
-  const el=document.getElementById('cong-carga-content');
-  const prods=st.Pr.filter(p=>p.empresa_id===planeta.id);
-  if(!prods.length){el.innerHTML='<div class="empty"><i class="ti ti-package-off"></i>Sin productos cargados para Planeta Empanada.</div>';return}
-  const byArea={};
-  prods.forEach(p=>{const a=st.A.find(x=>x.id===p.area_id);const an=a?a.nombre:'SA';if(!byArea[an])byArea[an]=[];byArea[an].push(p);});
-  let h=`<div class="stock-card"><table class="stock-tbl"><thead><tr>
-    <th style="text-align:left">Producto</th>
-    <th style="text-align:left;width:70px">Unidad</th>
-    <th style="text-align:right;width:120px">Cantidad</th>
-  </tr></thead><tbody>`;
-  Object.entries(byArea).forEach(([area,aProds])=>{
-    h+=`<tr><td colspan="3" style="background:var(--bg2);padding:6px 10px;font-size:11px;font-weight:700;color:var(--text2)">${area}</td></tr>`;
-    aProds.forEach(p=>{
-      const ex=existentes.find(e=>e.area===area&&e.producto===p.nombre);
-      const val=ex&&ex.cantidad>0?ex.cantidad:'';
-      const guardado=ex&&val!=='';
-      const pid=`cong-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
-      h+=`<tr>
-        <td style="font-weight:500">${p.nombre}${guardado?` <span style="color:var(--green);font-size:10px">✓</span>`:''}</td>
-        <td style="font-size:12px;color:var(--text2)">${p.unidad}</td>
-        <td style="text-align:right"><input class="proy-input" type="number" min="0" id="${pid}" value="${val}" placeholder="0"
-          style="border-color:${guardado?'var(--green)':'var(--border2)'};width:100px"/></td>
-      </tr>`;
-    });
-  });
-  h+=`</tbody></table></div>`;
-  el.innerHTML=h;
-}
-
-async function guardarCongCarga(){
-  const fecha=document.getElementById('cong-fecha').value||hoyLocal();
-  const planeta=congGetPlaneta();
-  const errEl=document.getElementById('cong-err');
-  const msgEl=document.getElementById('cong-msg');
-  errEl.style.display='none';msgEl.style.display='none';
-  if(!planeta){
-    document.getElementById('cong-err-txt').textContent='No se encontró la empresa Planeta Empanada.';
-    errEl.style.display='';
-    return;
-  }
-  const prods=st.Pr.filter(p=>p.empresa_id===planeta.id);
-  let guardados=0,errores=0,primerError='';
-  for(const p of prods){
-    const a=st.A.find(x=>x.id===p.area_id);const area=a?a.nombre:'SA';
-    const pid=`cong-${area.replace(/\s/g,'_')}-${p.nombre.replace(/[\s'\/]/g,'_')}`;
-    const inp=document.getElementById(pid);
-    if(!inp||inp.value==='')continue;
-    const cantidad=parseFloat(inp.value)||0;
-    try{
-      const res=await fetch(`${SB}/rest/v1/congelado_carga?on_conflict=fecha,empresa_id,area,producto`,{
-        method:'POST',
-        headers:{...H,'Prefer':'resolution=merge-duplicates,return=representation'},
-        body:JSON.stringify({fecha,empresa_id:planeta.id,area,producto:p.nombre,unidad:p.unidad,cantidad})
-      });
-      if(!res.ok)throw new Error(await res.text());
-      const data=await res.json();
-      if(!data||!data.length)throw new Error('El servidor no devolvió ninguna fila (revisá que exista la tabla congelado_carga y que RLS esté deshabilitado)');
-      guardados++;
-    }catch(e){
-      console.error('Error guardando congelado',p.nombre,':',e.message);
-      if(!primerError)primerError=e.message;
-      errores++;
-    }
-  }
-  if(errores){
-    document.getElementById('cong-err-txt').textContent=`${guardados} guardados, ${errores} con error: ${primerError}`;
-    errEl.style.display='';
-  } else {
-    document.getElementById('cong-msg-txt').textContent=`${guardados} productos guardados para el ${fecha}.`;
-    msgEl.style.display='';
-    setTimeout(()=>msgEl.style.display='none',4000);
-  }
-  await loadCongCarga();
-}
-
-async function buscarCongHistorial(){
-  const desde=document.getElementById('cong-hist-desde').value;
-  const hasta=document.getElementById('cong-hist-hasta').value;
-  const el=document.getElementById('cong-hist-content');
-  if(!desde||!hasta){el.innerHTML='<div class="alert alert-info"><i class="ti ti-info-circle"></i> Seleccioná un rango de fechas.</div>';return}
-  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
-  try{
-    const data=await get('congelado_carga',`fecha=gte.${desde}&fecha=lte.${hasta}&order=fecha.desc,area.asc,producto.asc`);
-    if(!data.length){el.innerHTML='<div class="empty"><i class="ti ti-snowflake-off"></i>Sin cargas registradas para ese rango.</div>';return}
-    const byFecha={};
-    data.forEach(d=>{if(!byFecha[d.fecha])byFecha[d.fecha]=[];byFecha[d.fecha].push(d)});
-    let h='';
-    Object.entries(byFecha).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([fecha,items])=>{
-      const total=items.reduce((s,i)=>s+(parseFloat(i.cantidad)||0),0);
-      const fLabel=new Date(fecha+'T00:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'});
-      h+=`<div class="stock-card" style="margin-bottom:1rem">
-        <div style="padding:8px 14px;background:var(--bg2);font-size:13px;font-weight:700;display:flex;justify-content:space-between">
-          <span>${fLabel}</span><span style="color:var(--blue)">Total: ${total.toLocaleString('es-AR')}</span>
-        </div>
-        <table class="stock-tbl"><thead><tr>
-          <th style="text-align:left">Área</th><th style="text-align:left">Producto</th>
-          <th style="text-align:right">Cantidad</th><th style="text-align:left;width:70px">Unidad</th>
-        </tr></thead><tbody>
-        ${items.map(i=>`<tr><td class="muted">${i.area||''}</td><td style="font-weight:500">${i.producto}</td><td style="text-align:right;font-weight:700;color:var(--blue)">${(parseFloat(i.cantidad)||0).toLocaleString('es-AR')}</td><td class="muted">${i.unidad||''}</td></tr>`).join('')}
-        </tbody></table>
-      </div>`;
-    });
-    el.innerHTML=h;
-  }catch(e){el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> Error: ${e.message}</div>`}
-}
+// (v4.308: pestaña "Congelado" eliminada por pedido del usuario -- tabla congelado_carga queda
+// sin usar en el código, se puede borrar de Supabase cuando quiera).
 
 // v4.232: "separar y ordenar la pestaña de stock" -- la barra de sub-pestañas de Stock pasó de ser
 // una sola fila plana (Conteo de stock/Historial/Stock seguridad/Mix ventas/Cajas/Depositos/Consumo
