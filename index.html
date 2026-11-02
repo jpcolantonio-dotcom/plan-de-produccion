@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.311</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.312</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -694,7 +694,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div class="toolbar">
       <div>
         <div style="font-size:16px;font-weight:600">Simulación</div>
-        <div style="font-size:13px;color:var(--text2)">Simulación rápida: tomá la producción planificada de un día, separada por área, y mirá qué cronograma daría a partir de una hora de inicio. No se guarda nada, es solo para probar.</div>
+        <div style="font-size:13px;color:var(--text2)">Simulación rápida: tomá la producción real ya cargada de un día, separada por área, y mirá qué cronograma daría a partir de una hora de inicio. No se guarda nada, es solo para probar.</div>
       </div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
@@ -2568,7 +2568,7 @@ async function renderInformeSimulacion(){
   const semKey=wk(new Date(fecha+'T00:00:00'));
   const diIdx=(new Date(fecha+'T00:00:00').getDay()+6)%7;
   el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Simulando...</div>';
-  await lp(semKey);
+  await Promise.all([lp(semKey),lr(semKey)]);
   let histData=[];
   try{histData=await get('rendimiento_proceso','select=empresa_id,area,producto,cantidad,hora_inicio,hora_fin');}catch{histData=[];}
   const hist={};
@@ -2583,13 +2583,20 @@ async function renderInformeSimulacion(){
     hist[k].totCant+=(r.cantidad||0);
     hist[k].totMin+=d;
   });
-  let plan=st.P[semKey]||[];
-  if(ef!=='all')plan=plan.filter(r=>r.empresa_id===ef);
+  // v4.312: "para la simulacion usa la produccion real" -- antes usaba lo planificado (r.days), ahora
+  // usa la producción REAL ya cargada ese día (realDia, misma fuente que "Producción del Día"). OJO:
+  // el filtro de empresa se aplica DESPUÉS de leer realDia, no antes de recorrer el plan -- realDia
+  // necesita el índice original (oi) dentro del array completo st.P[semKey] para encontrar los datos
+  // legacy por índice numérico (ver realArr), así que filtrar el array del plan antes rompería ese
+  // índice (mismo cuidado que ya tiene renderInformeDiario).
+  const plan=st.P[semKey]||[];
+  const real=st.R[semKey]||{};
   const porArea={};
   const sinDatos=[];
-  plan.forEach(r=>{
-    const pv=(r.days&&r.days[diIdx])||0;
+  plan.forEach((r,oi)=>{
+    const pv=realDia(real,r,diIdx,oi);
     if(pv<=0)return;
+    if(ef!=='all'&&r.empresa_id!==ef)return;
     const mp=mpParaProducto(r);
     const codigo=(mp&&mp.codigo)?mp.codigo:codigoParaProducto(r);
     const alias=(mp&&(mp.alias||mp.nombre))||r.producto;
@@ -2625,7 +2632,7 @@ async function renderInformeSimulacion(){
   const empSel=st.E.find(e=>e.id===ef);
   simMeta={fecha,empresaLabel:ef==='all'?'Todas las empresas':(empSel?empSel.nombre:''),horaInicio:horaInicioStr};
   if(!areas.length&&!sinDatos.length){
-    el.innerHTML='<div class="empty"><i class="ti ti-calendar-off"></i> No hay nada planificado para ese día.</div>';
+    el.innerHTML='<div class="empty"><i class="ti ti-calendar-off"></i> No hay producción real cargada para ese día.</div>';
     if(btnImp)btnImp.disabled=true;
     return;
   }
