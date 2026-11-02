@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.310</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.311</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -515,6 +515,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab" id="inftab-rango" onclick="showInfSubTab('rango')"><i class="ti ti-calendar-stats"></i> Producción por Rango</button>
     <button class="proy-tab" id="inftab-pdad" onclick="showInfSubTab('pdad')"><i class="ti ti-chart-bar"></i> Productividad</button>
     <button class="proy-tab" id="inftab-tiempos" onclick="showInfSubTab('tiempos')"><i class="ti ti-clock-hour-4"></i> Producción con tiempos</button>
+    <button class="proy-tab" id="inftab-sim" onclick="showInfSubTab('sim')"><i class="ti ti-flask"></i> Simulación</button>
   </div>
 
   <!-- SUB-TAB DESVIOS -->
@@ -686,6 +687,27 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     </div>
     <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Creá las máquinas que necesites y asignales productos desde "Sin asignar a máquina". Cada máquina tiene su hora de inicio, su tiempo de cambio de variedad (minutos antes de cada producto siguiente), hasta 6 personas, y se le puede marcar qué áreas NO puede producir. Con las flechas se reordena qué se cierra primero en cada máquina. Los productos sin rendimiento histórico cargado (Informes &gt; Rendimiento) no se pueden asignar (no hay con qué calcular el tiempo) y se listan aparte.</div>
     <div id="inf-tiempos-content"></div>
+  </div>
+
+  <!-- SUB-TAB SIMULACIÓN (nueva v4.311) -->
+  <div id="tab-sim" style="display:none">
+    <div class="toolbar">
+      <div>
+        <div style="font-size:16px;font-weight:600">Simulación</div>
+        <div style="font-size:13px;color:var(--text2)">Simulación rápida: tomá la producción planificada de un día, separada por área, y mirá qué cronograma daría a partir de una hora de inicio. No se guarda nada, es solo para probar.</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--text2)">Día:</label>
+      <input type="date" id="sim-fecha" onchange="renderInformeSimulacion()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <label style="font-size:13px;color:var(--text2)">Empresa:</label>
+      <select id="sim-esel" onchange="renderInformeSimulacion()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas</option></select>
+      <label style="font-size:13px;color:var(--text2)">Hora de inicio:</label>
+      <input type="time" id="sim-hora" value="08:00" onchange="renderInformeSimulacion()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <button class="btn btn-sm" id="btnImprimirSim" onclick="imprimirInformeSimulacion()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
+    </div>
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Agrupa solo automáticamente por área (cada área es una línea en paralelo, todas arrancan a la misma hora) respetando el orden del plan -- no se puede reordenar, asignar a máquinas ni guardar nada. Para armar el cronograma real día a día, con máquinas, personal y todo guardado, está la pestaña "Producción con tiempos".</div>
+    <div id="sim-content"></div>
   </div>
 </div>
 
@@ -1897,7 +1919,7 @@ function T(t){
 let infActiveSubTab='desv';
 function showInfSubTab(t){
   infActiveSubTab=t;
-  ['desv','dash','rend','diario','rango','pdad','tiempos'].forEach(x=>{
+  ['desv','dash','rend','diario','rango','pdad','tiempos','sim'].forEach(x=>{
     document.getElementById('tab-'+x).style.display=x===t?'':'none';
     document.getElementById('inftab-'+x).classList.toggle('active',x===t);
   });
@@ -1907,6 +1929,7 @@ function showInfSubTab(t){
   if(t==='diario')initInformeDiario();
   if(t==='rango')initInformeRango();
   if(t==='tiempos')initInformeTiempos();
+  if(t==='sim')initInformeSimulacion();
   if(t==='pdad')initInformeProductividad();
 }
 
@@ -2500,6 +2523,193 @@ function imprimirInformeTiempos(){
   <body>
     <h1>PRODUCCIÓN CON TIEMPOS — ${fechaFmt}</h1>
     <div class="sub">${infTiemposMeta.empresaLabel} · Impreso ${fechaImpresion}</div>
+    <table>
+      <thead><tr><th>ID</th><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Uds/h</th><th style="text-align:center">Inicio</th><th style="text-align:center">Fin</th></tr></thead>
+      <tbody>${filasHtml}</tbody>
+    </table>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
+  </body></html>`;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para imprimir.');
+}
+
+// "Simulación" (Informes, v4.311): "quiero que en informes armes una nueva pestaña que sea
+// simulación, donde voy a poner una fecha y va a tomar la producción de ese día separado por area,
+// le voy a poder poner una hora de ocmienzo y me va a decir todo el cronograma de produccion que
+// deberia ser por area". A diferencia de "Producción con tiempos" (v4.310, por máquina, con
+// asignación manual, personal y todo guardado en Supabase), esto es una pestaña aparte, liviana y
+// sin memoria: no hay que crear nada a mano, agrupa automáticamente por ÁREA (como hacía la primera
+// versión de "Producción con tiempos" en v4.308/v4.309, antes de pasar a máquinas) con una sola
+// hora de inicio para todas las áreas (corren en paralelo), respetando el orden del plan tal cual
+// está, sin reordenar ni guardar nada -- "simulación" en el sentido de probar rápido un horario
+// hipotético para un día, no de armar el cronograma real día a día. Misma fuente de datos que
+// "Producción con tiempos" (lo PLANIFICADO del día vía r.days[diIdx], uds/hora histórico completo
+// de rendimiento_proceso) y mismo `minToHHMM` ya definido arriba.
+let simAreas=[];
+let simSinDatos=[];
+let simMeta={fecha:'',empresaLabel:'',horaInicio:''};
+
+function initInformeSimulacion(){
+  const f=document.getElementById('sim-fecha');
+  if(!f.value)f.value=hoyLocal();
+  renderInformeSimulacion();
+}
+
+async function renderInformeSimulacion(){
+  const el=document.getElementById('sim-content');
+  const fecha=document.getElementById('sim-fecha').value;
+  const ef=document.getElementById('sim-esel').value;
+  const horaInicioStr=document.getElementById('sim-hora').value||'08:00';
+  const btnImp=document.getElementById('btnImprimirSim');
+  if(!fecha){el.innerHTML='';simAreas=[];simSinDatos=[];if(btnImp)btnImp.disabled=true;return}
+  const semKey=wk(new Date(fecha+'T00:00:00'));
+  const diIdx=(new Date(fecha+'T00:00:00').getDay()+6)%7;
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Simulando...</div>';
+  await lp(semKey);
+  let histData=[];
+  try{histData=await get('rendimiento_proceso','select=empresa_id,area,producto,cantidad,hora_inicio,hora_fin');}catch{histData=[];}
+  const hist={};
+  histData.forEach(r=>{
+    if(!r.hora_inicio||!r.hora_fin)return;
+    const[h1,m1]=r.hora_inicio.split(':').map(Number);
+    const[h2,m2]=r.hora_fin.split(':').map(Number);
+    let d=(h2*60+m2)-(h1*60+m1);if(d<0)d+=1440;
+    if(d<=0)return;
+    const k=r.empresa_id+'||'+r.area+'||'+r.producto;
+    if(!hist[k])hist[k]={totCant:0,totMin:0};
+    hist[k].totCant+=(r.cantidad||0);
+    hist[k].totMin+=d;
+  });
+  let plan=st.P[semKey]||[];
+  if(ef!=='all')plan=plan.filter(r=>r.empresa_id===ef);
+  const porArea={};
+  const sinDatos=[];
+  plan.forEach(r=>{
+    const pv=(r.days&&r.days[diIdx])||0;
+    if(pv<=0)return;
+    const mp=mpParaProducto(r);
+    const codigo=(mp&&mp.codigo)?mp.codigo:codigoParaProducto(r);
+    const alias=(mp&&(mp.alias||mp.nombre))||r.producto;
+    const areaNombre=areaCanon(r.empresa_id,r.area);
+    const k=r.empresa_id+'||'+r.area+'||'+r.producto;
+    const hd=hist[k];
+    const udsHora=hd&&hd.totMin>0?(hd.totCant/(hd.totMin/60)):0;
+    const item={empresaId:r.empresa_id,area:areaNombre,codigo,alias,cantidad:pv,unidad:r.unidad,udsHora};
+    if(udsHora>0){
+      const gk=r.empresa_id+'||'+areaNombre;
+      if(!porArea[gk])porArea[gk]={empresaId:r.empresa_id,area:areaNombre,items:[]};
+      porArea[gk].items.push(item);
+    }else{
+      sinDatos.push(item);
+    }
+  });
+  const[hIni,mIni]=horaInicioStr.split(':').map(Number);
+  const inicioMin=(hIni||0)*60+(mIni||0);
+  const areas=Object.values(porArea).map(grp=>{
+    let cursor=inicioMin;
+    const items=grp.items.map(it=>{
+      const durMin=Math.max(1,Math.round(it.cantidad/it.udsHora*60));
+      const horaInicioItem=minToHHMM(cursor);
+      cursor+=durMin;
+      const horaFinItem=minToHHMM(cursor);
+      return{...it,durMin,horaInicio:horaInicioItem,horaFin:horaFinItem};
+    });
+    const totalMin=items.reduce((s,i)=>s+i.durMin,0);
+    return{...grp,items,totalMin,horaInicio:minToHHMM(inicioMin),horaFin:minToHHMM(inicioMin+totalMin)};
+  }).sort((a,b)=>a.area.localeCompare(b.area));
+  simAreas=areas;
+  simSinDatos=sinDatos.sort((a,b)=>a.area.localeCompare(b.area)||a.alias.localeCompare(b.alias));
+  const empSel=st.E.find(e=>e.id===ef);
+  simMeta={fecha,empresaLabel:ef==='all'?'Todas las empresas':(empSel?empSel.nombre:''),horaInicio:horaInicioStr};
+  if(!areas.length&&!sinDatos.length){
+    el.innerHTML='<div class="empty"><i class="ti ti-calendar-off"></i> No hay nada planificado para ese día.</div>';
+    if(btnImp)btnImp.disabled=true;
+    return;
+  }
+  if(btnImp)btnImp.disabled=false;
+  let h='';
+  areas.forEach(grp=>{
+    h+=`<div class="stock-card" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg2);border-bottom:.5px solid var(--border);border-radius:var(--radius-lg) var(--radius-lg) 0 0;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="emp-tag" style="background:${ec(grp.empresaId)}18;color:${ec(grp.empresaId)}">${en(grp.empresaId)||''}</span>
+          <span style="font-weight:700">${remEsc(grp.area)}</span>
+        </div>
+        <div style="font-size:12px;color:var(--text2)"><b style="color:var(--text)">${grp.horaInicio}</b> a <b style="color:var(--text)">${grp.horaFin}</b> · ${Math.floor(grp.totalMin/60)}h ${grp.totalMin%60}m en total</div>
+      </div>
+      <div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
+        <th>ID</th><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Uds/hora</th>
+        <th style="text-align:right">Duración</th><th style="text-align:center">Inicio</th><th style="text-align:center">Fin</th>
+      </tr></thead><tbody>
+      ${grp.items.map(it=>`<tr>
+        <td class="muted">${it.codigo||'—'}</td>
+        <td style="font-weight:500">${remEsc(it.alias)}</td>
+        <td style="text-align:right;font-weight:600">${it.cantidad.toLocaleString('es-AR')}</td>
+        <td style="text-align:right;color:var(--blue)">${Math.round(it.udsHora).toLocaleString('es-AR')}</td>
+        <td style="text-align:right">${Math.floor(it.durMin/60)}h ${it.durMin%60}m</td>
+        <td style="text-align:center;font-weight:600;color:var(--green)">${it.horaInicio}</td>
+        <td style="text-align:center;font-weight:600;color:var(--red)">${it.horaFin}</td>
+      </tr>`).join('')}
+      </tbody></table></div>
+    </div>`;
+  });
+  if(sinDatos.length){
+    h+=`<div class="stock-card" style="margin-bottom:16px">
+      <div style="padding:10px 14px;background:var(--bg2);border-bottom:.5px solid var(--border);border-radius:var(--radius-lg) var(--radius-lg) 0 0;font-weight:700;color:var(--text2)">
+        <i class="ti ti-alert-triangle" style="color:var(--amber)"></i> Sin rendimiento histórico cargado (${sinDatos.length})
+      </div>
+      <div style="overflow-x:auto"><table class="stock-tbl"><thead><tr><th>ID</th><th>Área</th><th>Producto</th><th style="text-align:right">Cantidad</th><th>Unidad</th></tr></thead><tbody>
+      ${sinDatos.map(it=>`<tr><td class="muted">${it.codigo||'—'}</td><td class="muted">${remEsc(it.area)}</td><td style="font-weight:500">${remEsc(it.alias)}</td><td style="text-align:right;font-weight:600">${it.cantidad.toLocaleString('es-AR')}</td><td class="muted">${it.unidad||''}</td></tr>`).join('')}
+      </tbody></table></div>
+    </div>`;
+  }
+  el.innerHTML=h;
+}
+
+function imprimirInformeSimulacion(){
+  if(!simAreas.length&&!simSinDatos.length)return;
+  const[y,m,d]=(simMeta.fecha||'').split('-');
+  const fechaFmt=(y&&m&&d)?`${d}/${m}/${y}`:(simMeta.fecha||'');
+  const ahora=new Date();
+  const p2=n=>String(n).padStart(2,'0');
+  const fechaImpresion=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()} ${p2(ahora.getHours())}:${p2(ahora.getMinutes())}`;
+  let filasHtml='';
+  simAreas.forEach(grp=>{
+    filasHtml+=`<tr class="grp"><td colspan="6">${remEsc(grp.area)} — ${grp.horaInicio} a ${grp.horaFin}</td></tr>`;
+    grp.items.forEach(it=>{
+      filasHtml+=`<tr><td class="cod">${it.codigo||'—'}</td><td class="ali">${remEsc(it.alias)}</td><td class="cant">${it.cantidad.toLocaleString('es-AR')}</td><td class="uph">${Math.round(it.udsHora).toLocaleString('es-AR')}</td><td class="hor">${it.horaInicio}</td><td class="hor">${it.horaFin}</td></tr>`;
+    });
+  });
+  if(simSinDatos.length){
+    filasHtml+=`<tr class="grp"><td colspan="6">Sin rendimiento histórico</td></tr>`;
+    simSinDatos.forEach(it=>{
+      filasHtml+=`<tr><td class="cod">${it.codigo||'—'}</td><td class="ali">${remEsc(it.alias)} (${remEsc(it.area)})</td><td class="cant">${it.cantidad.toLocaleString('es-AR')}</td><td class="uph">—</td><td class="hor">—</td><td class="hor">—</td></tr>`;
+    });
+  }
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Simulación de producción — ${fechaFmt}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;padding:8mm;font-size:13pt}
+    h1{font-size:16pt;margin-bottom:2px}
+    .sub{font-size:11pt;color:#555;margin-bottom:10px}
+    table{width:100%;border-collapse:collapse}
+    th{text-align:left;padding:5px 7px;font-size:12pt;border-bottom:2px solid #333}
+    td{padding:5px 7px;font-size:12pt;border-bottom:1px solid #ccc}
+    tr.grp td{background:#eee;font-weight:700;border-top:2px solid #333;border-bottom:1px solid #333}
+    td.cod{width:12%;font-family:monospace}
+    td.ali{width:38%}
+    td.cant{width:15%;text-align:right;font-weight:700}
+    td.uph{width:13%;text-align:right}
+    td.hor{width:11%;text-align:center;font-weight:700}
+    @media print{@page{size:A4;margin:10mm}body{padding:0}}
+  </style></head>
+  <body>
+    <h1>SIMULACIÓN DE PRODUCCIÓN — ${fechaFmt}</h1>
+    <div class="sub">${simMeta.empresaLabel} · Hora de inicio: ${simMeta.horaInicio} · Impreso ${fechaImpresion}</div>
     <table>
       <thead><tr><th>ID</th><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Uds/h</th><th style="text-align:center">Inicio</th><th style="text-align:center">Fin</th></tr></thead>
       <tbody>${filasHtml}</tbody>
@@ -8784,7 +8994,7 @@ function clearDashTimer(){
 }
 
 function uES(){
-  ['resel','cesel','ceesel','desv-esel','dash-esel','inf-diario-esel','inf-rango-esel','inf-pdad-esel','inf-tiempos-esel'].forEach(id=>{
+  ['resel','cesel','ceesel','desv-esel','dash-esel','inf-diario-esel','inf-rango-esel','inf-pdad-esel','inf-tiempos-esel','sim-esel'].forEach(id=>{
     const s=document.getElementById(id);if(!s)return;
     const c=s.value;s.innerHTML='<option value="all">Todas</option>';
     if(id==='dash-esel')s.options[0].text='Todas las empresas';
