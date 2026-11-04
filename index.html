@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.317</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.318</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -10976,14 +10976,29 @@ async function importarExcelFlexxusStock(input){
     // Filas de datos: columna A = código numérico, la columna de remanente trae un número. Un mismo
     // código puede repetirse (un renglón por casillero o por depósito, si el archivo viene filtrado
     // por "Todos") -- se suman todos, porque ahora todo va al mismo depósito consolidado de la empresa.
+    // v4.318: en algunos exports de Flexxus, Excel guarda el código y/o el remanente como TEXTO en vez
+    // de número (se ve con el triangulito verde de "número guardado como texto" en la esquina de la
+    // celda) -- ahí "S. Remanente" llega como el string "0,000" (con coma decimal, formato argentino) en
+    // vez del número 0, y el chequeo viejo (typeof rem!=='number') descartaba TODAS las filas, dando
+    // "No encontré filas de datos" aunque la columna sí se haya encontrado bien. Ahora se acepta el
+    // remanente como número o como texto, parseando coma decimal / punto de miles.
+    const flexxusParseNum=v=>{
+      if(typeof v==='number')return v;
+      if(typeof v==='string'){
+        const s=v.trim();
+        if(!s)return NaN;
+        return parseFloat(s.replace(/\./g,'').replace(',','.'));
+      }
+      return NaN;
+    };
     const acum=new Map(); // codigo -> remanente sumado
     for(const row of filas){
       const c0=row[0];
-      if(typeof c0!=='string'||!/^\d{4,10}$/.test(c0.trim()))continue;
-      const rem=row[colRem];
-      if(typeof rem!=='number')continue;
-      const codigo=c0.trim();
-      acum.set(codigo,(acum.get(codigo)||0)+rem);
+      const codigoTxt=typeof c0==='string'?c0.trim():(typeof c0==='number'?String(c0):'');
+      if(!/^\d{4,10}$/.test(codigoTxt))continue;
+      const rem=flexxusParseNum(row[colRem]);
+      if(isNaN(rem))continue;
+      acum.set(codigoTxt,(acum.get(codigoTxt)||0)+rem);
     }
     if(!acum.size)throw new Error('No encontré filas de datos (código + S. Remanente) en el archivo.');
 
