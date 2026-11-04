@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.316</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.317</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -10960,12 +10960,18 @@ async function importarExcelFlexxusStock(input){
       throw new Error(`El archivo es de "${empresaTxt}" pero elegiste el depósito destino de "${empresaDestinoNombre}" -- revisá el archivo o cambiá el depósito destino antes de importar.`);
     }
 
-    // Encabezado: primera fila con "Código" en la columna A -- de ahí se saca en qué columna está
-    // "S. Remanente" (por si alguna vez cambia de posición entre exports).
-    const headerRow=filas.find(row=>row[0]==='Código');
-    if(!headerRow)throw new Error('No encontré la fila de encabezados ("Código" / "S. Remanente") -- ¿es el formato correcto de Flexxus?');
-    const colRem=headerRow.findIndex(c=>typeof c==='string'&&c.trim()==='S. Remanente');
-    if(colRem<0)throw new Error('No encontré la columna "S. Remanente" en el encabezado.');
+    // v4.317: "depende de que flexxus lo saco la columna de stock remanente puede estar en la
+    // columna I o L" -- antes se asumía que "S. Remanente" vivía en la MISMA fila que "Código"
+    // (fila 9 en este export real), pero el archivo real tiene encabezado de DOS filas: "Stock
+    // Total" es un título fusionado arriba, y "S. Remanente"/"S. Por O.C."/"S. Total"/"En Tránsito"
+    // son subtítulos en la fila de ABAJO -- en una columna que no coincide con la de "Código", y que
+    // además se corre según cuántas columnas en blanco separen los filtros de ese export puntual (de
+    // ahí que a veces caiga en I y a veces en L). Ahora se busca directamente la celda "S. Remanente"
+    // en CUALQUIER fila del archivo -- sea cual sea la fila y la columna donde haya caído esta vez --
+    // y de ahí se saca tanto la fila como la columna reales, sin depender de "Código".
+    const headerIdx=filas.findIndex(row=>row.some(c=>typeof c==='string'&&c.trim()==='S. Remanente'));
+    if(headerIdx<0)throw new Error('No encontré la columna "S. Remanente" en el archivo -- ¿es el formato correcto de Flexxus ("Stock - Listado por Depósitos")?');
+    const colRem=filas[headerIdx].findIndex(c=>typeof c==='string'&&c.trim()==='S. Remanente');
 
     // Filas de datos: columna A = código numérico, la columna de remanente trae un número. Un mismo
     // código puede repetirse (un renglón por casillero o por depósito, si el archivo viene filtrado
