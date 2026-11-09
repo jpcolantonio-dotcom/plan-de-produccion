@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.319</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.320</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -16168,8 +16168,15 @@ async function initEntrenamiento(){
 async function cargarDatosTren(){
   const ef=document.getElementById('tren-esel').value;
   try{
-    const fP=ef&&ef!=='all'?`empresa_id=eq.${ef}&order=orden.asc,nombre.asc`:'order=empresa_id.asc,orden.asc,nombre.asc';
-    trenPuestos=await get('puestos_capacitacion',fP);
+    // v4.320: "tengo que ver los puestos de planeta, es decir todos los puestos, si queres que
+    // los empleados esten separados por empresa pero que tenga todos los puestos" -- antes, si el
+    // selector de arriba tenía una empresa puntual elegida (no "Todas las empresas"), acá se
+    // filtraban los PUESTOS por esa misma empresa (fP con empresa_id=eq.${ef}) -- entonces al
+    // elegir, por ejemplo, Joselito, los puestos de Planeta desaparecían del todo de la matriz. El
+    // selector de empresa ahora sólo filtra EMPLEADOS (más abajo); los puestos siempre se traen
+    // completos, de todas las empresas -- así las columnas siempre están todas, con los empleados
+    // agrupados/separados por su propia empresa como ya se hacía.
+    trenPuestos=await get('puestos_capacitacion','order=empresa_id.asc,orden.asc,nombre.asc');
   }catch{trenPuestos=[]}
   try{
     // v4.319: antes esto solo cargaba empleados si el array global todavía estaba vacío
@@ -16217,16 +16224,24 @@ function renderMatrizCapacitacion(){
     return;
   }
 
-  // Agrupar empresas (mismo orden en que aparecen los empleados)
-  const empresas=[...new Set(trenEmpleadosData.map(e=>e.empresa_id))].filter(eid=>trenPuestos.some(p=>p.empresa_id===eid));
-  if(!empresas.length){
-    el.innerHTML='<div class="empty">Seleccioná una empresa con puestos configurados.</div>';
+  // v4.320: "tengo que ver los puestos de planeta, es decir todos los puestos, si queres que los
+  // empleados esten separados por empresa pero que tenga todos los puestos" -- antes las COLUMNAS
+  // (puestos) salían de las empresas que tenían EMPLEADOS visibles (`empresas`, derivado de
+  // trenEmpleadosData) -- si el filtro de arriba dejaba afuera a una empresa, sus puestos
+  // desaparecían de la matriz aunque la otra empresa sí tuviera empleados. Ahora las columnas
+  // (gruposPuestos/todosPuestos) salen SIEMPRE de todas las empresas con puestos configurados,
+  // sin importar el filtro de empleados; las FILAS siguen separadas por la empresa de cada
+  // empleado visible, como ya se hacía.
+  const empresasConPuestos=[...new Set(trenPuestos.map(p=>p.empresa_id))];
+  const gruposPuestos=empresasConPuestos.map(eid=>({eid,puestos:trenPuestos.filter(p=>p.empresa_id===eid)}));
+  const todosPuestos=gruposPuestos.flatMap(g=>g.puestos);
+
+  // Empresas de los empleados visibles (mismo orden en que aparecen) -- esto define las FILAS
+  const empresasConEmpleados=[...new Set(trenEmpleadosData.map(e=>e.empresa_id))];
+  if(!empresasConEmpleados.length){
+    el.innerHTML='<div class="empty">No hay empleados para mostrar.</div>';
     return;
   }
-
-  // Todos los puestos de todas las empresas, agrupados por empresa, en una sola fila de columnas
-  const gruposPuestos=empresas.map(eid=>({eid,puestos:trenPuestos.filter(p=>p.empresa_id===eid)}));
-  const todosPuestos=gruposPuestos.flatMap(g=>g.puestos);
 
   let html=`<div class="grid-card" style="margin-bottom:1.5rem;overflow:auto;max-height:75vh">
     <table style="border-collapse:collapse;min-width:100%">
@@ -16247,10 +16262,10 @@ function renderMatrizCapacitacion(){
   html+=`</tr></thead><tbody>`;
 
   let rowIdx=0;
-  gruposPuestos.forEach(g=>{
-    const emp=st.E.find(e=>e.id===g.eid);
-    const empNom=emp?.nombre||g.eid;const empColor=emp?.color||'#888';
-    const empsDeEsta=trenEmpleadosData.filter(e=>e.empresa_id===g.eid);
+  empresasConEmpleados.forEach(eid=>{
+    const emp=st.E.find(e=>e.id===eid);
+    const empNom=emp?.nombre||eid;const empColor=emp?.color||'#888';
+    const empsDeEsta=trenEmpleadosData.filter(e=>e.empresa_id===eid);
     html+=`<tr><td colspan="${todosPuestos.length+2}" style="padding:5px 12px;font-size:11px;font-weight:700;color:${empColor};background:${empColor}0d;border:.5px solid var(--border);position:sticky;left:0">
       <span class="color-dot" style="background:${empColor}"></span> ${empNom}
     </td></tr>`;
