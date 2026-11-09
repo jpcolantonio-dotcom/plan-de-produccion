@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.318</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.319</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -16172,7 +16172,15 @@ async function cargarDatosTren(){
     trenPuestos=await get('puestos_capacitacion',fP);
   }catch{trenPuestos=[]}
   try{
-    if(!empleados.length)await loadEmpleados();
+    // v4.319: antes esto solo cargaba empleados si el array global todavía estaba vacío
+    // ("if(!empleados.length)") -- pensado como optimización para no repetir el fetch si ya se
+    // habían cargado en otra pestaña de RRHH. El problema: si la pestaña del navegador quedó
+    // abierta de antes (o se entró primero a Horarios/Vacaciones/etc.) y DESPUÉS se agregó un
+    // empleado nuevo desde OTRO dispositivo/pestaña, Entrenamiento seguía usando la lista vieja
+    // en memoria y el empleado nuevo no aparecía en la matriz hasta refrescar toda la página a
+    // mano -- exactamente el síntoma de "no me aparecen los nombres que se agregaron la última
+    // vez". Ahora se recarga siempre, igual que ya se hace con trenPuestos arriba.
+    await loadEmpleados();
     trenEmpleadosData=ef&&ef!=='all'?empleados.filter(e=>e.empresa_id===ef):empleados;
   }catch{trenEmpleadosData=[]}
   if(trenPuestos.length&&trenEmpleadosData.length){
