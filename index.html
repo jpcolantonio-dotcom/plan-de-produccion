@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.321</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.322</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -5012,6 +5012,20 @@ async function renderCmpMensual(){
   const cls=pct>=90?'good':pct>=70?'warn':'bad';
   const nomMes=new Date(yr,mo-1,1).toLocaleString('es-AR',{month:'long',year:'numeric'});
 
+  // v4.322: "un rectangulo nuevo que diga KG Elaborados del mes, y que multiplique la cantidad de
+  // producto por la cantidad de kg que representa cada producto" -- Kg = producido real x
+  // productos.peso_gramos/1000 (mismo criterio y misma búsqueda de peso que Informes > Desvíos /
+  // Productividad: pesoGramosProducto). Los productos con producción real pero sin peso cargado no
+  // suman (no se inventa un peso) y se avisan abajo del número para que se sepa que el total es parcial.
+  let kgElab=0;const sinPeso=[];
+  items.forEach(i=>{
+    if(!(i.totalReal>0))return;
+    const pg=pesoGramosProducto({producto:i.nombre,empresa_id:i.empresa_id,area:i.area});
+    if(pg===null||isNaN(pg)||pg<=0){sinPeso.push(i.nombre);return;}
+    kgElab+=i.totalReal*pg/1000;
+  });
+  const kgTxt=kgElab.toLocaleString('es-AR',{minimumFractionDigits:0,maximumFractionDigits:1});
+
   let h=`<div class="metric-grid">
     <div class="metric"><div class="metric-label">${diaFiltro?'Día':'Mes'}</div>
       <div style="font-size:13px;font-weight:600;margin-top:2px">${diaFiltro?new Date(diaFiltro+'T00:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long'}):nomMes}</div></div>
@@ -5020,6 +5034,9 @@ async function renderCmpMensual(){
     <div class="metric"><div class="metric-label">Total producido</div><div class="metric-val">${totReal.toLocaleString('es-AR')}</div></div>
     <div class="metric"><div class="metric-label">Diferencia</div>
       <div class="metric-val ${totReal>=totPlan?'good':'bad'}">${(totReal-totPlan>=0?'+':'')+(totReal-totPlan).toLocaleString('es-AR')}</div></div>
+    <div class="metric"><div class="metric-label">Kg elaborados ${diaFiltro?'del día':'del mes'}</div>
+      <div class="metric-val">${kgTxt} <span style="font-size:13px;font-weight:500;color:var(--text2)">kg</span></div>
+      ${sinPeso.length?`<div style="font-size:11px;color:var(--amber);margin-top:2px;cursor:help" title="${sinPeso.map(n=>remEsc(n)).join('&#10;')}"><i class="ti ti-alert-triangle"></i> ${sinPeso.length} producto${sinPeso.length>1?'s':''} sin peso cargado</div>`:''}</div>
   </div>`;
 
   // Table - columns are dates (or just total if many dates)
