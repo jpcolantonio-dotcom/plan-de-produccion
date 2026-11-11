@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.320</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.321</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -689,23 +689,45 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div id="inf-tiempos-content"></div>
   </div>
 
-  <!-- SUB-TAB SIMULACIÓN (nueva v4.311) -->
+  <!-- SUB-TAB SIMULACIÓN (nueva v4.311; v4.321 se divide en "Por día" / "Por producto") -->
   <div id="tab-sim" style="display:none">
     <div class="toolbar">
       <div>
         <div style="font-size:16px;font-weight:600">Simulación</div>
-        <div style="font-size:13px;color:var(--text2)">Simulación rápida: tomá la producción real ya cargada de un día, separada por área, y mirá qué cronograma daría cada área a partir de su propia hora de inicio.</div>
+        <div style="font-size:13px;color:var(--text2)">Simulación rápida de tiempos de máquina/proceso.</div>
       </div>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
-      <label style="font-size:13px;color:var(--text2)">Día:</label>
-      <input type="date" id="sim-fecha" onchange="renderInformeSimulacion()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-      <label style="font-size:13px;color:var(--text2)">Empresa:</label>
-      <select id="sim-esel" onchange="renderInformeSimulacion()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas</option></select>
-      <button class="btn btn-sm" id="btnImprimirSim" onclick="imprimirInformeSimulacion()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
+    <div style="display:flex;gap:8px;margin-bottom:1rem">
+      <button class="proy-tab active" id="simtab-dia" onclick="showSimTab('dia')"><i class="ti ti-calendar"></i> Por día</button>
+      <button class="proy-tab" id="simtab-producto" onclick="showSimTab('producto')"><i class="ti ti-package"></i> Por producto</button>
     </div>
-    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Agrupa solo automáticamente por área (cada área es una línea en paralelo) respetando el orden del plan -- no se puede reordenar ni asignar a máquinas. Lo único que se guarda es, por área, la hora de inicio y el tiempo de cambio de variedad (quedan como default para la próxima vez, no dependen del día). Para armar el cronograma real día a día, con máquinas, personal y todo guardado, está la pestaña "Producción con tiempos".</div>
-    <div id="sim-content"></div>
+
+    <!-- SIMULACIÓN POR DÍA (la de siempre, v4.311-v4.316) -->
+    <div id="sim-sub-dia">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
+        <label style="font-size:13px;color:var(--text2)">Día:</label>
+        <input type="date" id="sim-fecha" onchange="renderInformeSimulacion()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        <label style="font-size:13px;color:var(--text2)">Empresa:</label>
+        <select id="sim-esel" onchange="renderInformeSimulacion()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas</option></select>
+        <button class="btn btn-sm" id="btnImprimirSim" onclick="imprimirInformeSimulacion()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
+      </div>
+      <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Agrupa solo automáticamente por área (cada área es una línea en paralelo) respetando el orden del plan -- no se puede reordenar ni asignar a máquinas. Lo único que se guarda es, por área, la hora de inicio y el tiempo de cambio de variedad (quedan como default para la próxima vez, no dependen del día). Para armar el cronograma real día a día, con máquinas, personal y todo guardado, está la pestaña "Producción con tiempos".</div>
+      <div id="sim-content"></div>
+    </div>
+
+    <!-- SIMULACIÓN POR PRODUCTO (nueva v4.321): "poner el producto que quiera y la cantidad que
+    quiera y que me simule tiempo de maquina/proceso del producto" -- a diferencia de "Por día" (que
+    toma la producción real ya cargada de un día completo), acá se elige a mano cualquier producto de
+    Maestro y cualquier cantidad hipotética, una o varias líneas, y se calcula el tiempo estimado con
+    el mismo rendimiento histórico (uds/hora) que ya usa el resto de la app. -->
+    <div id="sim-sub-producto" style="display:none">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
+        <button class="btn btn-sm" onclick="actualizarSimProdHist()" title="Volver a traer el rendimiento histórico de Supabase"><i class="ti ti-refresh"></i> Actualizar historial</button>
+        <button class="btn btn-sm" id="btnImprimirSimProd" onclick="imprimirSimPorProducto()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
+      </div>
+      <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Elegí cualquier producto y una cantidad hipotética -- se calcula el tiempo de máquina/proceso estimado con el rendimiento histórico (uds/hora) cargado en "Informes > Rendimiento". Podés agregar varios productos; abajo se suma el tiempo total combinado.</div>
+      <div id="simprod-content"></div>
+    </div>
   </div>
 </div>
 
@@ -2565,6 +2587,32 @@ function initInformeSimulacion(){
   renderInformeSimulacion();
 }
 
+// v4.321: se saca de acá el cálculo del rendimiento histórico (uds/hora por empresa+área+producto)
+// para poder reutilizarlo también en la sub-pestaña nueva "Por producto" -- misma lógica exacta que
+// ya tenía "Por día" desde v4.313 (si hora_fin<=hora_inicio, ese registro se descarta del promedio
+// en vez de sumarle un día, porque acá los turnos nunca cruzan medianoche).
+async function cargarHistRendimiento(){
+  let histData=[];
+  try{histData=await get('rendimiento_proceso','select=empresa_id,area,producto,cantidad,hora_inicio,hora_fin');}catch{histData=[];}
+  const hist={};
+  histData.forEach(r=>{
+    if(!r.hora_inicio||!r.hora_fin)return;
+    const[h1,m1]=r.hora_inicio.split(':').map(Number);
+    const[h2,m2]=r.hora_fin.split(':').map(Number);
+    let d=(h2*60+m2)-(h1*60+m1);
+    if(d<=0)return;
+    const k=r.empresa_id+'||'+r.area+'||'+r.producto;
+    if(!hist[k])hist[k]={totCant:0,totMin:0};
+    hist[k].totCant+=(r.cantidad||0);
+    hist[k].totMin+=d;
+  });
+  return hist;
+}
+function udsHoraDeHist(hist,empresaId,area,producto){
+  const hd=hist[empresaId+'||'+area+'||'+producto];
+  return hd&&hd.totMin>0?(hd.totCant/(hd.totMin/60)):0;
+}
+
 async function renderInformeSimulacion(){
   const el=document.getElementById('sim-content');
   const fecha=document.getElementById('sim-fecha').value;
@@ -2575,24 +2623,7 @@ async function renderInformeSimulacion(){
   const diIdx=(new Date(fecha+'T00:00:00').getDay()+6)%7;
   el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Simulando...</div>';
   await Promise.all([lp(semKey),lr(semKey)]);
-  let histData=[];
-  try{histData=await get('rendimiento_proceso','select=empresa_id,area,producto,cantidad,hora_inicio,hora_fin');}catch{histData=[];}
-  const hist={};
-  histData.forEach(r=>{
-    if(!r.hora_inicio||!r.hora_fin)return;
-    const[h1,m1]=r.hora_inicio.split(':').map(Number);
-    const[h2,m2]=r.hora_fin.split(':').map(Number);
-    // v4.313: mismo blindaje que "Producción con tiempos" -- hora_fin<=hora_inicio es casi
-    // siempre un error de carga (turnos cortos dentro del mismo día, nunca cruzan medianoche), no
-    // un proceso que pasó la medianoche. Se descarta ese registro del promedio en vez de sumarle
-    // 24hs a la duración, para que un typo de horario no arruine el uds/hora estimado.
-    let d=(h2*60+m2)-(h1*60+m1);
-    if(d<=0)return;
-    const k=r.empresa_id+'||'+r.area+'||'+r.producto;
-    if(!hist[k])hist[k]={totCant:0,totMin:0};
-    hist[k].totCant+=(r.cantidad||0);
-    hist[k].totMin+=d;
-  });
+  const hist=await cargarHistRendimiento();
   // v4.312: "para la simulacion usa la produccion real" -- antes usaba lo planificado (r.days), ahora
   // usa la producción REAL ya cargada ese día (realDia, misma fuente que "Producción del Día"). OJO:
   // el filtro de empresa se aplica DESPUÉS de leer realDia, no antes de recorrer el plan -- realDia
@@ -2624,9 +2655,7 @@ async function renderInformeSimulacion(){
     const codigo=(mp&&mp.codigo)?mp.codigo:codigoParaProducto(r);
     const alias=(mp&&(mp.alias||mp.nombre))||r.producto;
     const areaNombre=areaCanon(r.empresa_id,r.area);
-    const k=r.empresa_id+'||'+r.area+'||'+r.producto;
-    const hd=hist[k];
-    const udsHora=hd&&hd.totMin>0?(hd.totCant/(hd.totMin/60)):0;
+    const udsHora=udsHoraDeHist(hist,r.empresa_id,r.area,r.producto);
     const item={empresaId:r.empresa_id,area:areaNombre,codigo,alias,cantidad:pv,unidad:r.unidad,udsHora};
     if(udsHora>0){
       const gk=r.empresa_id+'||'+areaNombre;
@@ -2799,6 +2828,217 @@ function imprimirInformeSimulacion(){
     <table>
       <thead><tr><th>ID</th><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Uds/h</th><th style="text-align:center">Inicio</th><th style="text-align:center">Fin</th></tr></thead>
       <tbody>${filasHtml}</tbody>
+    </table>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
+  </body></html>`;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para imprimir.');
+}
+
+function showSimTab(t){
+  ['dia','producto'].forEach(id=>{
+    document.getElementById('sim-sub-'+id).style.display=id===t?'block':'none';
+    document.getElementById('simtab-'+id).classList.toggle('active',id===t);
+  });
+  if(t==='producto')initSimPorProducto();
+}
+
+// SIMULACIÓN POR PRODUCTO (v4.321): "QUE ME DEJE PONER EL PRODUCTO QUE QUIERA Y LA CANTIDAD QUE
+// QUIERA Y QUE ME SIMULE TIEMPO DE MAQUINA/PROCESO DEL PRODUCTO" -- a diferencia de "Por día" (que
+// toma automáticamente la producción real ya cargada de un día completo, separada por área), acá
+// el usuario arma a mano una lista chica de producto+cantidad hipotéticos (uno o varios) y para
+// cada uno se calcula el tiempo estimado con el MISMO rendimiento histórico (uds/hora por
+// empresa+área+producto, vía cargarHistRendimiento ya usada por "Por día") -- no depende de ningún
+// plan ni de ningún día puntual. El historial se trae UNA sola vez al entrar a la sub-pestaña (no
+// en cada tecla), con un botón "Actualizar historial" para refrescarlo a mano si hace falta.
+let simProdHist=null;
+let simProdFilas=[{prodId:'',cantidad:''}];
+
+async function initSimPorProducto(){
+  if(!simProdHist){
+    const el=document.getElementById('simprod-content');
+    if(el)el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando rendimiento histórico...</div>';
+    simProdHist=await cargarHistRendimiento();
+  }
+  renderSimPorProducto();
+}
+
+async function actualizarSimProdHist(){
+  const el=document.getElementById('simprod-content');
+  if(el)el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Actualizando rendimiento histórico...</div>';
+  simProdHist=await cargarHistRendimiento();
+  renderSimPorProducto();
+}
+
+// Código de Maestro > Configuración para un producto (mismo criterio de prioridad que
+// mpParaProducto/codigoParaProducto: vínculo manual mp_id primero, después codigo_articulo, y por
+// último match de nombre exacto normalizado) pero tomando el producto YA resuelto (objeto de
+// st.Pr), no un r.producto de texto suelto -- acá ya sabemos exactamente de qué producto se trata
+// porque lo eligió de la lista, no hace falta adivinar por nombre.
+function simProdCodigo(p){
+  if(p.mp_id){const m=mpData.find(x=>x.id===p.mp_id);if(m&&m.codigo)return m.codigo;}
+  if(p.codigo_articulo)return p.codigo_articulo;
+  const m=mpData.find(x=>normTxt(x.nombre)===normTxt(p.nombre));
+  return(m&&m.codigo)?m.codigo:'';
+}
+function simProdArea(p){
+  return(st.A.find(a=>a.id===p.area_id)||{}).nombre||'';
+}
+
+function simProdAgregarFila(){
+  simProdFilas.push({prodId:'',cantidad:''});
+  renderSimPorProducto();
+}
+function simProdQuitarFila(idx){
+  simProdFilas.splice(idx,1);
+  if(!simProdFilas.length)simProdFilas=[{prodId:'',cantidad:''}];
+  renderSimPorProducto();
+}
+function simProdCambiarProducto(idx){
+  if(!simProdFilas[idx])return;
+  simProdFilas[idx].prodId='';
+  renderSimPorProducto();
+}
+function simProdSetCantidad(idx,val){
+  if(!simProdFilas[idx])return;
+  simProdFilas[idx].cantidad=val;
+  renderSimPorProducto();
+}
+
+// Autocomplete de producto para la fila idx -- mismas clases CSS (.mp-ac-drop/.mp-ac-item) que ya
+// usa mpAC() para materias primas, así se hereda gratis la navegación con flechas/Enter (el
+// keydown global de más abajo busca cualquier ".mp-ac-drop" visible, no es específico de MP).
+function simProdAC(input,idx){
+  const q=(input.value||'').trim();
+  const qn=normTxt(q);
+  const wrap=input.parentElement;
+  let drop=wrap.querySelector('.mp-ac-drop');
+  if(!drop){drop=document.createElement('div');drop.className='mp-ac-drop';wrap.style.position='relative';wrap.appendChild(drop);}
+  const results=qn?st.Pr.filter(p=>normTxt(p.nombre).includes(qn)||simProdCodigo(p).toLowerCase().includes(q.toLowerCase())):st.Pr;
+  if(!results.length){drop.innerHTML='<div style="padding:8px 12px;font-size:12px;color:var(--text3)">Sin resultados</div>';drop.style.display='block';return;}
+  let h='';
+  results.slice(0,12).forEach(p=>{
+    const cod=simProdCodigo(p);
+    h+=`<div class="mp-ac-item" onmousedown="simProdPick(event,${idx},'${p.id}')">
+      <span>${highlight(p.nombre,q)} <span style="color:var(--text3);font-size:11px">— ${remEsc(simProdArea(p))}${cod?' · '+remEsc(cod):''}</span></span>
+      <span class="mp-ac-unit">${remEsc(en(p.empresa_id)||'')}</span>
+    </div>`;
+  });
+  drop.innerHTML=h;drop.style.display='block';
+}
+function simProdHideAC(input){
+  const drop=input.parentElement?.querySelector('.mp-ac-drop');
+  if(drop)drop.style.display='none';
+}
+function simProdPick(e,idx,prodId){
+  e.preventDefault();
+  if(!simProdFilas[idx])return;
+  simProdFilas[idx].prodId=prodId;
+  simProdFilas[idx].cantidad=simProdFilas[idx].cantidad||'';
+  renderSimPorProducto();
+}
+
+// Resultado puro de una fila (producto+cantidad) contra el historial -- separado de la UI para
+// poder testearlo standalone y para que imprimir use EXACTAMENTE el mismo cálculo que la pantalla.
+function simProdCalcularFila(p,cantidadRaw,hist){
+  const cantidad=parseFloat(cantidadRaw)||0;
+  if(!p||cantidad<=0)return{cantidad,udsHora:0,durMin:0,estado:cantidad<=0&&p?'sin-cantidad':'incompleta'};
+  const udsHora=udsHoraDeHist(hist,p.empresa_id,simProdArea(p),p.nombre);
+  if(udsHora<=0)return{cantidad,udsHora:0,durMin:0,estado:'sin-historico'};
+  const durMin=Math.max(1,Math.round(cantidad/udsHora*60));
+  return{cantidad,udsHora,durMin,estado:'ok'};
+}
+
+function renderSimPorProducto(){
+  const el=document.getElementById('simprod-content');
+  const btnImp=document.getElementById('btnImprimirSimProd');
+  if(!simProdHist){el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando rendimiento histórico...</div>';if(btnImp)btnImp.disabled=true;return}
+  let totalMinGeneral=0,filasValidas=0;
+  const filasHtml=simProdFilas.map((f,idx)=>{
+    const p=f.prodId?st.Pr.find(x=>x.id===f.prodId):null;
+    const r=simProdCalcularFila(p,f.cantidad,simProdHist);
+    if(r.estado==='ok'){totalMinGeneral+=r.durMin;filasValidas++;}
+    let resultadoHtml='<span style="color:var(--text3);font-size:12px">—</span>';
+    if(r.estado==='ok'){
+      resultadoHtml=`<b style="color:var(--blue)">${Math.round(r.udsHora).toLocaleString('es-AR')}</b> uds/h &nbsp;→&nbsp; <b style="color:var(--text)">${Math.floor(r.durMin/60)}h ${r.durMin%60}m</b>`;
+    }else if(r.estado==='sin-historico'){
+      resultadoHtml='<span style="color:var(--amber);font-size:12px"><i class="ti ti-alert-triangle"></i> Sin rendimiento histórico</span>';
+    }else if(r.estado==='sin-cantidad'){
+      resultadoHtml='<span style="color:var(--text3);font-size:12px">Ingresá una cantidad</span>';
+    }
+    const prodCellHtml=p
+      ?`<div style="display:flex;align-items:center;gap:8px">
+          <div><div style="font-weight:600">${remEsc(p.nombre)}</div><div style="font-size:11px;color:var(--text2)">${remEsc(en(p.empresa_id)||'')} · ${remEsc(simProdArea(p))}</div></div>
+          <button class="btn btn-xs" onclick="simProdCambiarProducto(${idx})" title="Cambiar producto"><i class="ti ti-edit"></i></button>
+        </div>`
+      :`<div style="position:relative">
+          <input type="text" placeholder="Escribí para buscar producto..." oninput="simProdAC(this,${idx})" onfocus="simProdAC(this,${idx})" onblur="setTimeout(()=>simProdHideAC(this),200)" autocomplete="off" style="width:100%;padding:6px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        </div>`;
+    return`<tr>
+      <td style="min-width:260px">${prodCellHtml}</td>
+      <td style="width:130px"><input type="number" min="0" step="0.01" value="${f.cantidad||''}" placeholder="Cantidad" onchange="simProdSetCantidad(${idx},this.value)" onkeydown="if(event.key==='Enter')this.blur()" style="width:100%;padding:6px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);text-align:right"/></td>
+      <td>${resultadoHtml}</td>
+      <td style="width:36px"><button class="btn btn-xs btn-danger" onclick="simProdQuitarFila(${idx})" title="Quitar"><i class="ti ti-trash"></i></button></td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML=`<div class="stock-card">
+    <div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
+      <th>Producto</th><th style="text-align:right">Cantidad</th><th>Resultado</th><th></th>
+    </tr></thead><tbody>${filasHtml}</tbody></table></div>
+    <div style="padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border-top:.5px solid var(--border);flex-wrap:wrap;gap:8px">
+      <button class="btn btn-sm" onclick="simProdAgregarFila()"><i class="ti ti-plus"></i> Agregar producto</button>
+      ${totalMinGeneral>0?`<div style="font-size:13px"><span style="color:var(--text2)">Tiempo total combinado${filasValidas>1?` (${filasValidas} productos)`:''}:</span> <b style="color:var(--text)">${Math.floor(totalMinGeneral/60)}h ${totalMinGeneral%60}m</b></div>`:''}
+    </div>
+  </div>`;
+  if(btnImp)btnImp.disabled=filasValidas===0;
+}
+
+function imprimirSimPorProducto(){
+  if(!simProdHist)return;
+  const filas=simProdFilas.map(f=>{
+    const p=f.prodId?st.Pr.find(x=>x.id===f.prodId):null;
+    return{p,r:simProdCalcularFila(p,f.cantidad,simProdHist)};
+  }).filter(x=>x.p&&x.r.estado!=='incompleta');
+  if(!filas.length)return;
+  const totalMin=filas.filter(x=>x.r.estado==='ok').reduce((s,x)=>s+x.r.durMin,0);
+  const ahora=new Date();
+  const p2=n=>String(n).padStart(2,'0');
+  const fechaImpresion=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()} ${p2(ahora.getHours())}:${p2(ahora.getMinutes())}`;
+  let filasHtml=filas.map(({p,r})=>{
+    const cod=simProdCodigo(p)||'—';
+    const uph=r.estado==='ok'?Math.round(r.udsHora).toLocaleString('es-AR'):'—';
+    const tiempo=r.estado==='ok'?`${Math.floor(r.durMin/60)}h ${r.durMin%60}m`:(r.estado==='sin-historico'?'Sin histórico':'—');
+    return`<tr><td class="cod">${cod}</td><td class="ali">${remEsc(p.nombre)}<div style="font-size:8pt;color:#777;font-weight:400">${remEsc(en(p.empresa_id)||'')} · ${remEsc(simProdArea(p))}</div></td><td class="cant">${r.cantidad.toLocaleString('es-AR')}</td><td class="uph">${uph}</td><td class="hor">${tiempo}</td></tr>`;
+  }).join('');
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Simulación por producto</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;padding:8mm;font-size:13pt}
+    h1{font-size:16pt;margin-bottom:2px}
+    .sub{font-size:11pt;color:#555;margin-bottom:10px}
+    table{width:100%;border-collapse:collapse}
+    th{text-align:left;padding:5px 7px;font-size:12pt;border-bottom:2px solid #333}
+    td{padding:5px 7px;font-size:12pt;border-bottom:1px solid #ccc;vertical-align:top}
+    td.cod{width:12%;font-family:monospace}
+    td.ali{width:40%}
+    td.cant{width:14%;text-align:right;font-weight:700}
+    td.uph{width:14%;text-align:right}
+    td.hor{width:14%;text-align:right;font-weight:700}
+    tfoot td{border-top:2px solid #333;border-bottom:none;font-weight:700;padding-top:8px}
+    @media print{@page{size:A4;margin:10mm}body{padding:0}}
+  </style></head>
+  <body>
+    <h1>SIMULACIÓN POR PRODUCTO</h1>
+    <div class="sub">Impreso ${fechaImpresion}</div>
+    <table>
+      <thead><tr><th>ID</th><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Uds/h</th><th style="text-align:right">Tiempo</th></tr></thead>
+      <tbody>${filasHtml}</tbody>
+      ${totalMin>0?`<tfoot><tr><td></td><td>Tiempo total combinado</td><td></td><td></td><td style="text-align:right">${Math.floor(totalMin/60)}h ${totalMin%60}m</td></tr></tfoot>`:''}
     </table>
   <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
   </body></html>`;
