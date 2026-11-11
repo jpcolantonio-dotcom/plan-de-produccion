@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.322</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.323</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -722,6 +722,10 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     el mismo rendimiento histórico (uds/hora) que ya usa el resto de la app. -->
     <div id="sim-sub-producto" style="display:none">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
+        <label style="font-size:13px;color:var(--text2)">Empresa:</label>
+        <select id="simprod-esel" onchange="simProdSetEmpresa(this.value)" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas</option></select>
+        <label style="font-size:13px;color:var(--text2)">Área:</label>
+        <select id="simprod-asel" onchange="simProdSetArea(this.value)" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas</option></select>
         <button class="btn btn-sm" onclick="actualizarSimProdHist()" title="Volver a traer el rendimiento histórico de Supabase"><i class="ti ti-refresh"></i> Actualizar historial</button>
         <button class="btn btn-sm" id="btnImprimirSimProd" onclick="imprimirSimPorProducto()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
       </div>
@@ -2857,7 +2861,36 @@ function showSimTab(t){
 let simProdHist=null;
 let simProdFilas=[{prodId:'',cantidad:''}];
 
+// v4.323: "que de la lista salgan los productos dependiendo de la empresa y por area" -- filtros
+// Empresa/Área arriba; el buscador de producto sólo ofrece los productos de esa empresa y esa área.
+let simProdEmpresa='all';
+let simProdAreaF='all';
+function simProdPoblarFiltros(){
+  const se=document.getElementById('simprod-esel');
+  if(se){
+    se.innerHTML='<option value="all">Todas</option>'+st.E.map(e=>`<option value="${e.id}">${remEsc(e.nombre)}</option>`).join('');
+    se.value=simProdEmpresa;
+  }
+  const sa=document.getElementById('simprod-asel');
+  if(sa){
+    const areas=st.A.filter(a=>simProdEmpresa==='all'||a.empresa_id===simProdEmpresa)
+      .filter(a=>st.Pr.some(p=>p.area_id===a.id))
+      .sort((a,b)=>(en(a.empresa_id)||'').localeCompare(en(b.empresa_id)||'')||(a.orden||0)-(b.orden||0)||a.nombre.localeCompare(b.nombre));
+    if(simProdAreaF!=='all'&&!areas.some(a=>a.id===simProdAreaF))simProdAreaF='all';
+    sa.innerHTML='<option value="all">Todas</option>'+areas.map(a=>`<option value="${a.id}">${remEsc(a.nombre)}${simProdEmpresa==='all'?' — '+remEsc(en(a.empresa_id)||''):''}</option>`).join('');
+    sa.value=simProdAreaF;
+  }
+}
+function simProdSetEmpresa(v){simProdEmpresa=v;simProdAreaF='all';simProdPoblarFiltros();}
+function simProdSetArea(v){simProdAreaF=v;}
+// Productos que ofrece el buscador según los filtros (puro, mismo orden que Maestro).
+function simProdFiltrados(prods,areas,empresa,areaId){
+  return prods.filter(p=>(empresa==='all'||String(p.empresa_id)===String(empresa))&&(areaId==='all'||p.area_id===areaId))
+    .sort((a,b)=>(a.orden||0)-(b.orden||0)||a.nombre.localeCompare(b.nombre));
+}
+
 async function initSimPorProducto(){
+  simProdPoblarFiltros();
   if(!simProdHist){
     const el=document.getElementById('simprod-content');
     if(el)el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando rendimiento histórico...</div>';
@@ -2917,10 +2950,16 @@ function simProdAC(input,idx){
   const wrap=input.parentElement;
   let drop=wrap.querySelector('.mp-ac-drop');
   if(!drop){drop=document.createElement('div');drop.className='mp-ac-drop';wrap.style.position='relative';wrap.appendChild(drop);}
-  const results=qn?st.Pr.filter(p=>normTxt(p.nombre).includes(qn)||simProdCodigo(p).toLowerCase().includes(q.toLowerCase())):st.Pr;
-  if(!results.length){drop.innerHTML='<div style="padding:8px 12px;font-size:12px;color:var(--text3)">Sin resultados</div>';drop.style.display='block';return;}
+  // v4.323: el desplegable salía recortado por el overflow-x:auto de la tabla (no se veía nada al
+  // escribir) -- se posiciona fijo sobre el input; y sólo ofrece productos de la empresa/área elegidas.
+  const r0=input.getBoundingClientRect();
+  drop.style.position='fixed';drop.style.top=(r0.bottom+2)+'px';drop.style.left=r0.left+'px';
+  drop.style.width=Math.max(r0.width,340)+'px';drop.style.maxHeight='300px';
+  const base=simProdFiltrados(st.Pr,st.A,simProdEmpresa,simProdAreaF);
+  const results=qn?base.filter(p=>normTxt(p.nombre).includes(qn)||simProdCodigo(p).toLowerCase().includes(q.toLowerCase())):base;
+  if(!results.length){drop.innerHTML='<div style="padding:8px 12px;font-size:12px;color:var(--text3)">Sin resultados para esa empresa/área</div>';drop.style.display='block';return;}
   let h='';
-  results.slice(0,12).forEach(p=>{
+  results.slice(0,80).forEach(p=>{
     const cod=simProdCodigo(p);
     h+=`<div class="mp-ac-item" onmousedown="simProdPick(event,${idx},'${p.id}')">
       <span>${highlight(p.nombre,q)} <span style="color:var(--text3);font-size:11px">— ${remEsc(simProdArea(p))}${cod?' · '+remEsc(cod):''}</span></span>
@@ -2975,7 +3014,7 @@ function renderSimPorProducto(){
           <button class="btn btn-xs" onclick="simProdCambiarProducto(${idx})" title="Cambiar producto"><i class="ti ti-edit"></i></button>
         </div>`
       :`<div style="position:relative">
-          <input type="text" placeholder="Escribí para buscar producto..." oninput="simProdAC(this,${idx})" onfocus="simProdAC(this,${idx})" onblur="setTimeout(()=>simProdHideAC(this),200)" autocomplete="off" style="width:100%;padding:6px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+          <input type="text" placeholder="Elegí o escribí para buscar producto..." oninput="simProdAC(this,${idx})" onfocus="simProdAC(this,${idx})" onblur="setTimeout(()=>simProdHideAC(this),200)" autocomplete="off" style="width:100%;padding:6px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
         </div>`;
     return`<tr>
       <td style="min-width:260px">${prodCellHtml}</td>
@@ -2986,7 +3025,7 @@ function renderSimPorProducto(){
   }).join('');
 
   el.innerHTML=`<div class="stock-card">
-    <div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
+    <div><table class="stock-tbl"><thead><tr>
       <th>Producto</th><th style="text-align:right">Cantidad</th><th>Resultado</th><th></th>
     </tr></thead><tbody>${filasHtml}</tbody></table></div>
     <div style="padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border-top:.5px solid var(--border);flex-wrap:wrap;gap:8px">
