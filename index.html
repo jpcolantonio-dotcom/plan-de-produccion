@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.324</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.325</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -727,6 +727,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <label style="font-size:13px;color:var(--text2)">Área:</label>
         <select id="simprod-asel" onchange="simProdSetArea(this.value)" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas</option></select>
         <button class="btn btn-sm" onclick="actualizarSimProdHist()" title="Volver a traer el rendimiento histórico de Supabase"><i class="ti ti-refresh"></i> Actualizar historial</button>
+        <span id="simprod-save-msg" style="font-size:12px;color:var(--text3)"></span>
         <button class="btn btn-sm" id="btnImprimirSimProd" onclick="imprimirSimPorProducto()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
       </div>
       <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Elegí cualquier producto y una cantidad hipotética -- se calcula el tiempo de máquina/proceso estimado con el rendimiento histórico (uds/hora) cargado en "Informes > Rendimiento". Podés agregar varios productos; abajo se suma el tiempo total combinado.</div>
@@ -2896,7 +2897,55 @@ function simProdFiltrados(prods,areas,empresa,areaId){
     .sort((a,b)=>(a.orden||0)-(b.orden||0)||a.nombre.localeCompare(b.nombre));
 }
 
+// v4.325: "no se guarda la info" -- la lista de productos/cantidades y los filtros vivían sólo en
+// memoria (se perdían al recargar o cambiar de pestaña). Ahora se guardan en Supabase
+// (`sim_producto_estado`, una sola fila id='default' con jsonb) -- por eso también aparecen igual en
+// cualquier navegador/dispositivo. Guardado automático con debounce; si la tabla no existe o tiene RLS
+// activada (42501) NO se guarda y se avisa en pantalla (mismo criterio que sim_tiempo_cambio: se chequea
+// res.ok y se muestra el error real, nunca falla en silencio).
+let simProdPuedeGuardar=false;
+let simProdGuardarTimer=null;
+function simProdMsg(txt,err){
+  const el=document.getElementById('simprod-save-msg');
+  if(!el)return;
+  el.textContent=txt;el.style.color=err?'var(--red)':'var(--text3)';
+  el.title=err?txt:'';
+}
+async function simProdCargarEstado(){
+  try{
+    const rows=await get('sim_producto_estado','id=eq.default');
+    const d=(rows&&rows[0]&&rows[0].datos)||{};
+    if(Array.isArray(d.filas)&&d.filas.length){
+      simProdFilas=d.filas.map(f=>({prodId:f.prodId||'',cantidad:f.cantidad==null?'':f.cantidad}));
+    }
+    if(d.empresa)simProdEmpresa=d.empresa;
+    if(d.area)simProdAreaF=d.area;
+    simProdPuedeGuardar=true;
+    simProdMsg('');
+  }catch(e){
+    simProdPuedeGuardar=false;
+    simProdMsg('No se puede guardar: falta la tabla sim_producto_estado (ver SQL) — '+String(e.message||e).slice(0,120),true);
+  }
+}
+function simProdGuardarDebounced(){
+  if(!simProdPuedeGuardar)return;
+  clearTimeout(simProdGuardarTimer);
+  simProdGuardarTimer=setTimeout(async()=>{
+    try{
+      const datos={filas:simProdFilas.map(f=>({prodId:f.prodId||'',cantidad:f.cantidad===''?'':(parseFloat(f.cantidad)||0)})),empresa:simProdEmpresa,area:simProdAreaF};
+      const res=await fetch(`${SB}/rest/v1/sim_producto_estado?on_conflict=id`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:'default',datos,updated_at:new Date().toISOString()})});
+      if(!res.ok)throw new Error(await res.text());
+      simProdMsg('Guardado ✓');
+    }catch(e){simProdMsg('Error guardando: '+String(e.message||e).slice(0,160),true);}
+  },500);
+}
+
+let simProdEstadoCargado=false;
 async function initSimPorProducto(){
+  if(!simProdEstadoCargado){
+    simProdEstadoCargado=true;
+    await simProdCargarEstado();
+  }
   simProdPoblarFiltros();
   if(!simProdHist){
     const el=document.getElementById('simprod-content');
@@ -3047,6 +3096,7 @@ function renderSimPorProducto(){
     </div>
   </div>`;
   if(btnImp)btnImp.disabled=filasValidas===0;
+  simProdGuardarDebounced();
 }
 
 function imprimirSimPorProducto(){
