@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.327</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.328</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -13817,6 +13817,7 @@ function ctrlhRenderCuerpo(){
       <label style="font-size:12px;color:var(--text2)">Descanso permitido <input type="number" min="0" max="240" value="${lim}" onchange="ctrlhCambiarLimite(this.value)" style="width:60px;padding:5px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"> min</label>
       <label style="font-size:12px;color:var(--text2)">Ordenar <select onchange="ctrlhSetOrden(this.value)" style="padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
         <option value="nombre" ${ctrlh.orden==='nombre'?'selected':''}>Por nombre</option><option value="exceso" ${ctrlh.orden==='exceso'?'selected':''}>Más se pasó</option><option value="descanso" ${ctrlh.orden==='descanso'?'selected':''}>Más descanso</option></select></label>
+      <button class="btn btn-sm" onclick="ctrlhImprimirPDF()" title="Armar el informe en PDF de esta empresa y período"><i class="ti ti-file-type-pdf"></i> Informe PDF</button>
       <button class="btn btn-sm" onclick="ctrlhEliminar()" title="Eliminar este informe"><i class="ti ti-trash"></i></button>
     </div></div>`;
   h+=`<div class="metric-grid">
@@ -13895,6 +13896,92 @@ function ctrlhHtmlDetalleDias(f,lim){
       else if(d.estado==='incompleta')des='<span style="color:var(--amber)">fichadas incompletas</span>';
       return `<tr><td style="padding:3px 6px">${remEsc(d.dia)} ${ctrlhFechaDM(d.fecha)}</td><td style="padding:3px 6px;color:var(--text2)">${remEsc(d.horario)}</td><td style="padding:3px 6px">${fich}</td><td style="padding:3px 6px;text-align:right">${des}</td><td style="padding:3px 6px;text-align:right">${exc}</td></tr>`;
     }).join('')}</table>`;
+}
+
+// v4.328: "me falta que me haga un informe en pdf para cada una de las [empresas]". Mismo patrón que el
+// resto de PAPO (ventana con el informe listo + diálogo de impresión → "Guardar como PDF"): sale
+// UN PDF por empresa y período, el que esté abierto en su solapa. Incluye resumen, lista por empleado
+// con total, excluidos con su motivo, lo que no entra en el cálculo y, en hoja aparte, el detalle día
+// por día de quienes se pasaron (para hablar con cada persona). `ctrlhHtmlPDF` es pura (devuelve el
+// HTML) para poder testearla sin abrir ventanas.
+function ctrlhHtmlPDF(r,orden,autoprint){
+  const lim=r.limite_min;
+  const calc=ctrlhCalcular(r.detalle,lim,r.excluidos);
+  const T=calc.tot;
+  const f=calc.filas.slice();
+  if(orden==='exceso')f.sort((x,y)=>y.exceso-x.exceso||x.nombre.localeCompare(y.nombre,'es'));
+  else if(orden==='descanso')f.sort((x,y)=>y.total-x.total||x.nombre.localeCompare(y.nombre,'es'));
+  else f.sort((x,y)=>x.nombre.localeCompare(y.nombre,'es'));
+  const excl=calc.excl.slice().sort((x,y)=>x.nombre.localeCompare(y.nombre,'es'));
+  const ahora=new Date();const p2=n=>String(n).padStart(2,'0');
+  const fechaGen=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()} ${p2(ahora.getHours())}:${p2(ahora.getMinutes())}`;
+  const rojo=T.exceso>0?'#b3261e':'#1b7f4b';
+  const filasHtml=f.map(x=>`<tr><td>${remEsc(x.nombre)}${x.incompletos?' <span class="av">*</span>':''}</td>
+    <td class="n">${x.medidos||'—'}</td><td class="n">${x.medidos?ctrlhDur(x.total):'sin medición'}</td><td class="n g">${x.medidos?ctrlhDur(x.permitido):''}</td>
+    <td class="n b" style="color:${x.exceso>0?'#b3261e':'#1b7f4b'}">${x.medidos?(x.exceso>0?ctrlhDur(x.exceso):'0 min'):''}</td>
+    <td class="n g">${x.medidos?x.diasExceso+' de '+x.medidos:''}</td><td class="n g">${x.medidos?Math.round(x.prom)+' min':''}</td></tr>`).join('');
+  const pasaron=f.filter(x=>x.exceso>0).sort((x,y)=>y.exceso-x.exceso||x.nombre.localeCompare(y.nombre,'es'));
+  const detalle=pasaron.map(x=>{
+    const dias=x.dias.filter(d=>d.estado==='ok'&&d.descanso>lim);
+    return `<tr><td class="nm">${remEsc(x.nombre)}</td><td class="n b" style="color:#b3261e">${ctrlhDur(x.exceso)}</td>
+      <td>${dias.map(d=>`${ctrlhFechaDM(d.fecha)}: ${d.descanso} min <b style="color:#b3261e">(+${d.descanso-lim})</b>`).join(' &nbsp;·&nbsp; ')}</td></tr>`;
+  }).join('');
+  const incs=calc.filas.filter(x=>x.incompletos>0);
+  const avisos=(T.incompletos||T.sinDescanso)?`<div class="nota"><b>Qué no entra en el cálculo.</b> ${T.incompletos?`${T.incompletos} día${T.incompletos>1?'s':''} con 3 fichadas (falta una marca y no se sabe cuál; marcados con * en la lista): ${incs.map(x=>remEsc(x.nombre)+' ('+x.dias.filter(d=>d.estado==='incompleta').map(d=>ctrlhFechaDM(d.fecha)).join(', ')+')').join('; ')}. `:''}${T.sinDescanso?`${T.sinDescanso} día${T.sinDescanso>1?'s':''} con solo entrada y salida (sin marca de descanso): no suman descanso ni exceso.`:''}</div>`:'';
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Control de horas — ${remEsc(r.empresa_nombre)} — ${ctrlhFechaCorta(r.desde)} al ${ctrlhFechaCorta(r.hasta)}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:9pt;padding:8mm}
+    h1{font-size:17pt;margin-bottom:2px}
+    h2{font-size:11.5pt;margin:14px 0 6px;page-break-after:avoid}
+    .sub{color:#555;font-size:9.5pt;margin-bottom:10px}
+    .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+    .kpi{border:1px solid #ccc;border-radius:6px;padding:7px 9px}
+    .kpi .l{font-size:7.5pt;text-transform:uppercase;letter-spacing:.4px;color:#666}
+    .kpi .v{font-size:14pt;font-weight:700;margin-top:2px}
+    .kpi .d{font-size:8pt;color:#666;margin-top:1px}
+    table{width:100%;border-collapse:collapse}
+    thead{display:table-header-group}
+    th{text-align:left;padding:4px 6px;font-size:8.5pt;border-bottom:2px solid #333;background:#f2f2f2}
+    td{padding:3.5px 6px;border-bottom:1px solid #ddd;vertical-align:top}
+    tr{page-break-inside:avoid}
+    .n{text-align:right;white-space:nowrap}th.n{text-align:right}
+    .g{color:#555}.b{font-weight:700}.av{color:#b26a00;font-weight:700}
+    tfoot td{border-top:2px solid #333;border-bottom:none;font-weight:700;padding-top:6px;background:#f2f2f2}
+    .nota{font-size:8.5pt;color:#444;background:#f6f6f6;border:1px solid #ddd;border-radius:6px;padding:7px 9px;margin-top:10px;page-break-inside:avoid}
+    td:first-child{white-space:nowrap}
+    .nm{white-space:nowrap;font-weight:600}
+    .pie{margin-top:12px;font-size:8pt;color:#888;text-align:center}
+    .salto{page-break-before:always}
+    @media print{@page{size:A4;margin:10mm}body{padding:0}}
+  </style></head><body>
+  <h1>Control de horas — ${remEsc(r.empresa_nombre)}</h1>
+  <div class="sub">Período ${ctrlhFechaCorta(r.desde)} al ${ctrlhFechaCorta(r.hasta)} · Descanso permitido: ${lim} min por día · Archivo: ${remEsc(r.archivo||'')} · Generado ${fechaGen}</div>
+  <div class="kpis">
+    <div class="kpi"><div class="l">Empleados</div><div class="v">${T.empleados}</div><div class="d">${T.conMedicion} con descanso medido${T.excluidos?' · '+T.excluidos+' excluidos':''}</div></div>
+    <div class="kpi"><div class="l">El descanso total fue</div><div class="v">${ctrlhDur(T.total)}</div><div class="d">${T.medidos} días medidos</div></div>
+    <div class="kpi"><div class="l">Descanso permitido</div><div class="v">${ctrlhDur(T.permitido)}</div><div class="d">${lim} min × ${T.medidos} días</div></div>
+    <div class="kpi"><div class="l">Se pasaron</div><div class="v" style="color:${rojo}">${ctrlhDur(T.exceso)}</div><div class="d">${T.empleadosPasados} empleados</div></div>
+  </div>
+  <table><thead><tr><th>Empleado</th><th class="n">Días medidos</th><th class="n">Descanso tomado</th><th class="n">Permitido</th><th class="n">Se pasó</th><th class="n">Días que se pasó</th><th class="n">Promedio / día</th></tr></thead>
+    <tbody>${filasHtml}</tbody>
+    <tfoot><tr><td>TOTAL ${remEsc(r.empresa_nombre).toUpperCase()}</td><td class="n">${T.medidos}</td><td class="n">${ctrlhDur(T.total)}</td><td class="n">${ctrlhDur(T.permitido)}</td><td class="n" style="color:${rojo}">${ctrlhDur(T.exceso)}</td><td></td><td class="n">${T.medidos?Math.round(T.total/T.medidos)+' min':''}</td></tr></tfoot></table>
+  ${excl.length?`<h2>Excluidos del informe (${excl.length}) — no suman en ningún total</h2><table><thead><tr><th>Empleado</th><th>Motivo</th><th>Nota</th></tr></thead><tbody>${excl.map(x=>`<tr><td>${remEsc(x.nombre)}</td><td>${remEsc(x.motivo)}</td><td class="g">${remEsc(x.nota)}</td></tr>`).join('')}</tbody></table>`:''}
+  ${avisos}
+  ${pasaron.length?`<h2>Detalle de quienes se pasaron (más de ${lim} min), día por día</h2>
+    <table><thead><tr><th>Empleado</th><th class="n">Se pasó</th><th>Días (descanso y minutos de más)</th></tr></thead><tbody>${detalle}</tbody></table>`:''}
+  <div class="pie">PAPO · Plan de Producción · RRHH · Control de horas</div>
+  ${autoprint?'<script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>':''}
+  </body></html>`;
+}
+function ctrlhImprimirPDF(){
+  const a=ctrlh.actual;if(!a)return;
+  const html=ctrlhHtmlPDF(a.row,ctrlh.orden,true);
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para armar el PDF.');
 }
 
 // ── CONFIGURACION (MOI / Persona de sucursal / Equipo) ───────────
