@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.328</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.329</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -730,7 +730,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <span id="simprod-save-msg" style="font-size:12px;color:var(--text3)"></span>
         <button class="btn btn-sm" id="btnImprimirSimProd" onclick="imprimirSimPorProducto()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
       </div>
-      <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Elegí cualquier producto y una cantidad hipotética -- se calcula el tiempo de máquina/proceso estimado con el rendimiento histórico (uds/hora) cargado en "Informes > Rendimiento". Podés agregar varios productos; abajo se suma el tiempo total combinado.</div>
+      <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Elegí cualquier producto y una cantidad hipotética -- se calcula el tiempo de máquina/proceso estimado con el rendimiento histórico (uds/hora) cargado en "Informes > Rendimiento". Armalo a tu gusto: cada máquina tiene su hora de inicio y su tiempo de cambio de variedad (se suma entre un producto y el siguiente); asigná cada producto a una máquina, subilo/bajalo para cambiar el orden y mirá a qué hora empieza y termina cada uno.</div>
       <div id="simprod-content"></div>
     </div>
   </div>
@@ -2876,7 +2876,37 @@ function showSimTab(t){
 // plan ni de ningún día puntual. El historial se trae UNA sola vez al entrar a la sub-pestaña (no
 // en cada tecla), con un botón "Actualizar historial" para refrescarlo a mano si hace falta.
 let simProdHist=null;
-let simProdFilas=[{prodId:'',cantidad:''}];
+let simProdFilas=[{prodId:'',cantidad:'',maq:'m1'}];
+// v4.329: "que pueda poner maquina, hora de inicio, cambio de letra como esta en el otro, que me deje la
+// posibilidad de jugar y armar a mi gusto" -- cada producto se asigna a una MÁQUINA (libre: nombre, hora de
+// inicio y minutos de cambio de variedad, igual que las tarjetas de "Por día"). Cada máquina arma su
+// secuencia: inicio/fin de cada producto, con el cambio de variedad como pausa ANTES de cada producto
+// salvo el primero (mismo criterio que Por día). Todo se guarda en el mismo jsonb sim_producto_estado
+// (datos.maquinas + filas[].maq) -- no hace falta SQL nuevo.
+let simProdMaquinas=[{id:'m1',nombre:'Máquina 1',inicio:'08:00',cambio:0}];
+function simProdHHMMaMin(s){
+  const m=/^(\d{1,2}):(\d{2})/.exec(String(s||''));
+  return m?(Math.min(23,+m[1])*60+Math.min(59,+m[2])):480;
+}
+function simProdMaqDeFila(f){
+  return simProdMaquinas.some(m=>m.id===f.maq)?f.maq:simProdMaquinas[0].id;
+}
+function simProdNuevoIdMaq(){
+  return 'm'+Date.now().toString(36)+Math.floor(Math.random()*1296).toString(36);
+}
+// Arma la secuencia de UNA máquina (puro): items=[{r:resultadoFila,...}] en orden, devuelve cada item con
+// ini/fin (minutos del día; null si la fila no tiene duración calculable) + totales.
+function simProdPlanMaquina(items,inicioMin,cambioMin){
+  let cursor=inicioMin,primero=true,totalProd=0,totalCamb=0;
+  const out=items.map(it=>{
+    if(!it.r||it.r.estado!=='ok')return{...it,ini:null,fin:null};
+    if(!primero){cursor+=cambioMin;totalCamb+=cambioMin;}
+    const ini=cursor;cursor+=it.r.durMin;totalProd+=it.r.durMin;primero=false;
+    return{...it,ini,fin:cursor};
+  });
+  return{items:out,totalProd,totalCamb,total:totalProd+totalCamb,iniMin:inicioMin,finMin:inicioMin+totalProd+totalCamb,nProd:out.filter(x=>x.ini!=null).length};
+}
+function simProdFmtDur(min){return Math.floor(min/60)+'h '+(min%60)+'m';}
 
 // v4.323: "que de la lista salgan los productos dependiendo de la empresa y por area" -- filtros
 // Empresa/Área arriba; el buscador de producto sólo ofrece los productos de esa empresa y esa área.
@@ -2932,8 +2962,12 @@ async function simProdCargarEstado(){
     const rows=await get('sim_producto_estado','id=eq.default');
     const d=(rows&&rows[0]&&rows[0].datos)||{};
     if(Array.isArray(d.filas)&&d.filas.length){
-      simProdFilas=d.filas.map(f=>({prodId:f.prodId||'',cantidad:f.cantidad==null?'':f.cantidad}));
+      simProdFilas=d.filas.map(f=>({prodId:f.prodId||'',cantidad:f.cantidad==null?'':f.cantidad,maq:f.maq||''}));
     }
+    if(Array.isArray(d.maquinas)&&d.maquinas.length){
+      simProdMaquinas=d.maquinas.map((m,i)=>({id:String(m.id||('m'+(i+1))),nombre:String(m.nombre||('Máquina '+(i+1))),inicio:/^\d{1,2}:\d{2}/.test(m.inicio||'')?m.inicio:'08:00',cambio:Math.max(0,parseInt(m.cambio,10)||0)}));
+    }
+    simProdFilas.forEach(f=>{f.maq=simProdMaqDeFila(f);});
     if(d.empresa)simProdEmpresa=d.empresa;
     if(d.area)simProdAreaF=d.area;
     simProdPuedeGuardar=true;
@@ -2948,7 +2982,7 @@ function simProdGuardarDebounced(){
   clearTimeout(simProdGuardarTimer);
   simProdGuardarTimer=setTimeout(async()=>{
     try{
-      const datos={filas:simProdFilas.map(f=>({prodId:f.prodId||'',cantidad:f.cantidad===''?'':(parseFloat(f.cantidad)||0)})),empresa:simProdEmpresa,area:simProdAreaF};
+      const datos={filas:simProdFilas.map(f=>({prodId:f.prodId||'',cantidad:f.cantidad===''?'':(parseFloat(f.cantidad)||0),maq:simProdMaqDeFila(f)})),maquinas:simProdMaquinas.map(m=>({id:m.id,nombre:m.nombre,inicio:m.inicio,cambio:m.cambio})),empresa:simProdEmpresa,area:simProdAreaF};
       const res=await fetch(`${SB}/rest/v1/sim_producto_estado?on_conflict=id`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:'default',datos,updated_at:new Date().toISOString()})});
       if(!res.ok)throw new Error(await res.text());
       simProdMsg('Guardado ✓');
@@ -2993,13 +3027,71 @@ function simProdArea(p){
   return(st.A.find(a=>a.id===p.area_id)||{}).nombre||'';
 }
 
-function simProdAgregarFila(){
-  simProdFilas.push({prodId:'',cantidad:''});
+function simProdAgregarFila(maqId){
+  simProdFilas.push({prodId:'',cantidad:'',maq:maqId||simProdMaquinas[0].id});
   renderSimPorProducto();
 }
 function simProdQuitarFila(idx){
   simProdFilas.splice(idx,1);
-  if(!simProdFilas.length)simProdFilas=[{prodId:'',cantidad:''}];
+  if(!simProdFilas.length)simProdFilas=[{prodId:'',cantidad:'',maq:simProdMaquinas[0].id}];
+  renderSimPorProducto();
+}
+// v4.329: máquinas
+function simProdAgregarMaquina(){
+  const ult=simProdMaquinas[simProdMaquinas.length-1]||{inicio:'08:00',cambio:0};
+  const m={id:simProdNuevoIdMaq(),nombre:'Máquina '+(simProdMaquinas.length+1),inicio:ult.inicio,cambio:ult.cambio};
+  simProdMaquinas.push(m);
+  simProdFilas.push({prodId:'',cantidad:'',maq:m.id});
+  renderSimPorProducto();
+}
+function simProdQuitarMaquina(mi){
+  if(simProdMaquinas.length<=1||!simProdMaquinas[mi])return;
+  const m=simProdMaquinas[mi];
+  const destino=simProdMaquinas[mi===0?1:0];
+  const conProd=simProdFilas.filter(f=>simProdMaqDeFila(f)===m.id&&f.prodId).length;
+  if(conProd&&!confirm('Se quita "'+m.nombre+'". Sus '+conProd+' producto'+(conProd>1?'s':'')+' pasan a "'+destino.nombre+'". ¿Seguir?'))return;
+  simProdFilas.forEach(f=>{if(simProdMaqDeFila(f)===m.id)f.maq=destino.id;});
+  simProdMaquinas.splice(mi,1);
+  renderSimPorProducto();
+}
+function simProdSetMaqNombre(mi,val){
+  if(!simProdMaquinas[mi])return;
+  simProdMaquinas[mi].nombre=(val||'').trim()||('Máquina '+(mi+1));
+  renderSimPorProducto();
+}
+function simProdSetMaqInicio(mi,val){
+  if(!simProdMaquinas[mi])return;
+  simProdMaquinas[mi].inicio=val||'08:00';
+  renderSimPorProducto();
+}
+function simProdSetMaqCambio(mi,val){
+  if(!simProdMaquinas[mi])return;
+  simProdMaquinas[mi].cambio=Math.max(0,parseInt(val,10)||0);
+  renderSimPorProducto();
+}
+// Pasa un producto a otra máquina (queda al final de la secuencia de esa máquina).
+function simProdSetMaqFila(idx,maqId){
+  const f=simProdFilas[idx];
+  if(!f||!simProdMaquinas.some(m=>m.id===maqId))return;
+  simProdFilas.splice(idx,1);
+  f.maq=maqId;
+  simProdFilas.push(f);
+  renderSimPorProducto();
+}
+// Sube/baja un producto dentro de su máquina (intercambia con el vecino visible de la misma máquina).
+function simProdMover(idx,dir){
+  const f=simProdFilas[idx];
+  if(!f)return;
+  const maq=simProdMaqDeFila(f);
+  const vis=[];
+  simProdFilas.forEach((g,i)=>{
+    if(simProdMaqDeFila(g)!==maq)return;
+    const p=g.prodId?st.Pr.find(x=>x.id===g.prodId):null;
+    if(simProdFilaVisible(p,simProdEmpresa,simProdAreaF))vis.push(i);
+  });
+  const to=vis[vis.indexOf(idx)+dir];
+  if(to==null)return;
+  const t=simProdFilas[idx];simProdFilas[idx]=simProdFilas[to];simProdFilas[to]=t;
   renderSimPorProducto();
 }
 function simProdCambiarProducto(idx){
@@ -3063,102 +3155,172 @@ function simProdCalcularFila(p,cantidadRaw,hist){
   return{cantidad,udsHora,durMin,estado:'ok'};
 }
 
+function simProdItemsDeMaquina(maqId){
+  // filas visibles (por el filtro Empresa/Área) de una máquina, en orden, con su resultado calculado
+  const out=[];
+  simProdFilas.forEach((f,idx)=>{
+    if(simProdMaqDeFila(f)!==maqId)return;
+    const p=f.prodId?st.Pr.find(x=>x.id===f.prodId):null;
+    if(!simProdFilaVisible(p,simProdEmpresa,simProdAreaF))return;
+    out.push({f,idx,p,r:simProdCalcularFila(p,f.cantidad,simProdHist)});
+  });
+  return out;
+}
 function renderSimPorProducto(){
   const el=document.getElementById('simprod-content');
   const btnImp=document.getElementById('btnImprimirSimProd');
   if(!simProdHist){el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando rendimiento histórico...</div>';if(btnImp)btnImp.disabled=true;return}
-  let totalMinGeneral=0,filasValidas=0,totalCantidad=0,filasOcultas=0;
-  const filasHtml=simProdFilas.map((f,idx)=>{
-    const p=f.prodId?st.Pr.find(x=>x.id===f.prodId):null;
-    if(!simProdFilaVisible(p,simProdEmpresa,simProdAreaF)){filasOcultas++;return'';}
-    const r=simProdCalcularFila(p,f.cantidad,simProdHist);
-    if(p)totalCantidad+=r.cantidad;
-    if(r.estado==='ok'){totalMinGeneral+=r.durMin;filasValidas++;}
-    let resultadoHtml='<span style="color:var(--text3);font-size:12px">—</span>';
-    if(r.estado==='ok'){
-      resultadoHtml=`<b style="color:var(--blue)">${Math.round(r.udsHora).toLocaleString('es-AR')}</b> uds/h &nbsp;→&nbsp; <b style="color:var(--text)">${Math.floor(r.durMin/60)}h ${r.durMin%60}m</b>`;
-    }else if(r.estado==='sin-historico'){
-      resultadoHtml='<span style="color:var(--amber);font-size:12px"><i class="ti ti-alert-triangle"></i> Sin rendimiento histórico</span>';
-    }else if(r.estado==='sin-cantidad'){
-      resultadoHtml='<span style="color:var(--text3);font-size:12px">Ingresá una cantidad</span>';
-    }
-    const prodCellHtml=p
-      ?`<div style="display:flex;align-items:center;gap:8px">
-          <div><div style="font-weight:600">${remEsc(p.nombre)}</div><div style="font-size:11px;color:var(--text2)">${remEsc(en(p.empresa_id)||'')} · ${remEsc(simProdArea(p))}</div></div>
-          <button class="btn btn-xs" onclick="simProdCambiarProducto(${idx})" title="Cambiar producto"><i class="ti ti-edit"></i></button>
-        </div>`
-      :`<div style="position:relative">
+  simProdFilas.forEach(f=>{f.maq=simProdMaqDeFila(f);});
+  const nMaq=simProdMaquinas.length;
+  const INP='padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)';
+  let totalMinGeneral=0,filasValidas=0,totalCantidad=0,totalCambiosGral=0,finGeneral=null;
+  const filasOcultas=simProdFilas.filter(f=>{const p=f.prodId?st.Pr.find(x=>x.id===f.prodId):null;return !simProdFilaVisible(p,simProdEmpresa,simProdAreaF);}).length;
+  const cards=simProdMaquinas.map((m,mi)=>{
+    const items=simProdItemsDeMaquina(m.id);
+    const plan=simProdPlanMaquina(items,simProdHHMMaMin(m.inicio),m.cambio);
+    totalMinGeneral+=plan.totalProd;filasValidas+=plan.nProd;totalCambiosGral+=plan.totalCamb;
+    items.forEach(it=>{if(it.p)totalCantidad+=it.r.cantidad;});
+    if(plan.nProd&&(finGeneral==null||plan.finMin>finGeneral))finGeneral=plan.finMin;
+    const totTxt=plan.nProd===0?'<span style="color:var(--text3)">Sin productos con tiempo calculado</span>'
+      :(plan.totalCamb>0
+        ?`Producción: <b style="color:var(--text)">${simProdFmtDur(plan.totalProd)}</b> + cambios: <b style="color:var(--text)">${simProdFmtDur(plan.totalCamb)}</b> = <b style="color:var(--text)">${simProdFmtDur(plan.total)}</b> en total`
+        :`<b style="color:var(--text)">${simProdFmtDur(plan.totalProd)}</b> en total`);
+    const filasHtml=plan.items.map((it,pos)=>{
+      const {f,idx,p,r}=it;
+      let resultadoHtml='<span style="color:var(--text3);font-size:12px">—</span>';
+      if(r.estado==='ok'){
+        resultadoHtml=`<b style="color:var(--blue)">${Math.round(r.udsHora).toLocaleString('es-AR')}</b> uds/h &nbsp;→&nbsp; <b style="color:var(--text)">${simProdFmtDur(r.durMin)}</b>`;
+      }else if(r.estado==='sin-historico'){
+        resultadoHtml='<span style="color:var(--amber);font-size:12px"><i class="ti ti-alert-triangle"></i> Sin rendimiento histórico</span>';
+      }else if(r.estado==='sin-cantidad'){
+        resultadoHtml='<span style="color:var(--text3);font-size:12px">Ingresá una cantidad</span>';
+      }
+      const prodCellHtml=p
+        ?`<div style="display:flex;align-items:center;gap:8px">
+            <div><div style="font-weight:600">${remEsc(p.nombre)}</div><div style="font-size:11px;color:var(--text2)">${remEsc(en(p.empresa_id)||'')} · ${remEsc(simProdArea(p))}</div></div>
+            <button class="btn btn-xs" onclick="simProdCambiarProducto(${idx})" title="Cambiar producto"><i class="ti ti-edit"></i></button>
+          </div>`
+        :`<div style="position:relative">
           <input type="text" placeholder="Elegí o escribí para buscar producto..." oninput="simProdAC(this,${idx})" onfocus="simProdAC(this,${idx})" onblur="setTimeout(()=>simProdHideAC(this),200)" autocomplete="off" style="width:100%;padding:6px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-        </div>`;
-    return`<tr>
-      <td style="min-width:260px">${prodCellHtml}</td>
-      <td style="width:130px"><input type="number" min="0" step="0.01" value="${f.cantidad||''}" placeholder="Cantidad" onchange="simProdSetCantidad(${idx},this.value)" onkeydown="if(event.key==='Enter')this.blur()" style="width:100%;padding:6px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);text-align:right"/></td>
-      <td>${resultadoHtml}</td>
-      <td style="width:36px"><button class="btn btn-xs btn-danger" onclick="simProdQuitarFila(${idx})" title="Quitar"><i class="ti ti-trash"></i></button></td>
-    </tr>`;
+          </div>`;
+      const selMaq=nMaq>1?`<select onchange="simProdSetMaqFila(${idx},this.value)" title="Pasar a otra máquina" style="${INP};max-width:110px">${simProdMaquinas.map(x=>`<option value="${x.id}"${x.id===m.id?' selected':''}>${remEsc(x.nombre)}</option>`).join('')}</select>`:'';
+      return`<tr>
+        <td style="min-width:240px">${prodCellHtml}</td>
+        <td style="width:120px"><input type="number" min="0" step="0.01" value="${f.cantidad||''}" placeholder="Cantidad" onchange="simProdSetCantidad(${idx},this.value)" onkeydown="if(event.key==='Enter')this.blur()" style="width:100%;padding:6px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);text-align:right"/></td>
+        <td>${resultadoHtml}</td>
+        <td style="text-align:center;font-weight:600;color:var(--green)">${it.ini!=null?minToHHMM(it.ini):'—'}</td>
+        <td style="text-align:center;font-weight:600;color:var(--red)">${it.fin!=null?minToHHMM(it.fin):'—'}</td>
+        <td style="white-space:nowrap;width:1%"><div style="display:flex;gap:4px;align-items:center">
+          <button class="btn btn-xs" onclick="simProdMover(${idx},-1)" title="Subir"${pos===0?' disabled':''}><i class="ti ti-arrow-up"></i></button>
+          <button class="btn btn-xs" onclick="simProdMover(${idx},1)" title="Bajar"${pos===plan.items.length-1?' disabled':''}><i class="ti ti-arrow-down"></i></button>
+          ${selMaq}
+          <button class="btn btn-xs btn-danger" onclick="simProdQuitarFila(${idx})" title="Quitar"><i class="ti ti-trash"></i></button>
+        </div></td>
+      </tr>`;
+    }).join('');
+    return`<div class="stock-card" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg2);border-bottom:.5px solid var(--border);border-radius:var(--radius-lg) var(--radius-lg) 0 0;flex-wrap:wrap;gap:8px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <i class="ti ti-building-factory-2" style="color:var(--text2)"></i>
+          <input type="text" value="${remEsc(m.nombre).replace(/"/g,'&quot;')}" onchange="simProdSetMaqNombre(${mi},this.value)" onkeydown="if(event.key==='Enter')this.blur()" title="Nombre de la máquina" style="${INP};font-weight:700;font-size:13px;width:150px"/>
+          <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)">Inicio:
+            <input type="time" value="${m.inicio}" onchange="simProdSetMaqInicio(${mi},this.value)" style="${INP}"/>
+          </span>
+          <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2)">Cambio de variedad:
+            <input type="number" min="0" value="${m.cambio}" onchange="simProdSetMaqCambio(${mi},this.value)" onkeydown="if(event.key==='Enter')this.blur()" style="${INP};width:56px"/> min
+          </span>
+          ${nMaq>1?`<button class="btn btn-xs btn-danger" onclick="simProdQuitarMaquina(${mi})" title="Quitar máquina"><i class="ti ti-x"></i></button>`:''}
+        </div>
+        <div style="font-size:12px;color:var(--text2);text-align:right">
+          ${plan.nProd?`<div><b style="color:var(--text)">${minToHHMM(plan.iniMin)}</b> a <b style="color:var(--text)">${minToHHMM(plan.finMin)}</b></div>`:''}
+          <div>${totTxt}</div>
+        </div>
+      </div>
+      <div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
+        <th>Producto</th><th style="text-align:right">Cantidad</th><th>Resultado</th><th style="text-align:center">Inicio</th><th style="text-align:center">Fin</th><th></th>
+      </tr></thead><tbody>${filasHtml}</tbody></table></div>
+      <div style="padding:8px 14px;border-top:.5px solid var(--border)">
+        <button class="btn btn-sm" onclick="simProdAgregarFila('${m.id}')"><i class="ti ti-plus"></i> Agregar producto</button>
+      </div>
+    </div>`;
   }).join('');
 
-  el.innerHTML=`<div class="stock-card">
-    <div><table class="stock-tbl"><thead><tr>
-      <th>Producto</th><th style="text-align:right">Cantidad</th><th>Resultado</th><th></th>
-    </tr></thead><tbody>${filasHtml}</tbody></table></div>
-    <div style="padding:10px 14px;display:flex;justify-content:space-between;align-items:center;border-top:.5px solid var(--border);flex-wrap:wrap;gap:8px">
-      <button class="btn btn-sm" onclick="simProdAgregarFila()"><i class="ti ti-plus"></i> Agregar producto</button>
+  el.innerHTML=`${cards}
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+      <button class="btn btn-sm" onclick="simProdAgregarMaquina()"><i class="ti ti-plus"></i> Agregar máquina</button>
       <div style="font-size:13px;display:flex;gap:18px;flex-wrap:wrap;align-items:center">
         ${filasOcultas?`<span style="color:var(--text3);font-size:12px">${filasOcultas} fila${filasOcultas>1?'s':''} oculta${filasOcultas>1?'s':''} por el filtro</span>`:''}
         ${totalCantidad>0?`<span><span style="color:var(--text2)">Cantidad total:</span> <b style="color:var(--text)">${totalCantidad.toLocaleString('es-AR')}</b></span>`:''}
-        ${totalMinGeneral>0?`<span><span style="color:var(--text2)">Tiempo total combinado${filasValidas>1?` (${filasValidas} productos)`:''}:</span> <b style="color:var(--text)">${Math.floor(totalMinGeneral/60)}h ${totalMinGeneral%60}m</b></span>`:''}
+        ${totalMinGeneral>0?`<span><span style="color:var(--text2)">Producción combinada${filasValidas>1?` (${filasValidas} productos)`:''}:</span> <b style="color:var(--text)">${simProdFmtDur(totalMinGeneral)}</b>${totalCambiosGral>0?` <span style="color:var(--text3)">+ cambios ${simProdFmtDur(totalCambiosGral)}</span>`:''}</span>`:''}
+        ${finGeneral!=null&&nMaq>1?`<span><span style="color:var(--text2)">Termina todo:</span> <b style="color:var(--text)">${minToHHMM(finGeneral)}</b></span>`:''}
       </div>
-    </div>
-  </div>`;
+    </div>`;
   if(btnImp)btnImp.disabled=filasValidas===0;
   simProdGuardarDebounced();
 }
 
 function imprimirSimPorProducto(){
   if(!simProdHist)return;
-  const filas=simProdFilas.map(f=>{
-    const p=f.prodId?st.Pr.find(x=>x.id===f.prodId):null;
-    return{p,r:simProdCalcularFila(p,f.cantidad,simProdHist)};
-  }).filter(x=>x.p&&x.r.estado!=='incompleta'&&simProdFilaVisible(x.p,simProdEmpresa,simProdAreaF));
-  if(!filas.length)return;
-  const totalCantidad=filas.reduce((s,x)=>s+x.r.cantidad,0);
-  const totalMin=filas.filter(x=>x.r.estado==='ok').reduce((s,x)=>s+x.r.durMin,0);
+  const maqs=simProdMaquinas.map(m=>{
+    const items=simProdItemsDeMaquina(m.id).filter(x=>x.p&&x.r.estado!=='incompleta');
+    return{m,plan:simProdPlanMaquina(items,simProdHHMMaMin(m.inicio),m.cambio)};
+  }).filter(x=>x.plan.items.length);
+  if(!maqs.length)return;
+  const todos=maqs.flatMap(x=>x.plan.items);
+  const totalCantidad=todos.reduce((s,x)=>s+x.r.cantidad,0);
+  const totalMin=maqs.reduce((s,x)=>s+x.plan.totalProd,0);
+  const totalCamb=maqs.reduce((s,x)=>s+x.plan.totalCamb,0);
   const ahora=new Date();
   const p2=n=>String(n).padStart(2,'0');
   const fechaImpresion=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()} ${p2(ahora.getHours())}:${p2(ahora.getMinutes())}`;
-  let filasHtml=filas.map(({p,r})=>{
-    const cod=simProdCodigo(p)||'—';
-    const uph=r.estado==='ok'?Math.round(r.udsHora).toLocaleString('es-AR'):'—';
-    const tiempo=r.estado==='ok'?`${Math.floor(r.durMin/60)}h ${r.durMin%60}m`:(r.estado==='sin-historico'?'Sin histórico':'—');
-    return`<tr><td class="cod">${cod}</td><td class="ali">${remEsc(p.nombre)}<div style="font-size:8pt;color:#777;font-weight:400">${remEsc(en(p.empresa_id)||'')} · ${remEsc(simProdArea(p))}</div></td><td class="cant">${r.cantidad.toLocaleString('es-AR')}</td><td class="uph">${uph}</td><td class="hor">${tiempo}</td></tr>`;
+  const bloques=maqs.map(({m,plan})=>{
+    const filasHtml=plan.items.map(it=>{
+      const {p,r}=it;
+      const cod=simProdCodigo(p)||'—';
+      const uph=r.estado==='ok'?Math.round(r.udsHora).toLocaleString('es-AR'):'—';
+      const tiempo=r.estado==='ok'?simProdFmtDur(r.durMin):(r.estado==='sin-historico'?'Sin histórico':'—');
+      return`<tr><td class="cod">${cod}</td><td class="ali">${remEsc(p.nombre)}<div style="font-size:8pt;color:#777;font-weight:400">${remEsc(en(p.empresa_id)||'')} · ${remEsc(simProdArea(p))}</div></td><td class="cant">${r.cantidad.toLocaleString('es-AR')}</td><td class="uph">${uph}</td><td class="uph">${tiempo}</td><td class="hor">${it.ini!=null?minToHHMM(it.ini):'—'}</td><td class="hor">${it.fin!=null?minToHHMM(it.fin):'—'}</td></tr>`;
+    }).join('');
+    const tot=plan.nProd===0?'':(plan.totalCamb>0
+      ?`Producción ${simProdFmtDur(plan.totalProd)} + cambios ${simProdFmtDur(plan.totalCamb)} = ${simProdFmtDur(plan.total)}`
+      :`Total ${simProdFmtDur(plan.totalProd)}`);
+    return`<div class="maq">
+      <div class="mh"><span class="mn">${remEsc(m.nombre)}</span><span class="mi">Inicio ${minToHHMM(plan.iniMin)}${plan.nProd?' · Fin '+minToHHMM(plan.finMin):''}${m.cambio>0?' · Cambio de variedad '+m.cambio+' min':''}</span></div>
+      <table>
+        <thead><tr><th>ID</th><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Uds/h</th><th style="text-align:right">Duración</th><th style="text-align:right">Inicio</th><th style="text-align:right">Fin</th></tr></thead>
+        <tbody>${filasHtml}</tbody>
+      </table>
+      ${tot?`<div class="mt">${tot}</div>`:''}
+    </div>`;
   }).join('');
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
   <title>Simulación por producto</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:Arial,sans-serif;padding:8mm;font-size:13pt}
+    body{font-family:Arial,sans-serif;padding:8mm;font-size:12pt}
     h1{font-size:16pt;margin-bottom:2px}
     .sub{font-size:11pt;color:#555;margin-bottom:10px}
+    .maq{margin-bottom:14px;page-break-inside:avoid}
+    .mh{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #333;padding:4px 0;margin-bottom:2px}
+    .mn{font-size:14pt;font-weight:700}
+    .mi{font-size:10.5pt;color:#444}
+    .mt{text-align:right;font-weight:700;font-size:11pt;padding-top:5px}
     table{width:100%;border-collapse:collapse}
-    th{text-align:left;padding:5px 7px;font-size:12pt;border-bottom:2px solid #333}
-    td{padding:5px 7px;font-size:12pt;border-bottom:1px solid #ccc;vertical-align:top}
-    td.cod{width:12%;font-family:monospace}
-    td.ali{width:40%}
-    td.cant{width:14%;text-align:right;font-weight:700}
-    td.uph{width:14%;text-align:right}
-    td.hor{width:14%;text-align:right;font-weight:700}
-    tfoot td{border-top:2px solid #333;border-bottom:none;font-weight:700;padding-top:8px}
+    th{text-align:left;padding:4px 6px;font-size:10.5pt;border-bottom:1px solid #333}
+    td{padding:4px 6px;font-size:11pt;border-bottom:1px solid #ccc;vertical-align:top}
+    td.cod{width:11%;font-family:monospace}
+    td.ali{width:34%}
+    td.cant{width:11%;text-align:right;font-weight:700}
+    td.uph{width:12%;text-align:right}
+    td.hor{width:10%;text-align:right;font-weight:700}
+    .tot{border-top:2px solid #333;padding-top:8px;font-weight:700;font-size:12pt;display:flex;justify-content:space-between}
     @media print{@page{size:A4;margin:10mm}body{padding:0}}
   </style></head>
   <body>
     <h1>SIMULACIÓN POR PRODUCTO</h1>
     <div class="sub">${[simProdEmpresa!=='all'?en(simProdEmpresa):'',simProdAreaF!=='all'?((st.A.find(a=>a.id===simProdAreaF)||{}).nombre||''):''].filter(Boolean).join(' · ')||'Todas las empresas y áreas'} · Impreso ${fechaImpresion}</div>
-    <table>
-      <thead><tr><th>ID</th><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Uds/h</th><th style="text-align:right">Tiempo</th></tr></thead>
-      <tbody>${filasHtml}</tbody>
-      <tfoot><tr><td></td><td>Total${totalMin>0?' (tiempo combinado)':''}</td><td style="text-align:right">${totalCantidad.toLocaleString('es-AR')}</td><td></td><td style="text-align:right">${totalMin>0?Math.floor(totalMin/60)+'h '+totalMin%60+'m':''}</td></tr></tfoot>
-    </table>
+    ${bloques}
+    <div class="tot"><span>Total${maqs.length>1?' ('+maqs.length+' máquinas)':''}${totalMin>0?' · producción combinada '+simProdFmtDur(totalMin)+(totalCamb>0?' + cambios '+simProdFmtDur(totalCamb):''):''}</span><span>Cantidad ${totalCantidad.toLocaleString('es-AR')}</span></div>
   <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
   </body></html>`;
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
