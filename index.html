@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.326</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.327</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1256,10 +1256,9 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <div class="toolbar">
     <div>
       <div style="font-size:16px;font-weight:600">Control de horas</div>
-      <div style="font-size:13px;color:var(--text2)">Subí el archivo de fichadas (Informe Liquidación Detallada): calcula el descanso de cada empleado y cuánto se pasó (Planeta 25 min · Joselito 30 min). Los informes quedan guardados.</div>
+      <div style="font-size:13px;color:var(--text2)">Un informe por empresa: subí el archivo de fichadas (Informe Liquidación Detallada) de Planeta o de Joselito en su solapa. Calcula el descanso de cada empleado y cuánto se pasó (Planeta 25 min · Joselito 30 min). Podés sacar personas del informe con un motivo. Todo queda guardado.</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-      <button class="btn btn-primary" onclick="ctrlhSubirArchivo()"><i class="ti ti-upload"></i> Subir archivo de fichadas</button>
       <button class="btn btn-sm" onclick="ctrlh.actual=null;initControlHoras()" title="Recargar"><i class="ti ti-refresh"></i></button>
     </div>
   </div>
@@ -13436,11 +13435,14 @@ const CTRLH_SQL_TABLA=`create table if not exists control_horas_informes (
   archivo text,
   resumen jsonb not null default '{}'::jsonb,
   detalle jsonb not null default '[]'::jsonb,
+  excluidos jsonb not null default '{}'::jsonb,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );`;
 const CTRLH_SQL_RLS='alter table control_horas_informes disable row level security;';
-let ctrlh={informes:[],actual:null,pendiente:null,orden:'nombre',abiertos:{},sinTabla:false,cargado:false};
+const CTRLH_SQL_COLUMNA="alter table control_horas_informes add column if not exists excluidos jsonb not null default '{}'::jsonb;";
+const CTRLH_MOTIVOS=['Vacaciones','Licencia / enfermedad','Franco o día no trabajado','Fuera de convenio / jerárquico','Baja (ya no trabaja)','Otro'];
+let ctrlh={informes:[],actual:null,empSel:null,orden:'nombre',abiertos:{},sinTabla:false,faltaColumna:false,cargado:false,motivoAbierto:null,filaKeys:[],exclKeys:[]};
 
 // <ctrlh-puro>
 function ctrlhMin(t){
@@ -13512,26 +13514,31 @@ function ctrlhParsear(rows){
   }
   return res;
 }
-function ctrlhCalcular(empleados,lim){
-  lim=Number(lim)||0;
-  const filas=(empleados||[]).map(e=>{
+function ctrlhKey(e){return (e.legajo||'')+'|'+(e.nombre||'');}
+// `excluidos` = {clave: {motivo, nota}}: esas personas NO suman en ningún total, pero siguen en el informe
+// (listadas aparte con su motivo) para poder restaurarlas.
+function ctrlhCalcular(empleados,lim,excluidos){
+  lim=Number(lim)||0;excluidos=excluidos||{};
+  const todas=(empleados||[]).map(e=>{
     let medidos=0,total=0,exceso=0,diasExceso=0,incompletos=0,sinDescanso=0;
     (e.dias||[]).forEach(d=>{
       if(d.estado==='ok'){medidos++;total+=d.descanso;const x=Math.max(0,d.descanso-lim);exceso+=x;if(x>0)diasExceso++;}
       else if(d.estado==='incompleta')incompletos++;
       else sinDescanso++;
     });
-    return{nombre:e.nombre,legajo:e.legajo,medidos,total,permitido:medidos*lim,exceso,diasExceso,
+    return{key:ctrlhKey(e),nombre:e.nombre,legajo:e.legajo,medidos,total,permitido:medidos*lim,exceso,diasExceso,
       prom:medidos?total/medidos:0,incompletos,sinDescanso,dias:e.dias||[]};
   });
-  const T={empleados:filas.length,conMedicion:0,medidos:0,total:0,permitido:0,exceso:0,empleadosPasados:0,incompletos:0,sinDescanso:0};
+  const filas=todas.filter(f=>!excluidos[f.key]);
+  const excl=todas.filter(f=>excluidos[f.key]).map(f=>({...f,motivo:excluidos[f.key].motivo||'',nota:excluidos[f.key].nota||''}));
+  const T={empleados:filas.length,excluidos:excl.length,conMedicion:0,medidos:0,total:0,permitido:0,exceso:0,empleadosPasados:0,incompletos:0,sinDescanso:0};
   filas.forEach(f=>{
     if(f.medidos>0)T.conMedicion++;
     T.medidos+=f.medidos;T.total+=f.total;T.permitido+=f.permitido;T.exceso+=f.exceso;
     if(f.exceso>0)T.empleadosPasados++;
     T.incompletos+=f.incompletos;T.sinDescanso+=f.sinDescanso;
   });
-  return{filas,tot:T};
+  return{filas,excl,tot:T};
 }
 function ctrlhDur(min){
   min=Math.round(min||0);
@@ -13541,25 +13548,63 @@ function ctrlhDur(min){
 }
 // </ctrlh-puro>
 
+// v4.327: "ahora te voy a mandar dos archivos con el mismo formato, uno de joselito y otro de planeta,
+// necesito que me de la posibilidad de borrar algunas personas por diferentes motivos, pero se cargan
+// por separados, y me debe dar un informe por separado de cada una de las empresas, y debe quedar
+// grabado". Cada empresa tiene su propia solapa con su propio botón de subir archivo y su propio
+// historial de períodos. "Borrar personas" = EXCLUIRLAS del informe con un motivo (reversible: quedan
+// listadas aparte con el motivo y un botón Restaurar; no suman en ningún total). Las exclusiones se
+// guardan en la columna `excluidos` del informe; si se vuelve a subir el mismo período se conservan.
 function ctrlhMsg(html,tipo){
   const el=document.getElementById('ctrlh-msg');if(!el)return;
   if(!html){el.innerHTML='';return;}
   el.innerHTML=`<div class="alert alert-${tipo||'info'}" style="align-items:flex-start"><i class="ti ti-${tipo==='err'?'alert-circle':tipo==='ok'?'check':'info-circle'}"></i><div>${html}</div></div>`;
 }
+function ctrlhEsErrorColumna(e){
+  const t=String((e&&e.message)||e||'');
+  return /excluidos/i.test(t)&&/column|PGRST204|42703/i.test(t);
+}
 function ctrlhEsErrorTabla(e){
+  if(ctrlhEsErrorColumna(e))return false;
   const t=String((e&&e.message)||e||'');
   return /PGRST205|42P01|Could not find the table|does not exist|schema cache/i.test(t);
 }
+const CTRLH_PRE='background:var(--bg2);padding:10px;border-radius:6px;overflow:auto;font-size:12px;margin:4px 0';
 function ctrlhHtmlSinTabla(){
   return `<div class="alert alert-info" style="display:block"><b>Falta crear la tabla en Supabase.</b> Corré este SQL en el SQL Editor (en dos pasos) y después tocá el botón de recargar.
-    <div style="margin-top:8px;font-size:12px;color:var(--text2)">Paso 1 — tabla:</div><pre style="background:var(--bg2);padding:10px;border-radius:6px;overflow:auto;font-size:12px;margin:4px 0">${remEsc(CTRLH_SQL_TABLA)}</pre>
-    <div style="font-size:12px;color:var(--text2)">Paso 2 — sin RLS (línea sola):</div><pre style="background:var(--bg2);padding:10px;border-radius:6px;overflow:auto;font-size:12px;margin:4px 0">${remEsc(CTRLH_SQL_RLS)}</pre></div>`;
+    <div style="margin-top:8px;font-size:12px;color:var(--text2)">Paso 1 — tabla:</div><pre style="${CTRLH_PRE}">${remEsc(CTRLH_SQL_TABLA)}</pre>
+    <div style="font-size:12px;color:var(--text2)">Paso 2 — sin RLS (línea sola):</div><pre style="${CTRLH_PRE}">${remEsc(CTRLH_SQL_RLS)}</pre></div>`;
 }
+function ctrlhHtmlFaltaColumna(){
+  return `<div class="alert alert-info" style="display:block"><b>A la tabla le falta una columna nueva</b> (para guardar las personas excluidas). Corré esto en el SQL Editor y después recargá:
+    <pre style="${CTRLH_PRE}">${remEsc(CTRLH_SQL_COLUMNA)}</pre></div>`;
+}
+
+// Empresas que se muestran como solapas: Planeta y Joselito (si no existen con esos nombres, todas)
+function ctrlhEmpresas(){
+  const out=[];
+  ['planeta','joselito'].forEach(k=>{const e=(st.E||[]).find(x=>new RegExp(k,'i').test(x.nombre));if(e)out.push(e);});
+  return out.length?out:(st.E||[]).slice();
+}
+function ctrlhInformesDe(empId){return ctrlh.informes.filter(i=>i.empresa_id===empId);}
 
 async function initControlHoras(){
   ctrlhMsg('');
   await ctrlhCargarLista();
-  if(!ctrlh.sinTabla&&!ctrlh.actual&&ctrlh.informes.length)await ctrlhAbrir(ctrlh.informes[0].id,true);
+  const emps=ctrlhEmpresas();
+  if(!ctrlh.empSel||!emps.find(e=>e.id===ctrlh.empSel))ctrlh.empSel=(emps[0]||{}).id||null;
+  if(!ctrlh.sinTabla)await ctrlhAbrirUltimo(true);
+  ctrlhRender();
+}
+async function ctrlhAbrirUltimo(silencioso){
+  const l=ctrlhInformesDe(ctrlh.empSel);
+  if(ctrlh.actual&&ctrlh.actual.row.empresa_id===ctrlh.empSel&&l.find(i=>i.id===ctrlh.actual.row.id))return;
+  ctrlh.actual=null;
+  if(l.length)await ctrlhAbrir(l[0].id,silencioso);
+}
+async function ctrlhSelEmpresa(id){
+  ctrlh.empSel=id;ctrlh.actual=null;ctrlh.motivoAbierto=null;ctrlhMsg('');
+  await ctrlhAbrirUltimo(true);
   ctrlhRender();
 }
 async function ctrlhCargarLista(){
@@ -13576,13 +13621,15 @@ async function ctrlhAbrir(id,silencioso){
   try{
     const r=await get('control_horas_informes','id=eq.'+encodeURIComponent(id));
     if(!r.length){ctrlh.actual=null;return;}
+    r[0].excluidos=r[0].excluidos||{};
     ctrlh.actual={row:r[0]};
-    ctrlh.abiertos={};
+    ctrlh.abiertos={};ctrlh.motivoAbierto=null;
   }catch(e){ctrlhMsg('No pude abrir el informe: '+remEsc(String(e.message||e).slice(0,200)),'err');}
   if(!silencioso)ctrlhRender();
 }
 
 function ctrlhSubirArchivo(){
+  if(!ctrlh.empSel){ctrlhMsg('No encuentro la empresa en el sistema.','err');return;}
   const input=document.createElement('input');
   input.type='file';input.accept='.xls,.xlsx';input.style.display='none';
   input.onchange=()=>ctrlhProcesarArchivo(input);
@@ -13593,6 +13640,8 @@ async function ctrlhProcesarArchivo(input){
   const file=input.files[0];
   if(!file){input.remove();return;}
   try{
+    const emp=st.E.find(e=>e.id===ctrlh.empSel);
+    if(!emp){ctrlhMsg('Elegí primero la empresa.','err');return;}
     ctrlhMsg('Leyendo el archivo…','info');
     if(!window.XLSX){
       await new Promise((res,rej)=>{
@@ -13613,52 +13662,91 @@ async function ctrlhProcesarArchivo(input){
     if(!parsed.desde||!parsed.hasta){
       ctrlhMsg('No pude determinar el período (Desde/Hasta) del archivo.','err');return;
     }
-    // empresa: por el título del archivo ("PASTAS JOSELITO" / "PLANETA EMPANADA")
-    let emp=null;
-    if(parsed.empresaTexto==='joselito')emp=st.E.find(e=>/joselito/i.test(e.nombre));
-    else if(parsed.empresaTexto==='planeta')emp=st.E.find(e=>/planeta/i.test(e.nombre));
-    ctrlh.pendiente={parsed,archivo:file.name};
-    if(emp){await ctrlhGuardarNuevo(emp.id);}
-    else{ctrlhMsg('','');ctrlh.actual=null;ctrlhRender();}
+    // el título del archivo ("PASTAS JOSELITO" / "PLANETA EMPANADA") tiene que coincidir con la solapa
+    if(parsed.empresaTexto&&!new RegExp(parsed.empresaTexto,'i').test(emp.nombre)){
+      if(!confirm('El archivo dice "'+parsed.titulo+'" pero lo estás cargando en '+emp.nombre+'. ¿Seguro que querés cargarlo en '+emp.nombre+'?')){ctrlhMsg('');return;}
+    }
+    await ctrlhGuardarNuevo(emp,parsed,file.name);
   }catch(e){
     console.error(e);
     ctrlhMsg('No pude leer el archivo: '+remEsc(String(e.message||e)),'err');
   }finally{input.remove();}
 }
-async function ctrlhGuardarNuevo(empresaId){
-  const p=ctrlh.pendiente;if(!p)return;
-  const emp=st.E.find(e=>e.id===empresaId);
-  if(!emp){ctrlhMsg('Elegí la empresa del archivo.','err');return;}
-  const limiteEl=document.getElementById('ctrlh-limite-nuevo');
-  const limite=limiteEl&&limiteEl.value!==''?parseInt(limiteEl.value,10):ctrlhLimiteDefault(emp.nombre);
-  const id=empresaId+'_'+p.parsed.desde+'_'+p.parsed.hasta;
+async function ctrlhGuardarNuevo(emp,parsed,archivo){
+  const limite=ctrlhLimiteDefault(emp.nombre);
+  const id=emp.id+'_'+parsed.desde+'_'+parsed.hasta;
   const reemplaza=ctrlh.informes.some(i=>i.id===id);
-  const calc=ctrlhCalcular(p.parsed.empleados,limite);
-  const row={id,empresa_id:empresaId,empresa_nombre:emp.nombre,desde:p.parsed.desde,hasta:p.parsed.hasta,
-    limite_min:limite,archivo:p.archivo,resumen:calc.tot,detalle:p.parsed.empleados,updated_at:new Date().toISOString()};
+  // al reemplazar el mismo período se conservan las exclusiones (y el límite) de la versión anterior
+  let excluidos={},limiteUsado=limite;
+  if(reemplaza){
+    try{
+      const prev=await get('control_horas_informes','select=excluidos,limite_min&id=eq.'+encodeURIComponent(id));
+      if(prev.length){
+        const ex=prev[0].excluidos||{};
+        parsed.empleados.forEach(e=>{const k=ctrlhKey(e);if(ex[k])excluidos[k]=ex[k];});
+        if(prev[0].limite_min!=null)limiteUsado=prev[0].limite_min;
+      }
+    }catch(e){/* tabla sin columna nueva: se detecta abajo al guardar */}
+  }
+  const calc=ctrlhCalcular(parsed.empleados,limiteUsado,excluidos);
+  const row={id,empresa_id:emp.id,empresa_nombre:emp.nombre,desde:parsed.desde,hasta:parsed.hasta,
+    limite_min:limiteUsado,archivo,resumen:calc.tot,detalle:parsed.empleados,excluidos,updated_at:new Date().toISOString()};
   try{
     await upsert('control_horas_informes',[row]);
-    ctrlh.pendiente=null;ctrlh.actual={row};ctrlh.abiertos={};
+    ctrlh.actual={row};ctrlh.abiertos={};ctrlh.motivoAbierto=null;
     await ctrlhCargarLista();
     ctrlhRender();
-    ctrlhMsg(`Informe guardado: <b>${remEsc(emp.nombre)}</b>, ${ctrlhFechaCorta(row.desde)} al ${ctrlhFechaCorta(row.hasta)}.${reemplaza?' Reemplazó el informe anterior de ese mismo período.':''}`,'ok');
-  }catch(e){
-    const t=String(e.message||e);
-    if(ctrlhEsErrorTabla(e)){ctrlh.sinTabla=true;ctrlhRender();}
-    else if(/42501|row-level security/i.test(t))ctrlhMsg('Supabase bloqueó la escritura (RLS). Corré: <code>'+remEsc(CTRLH_SQL_RLS)+'</code>','err');
-    else ctrlhMsg('No se pudo guardar el informe: '+remEsc(t.slice(0,200)),'err');
-  }
+    const nEx=Object.keys(excluidos).length;
+    ctrlhMsg(`Informe guardado: <b>${remEsc(emp.nombre)}</b>, ${ctrlhFechaCorta(row.desde)} al ${ctrlhFechaCorta(row.hasta)}.${reemplaza?' Reemplazó el informe anterior de ese mismo período'+(nEx?' y conservó las '+nEx+' persona(s) excluidas.':'.'):''}`,'ok');
+  }catch(e){ctrlhErrorGuardar(e,'el informe');}
+}
+function ctrlhErrorGuardar(e,que){
+  const t=String((e&&e.message)||e||'');
+  if(ctrlhEsErrorColumna(e)){ctrlh.faltaColumna=true;ctrlhRender();}
+  else if(ctrlhEsErrorTabla(e)){ctrlh.sinTabla=true;ctrlhRender();}
+  else if(/42501|row-level security/i.test(t))ctrlhMsg('Supabase bloqueó la escritura (RLS). Corré: <code>'+remEsc(CTRLH_SQL_RLS)+'</code>','err');
+  else ctrlhMsg('No se pudo guardar '+que+': '+remEsc(t.slice(0,200)),'err');
+}
+async function ctrlhGuardarCambios(campos,msgOk){
+  const a=ctrlh.actual;if(!a)return;
+  const calc=ctrlhCalcular(a.row.detalle,a.row.limite_min,a.row.excluidos);
+  a.row.resumen=calc.tot;
+  try{
+    await upsert('control_horas_informes',[{id:a.row.id,...campos(a.row),resumen:calc.tot,updated_at:new Date().toISOString()}]);
+    await ctrlhCargarLista();ctrlhRender();
+    if(msgOk)ctrlhMsg(msgOk,'ok');
+  }catch(e){ctrlhErrorGuardar(e,'el cambio');}
 }
 async function ctrlhCambiarLimite(v){
   const a=ctrlh.actual;if(!a)return;
   const n=parseInt(v,10);
   if(isNaN(n)||n<0||n>240){ctrlhMsg('El límite de descanso tiene que ser un número de minutos.','err');ctrlhRender();return;}
   a.row.limite_min=n;
-  const calc=ctrlhCalcular(a.row.detalle,n);a.row.resumen=calc.tot;
-  try{
-    await upsert('control_horas_informes',[{id:a.row.id,limite_min:n,resumen:calc.tot,updated_at:new Date().toISOString()}]);
-    await ctrlhCargarLista();ctrlhRender();ctrlhMsg('Límite actualizado a '+n+' min y recalculado.','ok');
-  }catch(e){ctrlhMsg('No pude guardar el nuevo límite: '+remEsc(String(e.message||e).slice(0,200)),'err');}
+  await ctrlhGuardarCambios(r=>({limite_min:n}),'Límite actualizado a '+n+' min y recalculado.');
+}
+function ctrlhExcluirAbrir(i){
+  const k=ctrlh.filaKeys[i];if(k==null)return;
+  ctrlh.motivoAbierto=ctrlh.motivoAbierto===k?null:k;ctrlhRenderCuerpo();
+}
+function ctrlhMotivoCambio(sel){
+  const n=document.getElementById('ctrlh-nota');
+  if(n){n.placeholder=sel.value==='Otro'?'Escribí el motivo (obligatorio)':'Nota (opcional)';}
+}
+async function ctrlhExcluirConfirmar(i){
+  const k=ctrlh.filaKeys[i];const a=ctrlh.actual;if(k==null||!a)return;
+  const motivo=document.getElementById('ctrlh-mot').value;
+  const nota=(document.getElementById('ctrlh-nota').value||'').trim();
+  if(motivo==='Otro'&&!nota){ctrlhMsg('Si el motivo es "Otro", escribí cuál es.','err');return;}
+  a.row.excluidos[k]={motivo,nota};
+  ctrlh.motivoAbierto=null;
+  const nombre=(a.row.detalle.find(e=>ctrlhKey(e)===k)||{}).nombre||'';
+  await ctrlhGuardarCambios(r=>({excluidos:r.excluidos}),`<b>${remEsc(nombre)}</b> quedó fuera del informe (${remEsc(motivo)}). Podés restaurarla abajo, en “Excluidos”.`);
+}
+async function ctrlhRestaurar(j){
+  const k=ctrlh.exclKeys[j];const a=ctrlh.actual;if(k==null||!a)return;
+  const nombre=(a.row.detalle.find(e=>ctrlhKey(e)===k)||{}).nombre||'';
+  delete a.row.excluidos[k];
+  await ctrlhGuardarCambios(r=>({excluidos:r.excluidos}),`<b>${remEsc(nombre)}</b> volvió al informe.`);
 }
 async function ctrlhEliminar(){
   const a=ctrlh.actual;if(!a)return;
@@ -13666,7 +13754,7 @@ async function ctrlhEliminar(){
   try{
     await del('control_horas_informes',encodeURIComponent(a.row.id));
     ctrlh.actual=null;await ctrlhCargarLista();
-    if(ctrlh.informes.length)await ctrlhAbrir(ctrlh.informes[0].id,true);
+    await ctrlhAbrirUltimo(true);
     ctrlhRender();ctrlhMsg('Informe eliminado.','ok');
   }catch(e){ctrlhMsg('No pude eliminar: '+remEsc(String(e.message||e).slice(0,200)),'err');}
 }
@@ -13676,27 +13764,27 @@ function ctrlhFechaCorta(iso){
 function ctrlhFechaDM(iso){
   if(!iso)return '';const p=String(iso).slice(0,10).split('-');return p[2]+'/'+p[1];
 }
-function ctrlhToggle(i){const k=(ctrlh.filaKeys||[])[i];if(k==null)return;ctrlh.abiertos[k]=!ctrlh.abiertos[k];ctrlhRenderCuerpo();}
+function ctrlhToggle(i){const k=ctrlh.filaKeys[i];if(k==null)return;ctrlh.abiertos[k]=!ctrlh.abiertos[k];ctrlhRenderCuerpo();}
 function ctrlhSetOrden(v){ctrlh.orden=v;ctrlhRenderCuerpo();}
 
+const CTRLH_SEL='padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);max-width:100%';
 function ctrlhRender(){
   const wrap=document.getElementById('ctrlh-wrap');if(!wrap)return;
   if(ctrlh.sinTabla){wrap.innerHTML=ctrlhHtmlSinTabla();return;}
-  const sel=ctrlh.informes.length?`<select onchange="ctrlhAbrir(this.value)" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);max-width:100%">
-    ${ctrlh.informes.map(i=>`<option value="${remEsc(i.id)}" ${ctrlh.actual&&ctrlh.actual.row.id===i.id?'selected':''}>${remEsc(i.empresa_nombre)} · ${ctrlhFechaCorta(i.desde)} al ${ctrlhFechaCorta(i.hasta)}${i.resumen&&i.resumen.exceso!=null?' · se pasó '+ctrlhDur(i.resumen.exceso):''}</option>`).join('')}
-  </select>`:'';
-  let h=`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:1rem">
-    ${sel?`<label style="font-size:12px;color:var(--text2)">Informes guardados&nbsp;${sel}</label>`:''}
-    </div>`;
-  if(ctrlh.pendiente){
-    const p=ctrlh.pendiente;
-    h+=`<div class="alert alert-info" style="display:block"><b>No pude identificar la empresa del archivo</b> (el título dice “${remEsc(p.parsed.titulo||'—')}”). Elegí a cuál corresponde para aplicar el descanso que le toca:
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
-        <select id="ctrlh-emp-nuevo" onchange="document.getElementById('ctrlh-limite-nuevo').value=ctrlhLimiteDefault(this.options[this.selectedIndex].text)" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">${st.E.map(e=>`<option value="${e.id}">${remEsc(e.nombre)}</option>`).join('')}</select>
-        <label style="font-size:12px">Descanso (min) <input id="ctrlh-limite-nuevo" type="number" min="0" max="240" value="${ctrlhLimiteDefault((st.E[0]||{}).nombre)}" style="width:64px;padding:5px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></label>
-        <button class="btn btn-primary btn-sm" onclick="ctrlhGuardarNuevo(document.getElementById('ctrlh-emp-nuevo').value)">Generar informe</button>
-      </div></div>`;
-  }
+  const emps=ctrlhEmpresas();
+  const emp=emps.find(e=>e.id===ctrlh.empSel)||emps[0];
+  // solapas por empresa
+  let h=`<div class="proy-subtabs" style="margin-bottom:12px">${emps.map(e=>{
+    const n=ctrlhInformesDe(e.id).length;
+    return `<button class="proy-tab ${e.id===ctrlh.empSel?'active':''}" onclick="ctrlhSelEmpresa('${e.id}')"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ec(e.id)};margin-right:5px"></span>${remEsc(e.nombre)} <span style="color:var(--text3);font-weight:400">(${n})</span></button>`;
+  }).join('')}</div>`;
+  if(ctrlh.faltaColumna)h+=ctrlhHtmlFaltaColumna();
+  const lista=emp?ctrlhInformesDe(emp.id):[];
+  h+=`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:1rem">
+    <button class="btn btn-primary" onclick="ctrlhSubirArchivo()"><i class="ti ti-upload"></i> Subir archivo de ${emp?remEsc(emp.nombre):'fichadas'}</button>
+    ${lista.length?`<label style="font-size:12px;color:var(--text2)">Períodos guardados&nbsp;<select onchange="ctrlhAbrir(this.value)" style="${CTRLH_SEL}">
+      ${lista.map(i=>`<option value="${remEsc(i.id)}" ${ctrlh.actual&&ctrlh.actual.row.id===i.id?'selected':''}>${ctrlhFechaCorta(i.desde)} al ${ctrlhFechaCorta(i.hasta)}${i.resumen&&i.resumen.exceso!=null?' · se pasó '+ctrlhDur(i.resumen.exceso):''}</option>`).join('')}
+    </select></label>`:''}</div>`;
   h+='<div id="ctrlh-cuerpo"></div>';
   wrap.innerHTML=h;
   ctrlhRenderCuerpo();
@@ -13705,16 +13793,22 @@ function ctrlhRenderCuerpo(){
   const el=document.getElementById('ctrlh-cuerpo');if(!el)return;
   const a=ctrlh.actual;
   if(!a){
-    el.innerHTML=ctrlh.pendiente?'':`<div class="empty"><i class="ti ti-clock-pause"></i>Todavía no hay informes. Subí el archivo de fichadas (“Informe Liquidación Detallada”) y se genera solo.<br><span style="font-size:12px">Descanso permitido: Planeta Empanada 25 min · Joselito 30 min.</span></div>`;
+    const emp=st.E.find(e=>e.id===ctrlh.empSel)||{nombre:''};
+    el.innerHTML=`<div class="empty"><i class="ti ti-clock-pause"></i>Todavía no hay informes de ${remEsc(emp.nombre)}. Subí su archivo de fichadas (“Informe Liquidación Detallada”) y se genera solo.<br><span style="font-size:12px">Descanso permitido: ${ctrlhLimiteDefault(emp.nombre)} min por día.</span></div>`;
     return;
   }
   const r=a.row,lim=r.limite_min;
-  const calc=ctrlhCalcular(r.detalle,lim);
+  const calc=ctrlhCalcular(r.detalle,lim,r.excluidos);
   const T=calc.tot;
-  let filas=calc.filas.slice();
-  if(ctrlh.orden==='exceso')filas.sort((x,y)=>y.exceso-x.exceso||x.nombre.localeCompare(y.nombre,'es'));
-  else if(ctrlh.orden==='descanso')filas.sort((x,y)=>y.total-x.total||x.nombre.localeCompare(y.nombre,'es'));
-  else filas.sort((x,y)=>x.nombre.localeCompare(y.nombre,'es'));
+  const orden=arr=>{
+    const f=arr.slice();
+    if(ctrlh.orden==='exceso')f.sort((x,y)=>y.exceso-x.exceso||x.nombre.localeCompare(y.nombre,'es'));
+    else if(ctrlh.orden==='descanso')f.sort((x,y)=>y.total-x.total||x.nombre.localeCompare(y.nombre,'es'));
+    else f.sort((x,y)=>x.nombre.localeCompare(y.nombre,'es'));
+    return f;
+  };
+  const filas=orden(calc.filas);
+  const excl=calc.excl.slice().sort((x,y)=>x.nombre.localeCompare(y.nombre,'es'));
   const col=ec(r.empresa_id);
   let h=`<div style="display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;margin-bottom:12px">
     <div><div style="font-size:15px;font-weight:600"><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${col};margin-right:6px"></span>${remEsc(r.empresa_nombre)}</div>
@@ -13726,17 +13820,17 @@ function ctrlhRenderCuerpo(){
       <button class="btn btn-sm" onclick="ctrlhEliminar()" title="Eliminar este informe"><i class="ti ti-trash"></i></button>
     </div></div>`;
   h+=`<div class="metric-grid">
-    <div class="metric"><div class="metric-label">Empleados</div><div class="metric-val">${T.empleados}</div><div style="font-size:11px;color:var(--text2)">${T.conMedicion} con descanso medido</div></div>
+    <div class="metric"><div class="metric-label">Empleados</div><div class="metric-val">${T.empleados}</div><div style="font-size:11px;color:var(--text2)">${T.conMedicion} con descanso medido${T.excluidos?' · '+T.excluidos+' excluidos':''}</div></div>
     <div class="metric"><div class="metric-label">Descanso total tomado</div><div class="metric-val">${ctrlhDur(T.total)}</div><div style="font-size:11px;color:var(--text2)">${T.medidos} días medidos</div></div>
     <div class="metric"><div class="metric-label">Descanso permitido</div><div class="metric-val">${ctrlhDur(T.permitido)}</div><div style="font-size:11px;color:var(--text2)">${lim} min × ${T.medidos} días</div></div>
     <div class="metric"><div class="metric-label">Total que se pasaron</div><div class="metric-val ${T.exceso>0?'bad':'good'}">${ctrlhDur(T.exceso)}</div><div style="font-size:11px;color:var(--text2)">${T.empleadosPasados} empleados se pasaron</div></div>
   </div>`;
   h+=`<div class="grid-card"><div class="grid-scroll"><table class="stock-tbl"><thead><tr>
     <th>Empleado</th><th style="text-align:right">Días medidos</th><th style="text-align:right">Descanso tomado</th><th style="text-align:right">Permitido</th>
-    <th style="text-align:right">Se pasó</th><th style="text-align:right">Días que se pasó</th><th style="text-align:right">Promedio / día</th></tr></thead><tbody>`;
-  ctrlh.filaKeys=filas.map(f=>f.legajo+'|'+f.nombre);
+    <th style="text-align:right">Se pasó</th><th style="text-align:right">Días que se pasó</th><th style="text-align:right">Promedio / día</th><th></th></tr></thead><tbody>`;
+  ctrlh.filaKeys=filas.map(f=>f.key);
   filas.forEach((f,fi)=>{
-    const abierto=!!ctrlh.abiertos[f.legajo+'|'+f.nombre];
+    const abierto=!!ctrlh.abiertos[f.key];
     h+=`<tr style="cursor:pointer" onclick="ctrlhToggle(${fi})">
       <td style="font-weight:500"><i class="ti ti-chevron-${abierto?'down':'right'}" style="font-size:12px;color:var(--text3)"></i> ${remEsc(f.nombre)}${f.incompletos?` <span title="${f.incompletos} día(s) con 3 fichadas, no medidos" style="font-size:11px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> ${f.incompletos}</span>`:''}</td>
       <td style="text-align:right">${f.medidos||'<span style="color:var(--text3)">—</span>'}</td>
@@ -13744,23 +13838,32 @@ function ctrlhRenderCuerpo(){
       <td style="text-align:right;color:var(--text2)">${f.medidos?ctrlhDur(f.permitido):''}</td>
       <td style="text-align:right;font-weight:700;color:${f.exceso>0?'var(--red)':'var(--green)'}">${f.medidos?(f.exceso>0?ctrlhDur(f.exceso):'0 min'):''}</td>
       <td style="text-align:right;color:var(--text2)">${f.medidos?f.diasExceso+' de '+f.medidos:''}</td>
-      <td style="text-align:right;color:var(--text2)">${f.medidos?Math.round(f.prom)+' min':''}</td></tr>`;
+      <td style="text-align:right;color:var(--text2)">${f.medidos?Math.round(f.prom)+' min':''}</td>
+      <td style="text-align:right"><button class="btn btn-xs" title="Sacar a esta persona del informe" onclick="event.stopPropagation();ctrlhExcluirAbrir(${fi})"><i class="ti ti-user-minus"></i></button></td></tr>`;
+    if(ctrlh.motivoAbierto===f.key){
+      h+=`<tr><td colspan="8" style="background:var(--amber-bg);padding:10px 14px">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:13px"><b>Sacar a ${remEsc(f.nombre)} del informe — motivo:</b>
+          <select id="ctrlh-mot" onchange="ctrlhMotivoCambio(this)" style="padding:5px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">${CTRLH_MOTIVOS.map(m=>`<option>${remEsc(m)}</option>`).join('')}</select>
+          <input id="ctrlh-nota" type="text" placeholder="Nota (opcional)" style="flex:1;min-width:160px;padding:5px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
+          <button class="btn btn-primary btn-sm" onclick="ctrlhExcluirConfirmar(${fi})">Sacar del informe</button>
+          <button class="btn btn-sm" onclick="ctrlhExcluirAbrir(${fi})">Cancelar</button></div></td></tr>`;
+    }
     if(abierto){
-      h+=`<tr><td colspan="7" style="background:var(--bg2);padding:8px 12px 12px 30px"><table style="width:100%;font-size:12px;border-collapse:collapse">
-        <tr style="color:var(--text2)"><th style="text-align:left;padding:3px 6px">Día</th><th style="text-align:left;padding:3px 6px">Horario</th><th style="text-align:left;padding:3px 6px">Fichadas</th><th style="text-align:right;padding:3px 6px">Descanso</th><th style="text-align:right;padding:3px 6px">Se pasó</th></tr>
-        ${f.dias.map(d=>{
-          const fich=d.fich.map(x=>x||'—').join(' · ');
-          let des='<span style="color:var(--text3)">sin marca de descanso</span>',exc='';
-          if(d.estado==='ok'){des=d.descanso+' min';const x=Math.max(0,d.descanso-lim);exc=x>0?`<b style="color:var(--red)">+${x} min</b>`:'<span style="color:var(--green)">ok</span>';}
-          else if(d.estado==='incompleta')des='<span style="color:var(--amber)">fichadas incompletas</span>';
-          return `<tr><td style="padding:3px 6px">${remEsc(d.dia)} ${ctrlhFechaDM(d.fecha)}</td><td style="padding:3px 6px;color:var(--text2)">${remEsc(d.horario)}</td><td style="padding:3px 6px">${fich}</td><td style="padding:3px 6px;text-align:right">${des}</td><td style="padding:3px 6px;text-align:right">${exc}</td></tr>`;
-        }).join('')}</table></td></tr>`;
+      h+=`<tr><td colspan="8" style="background:var(--bg2);padding:8px 12px 12px 30px">${ctrlhHtmlDetalleDias(f,lim)}</td></tr>`;
     }
   });
   h+=`<tr style="background:var(--bg2);font-weight:700"><td>TOTAL ${remEsc(r.empresa_nombre).toUpperCase()}</td><td style="text-align:right">${T.medidos}</td><td style="text-align:right">${ctrlhDur(T.total)}</td><td style="text-align:right">${ctrlhDur(T.permitido)}</td>
-    <td style="text-align:right;color:${T.exceso>0?'var(--red)':'var(--green)'}">${ctrlhDur(T.exceso)}</td><td></td><td style="text-align:right">${T.medidos?Math.round(T.total/T.medidos)+' min':''}</td></tr>`;
+    <td style="text-align:right;color:${T.exceso>0?'var(--red)':'var(--green)'}">${ctrlhDur(T.exceso)}</td><td></td><td style="text-align:right">${T.medidos?Math.round(T.total/T.medidos)+' min':''}</td><td></td></tr>`;
   h+=`</tbody></table></div></div>`;
-  // avisos de fichadas que no se pudieron medir
+  // personas excluidas (con motivo y botón para restaurar)
+  ctrlh.exclKeys=excl.map(f=>f.key);
+  if(excl.length){
+    h+=`<div class="grid-card"><div style="padding:10px 16px;font-weight:600;font-size:13px;border-bottom:.5px solid var(--border)">Excluidos del informe (${excl.length}) <span style="font-weight:400;color:var(--text2)">· no suman en ningún total</span></div>
+      <table class="stock-tbl"><thead><tr><th>Empleado</th><th>Motivo</th><th>Nota</th><th></th></tr></thead><tbody>
+      ${excl.map((f,j)=>`<tr><td style="font-weight:500">${remEsc(f.nombre)}</td><td>${remEsc(f.motivo)}</td><td style="color:var(--text2)">${remEsc(f.nota)}</td><td style="text-align:right"><button class="btn btn-xs" onclick="ctrlhRestaurar(${j})"><i class="ti ti-arrow-back-up"></i> Restaurar</button></td></tr>`).join('')}
+      </tbody></table></div>`;
+  }
+  // avisos de fichadas que no se pudieron medir (solo de las personas incluidas)
   const incs=calc.filas.filter(f=>f.incompletos>0);
   if(T.incompletos||T.sinDescanso){
     h+=`<div class="alert alert-info" style="display:block;font-size:12px"><b>Qué no entra en el cálculo.</b> ${T.incompletos?`${T.incompletos} día${T.incompletos>1?'s':''} con 3 fichadas (falta una marca y no se sabe cuál, por eso no se mide): ${incs.map(f=>remEsc(f.nombre)+' ('+f.dias.filter(d=>d.estado==='incompleta').map(d=>ctrlhFechaDM(d.fecha)).join(', ')+')').join('; ')}. `:''}${T.sinDescanso?`${T.sinDescanso} día${T.sinDescanso>1?'s':''} con solo entrada y salida (sin marca de descanso): no suman descanso ni exceso.`:''}</div>`;
@@ -13777,10 +13880,21 @@ function ctrlhRenderCuerpo(){
   filasEmp.forEach(x=>{
     if(!x.inf){h+=`<tr><td style="font-weight:500">${remEsc(x.nombre)}</td><td colspan="3" style="color:var(--text3);text-align:right">Sin archivo cargado para este período</td></tr>`;return;}
     const rs=x.inf.resumen||{};
-    h+=`<tr><td style="font-weight:500">${remEsc(x.nombre)}</td><td style="text-align:right;color:var(--text2)">${x.inf.limite_min} min por día</td><td style="text-align:right;font-weight:600">${ctrlhDur(rs.total)}</td><td style="text-align:right;font-weight:700;color:${rs.exceso>0?'var(--red)':'var(--green)'}">${ctrlhDur(rs.exceso)}</td></tr>`;
+    h+=`<tr><td style="font-weight:500">${remEsc(x.nombre)}${rs.excluidos?` <span style="font-size:11px;color:var(--text3)">(${rs.excluidos} excluidos)</span>`:''}</td><td style="text-align:right;color:var(--text2)">${x.inf.limite_min} min por día</td><td style="text-align:right;font-weight:600">${ctrlhDur(rs.total)}</td><td style="text-align:right;font-weight:700;color:${rs.exceso>0?'var(--red)':'var(--green)'}">${ctrlhDur(rs.exceso)}</td></tr>`;
   });
   h+=`</tbody></table></div>`;
   el.innerHTML=h;
+}
+function ctrlhHtmlDetalleDias(f,lim){
+  return `<table style="width:100%;font-size:12px;border-collapse:collapse">
+    <tr style="color:var(--text2)"><th style="text-align:left;padding:3px 6px">Día</th><th style="text-align:left;padding:3px 6px">Horario</th><th style="text-align:left;padding:3px 6px">Fichadas</th><th style="text-align:right;padding:3px 6px">Descanso</th><th style="text-align:right;padding:3px 6px">Se pasó</th></tr>
+    ${f.dias.map(d=>{
+      const fich=d.fich.map(x=>x||'—').join(' · ');
+      let des='<span style="color:var(--text3)">sin marca de descanso</span>',exc='';
+      if(d.estado==='ok'){des=d.descanso+' min';const x=Math.max(0,d.descanso-lim);exc=x>0?`<b style="color:var(--red)">+${x} min</b>`:'<span style="color:var(--green)">ok</span>';}
+      else if(d.estado==='incompleta')des='<span style="color:var(--amber)">fichadas incompletas</span>';
+      return `<tr><td style="padding:3px 6px">${remEsc(d.dia)} ${ctrlhFechaDM(d.fecha)}</td><td style="padding:3px 6px;color:var(--text2)">${remEsc(d.horario)}</td><td style="padding:3px 6px">${fich}</td><td style="padding:3px 6px;text-align:right">${des}</td><td style="padding:3px 6px;text-align:right">${exc}</td></tr>`;
+    }).join('')}</table>`;
 }
 
 // ── CONFIGURACION (MOI / Persona de sucursal / Equipo) ───────────
