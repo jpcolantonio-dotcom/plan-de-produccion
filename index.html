@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.329</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.330</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1617,6 +1617,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1.25rem">
     <button class="proy-tab active" id="remtab-subir" onclick="remIrVista('subir')"><i class="ti ti-upload"></i> Subir remito</button>
     <button class="proy-tab" id="remtab-historial" onclick="remIrVista('historial')"><i class="ti ti-history"></i> Historial</button>
+    <button class="proy-tab" id="remtab-envios" onclick="remIrVista('envios')"><i class="ti ti-truck-delivery"></i> Envío a locales</button>
   </div>
   <div id="rem-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
 </div>
@@ -18023,6 +18024,7 @@ async function agregarADistribucionPlaneta(){
     await ins('planilla_distribucion',{mp_id:m.id});
     await cargarDistribucionPlaneta();
     renderModalDistribucionPlaneta();
+    envRefrescarLista();
   }catch(e){alert('Error al agregar: '+e.message)}
 }
 
@@ -18031,6 +18033,7 @@ async function quitarDeDistribucionPlaneta(rowId){
     await del('planilla_distribucion',rowId);
     distPlanetaCache=distPlanetaCache.filter(x=>x.rowId!==rowId);
     renderModalDistribucionPlaneta();
+    envRefrescarLista();
   }catch(e){alert('Error al quitar: '+e.message)}
 }
 
@@ -18107,6 +18110,297 @@ async function imprimirPlanillaDistribucionPlaneta(){
   <script>window.onload=function(){setTimeout(function(){window.print()},350)};<\/script>
   </body></html>`;
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para imprimir.');
+}
+
+// ── ENVÍO A LOCALES (Remitos) ──
+// v4.330: "una nueva pestaña que diga envío a locales, en base a la planilla (Distribución Planeta) y se
+// pueda completar desde la compu para después imprimirla" + "que me deje editar los productos".
+// Mismas filas que la planilla Distribución Planeta de Planillas (lista planilla_distribucion: ID + Alias,
+// una hoja de empanadas y otra de burritos/pizzetas/salsas) y mismas columnas fijas de locales. Se carga
+// la cantidad de cada producto para cada local, con totales por producto y por local, se guarda POR FECHA
+// en la tabla envios_locales (una fila por día, jsonb {mp_id:{LOCAL:cantidad}}) y se imprime con lo cargado.
+// La lista de productos se edita con el mismo lápiz/modal de Distribución Planeta (es la misma lista).
+const ENV_COLS=['LAMADRID','DONADO','PATAGONIA','VILLA MITRE','UNI'];
+const ENV_SQL_TABLA=`create table if not exists envios_locales (
+  id text primary key,
+  fecha date not null,
+  cantidades jsonb not null default '{}'::jsonb,
+  notas text,
+  updated_at timestamptz default now()
+);`;
+const ENV_SQL_RLS='alter table envios_locales disable row level security;';
+let env={fecha:'',cant:{},notas:'',guardados:[],puedeGuardar:false,errTabla:'',timer:null,items:[],grupos:[]};
+
+// ---- puro ----
+// <env-puro>
+function envHoy(){
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+}
+function envFechaFmt(iso){
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso||''));
+  return m?`${m[3]}/${m[2]}/${m[1]}`:String(iso||'');
+}
+function envNum(v){
+  if(v==null)return null;
+  const s=String(v).trim().replace(',','.');
+  if(s==='')return null;
+  const n=parseFloat(s);
+  return isFinite(n)?n:null;
+}
+function envFmt(n){
+  if(n==null||!isFinite(n)||n===0)return '';
+  return n.toLocaleString('es-AR',{maximumFractionDigits:2});
+}
+// items = materias primas (mp) en el orden de la planilla -> hojas: empanadas / el resto
+function envArmarGrupos(items){
+  const esEmp=m=>normTxt(m.nombre||'').includes('EMPANADA');
+  const g=[
+    {titulo:'Empanadas',idxs:[]},
+    {titulo:'Burritos / Pizzetas / Salsas',idxs:[]}
+  ];
+  items.forEach((m,i)=>{(esEmp(m)?g[0]:g[1]).idxs.push(i);});
+  return g.filter(x=>x.idxs.length);
+}
+// cant = {mpId:{COL:n}} -> {fila:{mpId:suma}, col:{COL:suma}, total}
+function envTotales(items,idxs,cant,cols){
+  const fila={},col={};cols.forEach(c=>{col[c]=0;});
+  let total=0;
+  idxs.forEach(i=>{
+    const mp=items[i];const d=cant[String(mp.id)]||{};
+    let s=0;
+    cols.forEach(c=>{const n=envNum(d[c]);if(n!=null){s+=n;col[c]+=n;}});
+    fila[String(mp.id)]=s;total+=s;
+  });
+  return{fila,col,total};
+}
+// </env-puro>
+
+function envMsg(txt,err){
+  const el=document.getElementById('env-msg');
+  if(!el)return;
+  el.textContent=txt||'';el.style.color=err?'var(--red)':'var(--text3)';
+  el.title=err?txt:'';
+}
+async function envInit(){
+  const cont=document.getElementById('rem-content');
+  if(!cont)return;
+  if(!env.fecha)env.fecha=envHoy();
+  cont.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
+  try{await cargarDistribucionPlaneta();}
+  catch(e){
+    cont.innerHTML=`<div class="alert alert-info" style="display:block"><b>No pude leer la lista de productos</b> (tabla planilla_distribucion). Si todavía no la creaste, corré el SQL que te pasé de la planilla Distribución Planeta.<div style="margin-top:6px;font-size:12px;color:var(--text2)">${remEsc(e.message||e)}</div></div>`;
+    return;
+  }
+  env.items=distPlanetaOrdenados().map(x=>x.mp);
+  await envCargarDia(env.fecha);
+  await envCargarGuardados();
+  envRender();
+}
+async function envCargarDia(fecha){
+  try{
+    const rows=await get('envios_locales','id=eq.'+encodeURIComponent(fecha));
+    const r=rows&&rows[0];
+    env.cant=(r&&r.cantidades&&typeof r.cantidades==='object')?r.cantidades:{};
+    env.notas=(r&&r.notas)||'';
+    env.puedeGuardar=true;env.errTabla='';
+  }catch(e){
+    env.cant={};env.notas='';env.puedeGuardar=false;env.errTabla=String((e&&e.message)||e);
+  }
+}
+async function envCargarGuardados(){
+  env.guardados=[];
+  if(!env.puedeGuardar)return;
+  try{
+    const rows=await get('envios_locales','select=id,fecha,cantidades&order=fecha.desc&limit=60');
+    env.guardados=rows.map(r=>{
+      let tot=0;
+      Object.values(r.cantidades||{}).forEach(d=>Object.values(d||{}).forEach(v=>{const n=envNum(v);if(n!=null)tot+=n;}));
+      return{fecha:String(r.fecha||r.id).slice(0,10),total:tot};
+    }).filter(x=>x.total>0);
+  }catch(e){env.guardados=[];}
+}
+function envBannerSQL(){
+  const t=env.errTabla;
+  const falta=/PGRST205|42P01|Could not find the table|does not exist|schema cache|42501|row-level/i.test(t);
+  if(!falta)return `<div class="alert alert-info" style="display:block;margin-bottom:12px"><b>No se pudo leer lo guardado.</b> No se va a guardar hasta que se arregle.<div style="margin-top:6px;font-size:12px;color:var(--text2)">${remEsc(t.slice(0,300))}</div></div>`;
+  const pre='background:var(--bg2);padding:10px;border-radius:6px;overflow:auto;font-size:12px;margin:4px 0';
+  return `<div class="alert alert-info" style="display:block;margin-bottom:12px"><b>Falta crear la tabla en Supabase para guardar los envíos.</b> Mientras tanto podés cargar e imprimir, pero no se guarda. Corré este SQL en el SQL Editor (en dos pasos) y después recargá esta pestaña.
+    <div style="margin-top:8px;font-size:12px;color:var(--text2)">Paso 1 — tabla:</div><pre style="${pre}">${remEsc(ENV_SQL_TABLA)}</pre>
+    <div style="font-size:12px;color:var(--text2)">Paso 2 — sin RLS (línea sola):</div><pre style="${pre}">${remEsc(ENV_SQL_RLS)}</pre></div>`;
+}
+function envRender(){
+  const cont=document.getElementById('rem-content');
+  if(!cont)return;
+  env.grupos=envArmarGrupos(env.items);
+  const IN='padding:5px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)';
+  const opts=env.guardados.map(g=>`<option value="${g.fecha}"${g.fecha===env.fecha?' selected':''}>${envFechaFmt(g.fecha)} — ${envFmt(g.total)}</option>`).join('');
+  const hayActual=env.guardados.some(g=>g.fecha===env.fecha);
+  let h=`<div id="env-root">
+  ${env.errTabla?envBannerSQL():''}
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+    <label style="font-size:13px;color:var(--text2)">Fecha del envío:</label>
+    <input type="date" value="${env.fecha}" onchange="envCambiarFecha(this.value)" style="${IN}"/>
+    <button class="btn btn-sm" onclick="envCambiarFecha(envHoy())">Hoy</button>
+    ${env.guardados.length?`<select onchange="if(this.value)envCambiarFecha(this.value)" style="${IN}" title="Envíos guardados"><option value="">Envíos guardados…</option>${hayActual?'':''}${opts}</select>`:''}
+    <span id="env-msg" style="font-size:12px;color:var(--text3)"></span>
+    <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-sm" onclick="abrirEditarDistribucionPlaneta()" title="Agregar o quitar productos de la lista"><i class="ti ti-pencil"></i> Editar productos</button>
+      <button class="btn btn-sm" onclick="envLimpiar()"><i class="ti ti-eraser"></i> Limpiar</button>
+      <button class="btn btn-primary btn-sm" onclick="envImprimir()"><i class="ti ti-printer"></i> Imprimir</button>
+    </div>
+  </div>`;
+  if(!env.items.length){
+    h+=`<div class="empty"><i class="ti ti-list"></i> La lista de productos está vacía. Tocá "Editar productos" para agregar por código (ID).</div></div>`;
+    cont.innerHTML=h;return;
+  }
+  h+=`<div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Cargá la cantidad de cada producto para cada local (Enter o ↓ baja a la fila siguiente). Se guarda sola por fecha. La lista de productos es la misma de Planillas &gt; Distribución Planeta.</div>`;
+  env.grupos.forEach((g,gi)=>{
+    const filas=g.idxs.map((i,pos)=>{
+      const mp=env.items[i];const d=env.cant[String(mp.id)]||{};
+      return`<tr>
+        <td class="muted" style="font-size:11px">${remEsc(mp.codigo||'')}</td>
+        <td style="font-weight:600">${remEsc(mp.alias||mp.nombre||'')}</td>
+        ${ENV_COLS.map((c,ci)=>{const n=envNum(d[c]);return`<td style="padding:3px 4px;width:96px"><input class="env-in" type="number" min="0" step="any" inputmode="decimal" data-c="${ci}" value="${n==null?'':n}" oninput="envSet(${i},${ci},this.value)" onkeydown="envKey(event,this)" onfocus="this.select()" style="width:100%;padding:5px 4px;font-size:13px;text-align:center;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)"/></td>`;}).join('')}
+        <td id="env-tr-${i}" style="text-align:right;font-weight:700;width:80px"></td>
+      </tr>`;
+    }).join('');
+    h+=`<div class="stock-card" style="margin-bottom:16px">
+      <div style="padding:10px 14px;background:var(--bg2);border-bottom:.5px solid var(--border);border-radius:var(--radius-lg) var(--radius-lg) 0 0;font-weight:700">${g.titulo} <span style="font-weight:400;font-size:12px;color:var(--text2)">· ${g.idxs.length} artículo${g.idxs.length!==1?'s':''}</span></div>
+      <div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
+        <th style="width:110px">ID</th><th style="width:180px">Alias</th>${ENV_COLS.map(c=>`<th style="text-align:center">${c}</th>`).join('')}<th style="text-align:right">Total</th>
+      </tr></thead><tbody>${filas}</tbody>
+      <tfoot><tr style="background:var(--bg2)"><td></td><td style="font-weight:700">Total</td>${ENV_COLS.map((c,ci)=>`<td id="env-tc-${gi}-${ci}" style="text-align:center;font-weight:700"></td>`).join('')}<td id="env-tg-${gi}" style="text-align:right;font-weight:700"></td></tr></tfoot></table></div>
+    </div>`;
+  });
+  h+=`<div style="margin-bottom:1rem"><label style="font-size:13px;color:var(--text2)">Notas (salen impresas al pie):</label>
+    <textarea id="env-notas" rows="2" oninput="envSetNotas(this.value)" style="width:100%;margin-top:4px;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);font-family:inherit">${remEsc(env.notas||'')}</textarea></div></div>`;
+  cont.innerHTML=h;
+  envActualizarTotales();
+}
+function envActualizarTotales(){
+  env.grupos.forEach((g,gi)=>{
+    const t=envTotales(env.items,g.idxs,env.cant,ENV_COLS);
+    g.idxs.forEach(i=>{const el=document.getElementById('env-tr-'+i);if(el)el.textContent=envFmt(t.fila[String(env.items[i].id)]);});
+    ENV_COLS.forEach((c,ci)=>{const el=document.getElementById(`env-tc-${gi}-${ci}`);if(el)el.textContent=envFmt(t.col[c]);});
+    const eg=document.getElementById('env-tg-'+gi);if(eg)eg.textContent=envFmt(t.total);
+  });
+}
+function envSet(i,ci,val){
+  const mp=env.items[i];if(!mp)return;
+  const k=String(mp.id),c=ENV_COLS[ci];
+  const n=envNum(val);
+  if(n==null){
+    if(env.cant[k]){delete env.cant[k][c];if(!Object.keys(env.cant[k]).length)delete env.cant[k];}
+  }else{
+    (env.cant[k]=env.cant[k]||{})[c]=n;
+  }
+  envActualizarTotales();
+  envGuardarDebounced();
+}
+function envSetNotas(v){env.notas=v;envGuardarDebounced();}
+function envKey(e,inp){
+  const k=e.key;
+  if(k!=='Enter'&&k!=='ArrowDown'&&k!=='ArrowUp')return;
+  const list=[...document.querySelectorAll('.env-in[data-c="'+inp.dataset.c+'"]')];
+  const pos=list.indexOf(inp);
+  const to=list[pos+(k==='ArrowUp'?-1:1)];
+  e.preventDefault();
+  if(to)to.focus();else if(k==='Enter')inp.blur();
+}
+function envGuardarDebounced(){
+  if(!env.puedeGuardar)return;
+  clearTimeout(env.timer);envMsg('Guardando…');
+  env.timer=setTimeout(envGuardarYa,600);
+}
+async function envGuardarYa(){
+  clearTimeout(env.timer);env.timer=null;
+  if(!env.puedeGuardar)return;
+  const fecha=env.fecha;
+  try{
+    const res=await fetch(`${SB}/rest/v1/envios_locales?on_conflict=id`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:fecha,fecha,cantidades:env.cant,notas:env.notas||null,updated_at:new Date().toISOString()})});
+    if(!res.ok)throw new Error(await res.text());
+    envMsg('Guardado ✓');
+  }catch(e){envMsg('Error guardando: '+String((e&&e.message)||e).slice(0,160),true);}
+}
+async function envCambiarFecha(v){
+  if(!v||v===env.fecha)return;
+  if(env.timer)await envGuardarYa();
+  env.fecha=v;
+  await envCargarDia(v);
+  await envCargarGuardados();
+  envRender();
+}
+function envLimpiar(){
+  if(!confirm('¿Borrar todo lo cargado en el envío del '+envFechaFmt(env.fecha)+'?'))return;
+  env.cant={};env.notas='';
+  envRender();
+  envGuardarDebounced();
+}
+// Después de agregar/quitar productos en el modal de Distribución Planeta, refresca esta pantalla.
+function envRefrescarLista(){
+  if(typeof remVista==='undefined'||remVista!=='envios'||!document.getElementById('env-root'))return;
+  env.items=distPlanetaOrdenados().map(x=>x.mp);
+  envRender();
+}
+function envHtmlImpresion(){
+  const grupos=envArmarGrupos(env.items);
+  const fechaTxt=envFechaFmt(env.fecha);
+  const hojas=grupos.map((g,gi)=>{
+    const t=envTotales(env.items,g.idxs,env.cant,ENV_COLS);
+    const filas=g.idxs.map(i=>{
+      const mp=env.items[i];const d=env.cant[String(mp.id)]||{};
+      return`<tr><td class="c-id">${remEsc(mp.codigo||'')}</td><td class="c-alias">${remEsc(mp.alias||mp.nombre||'')}</td>${ENV_COLS.map(c=>`<td class="c-suc">${envFmt(envNum(d[c]))}</td>`).join('')}<td class="c-tot">${envFmt(t.fila[String(mp.id)])}</td></tr>`;
+    }).join('');
+    const ultima=gi===grupos.length-1;
+    return`<div class="hoja${ultima?'':' hoja-brk'}">
+      <h1>Envío a locales — ${remEsc(g.titulo)}</h1>
+      <div class="sub">Fecha de envío ${fechaTxt} · ${g.idxs.length} artículo${g.idxs.length!==1?'s':''}</div>
+      <table>
+        <thead><tr><th class="th-id">ID</th><th class="th-alias">Alias</th>${ENV_COLS.map(c=>`<th class="th-suc">${c}</th>`).join('')}<th class="th-tot">TOTAL</th></tr></thead>
+        <tbody>${filas}</tbody>
+        <tfoot><tr><td></td><td class="c-alias">TOTAL</td>${ENV_COLS.map(c=>`<td class="c-suc">${envFmt(t.col[c])}</td>`).join('')}<td class="c-tot">${envFmt(t.total)}</td></tr></tfoot>
+      </table>
+      ${ultima&&(env.notas||'').trim()?`<div class="notas"><b>Notas:</b> ${remEsc(env.notas.trim()).replace(/\n/g,'<br>')}</div>`:''}
+    </div>`;
+  }).join('');
+  return`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
+  <title>Envío a locales ${fechaTxt}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;color:#111}
+    .hoja{width:190mm;margin:0 auto;padding:6mm}
+    .hoja-brk{page-break-after:always}
+    h1{font-size:13pt;text-align:center;margin-bottom:1mm;text-transform:uppercase;letter-spacing:1px}
+    .sub{font-size:9pt;text-align:center;color:#444;margin-bottom:4mm}
+    table{width:100%;border-collapse:collapse}
+    thead{display:table-header-group}
+    tr{page-break-inside:avoid}
+    th{background:#1B3A6B;color:#fff;padding:4px 6px;font-size:8pt;text-align:left;border:1px solid #1B3A6B}
+    th.th-id{width:16mm}
+    th.th-alias{width:42mm}
+    th.th-suc{width:22mm;text-align:center}
+    th.th-tot{width:20mm;text-align:center}
+    td{border:1px solid #999;height:8mm;font-size:9pt;padding:0 5px}
+    td.c-id{width:16mm;font-size:8pt;color:#555}
+    td.c-alias{width:42mm;font-weight:600}
+    td.c-suc{width:22mm;text-align:center;font-size:10pt}
+    td.c-tot{width:20mm;text-align:center;font-weight:700;font-size:10pt;background:#eef1f6}
+    tbody tr:nth-child(even) td.c-suc,tbody tr:nth-child(even) td.c-alias,tbody tr:nth-child(even) td.c-id{background:#fafafa}
+    tfoot td{border-top:2px solid #333;font-weight:700;background:#eef1f6}
+    .notas{margin-top:5mm;font-size:9pt;border:1px solid #999;padding:3mm}
+    @media print{@page{size:A4;margin:8mm}body{margin:0}.hoja{width:100%;padding:0}}
+  </style></head><body>${hojas}
+  <script>window.onload=function(){setTimeout(function(){window.print()},350)};<\/script>
+  </body></html>`;
+}
+function envImprimir(){
+  if(!env.items.length){alert('La lista de productos está vacía.');return}
+  const blob=new Blob([envHtmlImpresion()],{type:'text/html;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const w=window.open(url,'_blank');
   setTimeout(()=>URL.revokeObjectURL(url),15000);
@@ -19252,17 +19546,20 @@ let remDetalle=null; // {remito,items} cuando se abre uno del historial
 let remFiltroHist='';
 
 function initRemitos(){
+  if(remVista==='envios'){envInit();return;}
   remRender();
 }
 function remIrVista(v){
   remVista=v;
-  ['subir','historial'].forEach(x=>document.getElementById('remtab-'+x).classList.toggle('active',x===v));
+  ['subir','historial','envios'].forEach(x=>document.getElementById('remtab-'+x).classList.toggle('active',x===v));
+  if(v==='envios'){envInit();return;}
   if(v==='historial'){remDetalle=null;remCargarHistorial();}
   remRender();
 }
 function remRender(){
   const cont=document.getElementById('rem-content');
   if(!cont)return;
+  if(remVista==='envios')return; // v4.330: la pantalla "Envío a locales" se dibuja sola (envRender)
   if(remVista==='subir')cont.innerHTML=remRenderSubir();
   else if(remDetalle)cont.innerHTML=remRenderDetalle();
   else cont.innerHTML=remRenderHistorial();
