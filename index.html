@@ -14,13 +14,13 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Plan de Produccion</title>
+<title>SOPE — Sistema Online Planeta Empanada</title>
 <!-- PWA -->
 <link rel="manifest" href="manifest.json"/>
 <meta name="theme-color" content="#1a1a1a"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="apple-mobile-web-app-title" content="PAPO"/>
+<meta name="apple-mobile-web-app-title" content="SOPE"/>
 <link rel="apple-touch-icon" href="icon-192.png"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
@@ -35,6 +35,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 .logo{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .logo i{color:var(--blue);font-size:20px}
 .logo .sub{font-weight:400;font-size:13px;color:var(--text2)}
+@media(max-width:700px){.logo .sub{display:none}}
 .status-dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;margin-right:5px;transition:background .3s}
 .status-dot.online{background:var(--green)}.status-dot.saving{background:var(--amber);animation:pulse .8s infinite}.status-dot.error{background:var(--red)}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
@@ -269,7 +270,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.331</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.334</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1472,7 +1473,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <div class="grid-card">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap">
           <div style="font-size:14px;font-weight:700"><i class="ti ti-link" style="color:var(--blue)"></i> Mapeo de códigos Joselito</div>
-          <span style="font-size:12px;color:var(--text2)">Asociá cada artículo del sistema externo con el producto correspondiente en PAPO</span>
+          <span style="font-size:12px;color:var(--text2)">Asociá cada artículo del sistema externo con el producto correspondiente en SOPE</span>
           <button class="btn btn-primary btn-sm" style="margin-left:auto" onclick="guardarMapeoJoselito()"><i class="ti ti-device-floppy"></i> Guardar todos</button>
         </div>
         <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center">
@@ -1485,7 +1486,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
               <th style="width:100px">Código</th>
               <th>Descripción (sistema externo)</th>
               <th style="width:100px">Rubro</th>
-              <th style="min-width:220px">Producto en PAPO</th>
+              <th style="min-width:220px">Producto en SOPE</th>
               <th style="width:70px;text-align:center">Estado</th>
             </tr></thead>
             <tbody id="mapeo-tbody"></tbody>
@@ -5509,7 +5510,7 @@ async function generarInformePDF(){
     }).join('');
     desviosHTML=`<div style="margin-top:24px;break-inside:avoid"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #dc2626"><span style="font-size:16px">⚠️</span><span style="font-size:15px;font-weight:700;color:#dc2626">Desvíos registrados</span><span style="font-size:11px;background:#fef2f2;color:#6b7280;padding:1px 7px;border-radius:10px;border:1px solid #fca5a5;margin-left:4px">${causasInforme.length} desvío${causasInforme.length!==1?'s':''}</span></div><table style="width:100%;border-collapse:collapse;border:1px solid #fca5a5"><thead><tr style="background:#fef2f2"><th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;border-bottom:1px solid #fca5a5">Empresa</th><th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;border-bottom:1px solid #fca5a5">Área</th><th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;border-bottom:1px solid #fca5a5">Producto</th><th style="padding:6px 10px;text-align:center;font-size:10px;color:#6b7280;border-bottom:1px solid #fca5a5">Día</th><th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;border-bottom:1px solid #fca5a5">Causa</th><th style="padding:6px 10px;text-align:left;font-size:10px;color:#6b7280;border-bottom:1px solid #fca5a5">Descripción</th><th style="padding:6px 10px;text-align:left;font-size:10px;color:#0F6E56;border-bottom:1px solid #fca5a5">Solución</th></tr></thead><tbody>${filasCausas}</tbody></table></div>`;
   }
-  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Informe PDF — ${semLabel}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#111827}.page{max-width:900px;margin:0 auto;background:#f1f5f9;padding:20px}.header{background:linear-gradient(135deg,#1B3A6B 0%,#2563eb 100%);border-radius:16px;padding:28px 32px;color:#fff;margin-bottom:24px}.header h1{font-size:22px;font-weight:800;margin-bottom:4px}.header p{font-size:13px;opacity:.75}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}.kpi{background:white;border:1px solid #e5e7eb;border-radius:12px;padding:16px;text-align:center}.kpi-label{font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}.kpi-val{font-size:24px;font-weight:800}.familias{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}@media print{@page{size:A4;margin:10mm}body{background:white}.page{padding:0;max-width:100%}}</style></head><body><div class="page"><div class="header"><h1>📊 Informe de Producción Semanal</h1><p>${semLabel} &nbsp;·&nbsp; ${fechaHoy}</p></div><div class="kpis"><div class="kpi" style="border-color:${colorGlobal};border-width:2px"><div class="kpi-label">Cumplimiento global</div><div class="kpi-val" style="color:${colorGlobal}">${pctGlobal}%</div></div><div class="kpi" style="border-color:#2563eb"><div class="kpi-label">Kg Planificados</div><div class="kpi-val" style="color:#2563eb">${hayKgGlobal?fmtKgT(kgPlanTotal):'--'}</div></div><div class="kpi" style="border-color:#16a34a"><div class="kpi-label">Kg Elaborados</div><div class="kpi-val" style="color:#16a34a">${hayKgGlobal?fmtKgT(kgRealTotal):'--'}</div></div></div>${hayKgGlobal?`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px">${kpiEmpresas}</div>`:''}<div class="familias">${familiaCards}</div>${desviosHTML}<div style="margin-top:20px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center">PAPO · Plan de Producción · ${fechaHoy}</div></div><script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script></body></html>`;
+  const html=`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Informe PDF — ${semLabel}</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:#f1f5f9;color:#111827}.page{max-width:900px;margin:0 auto;background:#f1f5f9;padding:20px}.header{background:linear-gradient(135deg,#1B3A6B 0%,#2563eb 100%);border-radius:16px;padding:28px 32px;color:#fff;margin-bottom:24px}.header h1{font-size:22px;font-weight:800;margin-bottom:4px}.header p{font-size:13px;opacity:.75}.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}.kpi{background:white;border:1px solid #e5e7eb;border-radius:12px;padding:16px;text-align:center}.kpi-label{font-size:10px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}.kpi-val{font-size:24px;font-weight:800}.familias{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:24px}@media print{@page{size:A4;margin:10mm}body{background:white}.page{padding:0;max-width:100%}}</style></head><body><div class="page"><div class="header"><h1>📊 Informe de Producción Semanal</h1><p>${semLabel} &nbsp;·&nbsp; ${fechaHoy}</p></div><div class="kpis"><div class="kpi" style="border-color:${colorGlobal};border-width:2px"><div class="kpi-label">Cumplimiento global</div><div class="kpi-val" style="color:${colorGlobal}">${pctGlobal}%</div></div><div class="kpi" style="border-color:#2563eb"><div class="kpi-label">Kg Planificados</div><div class="kpi-val" style="color:#2563eb">${hayKgGlobal?fmtKgT(kgPlanTotal):'--'}</div></div><div class="kpi" style="border-color:#16a34a"><div class="kpi-label">Kg Elaborados</div><div class="kpi-val" style="color:#16a34a">${hayKgGlobal?fmtKgT(kgRealTotal):'--'}</div></div></div>${hayKgGlobal?`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px">${kpiEmpresas}</div>`:''}<div class="familias">${familiaCards}</div>${desviosHTML}<div style="margin-top:20px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center">SOPE · Sistema Online Planeta Empanada · ${fechaHoy}</div></div><script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script></body></html>`;
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const w=window.open(url,'_blank');
@@ -7120,7 +7121,7 @@ function imprimirReceta(p){
       <th>Unidad</th>
       <th>Temp.</th>
     </tr></thead><tbody>${filas}</tbody></table>
-    <div class="foot">Planeta Empanada / Joselito - PAPO</div>
+    <div class="foot">Planeta Empanada / Joselito - SOPE</div>
   <script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`;
   const w=window.open('','_blank');
   if(w){w.document.write(html);w.document.close();}
@@ -13206,7 +13207,7 @@ async function importarVentasAgentes(input){
     }
 
     document.getElementById('ventas-agentes-msg-txt').textContent=
-      `${productos.length} productos leídos, ${volcados} vinculados a PAPO. Revisá los valores y guardá las ventas.`;
+      `${productos.length} productos leídos, ${volcados} vinculados a SOPE. Revisá los valores y guardá las ventas.`;
     msgEl.style.display='';
   }catch(e){
     document.getElementById('ventas-agentes-err-txt').textContent='Error: '+e.message;
@@ -13228,7 +13229,7 @@ function mostrarMatrizPreview(){
   </div>
   <div style="overflow-x:auto"><table class="ptbl" style="font-size:12px;min-width:600px">
     <thead><tr>
-      <th style="min-width:160px;text-align:left">Producto (PAPO)</th>`;
+      <th style="min-width:160px;text-align:left">Producto (SOPE)</th>`;
   agentes.forEach(a=>{
     const nombre=a.split(' ')[0]; // solo apellido para ahorrar espacio
     h+=`<th style="text-align:right;min-width:80px" title="${a}">${nombre}</th>`;
@@ -13310,7 +13311,7 @@ async function imprimirMatrizAgentes(){
   </style></head>
   <body>
     <h1>Pedidos de Agentes — ${fechaFmt}</h1>
-    <div class="sub">PAPO · ${productos.length} productos · ${agentes.length} agentes · Total: ${gtot.toLocaleString('es-AR')}</div>
+    <div class="sub">SOPE · ${productos.length} productos · ${agentes.length} agentes · Total: ${gtot.toLocaleString('es-AR')}</div>
     <table>
       <colgroup><col style="width:13%">${agentes.map(()=>`<col style="width:${Math.floor(80/agentes.length)}%">`).join('')}<col style="width:7%"></colgroup>
       <thead><tr><th class="h-prod">Producto</th>${thAgentes}<th class="h-tot">TOTAL</th></tr></thead>
@@ -14134,7 +14135,7 @@ function ctrlhHtmlPDF(r,orden,autoprint){
   ${avisos}
   ${pasaron.length?`<h2>Detalle de quienes se pasaron (más de ${lim} min), día por día</h2>
     <table><thead><tr><th>Empleado</th><th class="n">Se pasó</th><th>Días (descanso y minutos de más)</th></tr></thead><tbody>${detalle}</tbody></table>`:''}
-  <div class="pie">PAPO · Plan de Producción · RRHH · Control de horas</div>
+  <div class="pie">SOPE · Sistema Online Planeta Empanada · RRHH · Control de horas</div>
   ${autoprint?'<script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>':''}
   </body></html>`;
 }
@@ -16452,7 +16453,7 @@ function imprimirRellenos(){
   </style></head>
   <body>
     <h1>Planificación de Rellenos — ${wlb(sem)}</h1>
-    <div class="sub">PAPO · Generado ${new Date().toLocaleDateString('es-AR')}</div>
+    <div class="sub">SOPE · Generado ${new Date().toLocaleDateString('es-AR')}</div>
     ${tablas}
   <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
   </body></html>`;
@@ -20145,6 +20146,9 @@ const REMCORREO_SQL_TABLA=`create table if not exists remitos_correo_config (
   created_at timestamptz default now()
 );`;
 const REMCORREO_SQL_RLS='alter table remitos_correo_config disable row level security;';
+// v4.333: Supabase le puso a la función el nombre automático "smooth-responder" al publicarla desde el editor
+// (el slug no se puede cambiar después) -- PAPO la llama por ese nombre.
+const REMCORREO_FUNCION='smooth-responder';
 let remCorreoCfg={reglas:[],clientes:[],err:'',cargado:false};
 
 // <remcorreo-puro>
@@ -20245,10 +20249,10 @@ function remCorreoCuerpoHtml(guardados,adj){
     <p>Remitos de <b>${remEsc(p.cliente||'-')}</b> del <b>${remEsc(p.fecha||'-')}</b>.</p>
     <p>Documentos cerrados:</p><ul>${lista}</ul>
     <p>Adjuntos (${adj.length}): ${adj.map(a=>remEsc(a.filename)).join(', ')}</p>
-    <p style="color:#777;font-size:12px">Enviado automáticamente desde PAPO — Planeta Empanada.</p></div>`;
+    <p style="color:#777;font-size:12px">Enviado automáticamente desde SOPE — Sistema Online Planeta Empanada.</p></div>`;
 }
 async function remCorreoInvocar(payload){
-  const res=await fetch(`${SB}/functions/v1/enviar-remitos`,{method:'POST',headers:H,body:JSON.stringify(payload)});
+  const res=await fetch(`${SB}/functions/v1/${REMCORREO_FUNCION}`,{method:'POST',headers:H,body:JSON.stringify(payload)});
   let j=null;try{j=await res.json();}catch(e){}
   if(!res.ok||!j||j.ok===false){
     const err=new Error((j&&(j.error||j.message))||('Error HTTP '+res.status));
@@ -20257,7 +20261,7 @@ async function remCorreoInvocar(payload){
   return j;
 }
 function remCorreoMensajeError(e){
-  if(e&&e.status===404)return 'Todavía no está publicada la función "enviar-remitos" en Supabase (ver los pasos en Remitos > Configuración).';
+  if(e&&e.status===404)return 'Todavía no está publicada la función "'+REMCORREO_FUNCION+'" en Supabase (ver los pasos en Remitos > Configuración).';
   return String((e&&e.message)||e);
 }
 // guardados = [{remito,items,doc?}] del MISMO cliente. Devuelve {enviado:bool, motivo?, destinatarios?}.
@@ -20383,9 +20387,9 @@ function remCorreoCfgRender(){
   <details style="margin-top:18px;border:.5px solid var(--border);border-radius:var(--radius);padding:10px 14px">
     <summary style="cursor:pointer;font-size:13px;font-weight:600">Cómo dejar andando el envío de correos (una sola vez)</summary>
     <ol style="font-size:12.5px;line-height:1.6;margin:10px 0 0 18px;color:var(--text2)">
-      <li>Crear una cuenta en <b>resend.com</b>, generar una <b>API Key</b> y verificar un dominio propio para poder mandar a cualquier correo (sin dominio verificado, Resend solo deja enviar a la casilla de la cuenta).</li>
-      <li>En Supabase &gt; Edge Functions: crear la función <b>enviar-remitos</b> con el archivo <b>index.ts</b> que te pasé y publicarla.</li>
-      <li>En Supabase &gt; Edge Functions &gt; Secrets: cargar <b>RESEND_API_KEY</b> y <b>RESEND_FROM</b> (ej: <i>Planeta Empanada &lt;remitos@tudominio.com&gt;</i>).</li>
+      <li>En la cuenta de Google desde la que querés enviar: activar la <b>verificación en dos pasos</b> y crear una <b>contraseña de aplicación</b> (myaccount.google.com &gt; Seguridad &gt; Contraseñas de aplicaciones). Da una clave de 16 letras.</li>
+      <li>En Supabase &gt; Edge Functions: crear la función (queda con el nombre que le ponga Supabase, hoy <b>smooth-responder</b>) con el archivo <b>index.ts</b> que te pasé y publicarla.</li>
+      <li>En Supabase &gt; Edge Functions &gt; Secrets: cargar <b>GMAIL_USER</b> (la casilla de Gmail) y <b>GMAIL_APP_PASSWORD</b> (la clave de 16 letras).</li>
       <li>Crear la tabla de reglas (SQL de arriba si todavía no existe), agregar la regla y tocar <b>Enviar prueba</b>.</li>
     </ol>
   </details>`;
@@ -20432,7 +20436,7 @@ async function remCorreoCfgPrueba(id){
   if(!confirm('Se manda un correo de prueba (sin adjuntos) a:\n\n'+pr.validos.join('\n')+'\n\n¿Enviar?'))return;
   ss('saving','Enviando prueba...');
   try{
-    await remCorreoInvocar({regla_id:r.id,prueba:true,asunto:'Prueba de envío de remitos — PAPO',html:'<p style="font-family:Arial,sans-serif">Este es un correo de prueba de PAPO. Si lo recibiste, el envío de remitos está funcionando.</p>',adjuntos:[]});
+    await remCorreoInvocar({regla_id:r.id,prueba:true,asunto:'Prueba de envío de remitos — SOPE',html:'<p style="font-family:Arial,sans-serif">Este es un correo de prueba de SOPE. Si lo recibiste, el envío de remitos está funcionando.</p>',adjuntos:[]});
     ss('online','Prueba enviada');alert('Prueba enviada a: '+pr.validos.join(', '));
   }catch(e){ss('error','Falló la prueba');alert('No se pudo enviar la prueba:\n\n'+remCorreoMensajeError(e));}
 }
