@@ -269,7 +269,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.330</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>Plan de Produccion</span><span class="sub">Control Semanal</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.331</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1618,6 +1618,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab active" id="remtab-subir" onclick="remIrVista('subir')"><i class="ti ti-upload"></i> Subir remito</button>
     <button class="proy-tab" id="remtab-historial" onclick="remIrVista('historial')"><i class="ti ti-history"></i> Historial</button>
     <button class="proy-tab" id="remtab-envios" onclick="remIrVista('envios')"><i class="ti ti-truck-delivery"></i> Envío a locales</button>
+    <button class="proy-tab" id="remtab-config" onclick="remIrVista('config')"><i class="ti ti-settings"></i> Configuración</button>
   </div>
   <div id="rem-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
 </div>
@@ -19547,18 +19548,21 @@ let remFiltroHist='';
 
 function initRemitos(){
   if(remVista==='envios'){envInit();return;}
+  if(remVista==='config'){remCorreoCfgInit();return;}
   remRender();
 }
 function remIrVista(v){
   remVista=v;
-  ['subir','historial','envios'].forEach(x=>document.getElementById('remtab-'+x).classList.toggle('active',x===v));
+  ['subir','historial','envios','config'].forEach(x=>document.getElementById('remtab-'+x).classList.toggle('active',x===v));
   if(v==='envios'){envInit();return;}
+  if(v==='config'){remCorreoCfgInit();return;}
   if(v==='historial'){remDetalle=null;remCargarHistorial();}
   remRender();
 }
 function remRender(){
   const cont=document.getElementById('rem-content');
   if(!cont)return;
+  if(remVista==='config')return; // v4.331: Configuración se dibuja sola (remCorreoCfgRender)
   if(remVista==='envios')return; // v4.330: la pantalla "Envío a locales" se dibuja sola (envRender)
   if(remVista==='subir')cont.innerHTML=remRenderSubir();
   else if(remDetalle)cont.innerHTML=remRenderDetalle();
@@ -19701,7 +19705,7 @@ function remRenderDetalleGrupo(){
   <div style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--blue);cursor:pointer;margin-bottom:10px;font-weight:600" onclick="remDetalle=null;remRender();"><i class="ti ti-arrow-left"></i> Volver al historial</div>
   <div style="display:inline-block;font-size:11px;font-weight:700;color:var(--blue);background:var(--bg2);border-radius:20px;padding:3px 10px;margin-bottom:8px">COMBINADO · ${guardados.length} documentos</div>
   ${remCabeceraHtml(remito)}
-  <div style="margin-bottom:10px"><button class="btn" onclick="remImprimirCombinado(remDetalle.guardados)"><i class="ti ti-printer"></i> Imprimir (combinado)</button></div>
+  <div style="margin-bottom:10px"><button class="btn" onclick="remImprimirCombinado(remDetalle.guardados)"><i class="ti ti-printer"></i> Imprimir (combinado)</button> <button class="btn" id="rem-btn-correo" onclick="remCorreoEnviarDetalle()"><i class="ti ti-mail"></i> Enviar por correo</button></div>
   <div style="font-size:12px;color:var(--text2);margin-bottom:14px">Documentos de este grupo (abrí uno para marcar "Recibido" item por item): ${miembrosHtml}</div>
   <div style="font-size:13px;font-weight:600;margin-bottom:4px">Ítems netos (${items.length})</div>
   ${seccionesContenido}`;
@@ -19715,7 +19719,7 @@ function remRenderDetalle(){
   <div style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--blue);cursor:pointer;margin-bottom:10px;font-weight:600" onclick="remDetalle=null;remRender();"><i class="ti ti-arrow-left"></i> Volver al historial</div>
   ${esNC?'<div style="display:inline-block;font-size:11px;font-weight:700;color:var(--amber);background:var(--bg2);border-radius:20px;padding:3px 10px;margin-bottom:8px">NOTA DE CRÉDITO</div>':''}
   ${remCabeceraHtml(remito)}
-  <div style="margin-bottom:14px"><button class="btn" onclick="remImprimir(remDetalle.remito,remDetalle.items)"><i class="ti ti-printer"></i> Imprimir</button></div>
+  <div style="margin-bottom:14px"><button class="btn" onclick="remImprimir(remDetalle.remito,remDetalle.items)"><i class="ti ti-printer"></i> Imprimir</button> <button class="btn" id="rem-btn-correo" onclick="remCorreoEnviarDetalle()"><i class="ti ti-mail"></i> Enviar por correo</button></div>
   <div style="font-size:13px;font-weight:600;margin-bottom:4px">Ítems (${items.length})</div>
   ${seccionesContenido}
   ${remResumenDiferenciasHtml(items)}`;
@@ -19817,6 +19821,7 @@ async function remGuardarEImprimirDocs(docs,opts){
   else remImprimirCombinado(guardados);
   if(irHistorial)remIrVista('historial');
   else remRender();
+  remCorreoAuto(guardados); // v4.331: correo automático (PDF adjuntos) si el cliente tiene una regla en Remitos > Configuración
 }
 
 // v4.294: arma remHistorial mezclando documentos sueltos (grupo_id vacío, un renglón cada uno, igual
@@ -19958,7 +19963,7 @@ function remResumenInferiorHtml(resumenFilas){
     </div>
     <div class="nota-frio">* Se envía a sucursal empanadas con 24 hs de almacenamiento en cámara de congelado. Puede que el producto al tacto esté blando, con una temperatura promedio de -5°C. Por favor almacenar en equipo de frío rápidamente y dar seguimiento. Si no recupera en 24 horas, revisar el estado de congelado a -10°C y retener el producto.</div>`;
 }
-function remImprimir(remito,items){
+function remImprimir(remito,items,opts){
   const esNC=remEsNotaCredito(items);
   // v4.273: vuelve a agrupar el listado por categoría FINA (Clásicas/Especiales/Premium/...), igual
   // que el resumen de abajo -- revierte el agrupado "amplio" sin discriminar de v4.264. Usa el mismo
@@ -20028,8 +20033,9 @@ function remImprimir(remito,items){
     </div>
     <div class="catgrid">${bloquesHtml}</div>
     ${remResumenInferiorHtml(resumenFilas)}
-  <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
+  ${opts&&opts.soloHtml?'':'<script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>'}
   </body></html>`;
+  if(opts&&opts.soloHtml)return html; // v4.331: para armar el PDF adjunto del correo
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const w=window.open(url,'_blank');
@@ -20039,7 +20045,7 @@ function remImprimir(remito,items){
 // v4: imprime UNA hoja combinada para varios documentos (remitos + notas de crédito) del mismo
 // cliente/día -- misma pinta que remImprimir, pero con los ítems ya netos (remConsolidarItems) y la
 // cabecera listando todos los N° de remito incluidos en vez de uno solo.
-function remImprimirCombinado(guardados){
+function remImprimirCombinado(guardados,opts){
   const docs=guardados.map(g=>g.doc);
   const itemsCombinados=remConsolidarItems(docs);
   // v4.282: mismo criterio que remImprimir -- el listado de arriba se completa con las variedades
@@ -20106,13 +20112,329 @@ function remImprimirCombinado(guardados){
     </div>
     <div class="catgrid">${bloquesHtml}</div>
     ${remResumenInferiorHtml(resumenFilas)}
-  <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
+  ${opts&&opts.soloHtml?'':'<script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>'}
   </body></html>`;
+  if(opts&&opts.soloHtml)return html;
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const w=window.open(url,'_blank');
   setTimeout(()=>URL.revokeObjectURL(url),15000);
   if(!w)alert('Habilitá popups para este sitio para poder imprimir.');
+}
+
+// ── CORREO DE REMITOS (Remitos > Configuración) ──
+// v4.331: "en la configuración de remitos, que los remitos de Nicolás Sánchez se envíen por correo
+// electrónico; que salgan todos, tanto el resumen como los que cerramos virtualmente". Elegido por
+// AskUserQuestion: envío AUTOMÁTICO con Supabase + Resend, disparado al guardar/cerrar e imprimir, con
+// los remitos y el resumen como PDF ADJUNTOS. La página sola no puede mandar mails: genera los PDF acá
+// (html2canvas + jsPDF, cargados de cdnjs la primera vez) y se los pasa a una Edge Function de Supabase
+// ("enviar-remitos") que llama a Resend. La función NO recibe destinatarios: recibe el id de la regla y
+// los lee ella misma de la tabla remitos_correo_config -- así nadie puede usarla para mandar mails a
+// direcciones que no estén configuradas acá.
+// Reglas (tabla remitos_correo_config): nombre (para mostrar), patron (palabras que tienen que estar en
+// el cliente del remito, en cualquier orden y sin tildes -- así "Nicolás Sánchez" coincide con
+// "SANCHEZ NICOLAS ALDUVINO"), destinatarios (varios separados por coma/;/espacio) y activo.
+// Un solo remito: sale 1 PDF (la hoja del remito ya trae su resumen). Varios documentos cerrados juntos:
+// sale el PDF del RESUMEN combinado + un PDF por cada documento cerrado.
+const REMCORREO_SQL_TABLA=`create table if not exists remitos_correo_config (
+  id uuid primary key default gen_random_uuid(),
+  nombre text not null,
+  patron text not null,
+  destinatarios text not null,
+  activo boolean not null default true,
+  created_at timestamptz default now()
+);`;
+const REMCORREO_SQL_RLS='alter table remitos_correo_config disable row level security;';
+let remCorreoCfg={reglas:[],clientes:[],err:'',cargado:false};
+
+// <remcorreo-puro>
+// Todas las palabras del patrón tienen que aparecer en el cliente (sin tildes/mayúsculas, cualquier orden).
+function remCorreoCoincide(cliente,patron){
+  const tc=normTxt(cliente||'');
+  const tp=normTxt(patron||'').split(' ').filter(Boolean);
+  if(!tc||!tp.length)return false;
+  return tp.every(w=>tc.includes(w));
+}
+function remCorreoParsear(txt){
+  const partes=String(txt||'').split(/[,;\s]+/).map(s=>s.trim()).filter(Boolean);
+  const re=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return{validos:[...new Set(partes.filter(p=>re.test(p)))],invalidos:partes.filter(p=>!re.test(p))};
+}
+function remCorreoReglasPara(cliente,reglas){
+  return(reglas||[]).filter(r=>r.activo!==false&&remCorreoCoincide(cliente,r.patron)&&remCorreoParsear(r.destinatarios).validos.length);
+}
+function remCorreoNombreArchivo(s){
+  return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9._-]+/g,'_').replace(/^_+|_+$/g,'').slice(0,60)||'remito';
+}
+function remCorreoNormalizar(g){
+  return{remito:g.remito,items:g.items||[],doc:g.doc||{items:g.items||[],esNC:remEsNotaCredito(g.items||[])}};
+}
+// </remcorreo-puro>
+
+// ---- PDF en el navegador ----
+let remPdfLibsP=null;
+function remCargarScript(src){
+  return new Promise((ok,ko)=>{
+    const s=document.createElement('script');
+    s.src=src;s.onload=ok;s.onerror=()=>ko(new Error('No se pudo cargar '+src));
+    document.head.appendChild(s);
+  });
+}
+async function remCargarLibsPdf(){
+  if(window.html2canvas&&window.jspdf)return;
+  if(!remPdfLibsP){
+    remPdfLibsP=(async()=>{
+      if(!window.html2canvas)await remCargarScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+      if(!window.jspdf)await remCargarScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+    })().catch(e=>{remPdfLibsP=null;throw e;});
+  }
+  await remPdfLibsP;
+}
+// html (hoja de remito/resumen ya armada) -> PDF A4 en base64. Se dibuja en un iframe oculto de 794px
+// (A4 a 96 dpi), se saca una captura y se parte en páginas A4 si hiciera falta.
+async function remHtmlAPdfBase64(html){
+  await remCargarLibsPdf();
+  const fr=document.createElement('iframe');
+  fr.style.cssText='position:fixed;left:-10000px;top:0;width:794px;height:1123px;border:0';
+  document.body.appendChild(fr);
+  try{
+    await new Promise(res=>{fr.onload=res;fr.srcdoc=html;});
+    const doc=fr.contentDocument;
+    if(doc.fonts&&doc.fonts.ready)await doc.fonts.ready;
+    // html2canvas sobre <body> devuelve el alto de TODA la ventana (1123px); se limita al alto real del contenido
+    // para que no salga una segunda página en blanco.
+    const alto=Math.ceil(doc.body.getBoundingClientRect().height)+2;
+    const canvas=await window.html2canvas(doc.body,{scale:2,backgroundColor:'#ffffff',windowWidth:794,windowHeight:alto,height:alto,logging:false});
+    const{jsPDF}=window.jspdf;
+    const pdf=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
+    const pw=210,ph=297;
+    const pxPag=Math.floor(canvas.width*ph/pw);
+    let y=0,pag=0;
+    while(y<canvas.height){
+      const h=Math.min(pxPag,canvas.height-y);
+      const c=document.createElement('canvas');c.width=canvas.width;c.height=h;
+      const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,h);
+      ctx.drawImage(canvas,0,y,canvas.width,h,0,0,canvas.width,h);
+      if(pag)pdf.addPage();
+      pdf.addImage(c.toDataURL('image/jpeg',0.88),'JPEG',0,0,pw,h*pw/canvas.width);
+      y+=h;pag++;
+    }
+    return pdf.output('datauristring').split(',')[1];
+  }finally{fr.remove();}
+}
+
+// ---- armado y envío ----
+async function remCorreoArmarAdjuntos(guardados){
+  const p=guardados[0].remito;
+  const cli=remCorreoNombreArchivo(p.cliente);
+  const fec=remCorreoNombreArchivo((p.fecha||'').replace(/\//g,'-'));
+  const adj=[];
+  if(guardados.length>1){
+    adj.push({filename:`Resumen_${cli}_${fec}.pdf`,content:await remHtmlAPdfBase64(remImprimirCombinado(guardados,{soloHtml:true}))});
+  }
+  for(const g of guardados){
+    const nc=g.doc&&g.doc.esNC;
+    adj.push({filename:`${nc?'NotaCredito':'Remito'}_${remCorreoNombreArchivo(g.remito.numero||'sin-numero')}.pdf`,content:await remHtmlAPdfBase64(remImprimir(g.remito,g.items,{soloHtml:true}))});
+  }
+  return adj;
+}
+function remCorreoCuerpoHtml(guardados,adj){
+  const p=guardados[0].remito;
+  const lista=guardados.map(g=>`<li>${remEsc(g.remito.numero||'-')}${g.doc&&g.doc.esNC?' (nota de crédito)':''}</li>`).join('');
+  return `<div style="font-family:Arial,sans-serif;font-size:14px;color:#111">
+    <p>Remitos de <b>${remEsc(p.cliente||'-')}</b> del <b>${remEsc(p.fecha||'-')}</b>.</p>
+    <p>Documentos cerrados:</p><ul>${lista}</ul>
+    <p>Adjuntos (${adj.length}): ${adj.map(a=>remEsc(a.filename)).join(', ')}</p>
+    <p style="color:#777;font-size:12px">Enviado automáticamente desde PAPO — Planeta Empanada.</p></div>`;
+}
+async function remCorreoInvocar(payload){
+  const res=await fetch(`${SB}/functions/v1/enviar-remitos`,{method:'POST',headers:H,body:JSON.stringify(payload)});
+  let j=null;try{j=await res.json();}catch(e){}
+  if(!res.ok||!j||j.ok===false){
+    const err=new Error((j&&(j.error||j.message))||('Error HTTP '+res.status));
+    err.status=res.status;throw err;
+  }
+  return j;
+}
+function remCorreoMensajeError(e){
+  if(e&&e.status===404)return 'Todavía no está publicada la función "enviar-remitos" en Supabase (ver los pasos en Remitos > Configuración).';
+  return String((e&&e.message)||e);
+}
+// guardados = [{remito,items,doc?}] del MISMO cliente. Devuelve {enviado:bool, motivo?, destinatarios?}.
+async function remCorreoEnviar(guardados,opts){
+  opts=opts||{};
+  if(!guardados||!guardados.length)return{enviado:false,motivo:'vacio'};
+  guardados=guardados.map(remCorreoNormalizar);
+  const cliente=guardados[0].remito.cliente||'';
+  let reglas;
+  try{reglas=await get('remitos_correo_config','select=*&activo=eq.true');}
+  catch(e){if(opts.manual)throw e;return{enviado:false,motivo:'sin-config'};}
+  const aplican=remCorreoReglasPara(cliente,reglas);
+  if(!aplican.length)return{enviado:false,motivo:'sin-regla'};
+  ss('saving','Armando PDFs...');
+  const adj=await remCorreoArmarAdjuntos(guardados);
+  const p=guardados[0].remito;
+  const asunto=`Remitos ${cliente} — ${p.fecha||''}${guardados.length>1?` (${guardados.length} documentos + resumen)`:` — ${p.numero||''}`}`.trim();
+  const html=remCorreoCuerpoHtml(guardados,adj);
+  const dest=[];
+  ss('saving','Enviando correo...');
+  for(const r of aplican){
+    await remCorreoInvocar({regla_id:r.id,asunto,html,adjuntos:adj});
+    remCorreoParsear(r.destinatarios).validos.forEach(d=>{if(!dest.includes(d))dest.push(d);});
+  }
+  return{enviado:true,destinatarios:dest,adjuntos:adj.length};
+}
+// Disparo automático al guardar e imprimir: nunca interrumpe el flujo; si falla avisa y deja reintentar.
+async function remCorreoAuto(guardados){
+  try{
+    const r=await remCorreoEnviar(guardados);
+    if(r.enviado)ss('online','Correo enviado a '+r.destinatarios.join(', '));
+    else ss('online','Conectado');
+  }catch(e){
+    console.error(e);
+    ss('error','No se pudo enviar el correo');
+    alert('Los remitos se guardaron e imprimieron, pero NO se pudo enviar el correo:\n\n'+remCorreoMensajeError(e)+'\n\nPodés reintentarlo desde Historial: abrí el remito y tocá "Enviar por correo".');
+  }
+}
+async function remCorreoEnviarDetalle(){
+  if(!remDetalle)return;
+  const guardados=remDetalle.esGrupo?remDetalle.guardados:[{remito:remDetalle.remito,items:remDetalle.items}];
+  const btn=document.getElementById('rem-btn-correo');
+  if(btn)btn.disabled=true;
+  try{
+    const r=await remCorreoEnviar(guardados,{manual:true});
+    if(r.enviado){ss('online','Correo enviado');alert('Correo enviado a: '+r.destinatarios.join(', ')+'\n('+r.adjuntos+' PDF adjunto'+(r.adjuntos>1?'s':'')+')');}
+    else{ss('online','Conectado');alert('No hay ninguna regla activa que coincida con el cliente "'+(guardados[0].remito.cliente||'')+'". Configurala en Remitos > Configuración.');}
+  }catch(e){
+    console.error(e);ss('error','No se pudo enviar el correo');
+    alert('No se pudo enviar el correo:\n\n'+remCorreoMensajeError(e));
+  }
+  if(btn)btn.disabled=false;
+}
+
+// ---- pantalla Configuración ----
+async function remCorreoCfgInit(){
+  const cont=document.getElementById('rem-content');
+  if(!cont)return;
+  cont.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
+  remCorreoCfg.err='';
+  try{remCorreoCfg.reglas=await get('remitos_correo_config','select=*&order=created_at.asc');}
+  catch(e){remCorreoCfg.reglas=[];remCorreoCfg.err=String((e&&e.message)||e);}
+  try{
+    const rows=await get('remitos','select=cliente&order=creado_en.desc&limit=500');
+    remCorreoCfg.clientes=[...new Set(rows.map(r=>(r.cliente||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es'));
+  }catch(e){remCorreoCfg.clientes=[];}
+  remCorreoCfg.cargado=true;
+  remCorreoCfgRender();
+}
+function remCorreoCfgRender(){
+  if(remVista!=='config')return;
+  const cont=document.getElementById('rem-content');
+  if(!cont)return;
+  const IN='padding:6px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)';
+  const pre='background:var(--bg2);padding:10px;border-radius:6px;overflow:auto;font-size:12px;margin:4px 0';
+  let banner='';
+  if(remCorreoCfg.err){
+    const falta=/PGRST205|42P01|Could not find the table|does not exist|schema cache|42501/i.test(remCorreoCfg.err);
+    banner=falta
+      ?`<div class="alert alert-info" style="display:block;margin-bottom:14px"><b>Falta crear la tabla de reglas en Supabase.</b> Corré este SQL en el SQL Editor (en dos pasos) y después recargá esta pestaña.
+        <div style="margin-top:8px;font-size:12px;color:var(--text2)">Paso 1 — tabla:</div><pre style="${pre}">${remEsc(REMCORREO_SQL_TABLA)}</pre>
+        <div style="font-size:12px;color:var(--text2)">Paso 2 — sin RLS (línea sola):</div><pre style="${pre}">${remEsc(REMCORREO_SQL_RLS)}</pre></div>`
+      :`<div class="alert alert-info" style="display:block;margin-bottom:14px"><b>No se pudieron leer las reglas.</b><div style="margin-top:6px;font-size:12px;color:var(--text2)">${remEsc(remCorreoCfg.err.slice(0,300))}</div></div>`;
+  }
+  const dl=`<datalist id="rem-cfg-clientes">${remCorreoCfg.clientes.map(c=>`<option value="${comesEsc(c)}"></option>`).join('')}</datalist>`;
+  const form=remCorreoCfg.err?'':`<div style="border:.5px solid var(--border);border-radius:var(--radius);padding:12px 14px;margin-bottom:16px">
+    <div style="font-weight:600;font-size:13px;margin-bottom:8px">Nueva regla</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin-bottom:8px">
+      <label style="font-size:12px;color:var(--text2)">Nombre (para mostrar)<input type="text" id="rem-cfg-nombre" placeholder="Ej: Nicolás Sánchez" style="${IN};width:100%;margin-top:3px"/></label>
+      <label style="font-size:12px;color:var(--text2)">Cliente a buscar en el remito<input type="text" id="rem-cfg-patron" list="rem-cfg-clientes" placeholder="Ej: Sanchez Nicolas" autocomplete="off" style="${IN};width:100%;margin-top:3px"/></label>
+    </div>
+    <label style="font-size:12px;color:var(--text2);display:block">Enviar a (uno o varios correos, separados por coma)<input type="text" id="rem-cfg-dest" placeholder="nombre@correo.com, otro@correo.com" style="${IN};width:100%;margin-top:3px"/></label>
+    <div style="margin-top:10px"><button class="btn btn-primary btn-sm" onclick="remCorreoCfgAgregar()"><i class="ti ti-plus"></i> Agregar regla</button></div>
+    ${dl}</div>`;
+  const lista=remCorreoCfg.reglas.map(r=>{
+    const pr=remCorreoParsear(r.destinatarios);
+    const coincide=remCorreoCfg.clientes.filter(c=>remCorreoCoincide(c,r.patron));
+    return`<div style="border:.5px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;${r.activo===false?'opacity:.6':''}">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <input type="text" value="${comesEsc(r.nombre)}" onchange="remCorreoCfgGuardar('${r.id}','nombre',this.value)" style="${IN};font-weight:600;width:200px"/>
+        <label style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:5px"><input type="checkbox" ${r.activo!==false?'checked':''} onchange="remCorreoCfgGuardar('${r.id}','activo',this.checked)"/> Activa</label>
+        <div style="margin-left:auto;display:flex;gap:6px">
+          <button class="btn btn-xs" onclick="remCorreoCfgPrueba('${r.id}')" title="Manda un correo de prueba sin adjuntos"><i class="ti ti-send"></i> Enviar prueba</button>
+          <button class="btn btn-xs btn-danger" onclick="remCorreoCfgEliminar('${r.id}')" title="Eliminar regla"><i class="ti ti-trash"></i></button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 12px">
+        <label style="font-size:12px;color:var(--text2)">Cliente a buscar<input type="text" value="${comesEsc(r.patron)}" list="rem-cfg-clientes" onchange="remCorreoCfgGuardar('${r.id}','patron',this.value)" autocomplete="off" style="${IN};width:100%;margin-top:3px"/></label>
+        <label style="font-size:12px;color:var(--text2)">Enviar a<input type="text" value="${comesEsc(r.destinatarios)}" onchange="remCorreoCfgGuardar('${r.id}','destinatarios',this.value)" style="${IN};width:100%;margin-top:3px"/></label>
+      </div>
+      <div style="font-size:11.5px;color:var(--text2);margin-top:6px">
+        ${pr.invalidos.length?`<span style="color:var(--red)">Correo con formato inválido: ${remEsc(pr.invalidos.join(', '))}</span> · `:''}
+        ${pr.validos.length?`${pr.validos.length} destinatario${pr.validos.length>1?'s':''}`:'<span style="color:var(--red)">Sin destinatarios válidos</span>'} ·
+        ${coincide.length?`coincide con: ${remEsc(coincide.slice(0,3).join(' / '))}${coincide.length>3?' …':''}`:'<span style="color:var(--amber)">no coincide con ningún cliente de los remitos ya cargados (puede ser normal si todavía no cargaste ninguno)</span>'}
+      </div>
+    </div>`;
+  }).join('');
+  cont.innerHTML=`${banner}
+  <div class="alert alert-info" style="margin-bottom:14px"><i class="ti ti-info-circle"></i> Cuando guardás e imprimís los remitos de un cliente que coincida con una regla activa, se manda un correo con PDF adjuntos: el resumen combinado (si cerraste varios documentos juntos) y cada remito cerrado. También podés reenviar desde el Historial.</div>
+  ${form}
+  <div style="font-weight:600;font-size:13px;margin-bottom:8px">Reglas (${remCorreoCfg.reglas.length})</div>
+  ${lista||'<div style="font-size:12px;color:var(--text2);margin-bottom:16px">Todavía no hay ninguna regla.</div>'}
+  <details style="margin-top:18px;border:.5px solid var(--border);border-radius:var(--radius);padding:10px 14px">
+    <summary style="cursor:pointer;font-size:13px;font-weight:600">Cómo dejar andando el envío de correos (una sola vez)</summary>
+    <ol style="font-size:12.5px;line-height:1.6;margin:10px 0 0 18px;color:var(--text2)">
+      <li>Crear una cuenta en <b>resend.com</b>, generar una <b>API Key</b> y verificar un dominio propio para poder mandar a cualquier correo (sin dominio verificado, Resend solo deja enviar a la casilla de la cuenta).</li>
+      <li>En Supabase &gt; Edge Functions: crear la función <b>enviar-remitos</b> con el archivo <b>index.ts</b> que te pasé y publicarla.</li>
+      <li>En Supabase &gt; Edge Functions &gt; Secrets: cargar <b>RESEND_API_KEY</b> y <b>RESEND_FROM</b> (ej: <i>Planeta Empanada &lt;remitos@tudominio.com&gt;</i>).</li>
+      <li>Crear la tabla de reglas (SQL de arriba si todavía no existe), agregar la regla y tocar <b>Enviar prueba</b>.</li>
+    </ol>
+  </details>`;
+}
+async function remCorreoCfgAgregar(){
+  const g=id=>(document.getElementById(id)||{}).value||'';
+  const nombre=g('rem-cfg-nombre').trim(),patron=g('rem-cfg-patron').trim(),dest=g('rem-cfg-dest').trim();
+  if(!nombre||!patron||!dest){alert('Completá nombre, cliente a buscar y al menos un correo.');return;}
+  const pr=remCorreoParsear(dest);
+  if(!pr.validos.length||pr.invalidos.length){alert('Revisá los correos: '+(pr.invalidos.length?'formato inválido en "'+pr.invalidos.join(', ')+'".':'no hay ninguno válido.'));return;}
+  try{
+    await ins('remitos_correo_config',{nombre,patron,destinatarios:pr.validos.join(', '),activo:true});
+    await remCorreoCfgInit();
+  }catch(e){alert('Error guardando la regla: '+e.message);}
+}
+async function remCorreoCfgGuardar(id,campo,valor){
+  const r=remCorreoCfg.reglas.find(x=>String(x.id)===String(id));
+  if(!r)return;
+  if(typeof valor==='string')valor=valor.trim();
+  if(campo==='destinatarios'){
+    const pr=remCorreoParsear(valor);
+    if(!pr.validos.length){alert('Tiene que haber al menos un correo válido.');remCorreoCfgRender();return;}
+    if(pr.invalidos.length)alert('Se ignoran los que tienen formato inválido: '+pr.invalidos.join(', '));
+    valor=pr.validos.join(', ');
+  }
+  if((campo==='nombre'||campo==='patron')&&!valor){remCorreoCfgRender();return;}
+  try{
+    await pat('remitos_correo_config',id,{[campo]:valor});
+    r[campo]=valor;
+  }catch(e){alert('Error guardando: '+e.message);}
+  remCorreoCfgRender();
+}
+async function remCorreoCfgEliminar(id){
+  const r=remCorreoCfg.reglas.find(x=>String(x.id)===String(id));
+  if(!r||!confirm('¿Eliminar la regla "'+r.nombre+'"?'))return;
+  try{await del('remitos_correo_config',id);await remCorreoCfgInit();}
+  catch(e){alert('Error eliminando: '+e.message);}
+}
+async function remCorreoCfgPrueba(id){
+  const r=remCorreoCfg.reglas.find(x=>String(x.id)===String(id));
+  if(!r)return;
+  const pr=remCorreoParsear(r.destinatarios);
+  if(!pr.validos.length){alert('Esta regla no tiene correos válidos.');return;}
+  if(!confirm('Se manda un correo de prueba (sin adjuntos) a:\n\n'+pr.validos.join('\n')+'\n\n¿Enviar?'))return;
+  ss('saving','Enviando prueba...');
+  try{
+    await remCorreoInvocar({regla_id:r.id,prueba:true,asunto:'Prueba de envío de remitos — PAPO',html:'<p style="font-family:Arial,sans-serif">Este es un correo de prueba de PAPO. Si lo recibiste, el envío de remitos está funcionando.</p>',adjuntos:[]});
+    ss('online','Prueba enviada');alert('Prueba enviada a: '+pr.validos.join(', '));
+  }catch(e){ss('error','Falló la prueba');alert('No se pudo enviar la prueba:\n\n'+remCorreoMensajeError(e));}
 }
 
 // ── COMÉS (v4.255): "necesito una app que salga del papo, que es pedido de comida ... tiene hasta
