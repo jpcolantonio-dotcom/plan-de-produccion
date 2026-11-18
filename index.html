@@ -270,7 +270,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.336</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.338</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2172,7 +2172,7 @@ async function cargarInformeTiempos(){
   await lp(semKey);
   if(!empleados.length)await loadEmpleados();
   let histData=[];
-  try{histData=await get('rendimiento_proceso','select=empresa_id,area,producto,cantidad,hora_inicio,hora_fin');}catch{histData=[];}
+  try{histData=await rendimientoHistFilas();}catch{histData=[];}
   const hist={};
   histData.forEach(r=>{
     if(!r.hora_inicio||!r.hora_fin)return;
@@ -2640,9 +2640,24 @@ function initInformeSimulacion(){
 // para poder reutilizarlo también en la sub-pestaña nueva "Por producto" -- misma lógica exacta que
 // ya tenía "Por día" desde v4.313 (si hora_fin<=hora_inicio, ese registro se descarta del promedio
 // en vez de sumarle un día, porque acá los turnos nunca cruzan medianoche).
+// v4.338: "tengo cargado el promedio de cierre de carne pero no me aparece en la simulación" --
+// rendimiento_proceso ya pasó los 1000 registros (2994 al 18/11) y PostgREST corta en 1000 por
+// pedido, sin orden definido: la simulación calculaba el promedio con un subconjunto cualquiera y
+// productos con registros recientes quedaban "sin rendimiento histórico". Ahora se pagina todo,
+// con orden estable (mismo criterio que vspCargarTodo).
+async function rendimientoHistFilas(){
+  let all=[],off=0;
+  for(let i=0;i<60;i++){
+    const page=await get('rendimiento_proceso',`select=empresa_id,area,producto,cantidad,hora_inicio,hora_fin&order=created_at.asc,id.asc&limit=1000&offset=${off}`);
+    all=all.concat(page);
+    if(page.length<1000)break;
+    off+=1000;
+  }
+  return all;
+}
 async function cargarHistRendimiento(){
   let histData=[];
-  try{histData=await get('rendimiento_proceso','select=empresa_id,area,producto,cantidad,hora_inicio,hora_fin');}catch{histData=[];}
+  try{histData=await rendimientoHistFilas();}catch{histData=[];}
   const hist={};
   histData.forEach(r=>{
     if(!r.hora_inicio||!r.hora_fin)return;
@@ -3025,9 +3040,11 @@ async function initSimPorProducto(){
     await simProdCargarEstado();
   }
   simProdPoblarFiltros();
-  if(!simProdHist){
+  // v4.338: se recarga SIEMPRE al entrar (antes quedaba guardado de la primera vez y un promedio
+  // cargado después no aparecía hasta apretar "Actualizar historial").
+  {
     const el=document.getElementById('simprod-content');
-    if(el)el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando rendimiento histórico...</div>';
+    if(el&&!simProdHist)el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando rendimiento histórico...</div>';
     simProdHist=await cargarHistRendimiento();
   }
   renderSimPorProducto();
@@ -20613,7 +20630,9 @@ async function remCorreoEnviar(guardados,opts){
   ss('saving','Armando PDFs...');
   const adj=await remCorreoArmarAdjuntos(guardados);
   const p=guardados[0].remito;
-  const asunto=`Remitos ${cliente} — ${p.fecha||''}${guardados.length>1?` (${guardados.length} documentos + resumen)`:` — ${p.numero||''}`}`.trim();
+  const asuntoAscii=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\u2013\u2014]/g,'-').replace(/[^\x20-\x7E]/g,'').replace(/\s+/g,' ').trim();
+  // Asunto corto y solo ASCII: con acentos/rayas el mail llega con los encabezados mezclados en el cuerpo
+  const asunto=asuntoAscii(`Remitos ${asuntoAscii(cliente).slice(0,30)} - ${p.fecha||''}${guardados.length>1?` (${guardados.length} docs + resumen)`:` - ${p.numero||''}`}`).slice(0,70);
   const html=remCorreoCuerpoHtml(guardados,adj);
   const dest=[];
   ss('saving','Enviando correo...');
@@ -20771,7 +20790,7 @@ async function remCorreoCfgPrueba(id){
   if(!confirm('Se manda un correo de prueba (sin adjuntos) a:\n\n'+pr.validos.join('\n')+'\n\n¿Enviar?'))return;
   ss('saving','Enviando prueba...');
   try{
-    await remCorreoInvocar({regla_id:r.id,prueba:true,asunto:'Prueba de envío de remitos — SOPE',html:'<p style="font-family:Arial,sans-serif">Este es un correo de prueba de SOPE. Si lo recibiste, el envío de remitos está funcionando.</p>',adjuntos:[]});
+    await remCorreoInvocar({regla_id:r.id,prueba:true,asunto:'Prueba de envio de remitos - SOPE',html:'<p style="font-family:Arial,sans-serif">Este es un correo de prueba de SOPE. Si lo recibiste, el envío de remitos está funcionando.</p>',adjuntos:[]});
     ss('online','Prueba enviada');alert('Prueba enviada a: '+pr.validos.join(', '));
   }catch(e){ss('error','Falló la prueba');alert('No se pudo enviar la prueba:\n\n'+remCorreoMensajeError(e));}
 }
