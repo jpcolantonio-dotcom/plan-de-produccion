@@ -270,7 +270,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.335</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.336</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -14857,7 +14857,7 @@ function renderHorarios(){
     return;
   }
   let h=`<table class="plan-grid" style="min-width:1100px"><thead>
-    <tr><th class="left" style="width:160px">Empleado</th>`;
+    <tr><th class="left" style="width:215px">Empleado</th>`;
   DIAS_HOR_LBL.forEach((d,i)=>{
     h+=`<th colspan="2" style="text-align:center;font-size:11px">${d}<br><span style="font-weight:400;font-size:10px">${ddate(horSemana,i)}</span></th>`;
   });
@@ -14885,7 +14885,14 @@ function renderHorarios(){
     </td></tr>`;
   eEmps.forEach(emp=>{
     const hor=horarios[emp.id]||{};
-    h+=`<tr><td style="font-weight:500;white-space:nowrap">${emp.nombre}</td>`;
+    const descDef=ctrlhLimiteDefault(en(emp.empresa_id)||'');
+    const INPE='font-size:11px;padding:2px 4px;border:.5px solid var(--border2);border-radius:5px;background:var(--bg);color:var(--text)';
+    h+=`<tr><td style="font-weight:500;white-space:nowrap">${emp.nombre}
+      <div style="display:flex;gap:4px;align-items:center;margin-top:3px;font-weight:400">
+        <input type="text" inputmode="numeric" value="${emp.dni?String(emp.dni).replace(/"/g,''):''}" placeholder="DNI" title="DNI (solo en pantalla, no sale en la planilla impresa)" onchange="empSetDni('${emp.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()" style="${INPE};width:84px"/>
+        <input type="number" min="0" max="180" step="1" value="${emp.descanso_min==null?'':emp.descanso_min}" placeholder="${descDef}" title="Minutos de descanso (break) de este empleado. Vacío = el de la empresa (${descDef} min). Solo en pantalla, no sale en la planilla impresa" onchange="empSetDescanso('${emp.id}',this.value)" onkeydown="if(event.key==='Enter')this.blur()" style="${INPE};width:50px"/>
+        <span style="font-size:10px;color:var(--text2)">min desc.</span>
+      </div></td>`;
     DIAS_HOR.forEach((dia,di)=>{
       const eVal=hor[`${dia}_entrada`]||'';
       const sVal=hor[`${dia}_salida`]||'';
@@ -14986,6 +14993,51 @@ async function addEmpleado(){
     renderHorarios();
     ss('online','Empleado agregado');
   }catch(e){ss('error','Error');document.getElementById('hor-errtxt').textContent=e.message;fl('hor-err')}
+}
+
+// v4.336: "a los empleados se les pueda poner el número de DNI y el tiempo que tiene cada uno para el
+// descanso del break; cuando se imprime la planilla no se tiene que ver ni el DNI ni el descanso --
+// después el tiempo de descanso va a ser el que se usa para el informe de descanso semanal". Se guardan
+// en `empleados.dni` (texto, sólo dígitos) y `empleados.descanso_min` (minutos; vacío = el de la empresa,
+// 25 Planeta / 30 Joselito). Se guardan solos al salir del campo (no dependen del botón Guardar de los
+// horarios, porque son datos del empleado y no de la semana). La planilla impresa (pdfHorarios) sólo
+// toma `emp.nombre`, así que estos dos datos nunca salen en papel. Requiere las dos columnas nuevas (SQL).
+const EMP_SQL_COLUMNAS='alter table empleados add column if not exists dni text;\nalter table empleados add column if not exists descanso_min integer;';
+async function empGuardarCampo(id,campo,valor){
+  try{
+    await pat('empleados',id,{[campo]:valor});
+    const emp=empleados.find(e=>String(e.id)===String(id));
+    if(emp)emp[campo]=valor;
+    ss('online','Guardado ✓');
+    return true;
+  }catch(e){
+    const t=String((e&&e.message)||e);
+    ss('error','No se pudo guardar');
+    if(/dni|descanso_min/i.test(t)&&/column|PGRST204|42703/i.test(t))
+      alert('Falta crear las columnas nuevas en Supabase. Corré este SQL en el SQL Editor y volvé a intentar:\n\n'+EMP_SQL_COLUMNAS.replace(/\\n/g,'\n'));
+    else alert('Error guardando: '+t.slice(0,300));
+    return false;
+  }
+}
+async function empSetDni(id,val){
+  const limpio=String(val||'').replace(/\D/g,'');
+  if(limpio&&(limpio.length<6||limpio.length>9)){
+    if(!confirm('El DNI "'+limpio+'" tiene '+limpio.length+' dígitos (lo normal son 7 u 8). ¿Guardarlo igual?')){renderHorarios();return;}
+  }
+  const dup=limpio&&empleados.find(e=>String(e.id)!==String(id)&&String(e.dni||'')===limpio);
+  if(dup&&!confirm('Ese DNI ya está cargado en '+dup.nombre+'. ¿Guardarlo igual?')){renderHorarios();return;}
+  await empGuardarCampo(id,'dni',limpio||null);
+  renderHorarios();
+}
+async function empSetDescanso(id,val){
+  const t=String(val==null?'':val).trim();
+  let n=null;
+  if(t!==''){
+    n=parseInt(t,10);
+    if(!isFinite(n)||n<0||n>180){alert('El descanso tiene que ser un número de minutos entre 0 y 180.');renderHorarios();return;}
+  }
+  await empGuardarCampo(id,'descanso_min',n);
+  renderHorarios();
 }
 
 async function desactivarEmpleado(id){
