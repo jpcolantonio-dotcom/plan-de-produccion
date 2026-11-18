@@ -270,7 +270,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.334</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.335</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -517,6 +517,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab" id="inftab-pdad" onclick="showInfSubTab('pdad')"><i class="ti ti-chart-bar"></i> Productividad</button>
     <button class="proy-tab" id="inftab-tiempos" onclick="showInfSubTab('tiempos')"><i class="ti ti-clock-hour-4"></i> Producción con tiempos</button>
     <button class="proy-tab" id="inftab-sim" onclick="showInfSubTab('sim')"><i class="ti ti-flask"></i> Simulación</button>
+    <button class="proy-tab" id="inftab-vsp" onclick="showInfSubTab('vsp')"><i class="ti ti-traffic-lights"></i> Real vs Promedio</button>
   </div>
 
   <!-- SUB-TAB DESVIOS -->
@@ -688,6 +689,29 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     </div>
     <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Creá las máquinas que necesites y asignales productos desde "Sin asignar a máquina". Cada máquina tiene su hora de inicio, su tiempo de cambio de variedad (minutos antes de cada producto siguiente), hasta 6 personas, y se le puede marcar qué áreas NO puede producir. Con las flechas se reordena qué se cierra primero en cada máquina. Los productos sin rendimiento histórico cargado (Informes &gt; Rendimiento) no se pueden asignar (no hay con qué calcular el tiempo) y se listan aparte.</div>
     <div id="inf-tiempos-content"></div>
+  </div>
+
+  <!-- SUB-TAB REAL VS PROMEDIO (nueva v4.335) -->
+  <div id="tab-vsp" style="display:none">
+    <div class="toolbar">
+      <div>
+        <div style="font-size:16px;font-weight:600">Real vs Promedio</div>
+        <div style="font-size:13px;color:var(--text2)">Compara cada proceso con horas cargadas contra el tiempo promedio de cerrado de esa variedad, por empresa y por área.</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--text2)">Día:</label>
+      <input type="date" id="vsp-fecha" onchange="renderVsp(true)" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+      <label style="font-size:13px;color:var(--text2)">Empresa:</label>
+      <select id="vsp-esel" onchange="renderVsp(false)" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas</option></select>
+      <span style="font-size:13px;color:var(--text2);margin-left:6px">Semáforo: <span style="color:var(--green)">●</span> hasta -</span><input type="number" id="vsp-verde" min="0" max="100" value="5" onchange="vspGuardarUmbrales()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:60px"/>%
+      <span style="font-size:13px;color:var(--text2)"><span style="color:var(--amber)">●</span> hasta -</span><input type="number" id="vsp-amarillo" min="0" max="100" value="15" onchange="vspGuardarUmbrales()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:60px"/>%
+      <span style="font-size:13px;color:var(--text2)"><span style="color:var(--red)">●</span> peor</span>
+      <button class="btn btn-sm" onclick="renderVsp(true)" title="Volver a leer los registros"><i class="ti ti-refresh"></i> Actualizar</button>
+      <button class="btn btn-sm" id="btnImprimirVsp" onclick="imprimirVsp()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
+    </div>
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Cada renglón es un proceso cargado en Producción Real (detalle de proceso), en el orden en que se hizo durante el día. Se compara la producción por hora real contra el promedio histórico de esa variedad (sin contar este día). Abajo de cada área: a qué hora empezó, cuándo terminó y cuándo habría terminado a tiempo promedio, manteniendo las pausas reales entre procesos.</div>
+    <div id="vsp-content"></div>
   </div>
 
   <!-- SUB-TAB SIMULACIÓN (nueva v4.311; v4.321 se divide en "Por día" / "Por producto") -->
@@ -1963,7 +1987,7 @@ function T(t){
 let infActiveSubTab='desv';
 function showInfSubTab(t){
   infActiveSubTab=t;
-  ['desv','dash','rend','diario','rango','pdad','tiempos','sim'].forEach(x=>{
+  ['desv','dash','rend','diario','rango','pdad','tiempos','sim','vsp'].forEach(x=>{
     document.getElementById('tab-'+x).style.display=x===t?'':'none';
     document.getElementById('inftab-'+x).classList.toggle('active',x===t);
   });
@@ -1974,6 +1998,7 @@ function showInfSubTab(t){
   if(t==='rango')initInformeRango();
   if(t==='tiempos')initInformeTiempos();
   if(t==='sim')initInformeSimulacion();
+  if(t==='vsp')initVsp();
   if(t==='pdad')initInformeProductividad();
 }
 
@@ -3326,6 +3351,264 @@ function imprimirSimPorProducto(){
     <div class="tot"><span>Total${maqs.length>1?' ('+maqs.length+' máquinas)':''}${totalMin>0?' · producción combinada '+simProdFmtDur(totalMin)+(totalCamb>0?' + cambios '+simProdFmtDur(totalCamb):''):''}</span><span>Cantidad ${totalCantidad.toLocaleString('es-AR')}</span></div>
   <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
   </body></html>`;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para imprimir.');
+}
+
+// ── REAL VS PROMEDIO (Informes) ──
+// v4.335: "en informes unas nuevas pestañas que compare la producción que tiene tiempo con el tiempo promedio
+// de cerrado, por empresa y por área; en un renglón la variedad, el tiempo que le llevó, la producción por hora
+// real vs la promedio de la variedad, con semáforo rojo/amarillo/verde; manteniendo el orden en que se fue
+// cargando la producción; y al final: comenzó 6:30, finalizó real 11:00, cuando te daría que haber finalizado
+// 10:40". Confirmado por AskUserQuestion: (1) fin esperado = hora real de inicio + tiempo promedio de cada
+// variedad (cantidad / uds por hora promedio) MANTENIENDO las pausas reales entre procesos (así mide sólo la
+// eficiencia de las variedades, no los cambios de variedad); (2) semáforo verde >= -5%, amarillo hasta -15%,
+// rojo peor (umbrales editables en pantalla); (3) renglones en orden cronológico por hora de inicio; (4)
+// promedio = histórico de rendimiento_proceso SIN contar el día analizado (así no se compara consigo mismo).
+// Misma fuente y mismo criterio que Simulación/Producción con tiempos: rendimiento_proceso por
+// empresa+área+producto, descartando registros con hora_fin <= hora_inicio. Si el área tiene otro nombre en el
+// histórico (renombres de área), se usa como respaldo el promedio de la misma variedad en otra área de la
+// misma empresa y se marca con †. Sin tablas nuevas: sólo lectura.
+const VSP_DEF={verde:5,amarillo:15};
+let vspRaw=null;       // {fecha, filas:[...todas las filas de rendimiento_proceso]}
+let vspResultado=null; // resultado ya agrupado (para imprimir)
+
+// <vsp-puro>
+function vspMin(t){
+  const m=/^(\d{1,2}):(\d{2})/.exec(String(t==null?'':t));
+  return m?(+m[1]*60+ +m[2]):null;
+}
+function vspDur(m){
+  m=Math.round(m);const s=m<0?'-':'';m=Math.abs(m);
+  return s+(m>=60?Math.floor(m/60)+'h '+(m%60)+'m':m+' min');
+}
+function vspFechaDe(r){return String(r.fecha||'').slice(0,10);}
+// hist = {a:{eid||area||prod:{c,m}}, p:{eid||prod:{c,m}}} con todas las filas MENOS las del día analizado
+function vspArmarHist(rows,fechaExcluir){
+  const a={},p={};
+  (rows||[]).forEach(r=>{
+    if(vspFechaDe(r)===fechaExcluir)return;
+    const i=vspMin(r.hora_inicio),f=vspMin(r.hora_fin);
+    if(i==null||f==null||f<=i)return;
+    const c=+r.cantidad||0;if(c<=0)return;
+    const d=f-i;
+    const ka=r.empresa_id+'||'+r.area+'||'+r.producto,kp=r.empresa_id+'||'+r.producto;
+    (a[ka]=a[ka]||{c:0,m:0});a[ka].c+=c;a[ka].m+=d;
+    (p[kp]=p[kp]||{c:0,m:0});p[kp].c+=c;p[kp].m+=d;
+  });
+  return{a,p};
+}
+function vspPromedio(hist,eid,area,prod){
+  const ha=hist.a[eid+'||'+area+'||'+prod];
+  if(ha&&ha.m>0)return{uph:ha.c/(ha.m/60),origen:'area'};
+  const hp=hist.p[eid+'||'+prod];
+  if(hp&&hp.m>0)return{uph:hp.c/(hp.m/60),origen:'otra-area'};
+  return null;
+}
+// pct = variación de la producción por hora real contra la promedio (negativo = más lento)
+function vspSemaforo(pct,v,a){
+  if(pct==null||!isFinite(pct))return'gris';
+  if(pct>=-v)return'verde';
+  if(pct>=-a)return'amarillo';
+  return'rojo';
+}
+// regs = filas del día de UNA empresa+área. Devuelve filas en orden cronológico + resumen del área.
+function vspArmarArea(regs,hist,v,a){
+  const orden=regs.map(r=>({r,ini:vspMin(r.hora_inicio),fin:vspMin(r.hora_fin)}));
+  orden.sort((x,y)=>{
+    if(x.ini==null&&y.ini==null)return String(x.r.created_at||'').localeCompare(String(y.r.created_at||''));
+    if(x.ini==null)return 1;if(y.ini==null)return-1;
+    return x.ini-y.ini||String(x.r.created_at||'').localeCompare(String(y.r.created_at||''));
+  });
+  let prevFin=null,cursor=null,iniArea=null,finArea=null,totReal=0,totEsp=0,nSinHist=0,superpuestos=false,nValidas=0;
+  const filas=orden.map(o=>{
+    const r=o.r,cant=+r.cantidad||0;
+    const dur=(o.ini!=null&&o.fin!=null&&o.fin>o.ini)?(o.fin-o.ini):null;
+    const uphReal=(dur&&cant>0)?cant/(dur/60):null;
+    const prom=vspPromedio(hist,r.empresa_id,r.area,r.producto);
+    const esp=(prom&&cant>0&&dur!=null)?cant/prom.uph*60:null; // sin horas válidas no hay tiempo promedio que mostrar
+    const pct=(uphReal!=null&&prom)?(uphReal/prom.uph-1)*100:null;
+    let pausa=null;
+    if(dur!=null){
+      nValidas++;
+      if(iniArea==null){iniArea=o.ini;cursor=o.ini;prevFin=o.ini;}
+      pausa=o.ini-prevFin;
+      if(pausa<0){superpuestos=true;pausa=0;}
+      cursor+=pausa;
+      const usado=esp!=null?esp:dur;
+      if(esp==null)nSinHist++;
+      cursor+=usado;totEsp+=usado;totReal+=dur;
+      prevFin=Math.max(prevFin,o.fin);
+      finArea=finArea==null?o.fin:Math.max(finArea,o.fin);
+    }
+    return{id:r.id,producto:r.producto,ini:o.ini,fin:o.fin,dur,cant,uphReal,uphProm:prom?prom.uph:null,origen:prom?prom.origen:null,
+      esp,pct,pausa,sem:vspSemaforo(pct,v,a)};
+  });
+  const pctArea=(nValidas&&totReal>0)?(totEsp/totReal-1)*100:null;
+  const finEsp=nValidas?Math.round(cursor):null;
+  return{filas,ini:iniArea,finReal:finArea,finEsp,difMin:(finArea!=null&&finEsp!=null)?finArea-finEsp:null,
+    totReal,totEsp,pct:pctArea,sem:vspSemaforo(pctArea,v,a),nSinHist,superpuestos,nValidas};
+}
+// rows = todas las filas de rendimiento_proceso; arma [{empresaId,areas:[{area,...}]}] del día elegido
+function vspAgrupar(rows,fecha,ef,v,a,ordenArea){
+  const hist=vspArmarHist(rows,fecha);
+  const dia=(rows||[]).filter(r=>vspFechaDe(r)===fecha&&(ef==='all'||String(r.empresa_id)===String(ef)));
+  const porE={};
+  dia.forEach(r=>{((porE[r.empresa_id]=porE[r.empresa_id]||{})[r.area]=porE[r.empresa_id][r.area]||[]).push(r);});
+  return Object.keys(porE).map(eid=>({
+    empresaId:eid,
+    areas:Object.keys(porE[eid]).map(area=>({area,...vspArmarArea(porE[eid][area],hist,v,a)}))
+      .sort((x,y)=>(ordenArea?ordenArea(eid,x.area)-ordenArea(eid,y.area):0)||x.area.localeCompare(y.area))
+  }));
+}
+// </vsp-puro>
+
+const VSP_COL={verde:'var(--green)',amarillo:'var(--amber)',rojo:'var(--red)',gris:'var(--text3)'};
+const VSP_COL_PRINT={verde:'#1a8f4c',amarillo:'#d9a400',rojo:'#d93a3a',gris:'#aaa'};
+const VSP_TXT={verde:'Dentro del promedio',amarillo:'Algo por debajo del promedio',rojo:'Muy por debajo del promedio',gris:'Sin promedio histórico para comparar'};
+
+function vspUmbrales(){
+  let v=parseFloat((document.getElementById('vsp-verde')||{}).value),a=parseFloat((document.getElementById('vsp-amarillo')||{}).value);
+  if(!isFinite(v)||v<0)v=VSP_DEF.verde;
+  if(!isFinite(a)||a<v)a=Math.max(v,VSP_DEF.amarillo);
+  return{v,a};
+}
+function vspGuardarUmbrales(){
+  const u=vspUmbrales();
+  try{localStorage.setItem('vsp_umbrales',JSON.stringify(u));}catch(e){}
+  renderVsp(false);
+}
+function vspOrdenArea(eid,area){
+  const a=(st.A||[]).find(x=>x.empresa_id===eid&&x.nombre===area);
+  return a&&a.orden!=null?a.orden:999;
+}
+async function vspCargarTodo(){
+  // pagina de a 1000 (límite por defecto de PostgREST) para no cortar el histórico
+  const cols='id,empresa_id,area,producto,fecha,cantidad,hora_inicio,hora_fin,created_at';
+  let all=[],off=0;
+  for(let i=0;i<60;i++){
+    const page=await get('rendimiento_proceso',`select=${cols}&order=created_at.asc,id.asc&limit=1000&offset=${off}`);
+    all=all.concat(page);
+    if(page.length<1000)break;
+    off+=1000;
+  }
+  return all;
+}
+function initVsp(){
+  const f=document.getElementById('vsp-fecha');
+  if(f&&!f.value)f.value=hoyLocal();
+  try{
+    const u=JSON.parse(localStorage.getItem('vsp_umbrales')||'null');
+    if(u&&isFinite(u.v)&&isFinite(u.a)){document.getElementById('vsp-verde').value=u.v;document.getElementById('vsp-amarillo').value=u.a;}
+  }catch(e){}
+  renderVsp(true);
+}
+async function renderVsp(refetch){
+  const el=document.getElementById('vsp-content');
+  const fecha=document.getElementById('vsp-fecha').value;
+  const ef=document.getElementById('vsp-esel').value;
+  const btn=document.getElementById('btnImprimirVsp');
+  if(!fecha){el.innerHTML='';vspResultado=null;if(btn)btn.disabled=true;return;}
+  if(refetch||!vspRaw){
+    el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Comparando contra el promedio histórico...</div>';
+    try{vspRaw={filas:await vspCargarTodo()};}
+    catch(e){el.innerHTML=`<div class="alert alert-info" style="display:block">No pude leer los registros de rendimiento.<div style="margin-top:6px;font-size:12px;color:var(--text2)">${remEsc(String(e.message||e).slice(0,300))}</div></div>`;vspResultado=null;if(btn)btn.disabled=true;return;}
+  }
+  const{v,a}=vspUmbrales();
+  const grupos=vspAgrupar(vspRaw.filas,fecha,ef,v,a,vspOrdenArea);
+  vspResultado={fecha,ef,v,a,grupos};
+  if(btn)btn.disabled=!grupos.length;
+  if(!grupos.length){el.innerHTML='<div class="empty"><i class="ti ti-clock-off"></i> No hay procesos con horas cargados ese día (se cargan desde Producción Real > detalle de proceso).</div>';return;}
+  const dot=(s,t)=>`<span title="${remEsc(t||VSP_TXT[s])}" style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${VSP_COL[s]};vertical-align:middle"></span>`;
+  const hh=m=>m==null?'—':minToHHMM(m);
+  let h='';
+  grupos.forEach(g=>{
+    h+=`<div style="display:flex;align-items:center;gap:10px;margin:18px 0 8px"><span class="emp-tag" style="background:${ec(g.empresaId)}18;color:${ec(g.empresaId)}">${remEsc(en(g.empresaId)||'')}</span></div>`;
+    g.areas.forEach(ar=>{
+      const dif=ar.difMin;
+      let resumen='<span style="color:var(--text3)">Sin procesos con horas válidas</span>';
+      if(ar.nValidas){
+        const col=VSP_COL[ar.sem];
+        const difTxt=dif==null?'':(dif===0?'justo en hora':(dif>0?`<b style="color:${VSP_COL.rojo}">${vspDur(dif)} más tarde</b>`:`<b style="color:${VSP_COL.verde}">${vspDur(-dif)} antes</b>`));
+        resumen=`Comenzó <b style="color:var(--text)">${hh(ar.ini)}</b> · finalizó real <b style="color:var(--text)">${hh(ar.finReal)}</b> · debería haber finalizado <b style="color:var(--text)">${hh(ar.finEsp)}</b> · ${difTxt}`;
+      }
+      const filasHtml=ar.filas.map((f,i)=>`<tr>
+        <td style="width:6px;padding:0;background:${VSP_COL[f.sem]}"></td>
+        <td class="muted" style="width:28px">${i+1}</td>
+        <td style="font-weight:600">${remEsc(f.producto)}</td>
+        <td style="text-align:center">${f.ini!=null||f.fin!=null?hh(f.ini)+' – '+hh(f.fin):'—'}</td>
+        <td style="text-align:right">${f.dur!=null?vspDur(f.dur):'<span style="color:var(--amber)">sin horas válidas</span>'}</td>
+        <td style="text-align:right">${f.cant?f.cant.toLocaleString('es-AR'):'—'}</td>
+        <td style="text-align:right;font-weight:600">${f.uphReal!=null?Math.round(f.uphReal).toLocaleString('es-AR'):'—'}</td>
+        <td style="text-align:right;color:var(--blue)">${f.uphProm!=null?Math.round(f.uphProm).toLocaleString('es-AR')+(f.origen==='otra-area'?' †':''):'<span style="color:var(--text3)">sin histórico</span>'}</td>
+        <td style="text-align:right;font-weight:700;color:${VSP_COL[f.sem]}">${f.pct!=null?(f.pct>0?'+':'')+f.pct.toFixed(1).replace('.',',')+'%':'—'}</td>
+        <td style="text-align:right">${f.esp!=null?vspDur(f.esp):'—'}</td>
+        <td style="text-align:right;color:var(--text2)">${f.pausa?vspDur(f.pausa):''}</td>
+        <td style="text-align:center">${dot(f.sem)}</td>
+      </tr>`).join('');
+      const notas=[];
+      if(ar.nSinHist)notas.push(`${ar.nSinHist} proceso${ar.nSinHist>1?'s':''} sin promedio histórico: en el cálculo del fin esperado se usó su tiempo real.`);
+      if(ar.superpuestos)notas.push('Hay procesos superpuestos en horario (máquinas en paralelo): el fin esperado es aproximado.');
+      h+=`<div class="stock-card" style="margin-bottom:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg2);border-bottom:.5px solid var(--border);border-radius:var(--radius-lg) var(--radius-lg) 0 0;flex-wrap:wrap;gap:8px">
+          <div style="display:flex;align-items:center;gap:10px"><span style="font-weight:700">${remEsc(ar.area)}</span>${ar.nValidas?dot(ar.sem,VSP_TXT[ar.sem]+(ar.pct!=null?' ('+(ar.pct>0?'+':'')+ar.pct.toFixed(1).replace('.',',')+'% en total)':'')):''}</div>
+          <div style="font-size:12px;color:var(--text2);text-align:right">${resumen}</div>
+        </div>
+        <div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
+          <th></th><th>#</th><th>Variedad</th><th style="text-align:center">Inicio – Fin</th><th style="text-align:right">Tiempo real</th><th style="text-align:right">Cantidad</th>
+          <th style="text-align:right">Uds/h real</th><th style="text-align:right">Uds/h prom.</th><th style="text-align:right">Dif.</th><th style="text-align:right">Tiempo prom.</th><th style="text-align:right">Pausa previa</th><th></th>
+        </tr></thead><tbody>${filasHtml}</tbody></table></div>
+        ${ar.nValidas?`<div style="padding:8px 14px;border-top:.5px solid var(--border);font-size:12px;color:var(--text2)">Producción real: <b style="color:var(--text)">${vspDur(ar.totReal)}</b> · a tiempo promedio habría sido <b style="color:var(--text)">${vspDur(ar.totEsp)}</b>${ar.pct!=null?` · <b style="color:${VSP_COL[ar.sem]}">${ar.pct>0?'+':''}${ar.pct.toFixed(1).replace('.',',')}%</b> de rendimiento`:''}${notas.length?'<div style="margin-top:4px;color:var(--text3)">'+notas.map(remEsc).join('<br>')+'</div>':''}</div>`:''}
+      </div>`;
+    });
+  });
+  el.innerHTML=h;
+}
+function imprimirVsp(){
+  if(!vspResultado||!vspResultado.grupos.length)return;
+  const R=vspResultado;
+  const hh=m=>m==null?'—':minToHHMM(m);
+  const fp=R.fecha.split('-').reverse().join('/');
+  const body=R.grupos.map(g=>`<h2>${remEsc(en(g.empresaId)||'')}</h2>`+g.areas.map(ar=>{
+    const col=VSP_COL_PRINT[ar.sem];
+    const dif=ar.difMin;
+    const resumen=ar.nValidas?`Comenzó <b>${hh(ar.ini)}</b> · finalizó real <b>${hh(ar.finReal)}</b> · debería haber finalizado <b>${hh(ar.finEsp)}</b>${dif==null?'':(dif===0?' · justo en hora':(dif>0?` · <b style="color:${VSP_COL_PRINT.rojo}">${vspDur(dif)} más tarde</b>`:` · <b style="color:${VSP_COL_PRINT.verde}">${vspDur(-dif)} antes</b>`))}`:'Sin procesos con horas válidas';
+    const filas=ar.filas.map((f,i)=>`<tr>
+      <td class="sem" style="background:${VSP_COL_PRINT[f.sem]}"></td><td>${i+1}</td><td class="p">${remEsc(f.producto)}</td>
+      <td class="c">${f.ini!=null||f.fin!=null?hh(f.ini)+' – '+hh(f.fin):'—'}</td><td class="n">${f.dur!=null?vspDur(f.dur):'s/horas'}</td>
+      <td class="n">${f.cant?f.cant.toLocaleString('es-AR'):'—'}</td><td class="n b">${f.uphReal!=null?Math.round(f.uphReal).toLocaleString('es-AR'):'—'}</td>
+      <td class="n">${f.uphProm!=null?Math.round(f.uphProm).toLocaleString('es-AR')+(f.origen==='otra-area'?' †':''):'s/hist.'}</td>
+      <td class="n b" style="color:${VSP_COL_PRINT[f.sem]}">${f.pct!=null?(f.pct>0?'+':'')+f.pct.toFixed(1).replace('.',',')+'%':'—'}</td>
+      <td class="n">${f.esp!=null?vspDur(f.esp):'—'}</td><td class="n">${f.pausa?vspDur(f.pausa):''}</td></tr>`).join('');
+    return`<div class="area"><div class="ah"><span class="an"><span class="dot" style="background:${col}"></span> ${remEsc(ar.area)}</span><span class="rs">${resumen}</span></div>
+      <table><thead><tr><th></th><th>#</th><th>Variedad</th><th class="c">Inicio – Fin</th><th class="n">Tiempo real</th><th class="n">Cant.</th><th class="n">Uds/h real</th><th class="n">Uds/h prom.</th><th class="n">Dif.</th><th class="n">T. prom.</th><th class="n">Pausa</th></tr></thead><tbody>${filas}</tbody></table>
+      ${ar.nValidas?`<div class="ft">Producción real ${vspDur(ar.totReal)} · a tiempo promedio ${vspDur(ar.totEsp)}${ar.pct!=null?` · ${ar.pct>0?'+':''}${ar.pct.toFixed(1).replace('.',',')}% de rendimiento`:''}</div>`:''}</div>`;
+  }).join('')).join('');
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Real vs promedio — ${fp}</title><style>
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{font-family:Arial,sans-serif;padding:8mm;font-size:9pt;color:#111}
+    h1{font-size:14pt}.sub{font-size:9pt;color:#555;margin:2px 0 8px}
+    h2{font-size:11pt;margin:10px 0 4px;border-bottom:2px solid #333;padding-bottom:2px}
+    .area{margin-bottom:10px;break-inside:avoid}
+    .ah{display:flex;justify-content:space-between;align-items:baseline;gap:10px;background:#eee;padding:4px 6px;border:1px solid #999;border-bottom:none}
+    .an{font-weight:700;font-size:10pt}.dot{display:inline-block;width:10px;height:10px;border-radius:50%;vertical-align:middle}
+    .rs{font-size:8.5pt;text-align:right}
+    table{width:100%;border-collapse:collapse}th,td{border:1px solid #999;padding:2px 5px;font-size:8.5pt}
+    th{background:#f4f4f4;text-align:left;font-size:7.5pt;text-transform:uppercase}
+    .n{text-align:right;white-space:nowrap}.c{text-align:center;white-space:nowrap}.b{font-weight:700}.p{font-weight:600}
+    td.sem{width:5px;padding:0;border-right:none}
+    .ft{font-size:8.5pt;padding:3px 6px;border:1px solid #999;border-top:none}
+    .leg{font-size:8pt;color:#555;margin-top:6px}
+    @media print{@page{size:A4 landscape;margin:8mm}body{padding:0}}
+  </style></head><body>
+    <h1>PRODUCCIÓN REAL VS PROMEDIO</h1>
+    <div class="sub">${fp}${R.ef!=='all'?' · '+remEsc(en(R.ef)||''):' · Todas las empresas'} · Semáforo: verde ≥ -${R.v}% · amarillo hasta -${R.a}% · rojo peor (uds/hora real vs promedio histórico sin contar este día)</div>
+    ${body}
+    <div class="leg">† Promedio tomado de la misma variedad en otra área de la empresa (no había histórico bajo este nombre de área). Pausa = tiempo entre el fin del proceso anterior y el inicio de este.</div>
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script></body></html>`;
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const w=window.open(url,'_blank');
@@ -9621,7 +9904,7 @@ function clearDashTimer(){
 }
 
 function uES(){
-  ['resel','cesel','ceesel','desv-esel','dash-esel','inf-diario-esel','inf-rango-esel','inf-pdad-esel','inf-tiempos-esel','sim-esel'].forEach(id=>{
+  ['resel','cesel','ceesel','desv-esel','dash-esel','inf-diario-esel','inf-rango-esel','inf-pdad-esel','inf-tiempos-esel','sim-esel','vsp-esel'].forEach(id=>{
     const s=document.getElementById(id);if(!s)return;
     const c=s.value;s.innerHTML='<option value="all">Todas</option>';
     if(id==='dash-esel')s.options[0].text='Todas las empresas';
