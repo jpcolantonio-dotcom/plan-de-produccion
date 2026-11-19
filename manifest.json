@@ -1,7 +1,7 @@
 {
-  "name": "PAPO - Plan de Produccion",
-  "short_name": "PAPO",
-  "description": "Control semanal de produccion, stock y proyeccion diaria",
+  "name": "SOPE - Sistema Online Planeta Empanada",
+  "short_name": "SOPE",
+  "description": "Control semanal de producción, stock y proyección diaria",
   "start_url": "/plan-de-produccion/",
   "scope": "/plan-de-produccion/",
   "display": "standalone",
@@ -22,5 +22,8 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["business", "productivity"]
+  "categories": [
+    "business",
+    "productivity"
+  ]
 }
