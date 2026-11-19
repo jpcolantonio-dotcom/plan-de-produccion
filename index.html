@@ -270,7 +270,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.338</span></div>
+  <div class="logo"><i class="ti ti-building-factory-2"></i><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.339</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -13982,21 +13982,25 @@ function ctrlhParsear(rows){
 function ctrlhKey(e){return (e.legajo||'')+'|'+(e.nombre||'');}
 // `excluidos` = {clave: {motivo, nota}}: esas personas NO suman en ningún total, pero siguen en el informe
 // (listadas aparte con su motivo) para poder restaurarlas.
-function ctrlhCalcular(empleados,lim,excluidos){
+// v4.339: 4º parámetro opcional `limDe(e)` = descanso propio de esa persona (RRHH > Horarios); si no
+// devuelve nada se usa el general `lim`.
+function ctrlhCalcular(empleados,lim,excluidos,limDe){
   lim=Number(lim)||0;excluidos=excluidos||{};
   const todas=(empleados||[]).map(e=>{
     let medidos=0,total=0,exceso=0,diasExceso=0,incompletos=0,sinDescanso=0;
+    const propio=limDe?(Number(limDe(e))||0):0;
+    const lm=propio>0?propio:lim;
     (e.dias||[]).forEach(d=>{
-      if(d.estado==='ok'){medidos++;total+=d.descanso;const x=Math.max(0,d.descanso-lim);exceso+=x;if(x>0)diasExceso++;}
+      if(d.estado==='ok'){medidos++;total+=d.descanso;const x=Math.max(0,d.descanso-lm);exceso+=x;if(x>0)diasExceso++;}
       else if(d.estado==='incompleta')incompletos++;
       else sinDescanso++;
     });
-    return{key:ctrlhKey(e),nombre:e.nombre,legajo:e.legajo,medidos,total,permitido:medidos*lim,exceso,diasExceso,
+    return{key:ctrlhKey(e),nombre:e.nombre,legajo:e.legajo,lim:lm,propio:propio>0,medidos,total,permitido:medidos*lm,exceso,diasExceso,
       prom:medidos?total/medidos:0,incompletos,sinDescanso,dias:e.dias||[]};
   });
   const filas=todas.filter(f=>!excluidos[f.key]);
   const excl=todas.filter(f=>excluidos[f.key]).map(f=>({...f,motivo:excluidos[f.key].motivo||'',nota:excluidos[f.key].nota||''}));
-  const T={empleados:filas.length,excluidos:excl.length,conMedicion:0,medidos:0,total:0,permitido:0,exceso:0,empleadosPasados:0,incompletos:0,sinDescanso:0};
+  const T={empleados:filas.length,excluidos:excl.length,conPropio:filas.filter(f=>f.propio).length,conMedicion:0,medidos:0,total:0,permitido:0,exceso:0,empleadosPasados:0,incompletos:0,sinDescanso:0};
   filas.forEach(f=>{
     if(f.medidos>0)T.conMedicion++;
     T.medidos+=f.medidos;T.total+=f.total;T.permitido+=f.permitido;T.exceso+=f.exceso;
@@ -14051,10 +14055,12 @@ function ctrlhEmpresas(){
   ['planeta','joselito'].forEach(k=>{const e=(st.E||[]).find(x=>new RegExp(k,'i').test(x.nombre));if(e)out.push(e);});
   return out.length?out:(st.E||[]).slice();
 }
+function ctrlhLimFn(empId){return e=>ctrlhLimDeEmpleado(e.nombre,empId,empleados);}
 function ctrlhInformesDe(empId){return ctrlh.informes.filter(i=>i.empresa_id===empId);}
 
 async function initControlHoras(){
   ctrlhMsg('');
+  await loadEmpleados();   // v4.339: descanso y DNI propios de cada persona (RRHH > Horarios)
   await ctrlhCargarLista();
   const emps=ctrlhEmpresas();
   if(!ctrlh.empSel||!emps.find(e=>e.id===ctrlh.empSel))ctrlh.empSel=(emps[0]||{}).id||null;
@@ -14068,6 +14074,7 @@ async function ctrlhAbrirUltimo(silencioso){
   if(l.length)await ctrlhAbrir(l[0].id,silencioso);
 }
 async function ctrlhSelEmpresa(id){
+  llam.abierto=false;
   ctrlh.empSel=id;ctrlh.actual=null;ctrlh.motivoAbierto=null;ctrlhMsg('');
   await ctrlhAbrirUltimo(true);
   ctrlhRender();
@@ -14088,6 +14095,7 @@ async function ctrlhAbrir(id,silencioso){
     if(!r.length){ctrlh.actual=null;return;}
     r[0].excluidos=r[0].excluidos||{};
     ctrlh.actual={row:r[0]};
+    llam.abierto=false;
     ctrlh.abiertos={};ctrlh.motivoAbierto=null;
   }catch(e){ctrlhMsg('No pude abrir el informe: '+remEsc(String(e.message||e).slice(0,200)),'err');}
   if(!silencioso)ctrlhRender();
@@ -14153,7 +14161,7 @@ async function ctrlhGuardarNuevo(emp,parsed,archivo){
       }
     }catch(e){/* tabla sin columna nueva: se detecta abajo al guardar */}
   }
-  const calc=ctrlhCalcular(parsed.empleados,limiteUsado,excluidos);
+  const calc=ctrlhCalcular(parsed.empleados,limiteUsado,excluidos,ctrlhLimFn(emp.id));
   const row={id,empresa_id:emp.id,empresa_nombre:emp.nombre,desde:parsed.desde,hasta:parsed.hasta,
     limite_min:limiteUsado,archivo,resumen:calc.tot,detalle:parsed.empleados,excluidos,updated_at:new Date().toISOString()};
   try{
@@ -14174,7 +14182,7 @@ function ctrlhErrorGuardar(e,que){
 }
 async function ctrlhGuardarCambios(campos,msgOk){
   const a=ctrlh.actual;if(!a)return;
-  const calc=ctrlhCalcular(a.row.detalle,a.row.limite_min,a.row.excluidos);
+  const calc=ctrlhCalcular(a.row.detalle,a.row.limite_min,a.row.excluidos,ctrlhLimFn(a.row.empresa_id));
   a.row.resumen=calc.tot;
   try{
     await upsert('control_horas_informes',[{id:a.row.id,...campos(a.row),resumen:calc.tot,updated_at:new Date().toISOString()}]);
@@ -14263,7 +14271,7 @@ function ctrlhRenderCuerpo(){
     return;
   }
   const r=a.row,lim=r.limite_min;
-  const calc=ctrlhCalcular(r.detalle,lim,r.excluidos);
+  const calc=ctrlhCalcular(r.detalle,lim,r.excluidos,ctrlhLimFn(r.empresa_id));
   const T=calc.tot;
   const orden=arr=>{
     const f=arr.slice();
@@ -14283,12 +14291,14 @@ function ctrlhRenderCuerpo(){
       <label style="font-size:12px;color:var(--text2)">Ordenar <select onchange="ctrlhSetOrden(this.value)" style="padding:5px 8px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">
         <option value="nombre" ${ctrlh.orden==='nombre'?'selected':''}>Por nombre</option><option value="exceso" ${ctrlh.orden==='exceso'?'selected':''}>Más se pasó</option><option value="descanso" ${ctrlh.orden==='descanso'?'selected':''}>Más descanso</option></select></label>
       <button class="btn btn-sm" onclick="ctrlhImprimirPDF()" title="Armar el informe en PDF de esta empresa y período"><i class="ti ti-file-type-pdf"></i> Informe PDF</button>
+      <button class="btn btn-sm ${llamCandidatosActuales().length?'btn-primary':''}" onclick="llamToggle()" title="Actas de llamada de atención por exceso de break"><i class="ti ti-file-alert"></i> Llamadas de atención (${llamCandidatosActuales().length})</button>
       <button class="btn btn-sm" onclick="ctrlhEliminar()" title="Eliminar este informe"><i class="ti ti-trash"></i></button>
     </div></div>`;
+  h+='<div id="llam-panel"></div>';
   h+=`<div class="metric-grid">
     <div class="metric"><div class="metric-label">Empleados</div><div class="metric-val">${T.empleados}</div><div style="font-size:11px;color:var(--text2)">${T.conMedicion} con descanso medido${T.excluidos?' · '+T.excluidos+' excluidos':''}</div></div>
     <div class="metric"><div class="metric-label">Descanso total tomado</div><div class="metric-val">${ctrlhDur(T.total)}</div><div style="font-size:11px;color:var(--text2)">${T.medidos} días medidos</div></div>
-    <div class="metric"><div class="metric-label">Descanso permitido</div><div class="metric-val">${ctrlhDur(T.permitido)}</div><div style="font-size:11px;color:var(--text2)">${lim} min × ${T.medidos} días</div></div>
+    <div class="metric"><div class="metric-label">Descanso permitido</div><div class="metric-val">${ctrlhDur(T.permitido)}</div><div style="font-size:11px;color:var(--text2)">${T.conPropio?`según el descanso de cada persona (${T.conPropio} con descanso propio, el resto ${lim} min)`:`${lim} min × ${T.medidos} días`}</div></div>
     <div class="metric"><div class="metric-label">Total que se pasaron</div><div class="metric-val ${T.exceso>0?'bad':'good'}">${ctrlhDur(T.exceso)}</div><div style="font-size:11px;color:var(--text2)">${T.empleadosPasados} empleados se pasaron</div></div>
   </div>`;
   h+=`<div class="grid-card"><div class="grid-scroll"><table class="stock-tbl"><thead><tr>
@@ -14315,7 +14325,7 @@ function ctrlhRenderCuerpo(){
           <button class="btn btn-sm" onclick="ctrlhExcluirAbrir(${fi})">Cancelar</button></div></td></tr>`;
     }
     if(abierto){
-      h+=`<tr><td colspan="8" style="background:var(--bg2);padding:8px 12px 12px 30px">${ctrlhHtmlDetalleDias(f,lim)}</td></tr>`;
+      h+=`<tr><td colspan="8" style="background:var(--bg2);padding:8px 12px 12px 30px">${ctrlhHtmlDetalleDias(f,f.lim)}</td></tr>`;
     }
   });
   h+=`<tr style="background:var(--bg2);font-weight:700"><td>TOTAL ${remEsc(r.empresa_nombre).toUpperCase()}</td><td style="text-align:right">${T.medidos}</td><td style="text-align:right">${ctrlhDur(T.total)}</td><td style="text-align:right">${ctrlhDur(T.permitido)}</td>
@@ -14350,6 +14360,7 @@ function ctrlhRenderCuerpo(){
   });
   h+=`</tbody></table></div>`;
   el.innerHTML=h;
+  llamRenderPanel();
 }
 function ctrlhHtmlDetalleDias(f,lim){
   return `<table style="width:100%;font-size:12px;border-collapse:collapse">
@@ -14371,7 +14382,7 @@ function ctrlhHtmlDetalleDias(f,lim){
 // HTML) para poder testearla sin abrir ventanas.
 function ctrlhHtmlPDF(r,orden,autoprint){
   const lim=r.limite_min;
-  const calc=ctrlhCalcular(r.detalle,lim,r.excluidos);
+  const calc=ctrlhCalcular(r.detalle,lim,r.excluidos,ctrlhLimFn(r.empresa_id));
   const T=calc.tot;
   const f=calc.filas.slice();
   if(orden==='exceso')f.sort((x,y)=>y.exceso-x.exceso||x.nombre.localeCompare(y.nombre,'es'));
@@ -14387,9 +14398,9 @@ function ctrlhHtmlPDF(r,orden,autoprint){
     <td class="n g">${x.medidos?x.diasExceso+' de '+x.medidos:''}</td><td class="n g">${x.medidos?Math.round(x.prom)+' min':''}</td></tr>`).join('');
   const pasaron=f.filter(x=>x.exceso>0).sort((x,y)=>y.exceso-x.exceso||x.nombre.localeCompare(y.nombre,'es'));
   const detalle=pasaron.map(x=>{
-    const dias=x.dias.filter(d=>d.estado==='ok'&&d.descanso>lim);
+    const dias=x.dias.filter(d=>d.estado==='ok'&&d.descanso>x.lim);
     return `<tr><td class="nm">${remEsc(x.nombre)}</td><td class="n b" style="color:#b3261e">${ctrlhDur(x.exceso)}</td>
-      <td>${dias.map(d=>`${ctrlhFechaDM(d.fecha)}: ${d.descanso} min <b style="color:#b3261e">(+${d.descanso-lim})</b>`).join(' &nbsp;·&nbsp; ')}</td></tr>`;
+      <td>${dias.map(d=>`${ctrlhFechaDM(d.fecha)}: ${d.descanso} min <b style="color:#b3261e">(+${d.descanso-x.lim})</b>`).join(' &nbsp;·&nbsp; ')}</td></tr>`;
   }).join('');
   const incs=calc.filas.filter(x=>x.incompletos>0);
   const avisos=(T.incompletos||T.sinDescanso)?`<div class="nota"><b>Qué no entra en el cálculo.</b> ${T.incompletos?`${T.incompletos} día${T.incompletos>1?'s':''} con 3 fichadas (falta una marca y no se sabe cuál; marcados con * en la lista): ${incs.map(x=>remEsc(x.nombre)+' ('+x.dias.filter(d=>d.estado==='incompleta').map(d=>ctrlhFechaDM(d.fecha)).join(', ')+')').join('; ')}. `:''}${T.sinDescanso?`${T.sinDescanso} día${T.sinDescanso>1?'s':''} con solo entrada y salida (sin marca de descanso): no suman descanso ni exceso.`:''}</div>`:'';
@@ -14425,7 +14436,7 @@ function ctrlhHtmlPDF(r,orden,autoprint){
   <div class="kpis">
     <div class="kpi"><div class="l">Empleados</div><div class="v">${T.empleados}</div><div class="d">${T.conMedicion} con descanso medido${T.excluidos?' · '+T.excluidos+' excluidos':''}</div></div>
     <div class="kpi"><div class="l">El descanso total fue</div><div class="v">${ctrlhDur(T.total)}</div><div class="d">${T.medidos} días medidos</div></div>
-    <div class="kpi"><div class="l">Descanso permitido</div><div class="v">${ctrlhDur(T.permitido)}</div><div class="d">${lim} min × ${T.medidos} días</div></div>
+    <div class="kpi"><div class="l">Descanso permitido</div><div class="v">${ctrlhDur(T.permitido)}</div><div class="d">${T.conPropio?`descanso propio de cada persona (${T.conPropio}), el resto ${lim} min`:`${lim} min × ${T.medidos} días`}</div></div>
     <div class="kpi"><div class="l">Se pasaron</div><div class="v" style="color:${rojo}">${ctrlhDur(T.exceso)}</div><div class="d">${T.empleadosPasados} empleados</div></div>
   </div>
   <table><thead><tr><th>Empleado</th><th class="n">Días medidos</th><th class="n">Descanso tomado</th><th class="n">Permitido</th><th class="n">Se pasó</th><th class="n">Días que se pasó</th><th class="n">Promedio / día</th></tr></thead>
@@ -14433,7 +14444,7 @@ function ctrlhHtmlPDF(r,orden,autoprint){
     <tfoot><tr><td>TOTAL ${remEsc(r.empresa_nombre).toUpperCase()}</td><td class="n">${T.medidos}</td><td class="n">${ctrlhDur(T.total)}</td><td class="n">${ctrlhDur(T.permitido)}</td><td class="n" style="color:${rojo}">${ctrlhDur(T.exceso)}</td><td></td><td class="n">${T.medidos?Math.round(T.total/T.medidos)+' min':''}</td></tr></tfoot></table>
   ${excl.length?`<h2>Excluidos del informe (${excl.length}) — no suman en ningún total</h2><table><thead><tr><th>Empleado</th><th>Motivo</th><th>Nota</th></tr></thead><tbody>${excl.map(x=>`<tr><td>${remEsc(x.nombre)}</td><td>${remEsc(x.motivo)}</td><td class="g">${remEsc(x.nota)}</td></tr>`).join('')}</tbody></table>`:''}
   ${avisos}
-  ${pasaron.length?`<h2>Detalle de quienes se pasaron (más de ${lim} min), día por día</h2>
+  ${pasaron.length?`<h2>Detalle de quienes se pasaron (más de ${T.conPropio?'su descanso permitido':lim+' min'}), día por día</h2>
     <table><thead><tr><th>Empleado</th><th class="n">Se pasó</th><th>Días (descanso y minutos de más)</th></tr></thead><tbody>${detalle}</tbody></table>`:''}
   <div class="pie">SOPE · Sistema Online Planeta Empanada · RRHH · Control de horas</div>
   ${autoprint?'<script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>':''}
@@ -14448,6 +14459,347 @@ function ctrlhImprimirPDF(){
   setTimeout(()=>URL.revokeObjectURL(url),15000);
   if(!w)alert('Habilitá popups para este sitio para armar el PDF.');
 }
+
+// ── LLAMADAS DE ATENCIÓN POR EXCESO DE BREAK (RRHH > Control de horas) ───────────────────────
+// v4.339: "cuando te cargo el archivo semanal, identificás cuál empleado se pasó de sus horarios,
+// generás este archivo para imprimir, con el nombre, DNI (está en la pestaña de horarios) y las
+// llegadas tarde, según el tiempo de descanso que tenga cada uno... debe quedar guardado".
+// Una acta por empleado: el día que más se pasó va en el párrafo principal y los demás en la lista de
+// reiteración (igual que la plantilla Word de cada empresa). El descanso de cada persona sale de
+// `empleados.descanso_min` (RRHH > Horarios); si no tiene, se usa el descanso general del informe.
+const LLAM_SQL_TABLA=`create table if not exists llamadas_atencion(
+  id text primary key,
+  empresa_id text,
+  empresa_nombre text,
+  desde date,
+  hasta date,
+  empleado_key text,
+  empleado_nombre text,
+  dni text,
+  datos jsonb not null default '{}'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+create table if not exists llamadas_config(
+  empresa_id text primary key,
+  datos jsonb not null default '{}'::jsonb,
+  updated_at timestamptz default now()
+);`;
+const LLAM_SQL_RLS1='alter table llamadas_atencion disable row level security;';
+const LLAM_SQL_RLS2='alter table llamadas_config disable row level security;';
+let llam={abierto:false,cfg:null,guardadas:[],sel:{},cands:[],sinTabla:false,fecha:''};
+
+// <llam-puro>
+function llamNorm(s){return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toUpperCase().replace(/[^A-Z0-9 ]+/g,' ').replace(/\s+/g,' ').trim();}
+function llamTokens(s){return llamNorm(s).split(' ').filter(Boolean);}
+// Busca en la lista de empleados (Horarios) a la persona que figura en el archivo de fichadas.
+// Compara por palabras sin importar el orden ("ACEVEDO GABRIEL" = "Gabriel Acevedo"); si no hay
+// coincidencia exacta, acepta que un nombre contenga al otro SOLO si es único (nunca adivina entre varios).
+function ctrlhEmpMatch(nombre,lista,empresaId){
+  const t=llamTokens(nombre);if(!t.length||!lista||!lista.length)return null;
+  const key=t.slice().sort().join(' ');
+  const cand=lista.map(e=>({e,t:llamTokens(e.nombre)}));
+  const elegir=arr=>{if(!arr.length)return null;const m=arr.filter(x=>empresaId&&String(x.e.empresa_id)===String(empresaId));return(m[0]||arr[0]).e;};
+  const exactos=cand.filter(x=>x.t.slice().sort().join(' ')===key);
+  if(exactos.length)return elegir(exactos);
+  if(t.length>=2){
+    const sub=cand.filter(x=>x.t.length>=2&&(t.every(w=>x.t.includes(w))||x.t.every(w=>t.includes(w))));
+    if(sub.length===1)return sub[0].e;
+    const m=sub.filter(x=>empresaId&&String(x.e.empresa_id)===String(empresaId));
+    if(m.length===1)return m[0].e;
+  }
+  return null;
+}
+function ctrlhLimDeEmpleado(nombre,empresaId,lista){
+  const e=ctrlhEmpMatch(nombre,lista,empresaId);
+  const n=e&&e.descanso_min!=null&&e.descanso_min!==''?Number(e.descanso_min):null;
+  return(n!=null&&isFinite(n)&&n>0)?n:null;
+}
+function llamTipo(nombreEmpresa){return /joselito/i.test(nombreEmpresa||'')?'joselito':'planeta';}
+function llamCfgDefault(tipo){
+  return tipo==='joselito'
+    ?{puesto:'Operario de Producción',supNombre:'',supDni:'',art:'',cctMin:30,incNum:'',incTitulo:'',incTexto:''}
+    :{puesto:'Operario de Producción',supNombre:'',supDni:'',art:'',cctMin:20};
+}
+function llamLetras(n){
+  n=Math.round(Number(n)||0);
+  const U=['cero','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve'];
+  const D=['','','','treinta','cuarenta','cincuenta','sesenta','setenta','ochenta','noventa'];
+  const C=['','','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'];
+  if(n<0)return String(n);
+  if(n<30)return U[n];
+  if(n<100){const d=Math.floor(n/10),u=n%10;return D[d]+(u?' y '+U[u]:'');}
+  if(n===100)return 'cien';
+  if(n<200)return 'ciento '+llamLetras(n-100);
+  if(n<1000)return C[Math.floor(n/100)]+(n%100?' '+llamLetras(n%100):'');
+  return String(n);
+}
+const LLAM_MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+function llamFechaLarga(iso){
+  const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m)return '……… de ……………………… del 2026';
+  return parseInt(m[3],10)+' de '+LLAM_MESES[parseInt(m[2],10)-1]+' del '+m[1];
+}
+function llamFechaCorta(iso){
+  const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m?m[3]+'/'+m[2]+'/'+m[1]:'……/……/……';
+}
+// Personas que se pasaron de su descanso en el período (sin las excluidas del informe).
+// `lim` = descanso general del informe; cada persona usa su propio descanso_min si lo tiene.
+function llamCandidatos(detalle,excluidos,lim,lista,empresaId){
+  const out=[];excluidos=excluidos||{};
+  (detalle||[]).forEach(e=>{
+    if(excluidos[ctrlhKey(e)])return;
+    const emp=ctrlhEmpMatch(e.nombre,lista,empresaId);
+    const own=emp&&Number(emp.descanso_min)>0?Number(emp.descanso_min):null;
+    const l=own||Number(lim)||0;
+    const dias=[];
+    (e.dias||[]).forEach(d=>{
+      if(d.estado!=='ok'||d.descanso==null)return;
+      const x=d.descanso-l;
+      if(x>0)dias.push({fecha:d.fecha,dia:d.dia,sal:(d.fich||[])[1]||'',reg:(d.fich||[])[2]||'',desc:d.descanso,exceso:x});
+    });
+    if(!dias.length)return;
+    out.push({key:ctrlhKey(e),nombre:e.nombre,legajo:e.legajo,lim:l,propio:!!own,empId:emp?emp.id:null,
+      dni:emp&&emp.dni?String(emp.dni):'',dias,total:dias.reduce((s,d)=>s+d.exceso,0)});
+  });
+  out.sort((a,b)=>b.total-a.total||String(a.nombre).localeCompare(String(b.nombre),'es'));
+  return out;
+}
+// Foto completa de un acta (se guarda tal cual: reimprimir da lo mismo aunque después cambie la configuración).
+function llamArmarItem(c,cfg,tipo,empresaNombre,fechaActa,dni){
+  let pr=c.dias[0];c.dias.forEach(d=>{if(d.exceso>pr.exceso)pr=d;});
+  const otros=c.dias.filter(d=>d!==pr).sort((a,b)=>String(a.fecha).localeCompare(String(b.fecha)));
+  return{key:c.key,nombre:c.nombre,dni:dni||'',tipo,empresaNombre,fechaActa,lim:c.lim,principal:pr,otros,
+    puesto:cfg.puesto||'',superior:{nombre:cfg.supNombre||'',dni:cfg.supDni||''},art:cfg.art||'',cctMin:Number(cfg.cctMin)||(tipo==='joselito'?30:20),
+    inciso:{num:cfg.incNum||'',titulo:cfg.incTitulo||'',texto:cfg.incTexto||''}};
+}
+function llamHtmlActas(items){
+  const esc=remEsc;
+  const pt=(v,n)=>v?esc(v):'…'.repeat(n||12);
+  const pg=items.map(it=>{
+    const jos=it.tipo==='joselito';
+    const L1=n=>n+' ('+llamLetras(n)+')';
+    const L2=n=>llamLetras(n)+' ('+n+')';
+    const pr=it.principal;
+    const lugar=jos?'la Planta Industrial de JOSELITO S.R.L., sita en Juan Manuel de Rosas 3685 de Bahía Blanca':'Planeta Empanada';
+    const reg=jos
+      ?`Como usted sabe, está incumpliendo el reglamento interno de la empresa. &quot;Reglamento Interno de JOSELITO PASTAS: Inciso ${pt(it.inciso.num,3)}. ${pt(it.inciso.titulo,14)}: ${pt(it.inciso.texto,30)}&quot;. Asimismo, Inciso 5.1.2. Derechos y Obligaciones del personal: ítem 1. Obligaciones Generales: &quot;Acatar, cumplir y hacer cumplir las normas de trabajo, procedimientos y responsabilidades&quot;.`
+      :`Como usted sabe, está incumpliendo el reglamento interno de la empresa. &quot;Reglamento Interno de Planeta Empanada: Inciso 5.8.1.4. Descansos: &quot;Los descansos son pautados por los Convenios de Trabajo de aplicación vigente y según la organización del equipo de trabajo que disponga el Encargado&quot;. Asimismo, el Inciso 5.4.4. Derechos y obligaciones del personal: Obligaciones Generales: &quot;Acatar, cumplir y hacer cumplir las normas de trabajo, Procedimientos y responsabilidades&quot;. El Inciso 5.8.4. Aplicación de sanciones prevé como FALTA LEVE la llamada de atención y el apercibimiento.&quot;`;
+    const cct=`Convenio Colectivo de Trabajo ${jos?'90/90 (rama pastas frescas)':'329/00'}: Art. ${pt(it.art,3)} (descanso de ${L2(it.cctMin)} minutos durante la jornada de trabajo). El tiempo de descanso asignado por el convenio es de ${L2(it.cctMin)} minutos, no pudiendo excederse del mismo.`;
+    const reit=(it.otros&&it.otros.length)
+      ?`<p>En caso de reiteración, se registran los siguientes excesos:</p>${it.otros.map(d=>`<p class="li">- Fecha ${llamFechaCorta(d.fecha)}: ${d.exceso} minutos de exceso.</p>`).join('')}`:'';
+    return `<div class="acta">
+<p class="t1">ACTA DE LLAMADA DE ATENCIÓN POR INCONDUCTA</p>
+<p class="t2">EXCESO DEL TIEMPO DE BREAK</p>
+<p class="fe">Bahía Blanca, ${llamFechaLarga(it.fechaActa)}</p>
+<p class="sr">Sr./Sra. ${esc(it.nombre)}</p>
+<p class="dn">CUIL/DNI Nº ${pt(it.dni,10)}</p>
+<p>Que conforme surge de nuestros registros de fichaje de personal, hemos constatado de su parte un incumplimiento en el tiempo de descanso (break) asignado, según lo informado y ratificado por su superior de área.</p>
+<p>Durante la jornada del día ${llamFechaCorta(pr.fecha)}, ${esc(it.nombre)}, quien desempeña tareas en ${lugar}, en el puesto de ${pt(it.puesto,12)}, fichó la salida a su break a las ${esc(pr.sal||'……:……')} hs. y el regreso a las ${esc(pr.reg||'……:……')} hs., excediéndose en ${pr.exceso} minutos del tiempo de ${L1(it.lim)} minutos de descanso que le corresponden.</p>
+${reit}
+<p>${reg}</p>
+<p>${cct}</p>
+<p>Como usted sabe, estas actitudes implican el incumplimiento de las obligaciones generales detalladas en el Reglamento Interno de la Empresa de las que fuera fehacientemente notificado/a por sus superiores, así como de los deberes de diligencia, colaboración y buena fe, y de cumplimiento de las instrucciones y procedimientos impartidos por el empleador, previstos en los arts. 62, 63, 84 y 86 de la Ley de Contrato de Trabajo.</p>
+<p>Entendemos esta conducta como falta leve a la relación laboral, por no cumplir con los tiempos de descanso establecidos y es argumento de sanción. Por lo tanto, se le realiza una llamada de atención formal al/a la Sr./Sra. ${esc(it.nombre)}, CUIL/DNI Nº ${pt(it.dni,10)}, por exceder en ${pr.exceso} minutos el tiempo de break de ${L1(it.lim)} minutos. Se lo/la exhorta a respetar estrictamente el tiempo de descanso asignado, fichando su regreso en el horario correspondiente, so pena de aplicársele mayores sanciones, en caso de reiterar inconductas como la descripta.- El presente acta será agregada al legajo del/de la empleado/a.</p>
+<table class="fi"><colgroup><col style="width:46%"><col style="width:8%"><col style="width:46%"></colgroup><tr>
+<td><div class="rg"></div><b>${esc(it.nombre)}</b><br><b>CUIL/DNI Nº ${pt(it.dni,10)}</b></td><td class="gap"></td>
+<td><div class="rg"></div><b>${it.superior&&it.superior.nombre?esc(it.superior.nombre):'APELLIDO, NOMBRE DEL SUPERIOR'}</b><br><b>CUIL/DNI Nº ${pt(it.superior&&it.superior.dni,10)}</b></td></tr>
+<tr><td><div class="rg"></div><b>……………………………………………</b><br><b>CUIL/DNI Nº ……………………</b></td><td></td><td></td></tr></table>
+</div>`;
+  }).join('');
+  return `<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Llamadas de atención — break</title>
+<style>
+@page{size:216mm 356mm;margin:38mm 25mm 20mm 35mm}
+*{box-sizing:border-box}
+body{font-family:"Courier New",Courier,monospace;font-size:10pt;color:#000;margin:0;line-height:1.15}
+.acta{page-break-after:always}.acta:last-child{page-break-after:auto}
+p{margin:0 0 7pt;text-align:justify}
+.t1{font-size:14pt;font-weight:bold;text-align:center;text-decoration:underline;margin-bottom:2pt}
+.t2{font-size:14pt;font-weight:bold;text-align:center;margin-bottom:10pt}
+.fe{text-align:right;margin-bottom:9pt}
+.sr{font-size:14pt;font-weight:bold;margin-bottom:0}
+.dn{font-weight:bold;margin-bottom:9pt}
+.li{margin-left:0;margin-bottom:3pt}.li+p{margin-top:8pt}
+table.fi{width:100%;border-collapse:collapse;table-layout:fixed;margin-top:12pt;page-break-inside:avoid}
+table.fi td{vertical-align:bottom;padding:0;font-size:10pt;word-wrap:break-word}
+.rg{height:26pt;border-bottom:1px solid #000;margin-bottom:3pt;width:94%}
+table.fi tr+tr td{padding-top:6pt}
+@media screen{body{padding:20px;max-width:760px;margin:0 auto}.acta{border-bottom:2px dashed #aaa;margin-bottom:30px;padding-bottom:20px}}
+</style></head><body>${pg}<script>window.onload=function(){setTimeout(function(){window.print()},350)}<\/script></body></html>`;
+}
+// </llam-puro>
+
+function llamMsg(html,tipo){
+  const el=document.getElementById('llam-msg');if(!el)return;
+  if(!html){el.innerHTML='';return;}
+  el.innerHTML=`<div class="alert alert-${tipo||'info'}" style="align-items:flex-start;display:flex;gap:8px"><i class="ti ti-${tipo==='err'?'alert-circle':tipo==='ok'?'check':'info-circle'}"></i><div>${html}</div></div>`;
+}
+function llamHtmlSinTabla(){
+  return `<div class="alert alert-info" style="display:block;margin-bottom:10px"><b>Falta crear las tablas en Supabase</b> para que las actas y los datos fijos queden guardados (igual podés imprimir las actas ahora). Corré este SQL y después las líneas de RLS, cada una sola:
+    <pre style="${CTRLH_PRE}">${remEsc(LLAM_SQL_TABLA)}</pre><pre style="${CTRLH_PRE}">${remEsc(LLAM_SQL_RLS1)}</pre><pre style="${CTRLH_PRE}">${remEsc(LLAM_SQL_RLS2)}</pre></div>`;
+}
+function llamEsErrorTabla(e){
+  const t=String((e&&e.message)||e||'');
+  return /PGRST205|42P01|Could not find the table|does not exist|schema cache/i.test(t);
+}
+function llamCandidatosActuales(){
+  const a=ctrlh.actual;if(!a)return[];
+  const r=a.row;
+  return llamCandidatos(r.detalle,r.excluidos,r.limite_min,empleados,r.empresa_id);
+}
+async function llamToggle(){
+  if(llam.abierto){llam.abierto=false;llamRenderPanel();return;}
+  const a=ctrlh.actual;if(!a)return;
+  llam.abierto=true;llam.sinTabla=false;
+  const el=document.getElementById('llam-panel');
+  if(el)el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Armando las actas...</div>';
+  const r=a.row,tipo=llamTipo(r.empresa_nombre);
+  await loadEmpleados();
+  llam.cands=llamCandidatosActuales();
+  llam.sel={};llam.cands.forEach(c=>{llam.sel[c.key]=true;});
+  llam.fecha=hoyLocal();
+  llam.cfg=llamCfgDefault(tipo);llam.guardadas=[];
+  try{
+    const cf=await get('llamadas_config','empresa_id=eq.'+encodeURIComponent(r.empresa_id));
+    if(cf.length&&cf[0].datos)llam.cfg=Object.assign(llamCfgDefault(tipo),cf[0].datos);
+    llam.guardadas=await get('llamadas_atencion','empresa_id=eq.'+encodeURIComponent(r.empresa_id)+'&desde=eq.'+r.desde+'&hasta=eq.'+r.hasta+'&order=empleado_nombre.asc');
+  }catch(e){
+    if(llamEsErrorTabla(e))llam.sinTabla=true;
+    else console.error(e);
+  }
+  llamRenderPanel();
+}
+function llamRenderPanel(){
+  const el=document.getElementById('llam-panel');if(!el)return;
+  const a=ctrlh.actual;
+  if(!llam.abierto||!a){el.innerHTML='';return;}
+  const r=a.row,tipo=llamTipo(r.empresa_nombre),c=llam.cfg||llamCfgDefault(tipo);
+  const jos=tipo==='joselito';
+  const INP=CTRLH_SEL+';font-size:12px;padding:5px 8px';
+  const campo=(lbl,id,val,w,ph)=>`<label style="font-size:11px;color:var(--text2);display:flex;flex-direction:column;gap:3px">${lbl}<input id="${id}" type="text" value="${remEsc(val||'')}" placeholder="${remEsc(ph||'')}" onchange="llamCfgCambio()" style="${INP};width:${w}px"></label>`;
+  const guardadasPorKey={};llam.guardadas.forEach(g=>{guardadasPorKey[g.empleado_key]=g;});
+  let h=`<div class="grid-card" style="margin-bottom:14px"><div style="padding:12px 16px;border-bottom:.5px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <div style="font-weight:600;font-size:14px"><i class="ti ti-file-alert"></i> Llamadas de atención por exceso de break · ${remEsc(r.empresa_nombre)} · ${ctrlhFechaCorta(r.desde)} al ${ctrlhFechaCorta(r.hasta)}</div>
+    <button class="btn btn-sm" onclick="llamToggle()"><i class="ti ti-x"></i> Cerrar</button></div><div style="padding:12px 16px">`;
+  if(llam.sinTabla)h+=llamHtmlSinTabla();
+  h+=`<div id="llam-msg"></div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:6px">Datos fijos del acta (se guardan por empresa):</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      ${campo('Puesto','llam-puesto',c.puesto,200)}
+      ${campo('Superior (apellido y nombre)','llam-supn',c.supNombre,210,'APELLIDO, NOMBRE')}
+      ${campo('DNI del superior','llam-supd',c.supDni,110)}
+      ${campo('Artículo del convenio','llam-art',c.art,110,'ej. 45')}
+      ${campo('Minutos del convenio','llam-cctmin',String(c.cctMin),90)}
+    </div>`;
+  if(jos)h+=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      ${campo('Inciso (reglamento) Nº','llam-incnum',c.incNum,90)}
+      ${campo('Título del inciso','llam-inctit',c.incTitulo,230)}
+      ${campo('Texto del inciso','llam-inctxt',c.incTexto,380)}</div>`;
+  h+=`<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">
+      <label style="font-size:11px;color:var(--text2);display:flex;flex-direction:column;gap:3px">Fecha del acta<input id="llam-fecha" type="date" value="${remEsc(llam.fecha)}" onchange="llam.fecha=this.value" style="${INP}"></label>
+      <button class="btn btn-primary" onclick="llamImprimir()"><i class="ti ti-printer"></i> Imprimir actas seleccionadas (${llam.cands.filter(x=>llam.sel[x.key]).length})</button>
+    </div>`;
+  if(!llam.cands.length){
+    h+=`<div class="empty" style="color:var(--green)"><i class="ti ti-circle-check"></i> Nadie se pasó de su descanso en este período.</div>`;
+  }else{
+    h+=`<div class="grid-scroll"><table class="stock-tbl"><thead><tr><th></th><th>Empleado</th><th>DNI</th><th style="text-align:right">Su descanso</th><th>Días que se pasó</th><th style="text-align:right">Exceso total</th><th>Acta</th></tr></thead><tbody>`;
+    llam.cands.forEach((x,i)=>{
+      const g=guardadasPorKey[x.key];
+      h+=`<tr><td><input type="checkbox" ${llam.sel[x.key]?'checked':''} onchange="llamSelCambio(${i},this.checked)"></td>
+        <td style="font-weight:500">${remEsc(x.nombre)}${x.empId?'':' <span title="No lo encontré en la lista de Horarios: cargale el DNI acá (sólo para esta acta)" style="font-size:11px;color:var(--amber)">· no está en Horarios</span>'}</td>
+        <td><input type="text" inputmode="numeric" value="${remEsc(x.dni)}" placeholder="falta DNI" onchange="llamDniCambio(${i},this.value)" style="${INP};width:100px;${x.dni?'':'border-color:var(--red)'}"></td>
+        <td style="text-align:right;white-space:nowrap">${x.lim} min <span style="font-size:11px;color:var(--text3)">${x.propio?'(propio)':'(general)'}</span></td>
+        <td style="font-size:12px">${x.dias.map(d=>`${remEsc(d.dia||'')} ${ctrlhFechaDM(d.fecha)} <b style="color:var(--red)">+${d.exceso}</b>`).join(' · ')}</td>
+        <td style="text-align:right;font-weight:700;color:var(--red)">${x.total} min</td>
+        <td style="font-size:12px;color:var(--text2)">${g?'<span style="color:var(--green)">generada '+remEsc(llamFechaCorta((g.datos||{}).fechaActa))+'</span>':'—'}</td></tr>`;
+    });
+    h+=`</tbody></table></div>`;
+  }
+  if(llam.guardadas.length){
+    h+=`<div style="margin-top:14px;font-weight:600;font-size:13px">Actas guardadas de este período (${llam.guardadas.length})</div>
+      <table class="stock-tbl"><tbody>${llam.guardadas.map((g,j)=>`<tr><td style="font-weight:500">${remEsc(g.empleado_nombre||'')}</td>
+        <td style="color:var(--text2)">acta del ${remEsc(llamFechaCorta((g.datos||{}).fechaActa))}</td>
+        <td style="text-align:right;white-space:nowrap"><button class="btn btn-xs" onclick="llamReimprimir(${j})"><i class="ti ti-printer"></i> Reimprimir</button>
+        <button class="btn btn-xs" title="Borrar esta acta guardada" onclick="llamBorrar(${j})"><i class="ti ti-trash"></i></button></td></tr>`).join('')}</tbody></table>`;
+  }
+  h+=`<div style="font-size:11px;color:var(--text3);margin-top:10px">El exceso se calcula con el descanso de cada persona (cargado en RRHH > Horarios); si no tiene, con el general del informe. En el acta, el día que más se pasó va en el párrafo principal y los otros en la lista de reiteración.</div></div></div>`;
+  el.innerHTML=h;
+}
+function llamLeerCfg(){
+  const g=id=>{const e=document.getElementById(id);return e?e.value.trim():null;};
+  const c=Object.assign({},llam.cfg||{});
+  [['puesto','llam-puesto'],['supNombre','llam-supn'],['supDni','llam-supd'],['art','llam-art'],['incNum','llam-incnum'],['incTitulo','llam-inctit'],['incTexto','llam-inctxt']].forEach(([k,id])=>{const v=g(id);if(v!==null)c[k]=v;});
+  const m=parseInt(g('llam-cctmin'),10);if(isFinite(m)&&m>0&&m<=240)c.cctMin=m;
+  return c;
+}
+async function llamCfgCambio(){
+  const a=ctrlh.actual;if(!a)return;
+  llam.cfg=llamLeerCfg();
+  try{
+    await upsert('llamadas_config',[{empresa_id:a.row.empresa_id,datos:llam.cfg,updated_at:new Date().toISOString()}]);
+    ss('online','Datos del acta guardados ✓');
+  }catch(e){
+    if(llamEsErrorTabla(e)){llam.sinTabla=true;llamRenderPanel();}
+    else if(/42501|row-level security/i.test(String(e.message||e)))llamMsg('Supabase bloqueó la escritura (RLS). Corré: <code>'+remEsc(LLAM_SQL_RLS2)+'</code>','err');
+    else llamMsg('No se pudieron guardar los datos fijos: '+remEsc(String(e.message||e).slice(0,200)),'err');
+  }
+}
+function llamSelCambio(i,v){const c=llam.cands[i];if(!c)return;llam.sel[c.key]=!!v;llamRenderPanel();}
+async function llamDniCambio(i,v){
+  const c=llam.cands[i];if(!c)return;
+  const limpio=String(v||'').replace(/\D/g,'');
+  c.dni=limpio;
+  if(c.empId)await empGuardarCampo(c.empId,'dni',limpio||null);
+  llamRenderPanel();
+}
+function llamAbrirVentana(html){
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),20000);
+  if(!w)alert('Habilitá popups para este sitio para imprimir las actas.');
+  return w;
+}
+async function llamImprimir(){
+  const a=ctrlh.actual;if(!a)return;
+  const r=a.row,tipo=llamTipo(r.empresa_nombre);
+  const cfg=llamLeerCfg();llam.cfg=cfg;
+  const sel=llam.cands.filter(c=>llam.sel[c.key]);
+  if(!sel.length){llamMsg('Elegí al menos una persona.','err');return;}
+  const sinDni=sel.filter(c=>!c.dni);
+  if(sinDni.length&&!confirm(sinDni.length+' persona(s) sin DNI ('+sinDni.map(c=>c.nombre).join(', ')+'). El acta sale con puntitos para completar a mano. ¿Imprimir igual?'))return;
+  const fecha=(document.getElementById('llam-fecha')||{}).value||hoyLocal();
+  const items=sel.map(c=>llamArmarItem(c,cfg,tipo,r.empresa_nombre,fecha,c.dni));
+  llamAbrirVentana(llamHtmlActas(items));   // primero la ventana (si no, el navegador bloquea el popup)
+  const ahora=new Date().toISOString();
+  const rows=items.map(it=>({id:r.empresa_id+'_'+r.desde+'_'+r.hasta+'_'+it.key,empresa_id:r.empresa_id,empresa_nombre:r.empresa_nombre,
+    desde:r.desde,hasta:r.hasta,empleado_key:it.key,empleado_nombre:it.nombre,dni:it.dni||null,datos:it,updated_at:ahora}));
+  try{
+    await upsert('llamadas_atencion',rows);
+    await upsert('llamadas_config',[{empresa_id:r.empresa_id,datos:cfg,updated_at:ahora}]);
+    llam.guardadas=await get('llamadas_atencion','empresa_id=eq.'+encodeURIComponent(r.empresa_id)+'&desde=eq.'+r.desde+'&hasta=eq.'+r.hasta+'&order=empleado_nombre.asc');
+    llam.sinTabla=false;llamRenderPanel();
+    llamMsg(rows.length+' acta(s) guardadas en el sistema.','ok');
+  }catch(e){
+    if(llamEsErrorTabla(e)){llam.sinTabla=true;llamRenderPanel();llamMsg('Se imprimió, pero NO quedó guardada: faltan crear las tablas (SQL arriba).','err');}
+    else if(/42501|row-level security/i.test(String(e.message||e))){llamRenderPanel();llamMsg('Se imprimió, pero NO quedó guardada: Supabase bloqueó la escritura (RLS). Corré: <code>'+remEsc(LLAM_SQL_RLS1)+'</code> y <code>'+remEsc(LLAM_SQL_RLS2)+'</code>','err');}
+    else{llamRenderPanel();llamMsg('Se imprimió, pero NO quedó guardada: '+remEsc(String(e.message||e).slice(0,200)),'err');}
+  }
+}
+function llamReimprimir(j){
+  const g=llam.guardadas[j];if(!g||!g.datos)return;
+  llamAbrirVentana(llamHtmlActas([g.datos]));
+}
+async function llamBorrar(j){
+  const g=llam.guardadas[j];if(!g)return;
+  if(!confirm('¿Borrar el acta guardada de '+(g.empleado_nombre||'')+'? No se puede deshacer.'))return;
+  try{
+    await del('llamadas_atencion',encodeURIComponent(g.id));
+    llam.guardadas.splice(j,1);llamRenderPanel();
+  }catch(e){llamMsg('No pude borrarla: '+remEsc(String(e.message||e).slice(0,200)),'err');}
+}
+
 
 // ── CONFIGURACION (MOI / Persona de sucursal / Equipo) ───────────
 function initConfigRrhh(){
