@@ -22,6 +22,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="apple-mobile-web-app-title" content="SOPE"/>
 <link rel="apple-touch-icon" href="icon-192.png"/>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiByeD0iMTQiIGZpbGw9IiMxYTFhNmIiLz48ZyB0cmFuc2Zvcm09InRyYW5zbGF0ZSgzMiAzMikgcm90YXRlKC0xOCkiPjxlbGxpcHNlIHJ4PSIyNyIgcnk9IjciIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzhmYTZmZiIgc3Ryb2tlLXdpZHRoPSIzLjUiLz48Y2lyY2xlIHI9IjE0IiBmaWxsPSIjZjBhMDMwIi8+PHBhdGggZD0iTS0yNyAwYTI3IDcgMCAwIDAgNTQgMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjYzRkMWZmIiBzdHJva2Utd2lkdGg9IjMuNSIvPjwvZz48L3N2Zz4="/>
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
@@ -34,7 +36,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5rem;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100}
 .logo{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .logo i{color:var(--blue);font-size:20px}
-.logo .sub{font-weight:400;font-size:13px;color:var(--text2)}
+.logo .logo-s{width:26px;height:26px;flex:none}
+.logo .sub{font-weight:500;font-size:13px;color:var(--text2)}
 @media(max-width:700px){.logo .sub{display:none}}
 .status-dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;margin-right:5px;transition:background .3s}
 .status-dot.online{background:var(--green)}.status-dot.saving{background:var(--amber);animation:pulse .8s infinite}.status-dot.error{background:var(--red)}
@@ -270,7 +273,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><i class="ti ti-building-factory-2"></i><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.339</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.341</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -725,6 +728,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div style="display:flex;gap:8px;margin-bottom:1rem">
       <button class="proy-tab active" id="simtab-dia" onclick="showSimTab('dia')"><i class="ti ti-calendar"></i> Por día</button>
       <button class="proy-tab" id="simtab-producto" onclick="showSimTab('producto')"><i class="ti ti-package"></i> Por producto</button>
+      <button class="proy-tab" id="simtab-equipos" onclick="showSimTab('equipos')"><i class="ti ti-building-factory-2"></i> Por día con equipos</button>
     </div>
 
     <!-- SIMULACIÓN POR DÍA (la de siempre, v4.311-v4.316) -->
@@ -757,6 +761,26 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       </div>
       <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Elegí cualquier producto y una cantidad hipotética -- se calcula el tiempo de máquina/proceso estimado con el rendimiento histórico (uds/hora) cargado en "Informes > Rendimiento". Armalo a tu gusto: cada máquina tiene su hora de inicio y su tiempo de cambio de variedad (se suma entre un producto y el siguiente); asigná cada producto a una máquina, subilo/bajalo para cambiar el orden y mirá a qué hora empieza y termina cada uno.</div>
       <div id="simprod-content"></div>
+    </div>
+
+    <!-- SIMULACIÓN POR DÍA CON EQUIPOS (v4.340): toma el orden por equipo guardado en "Por producto" y lo aplica
+    a la producción de un día elegido; además arma el PDF de rellenos con la hora en máquina. -->
+    <div id="sim-sub-equipos" style="display:none">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
+        <label style="font-size:13px;color:var(--text2)">Día:</label>
+        <input type="date" id="simeq-fecha" onchange="simEqCambio()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        <label style="font-size:13px;color:var(--text2)">Tomar de:</label>
+        <select id="simeq-fuente" onchange="simEqCambio()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="plan">Plan de producción</option><option value="real">Producción real</option></select>
+        <label style="font-size:13px;color:var(--text2)">Empresa:</label>
+        <select id="simeq-esel" onchange="simEqCambio()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas</option></select>
+        <button class="btn btn-sm" onclick="simEqCambio()" title="Volver a leer el plan y el historial"><i class="ti ti-refresh"></i> Actualizar</button>
+        <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm" id="btnSimEqImp" onclick="simEqImprimir()"><i class="ti ti-printer"></i> Imprimir simulación</button>
+          <button class="btn btn-sm btn-primary" id="btnSimEqRell" onclick="simEqImprimirRellenos()"><i class="ti ti-file-type-pdf"></i> PDF de rellenos</button>
+        </span>
+      </div>
+      <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Usa los equipos, las variedades de cada uno y el orden que armaste en <b>Por producto</b>. Elegí el día y se simula la producción de ese día en ese orden. El PDF de rellenos dice a qué hora tiene que estar cada relleno en la máquina (la hora de inicio de la variedad en su equipo).</div>
+      <div id="simeq-content"></div>
     </div>
   </div>
 </div>
@@ -2903,11 +2927,12 @@ function imprimirInformeSimulacion(){
 }
 
 function showSimTab(t){
-  ['dia','producto'].forEach(id=>{
+  ['dia','producto','equipos'].forEach(id=>{
     document.getElementById('sim-sub-'+id).style.display=id===t?'block':'none';
     document.getElementById('simtab-'+id).classList.toggle('active',id===t);
   });
   if(t==='producto')initSimPorProducto();
+  if(t==='equipos')initSimEquipos();
 }
 
 // SIMULACIÓN POR PRODUCTO (v4.321): "QUE ME DEJE PONER EL PRODUCTO QUE QUIERA Y LA CANTIDAD QUE
@@ -3373,6 +3398,282 @@ function imprimirSimPorProducto(){
   const w=window.open(url,'_blank');
   setTimeout(()=>URL.revokeObjectURL(url),15000);
   if(!w)alert('Habilitá popups para este sitio para imprimir.');
+}
+
+// ── SIMULACIÓN POR DÍA CON EQUIPOS (Informes > Simulación) ───────────────────────────────────
+// v4.340: "en simulación tomes el producto. Yo puse una orden, una forma de producir, qué variedades
+// van por equipo, que cuando vos lo pongas por plan de producción tome ese orden que está establecido
+// por producto, y que yo pueda elegir el día de producción y me lo simule en el orden que están esos
+// productos, y además un PDF que diga a qué hora tienen que estar los rellenos para la máquina".
+// El orden y los equipos son los que ya están guardados en "Por producto" (sim_producto_estado:
+// simProdFilas[].maq = equipo de cada variedad, y el ORDEN de las filas = orden de producción dentro
+// del equipo; simProdMaquinas = nombre/inicio/cambio de cada equipo) -- no se arma nada nuevo ni hay
+// SQL nuevo. Este día se toma del plan de producción (o de la producción real, a elección) y cada
+// variedad cae en su equipo, en ese orden. Las variedades del día que no están en el orden guardado
+// quedan aparte, con un selector para asignarlas a un equipo (se agregan al final del orden).
+let simEq={fecha:'',fuente:'plan',empresa:'all',ov:{},dia:[],maqs:[],sin:[],cargado:false,aviso:''};
+
+// <simeq-puro>
+function simEqEsRellenos(p){const a=st.A.find(x=>x.id===p.area_id);return !!a&&normTxt(a.nombre)==='RELLENOS';}
+// Arma, para el día, la secuencia de cada equipo en el orden establecido. `dia`=[{p,cantidad}],
+// `filas`=simProdFilas (orden global), `maquinas`=simProdMaquinas, `ov`={maqId:{inicio,cambio}} (ajuste solo
+// para esta simulación).
+function simEqArmar(dia,filas,maquinas,hist,ov){
+  ov=ov||{};
+  const idx={};filas.forEach((f,i)=>{if(f.prodId&&idx[f.prodId]==null)idx[f.prodId]=i;});
+  const maqDe=pid=>{const f=filas[idx[pid]];return maquinas.some(m=>m.id===f.maq)?f.maq:maquinas[0].id;};
+  const areasConocidas=new Set();
+  filas.forEach(f=>{const p=f.prodId?st.Pr.find(x=>x.id===f.prodId):null;if(p)areasConocidas.add(p.area_id);});
+  const asign={},sin=[];
+  dia.forEach(d=>{
+    if(idx[d.p.id]!=null){const mid=maqDe(d.p.id);(asign[mid]=asign[mid]||[]).push(d);}
+    else if(areasConocidas.has(d.p.area_id)&&!simEqEsRellenos(d.p))sin.push(d);
+  });
+  const maqs=maquinas.map(m=>{
+    const items=(asign[m.id]||[]).slice().sort((a,b)=>idx[a.p.id]-idx[b.p.id])
+      .map(d=>({p:d.p,r:simProdCalcularFila(d.p,d.cantidad,hist)}));
+    const o=ov[m.id]||{};
+    const inicio=/^\d{1,2}:\d{2}/.test(o.inicio||'')?o.inicio:m.inicio;
+    const cambio=(o.cambio!==undefined&&o.cambio!=='')?Math.max(0,parseInt(o.cambio,10)||0):m.cambio;
+    return{m,inicio,cambio,plan:simProdPlanMaquina(items,simProdHHMMaMin(inicio),cambio)};
+  });
+  sin.sort((a,b)=>simProdArea(a.p).localeCompare(simProdArea(b.p))||a.p.nombre.localeCompare(b.p.nombre));
+  return{maqs,sin};
+}
+// Qué relleno(s) lleva un producto y cuántos kg por unidad (null si no se puede saber):
+//  1) vínculo explícito Rellenos → producto (productos.vinculo_productos, con gramos por unidad);
+//  2) receta del producto: ingredientes que son un producto del área "Rellenos" o cuyo nombre dice RELLENO.
+function simEqRellenosDeProducto(p){
+  const out=[],vistos=new Set();
+  const add=(nombre,kgUd)=>{const k=normTxt(nombre);if(!k||vistos.has(k))return;vistos.add(k);out.push({nombre:String(nombre),kgUd});};
+  (st.Pr||[]).forEach(rp=>{
+    if(!rp.vinculo_productos||!simEqEsRellenos(rp))return;
+    let v=[];try{v=JSON.parse(rp.vinculo_productos)||[];}catch{}
+    const l=v.find(x=>x&&x.producto_id===p.id);
+    if(l){const g=parseFloat(l.gramos_por_unidad);add(rp.nombre,(isFinite(g)&&g>0)?g/1000:null);}
+  });
+  const rec=(st.Rec&&st.Rec[p.nombre])||[];
+  const tanda=Number((st.RecTanda&&st.RecTanda[p.nombre])||1)||1;
+  const nomRell=new Set((st.Pr||[]).filter(x=>simEqEsRellenos(x)&&String(x.empresa_id)===String(p.empresa_id)).map(x=>normTxt(x.nombre)));
+  rec.forEach(si=>{
+    const n=normTxt(si.ingrediente);
+    if(!(nomRell.has(n)||/(^| )RELLENO( |$)/.test(n)))return;
+    let kg=null;const q=Number(si.cantidad),u=String(si.unidad||'').trim().toLowerCase();
+    if(isFinite(q)&&q>0){
+      if(/^(kg|kilo)/.test(u))kg=q/tanda;
+      else if(/^(g|gr|grs|gramo)/.test(u))kg=q/tanda/1000;
+    }
+    add(si.ingrediente,kg);
+  });
+  return out;
+}
+// Para el PDF: una línea por (variedad, relleno) con la hora a la que arranca esa variedad en la máquina
+// (= hora a la que tiene que estar el relleno), ordenadas por hora. Lo que no tiene hora (sin histórico) o
+// no tiene relleno identificado va en listas aparte para revisarlo.
+function simEqLineasRellenos(maqs){
+  const lineas=[],sinRelleno=[],sinHora=[];
+  maqs.forEach(({m,plan})=>plan.items.forEach(it=>{
+    const rs=simEqRellenosDeProducto(it.p);
+    if(it.ini==null){sinHora.push({maq:m.nombre,p:it.p,cantidad:it.r.cantidad,rellenos:rs.map(x=>x.nombre)});return;}
+    if(!rs.length){sinRelleno.push({maq:m.nombre,p:it.p,cantidad:it.r.cantidad,ini:it.ini});return;}
+    rs.forEach(rl=>lineas.push({ini:it.ini,maq:m.nombre,relleno:rl.nombre,p:it.p,cantidad:it.r.cantidad,
+      kg:rl.kgUd!=null?rl.kgUd*it.r.cantidad:null}));
+  }));
+  lineas.sort((a,b)=>a.ini-b.ini||a.maq.localeCompare(b.maq,'es')||a.relleno.localeCompare(b.relleno,'es'));
+  const porRell={};
+  lineas.forEach(l=>{
+    const k=normTxt(l.relleno);
+    if(!porRell[k])porRell[k]={relleno:l.relleno,ini:l.ini,nProd:0,kg:0,kgOk:true,maqs:new Set()};
+    const g=porRell[k];g.ini=Math.min(g.ini,l.ini);g.nProd++;g.maqs.add(l.maq);
+    if(l.kg==null)g.kgOk=false;else g.kg+=l.kg;
+  });
+  const resumen=Object.values(porRell).sort((a,b)=>a.ini-b.ini||a.relleno.localeCompare(b.relleno,'es'));
+  return{lineas,resumen,sinRelleno,sinHora};
+}
+// </simeq-puro>
+
+function simEqProductoDeFila(r){
+  const cands=(st.Pr||[]).filter(x=>x.nombre===r.producto&&String(x.empresa_id)===String(r.empresa_id));
+  if(cands.length<=1)return cands[0]||null;
+  const ac=areaCanon(r.empresa_id,r.area);
+  return cands.find(x=>simProdArea(x)===ac)||cands[0];
+}
+function simEqPoblarEmpresas(){
+  const se=document.getElementById('simeq-esel');if(!se)return;
+  se.innerHTML='<option value="all">Todas</option>'+st.E.map(e=>`<option value="${e.id}">${remEsc(e.nombre)}</option>`).join('');
+  se.value=simEq.empresa;
+}
+async function initSimEquipos(){
+  const f=document.getElementById('simeq-fecha');
+  if(!simEq.fecha)simEq.fecha=hoyLocal();
+  if(f)f.value=simEq.fecha;
+  const fs=document.getElementById('simeq-fuente');if(fs)fs.value=simEq.fuente;
+  simEqPoblarEmpresas();
+  const el=document.getElementById('simeq-content');
+  if(el)el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando orden por equipo y producción del día...</div>';
+  if(!simProdEstadoCargado){simProdEstadoCargado=true;await simProdCargarEstado();}
+  await simEqCargar();
+}
+async function simEqCambio(){
+  simEq.fecha=document.getElementById('simeq-fecha').value||simEq.fecha;
+  simEq.fuente=document.getElementById('simeq-fuente').value;
+  simEq.empresa=document.getElementById('simeq-esel').value;
+  simEq.ov={};
+  const el=document.getElementById('simeq-content');
+  if(el)el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando...</div>';
+  await simEqCargar();
+}
+async function simEqCargar(){
+  const el=document.getElementById('simeq-content');
+  const fecha=simEq.fecha;
+  if(!fecha){if(el)el.innerHTML='';return;}
+  const d0=new Date(fecha+'T00:00:00');
+  const semKey=wk(d0),diIdx=(d0.getDay()+6)%7;
+  const real=simEq.fuente==='real';
+  try{
+    await Promise.all([real?Promise.all([lp(semKey),lr(semKey)]):lp(semKey),
+      cargarHistRendimiento().then(h=>{simProdHist=h;})]);
+  }catch(e){if(el)el.innerHTML='<div class="alert alert-info">No pude cargar los datos: '+remEsc(String(e.message||e).slice(0,160))+'</div>';return;}
+  const plan=st.P[semKey]||[],re=real?(st.R[semKey]||{}):null;
+  const porProd={};
+  plan.forEach((r,oi)=>{
+    const q=real?(realDia(re,r,diIdx,oi)||0):(((r.days||[])[diIdx])||0);
+    if(!(q>0))return;
+    if(simEq.empresa!=='all'&&String(r.empresa_id)!==String(simEq.empresa))return;
+    const p=simEqProductoDeFila(r);if(!p)return;
+    if(!porProd[p.id])porProd[p.id]={p,cantidad:0};
+    porProd[p.id].cantidad+=q;
+  });
+  simEq.dia=Object.values(porProd);
+  simEq.cargado=true;
+  simEqRender();
+}
+function simEqRecalcular(){
+  const r=simEqArmar(simEq.dia,simProdFilas,simProdMaquinas,simProdHist||{},simEq.ov);
+  simEq.maqs=r.maqs;simEq.sin=r.sin;
+}
+function simEqOv(maqId,campo,v){
+  if(!simEq.ov[maqId])simEq.ov[maqId]={};
+  simEq.ov[maqId][campo]=v;
+  simEqRender();
+}
+function simEqAsignar(prodId,maqId){
+  if(!maqId||!prodId)return;
+  simProdFilas.push({prodId,cantidad:'',maq:maqId});
+  simProdGuardarDebounced();
+  simEqRender();
+}
+function simEqRender(){
+  const el=document.getElementById('simeq-content');if(!el)return;
+  const btn1=document.getElementById('btnSimEqImp'),btn2=document.getElementById('btnSimEqRell');
+  const hayOrden=simProdFilas.some(f=>f.prodId);
+  if(!hayOrden){
+    el.innerHTML='<div class="alert alert-info"><i class="ti ti-info-circle"></i> Todavía no hay un orden por equipo guardado. Armalo en la solapa <b>Por producto</b> (equipos, variedades y orden) y volvé acá.</div>';
+    if(btn1)btn1.disabled=true;if(btn2)btn2.disabled=true;return;
+  }
+  simEqRecalcular();
+  const maqs=simEq.maqs.filter(x=>x.plan.items.length);
+  const fechaTxt=simEqFechaLarga(simEq.fecha);
+  if(!maqs.length&&!simEq.sin.length){
+    el.innerHTML=`<div class="empty"><i class="ti ti-calendar-off"></i> ${simEq.fuente==='real'?'No hay producción real cargada':'No hay producción planificada'} para el ${fechaTxt} de las variedades que están en tus equipos.${simEq.fuente==='real'?' Probá con “Plan de producción”.':''}</div>`;
+    if(btn1)btn1.disabled=true;if(btn2)btn2.disabled=true;return;
+  }
+  if(btn1)btn1.disabled=!maqs.length;if(btn2)btn2.disabled=!maqs.length;
+  const INP='padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)';
+  let h='';
+  maqs.forEach(({m,inicio,cambio,plan})=>{
+    h+=`<div class="grid-card" style="margin-bottom:12px"><div style="padding:10px 14px;border-bottom:.5px solid var(--border);display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+      <div style="font-size:14px;font-weight:700">${remEsc(m.nombre)}</div>
+      <label style="font-size:12px;color:var(--text2)">Inicio <input type="time" value="${remEsc(minToHHMM(simProdHHMMaMin(inicio)))}" onchange="simEqOv('${m.id}','inicio',this.value)" style="${INP}"></label>
+      <label style="font-size:12px;color:var(--text2)">Cambio de variedad <input type="number" min="0" max="240" value="${cambio}" onchange="simEqOv('${m.id}','cambio',this.value)" style="${INP};width:60px"> min</label>
+      <div style="margin-left:auto;font-size:12px;color:var(--text2)">${plan.nProd?`Fin ${minToHHMM(plan.finMin)} · ${plan.totalCamb>0?`producción ${simProdFmtDur(plan.totalProd)} + cambios ${simProdFmtDur(plan.totalCamb)} = `:''}<b style="color:var(--text)">${simProdFmtDur(plan.total)}</b>`:'Sin tiempos calculables'}</div></div>
+      <div class="grid-scroll"><table class="stock-tbl"><thead><tr><th style="width:34px">#</th><th>Variedad</th><th>Relleno</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Uds/h</th><th style="text-align:right">Duración</th><th style="text-align:right">Inicio</th><th style="text-align:right">Fin</th></tr></thead><tbody>`;
+    plan.items.forEach((it,i)=>{
+      const r=it.r,rs=simEqRellenosDeProducto(it.p);
+      h+=`<tr><td style="color:var(--text3)">${i+1}</td><td style="font-weight:500">${remEsc(it.p.nombre)}<div style="font-size:11px;color:var(--text3);font-weight:400">${remEsc(en(it.p.empresa_id)||'')} · ${remEsc(simProdArea(it.p))}</div></td>
+        <td style="font-size:12px">${rs.length?rs.map(x=>remEsc(x.nombre)).join(' + '):'<span style="color:var(--amber)" title="No encontré qué relleno lleva: revisá la receta del producto">sin identificar</span>'}</td>
+        <td style="text-align:right;font-weight:700">${Math.round(r.cantidad).toLocaleString('es-AR')}</td>
+        <td style="text-align:right">${r.estado==='ok'?Math.round(r.udsHora).toLocaleString('es-AR'):'—'}</td>
+        <td style="text-align:right">${r.estado==='ok'?simProdFmtDur(r.durMin):'<span style="color:var(--amber)">Sin rendimiento histórico</span>'}</td>
+        <td style="text-align:right;font-weight:700;color:var(--green)">${it.ini!=null?minToHHMM(it.ini):'—'}</td>
+        <td style="text-align:right;font-weight:700;color:var(--red)">${it.fin!=null?minToHHMM(it.fin):'—'}</td></tr>`;
+    });
+    h+=`</tbody></table></div></div>`;
+  });
+  if(simEq.sin.length){
+    h+=`<div class="grid-card" style="margin-bottom:12px"><div style="padding:10px 14px;border-bottom:.5px solid var(--border);font-weight:700;font-size:14px">Sin equipo asignado <span style="font-weight:400;font-size:12px;color:var(--text2)">· están en la producción del día pero no en tu orden por equipo; asignalas y quedan al final del equipo (y guardadas en “Por producto”)</span></div>
+      <div class="grid-scroll"><table class="stock-tbl"><tbody>${simEq.sin.map(d=>`<tr><td style="font-weight:500">${remEsc(d.p.nombre)}<div style="font-size:11px;color:var(--text3);font-weight:400">${remEsc(simProdArea(d.p))}</div></td>
+        <td style="text-align:right;font-weight:700">${Math.round(d.cantidad).toLocaleString('es-AR')}</td>
+        <td style="text-align:right"><select onchange="simEqAsignar('${d.p.id}',this.value)" style="${INP}"><option value="">Asignar a equipo…</option>${simProdMaquinas.map(m=>`<option value="${m.id}">${remEsc(m.nombre)}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div></div>`;
+  }
+  const tot=maqs.reduce((s,x)=>s+x.plan.items.reduce((a,i)=>a+(i.r.cantidad||0),0),0);
+  h+=`<div style="font-size:12px;color:var(--text2);margin-top:6px">${maqs.length} equipo(s) · cantidad total ${Math.round(tot).toLocaleString('es-AR')} · ${simEq.fuente==='real'?'producción real':'plan de producción'} del ${fechaTxt}. El inicio y el cambio que cambies acá valen solo para esta simulación (el guardado queda en “Por producto”).</div>`;
+  el.innerHTML=h;
+}
+function simEqFechaLarga(iso){
+  const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})/);if(!m)return '';
+  const d=new Date(+m[1],+m[2]-1,+m[3]);
+  const dias=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+  return dias[d.getDay()]+' '+m[3]+'/'+m[2]+'/'+m[1];
+}
+function simEqAbrirImpresion(html){
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para imprimir.');
+}
+const SIMEQ_CSS=`*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;padding:8mm;font-size:11pt;color:#111}
+h1{font-size:17pt;margin-bottom:2px}
+h2{font-size:12.5pt;margin:16px 0 5px;page-break-after:avoid}
+.sub{font-size:10.5pt;color:#555;margin-bottom:12px}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;padding:4px 6px;font-size:9.5pt;border-bottom:2px solid #333;background:#f2f2f2}
+td{padding:4px 6px;font-size:10.5pt;border-bottom:1px solid #ccc;vertical-align:top}
+tr{page-break-inside:avoid}
+.n{text-align:right;white-space:nowrap}th.n{text-align:right}
+.hr{font-size:14pt;font-weight:700;white-space:nowrap}
+.maq{margin-bottom:14px;page-break-inside:avoid}
+.mh{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #333;padding:4px 0;margin-bottom:2px}
+.mn{font-size:14pt;font-weight:700}.mi{font-size:10pt;color:#444}
+.nota{font-size:9pt;color:#555;background:#f6f6f6;border:1px solid #ddd;border-radius:5px;padding:6px 8px;margin-top:10px}
+@media print{@page{size:A4;margin:10mm}body{padding:0}}`;
+function simEqEncabezadoSub(){
+  const ahora=new Date(),p2=n=>String(n).padStart(2,'0');
+  const e=simEq.empresa==='all'?'Todas las empresas':(en(simEq.empresa)||'');
+  return `${simEqFechaLarga(simEq.fecha)} · ${simEq.fuente==='real'?'Producción real':'Plan de producción'} · ${remEsc(e)} · Impreso ${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()} ${p2(ahora.getHours())}:${p2(ahora.getMinutes())}`;
+}
+function simEqImprimir(){
+  simEqRecalcular();
+  const maqs=simEq.maqs.filter(x=>x.plan.items.length);
+  if(!maqs.length)return;
+  const bloques=maqs.map(({m,inicio,cambio,plan})=>`<div class="maq"><div class="mh"><span class="mn">${remEsc(m.nombre)}</span><span class="mi">Inicio ${minToHHMM(plan.iniMin)}${plan.nProd?' · Fin '+minToHHMM(plan.finMin):''}${cambio>0?' · Cambio de variedad '+cambio+' min':''}${plan.nProd?' · '+(plan.totalCamb>0?'producción '+simProdFmtDur(plan.totalProd)+' + cambios '+simProdFmtDur(plan.totalCamb)+' = ':'')+simProdFmtDur(plan.total):''}</span></div>
+    <table><thead><tr><th>#</th><th>Variedad</th><th>Relleno</th><th class="n">Cantidad</th><th class="n">Uds/h</th><th class="n">Duración</th><th class="n">Inicio</th><th class="n">Fin</th></tr></thead><tbody>
+    ${plan.items.map((it,i)=>{const r=it.r,rs=simEqRellenosDeProducto(it.p);return `<tr><td>${i+1}</td><td>${remEsc(it.p.nombre)}</td><td>${rs.length?rs.map(x=>remEsc(x.nombre)).join(' + '):'—'}</td><td class="n"><b>${Math.round(r.cantidad).toLocaleString('es-AR')}</b></td><td class="n">${r.estado==='ok'?Math.round(r.udsHora).toLocaleString('es-AR'):'—'}</td><td class="n">${r.estado==='ok'?simProdFmtDur(r.durMin):'Sin histórico'}</td><td class="n"><b>${it.ini!=null?minToHHMM(it.ini):'—'}</b></td><td class="n"><b>${it.fin!=null?minToHHMM(it.fin):'—'}</b></td></tr>`;}).join('')}</tbody></table></div>`).join('');
+  const sin=simEq.sin.length?`<div class="nota"><b>Sin equipo asignado (no están en el orden por equipo):</b> ${simEq.sin.map(d=>remEsc(d.p.nombre)+' ('+Math.round(d.cantidad).toLocaleString('es-AR')+')').join(' · ')}</div>`:'';
+  simEqAbrirImpresion(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Simulación por día con equipos</title><style>${SIMEQ_CSS}</style></head><body>
+    <h1>SIMULACIÓN POR DÍA — EQUIPOS</h1><div class="sub">${simEqEncabezadoSub()}</div>${bloques}${sin}
+    <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script></body></html>`);
+}
+function simEqImprimirRellenos(){
+  simEqRecalcular();
+  const maqs=simEq.maqs.filter(x=>x.plan.items.length);
+  if(!maqs.length)return;
+  const L=simEqLineasRellenos(maqs);
+  const kgTxt=kg=>kg==null?'—':kg.toLocaleString('es-AR',{maximumFractionDigits:1})+' kg';
+  const cron=L.lineas.length?`<table><thead><tr><th>Hora en máquina</th><th>Relleno</th><th>Equipo</th><th>Variedad</th><th class="n">Cantidad</th><th class="n">Kg aprox.</th></tr></thead><tbody>
+    ${L.lineas.map(l=>`<tr><td class="hr">${minToHHMM(l.ini)}</td><td><b>${remEsc(l.relleno)}</b></td><td>${remEsc(l.maq)}</td><td>${remEsc(l.p.nombre)}</td><td class="n">${Math.round(l.cantidad).toLocaleString('es-AR')}</td><td class="n">${kgTxt(l.kg)}</td></tr>`).join('')}</tbody></table>`
+    :'<div class="nota">No encontré rellenos para las variedades de este día.</div>';
+  const res=L.resumen.length?`<h2>Resumen por relleno</h2><table><thead><tr><th>Relleno</th><th>Primera hora en máquina</th><th>Equipos</th><th class="n">Variedades</th><th class="n">Kg aprox. total</th></tr></thead><tbody>
+    ${L.resumen.map(g=>`<tr><td><b>${remEsc(g.relleno)}</b></td><td class="hr">${minToHHMM(g.ini)}</td><td>${remEsc([...g.maqs].join(', '))}</td><td class="n">${g.nProd}</td><td class="n">${g.kgOk?kgTxt(g.kg):(g.kg>0?kgTxt(g.kg)+' +':'—')}</td></tr>`).join('')}</tbody></table>`:'';
+  const sinR=L.sinRelleno.length?`<h2>Sin relleno identificado (revisar la receta)</h2><table><tbody>${L.sinRelleno.map(x=>`<tr><td class="hr">${minToHHMM(x.ini)}</td><td>${remEsc(x.p.nombre)}</td><td>${remEsc(x.maq)}</td><td class="n">${Math.round(x.cantidad).toLocaleString('es-AR')}</td></tr>`).join('')}</tbody></table>`:'';
+  const sinH=L.sinHora.length?`<h2>Sin hora (no tienen rendimiento histórico)</h2><table><tbody>${L.sinHora.map(x=>`<tr><td>${remEsc(x.p.nombre)}</td><td>${remEsc(x.maq)}</td><td>${x.rellenos.length?remEsc(x.rellenos.join(' + ')):'—'}</td><td class="n">${Math.round(x.cantidad).toLocaleString('es-AR')}</td></tr>`).join('')}</tbody></table>`:'';
+  simEqAbrirImpresion(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Rellenos — hora en máquina</title><style>${SIMEQ_CSS}</style></head><body>
+    <h1>RELLENOS — HORA EN MÁQUINA</h1><div class="sub">${simEqEncabezadoSub()}</div>
+    <div class="nota" style="margin:0 0 10px">La hora es la de inicio de cada variedad en su equipo: a esa hora tiene que estar el relleno en la máquina. Los kg son aproximados (según la receta o el vínculo del relleno).</div>
+    ${cron}${res}${sinR}${sinH}
+    <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script></body></html>`);
 }
 
 // ── REAL VS PROMEDIO (Informes) ──
