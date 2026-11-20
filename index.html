@@ -273,7 +273,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.341</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.342</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -3662,16 +3662,15 @@ function simEqImprimirRellenos(){
   if(!maqs.length)return;
   const L=simEqLineasRellenos(maqs);
   const kgTxt=kg=>kg==null?'—':kg.toLocaleString('es-AR',{maximumFractionDigits:1})+' kg';
-  const cron=L.lineas.length?`<table><thead><tr><th>Hora en máquina</th><th>Relleno</th><th>Equipo</th><th>Variedad</th><th class="n">Cantidad</th><th class="n">Kg aprox.</th></tr></thead><tbody>
-    ${L.lineas.map(l=>`<tr><td class="hr">${minToHHMM(l.ini)}</td><td><b>${remEsc(l.relleno)}</b></td><td>${remEsc(l.maq)}</td><td>${remEsc(l.p.nombre)}</td><td class="n">${Math.round(l.cantidad).toLocaleString('es-AR')}</td><td class="n">${kgTxt(l.kg)}</td></tr>`).join('')}</tbody></table>`
+  const cron=L.lineas.length?`<table><thead><tr><th>Hora en máquina</th><th>Relleno</th><th>Equipo</th></tr></thead><tbody>
+    ${L.lineas.map(l=>`<tr><td class="hr">${minToHHMM(l.ini)}</td><td><b>${remEsc(l.relleno)}</b></td><td style="white-space:nowrap">${remEsc(l.maq)}</td></tr>`).join('')}</tbody></table>`
     :'<div class="nota">No encontré rellenos para las variedades de este día.</div>';
-  const res=L.resumen.length?`<h2>Resumen por relleno</h2><table><thead><tr><th>Relleno</th><th>Primera hora en máquina</th><th>Equipos</th><th class="n">Variedades</th><th class="n">Kg aprox. total</th></tr></thead><tbody>
-    ${L.resumen.map(g=>`<tr><td><b>${remEsc(g.relleno)}</b></td><td class="hr">${minToHHMM(g.ini)}</td><td>${remEsc([...g.maqs].join(', '))}</td><td class="n">${g.nProd}</td><td class="n">${g.kgOk?kgTxt(g.kg):(g.kg>0?kgTxt(g.kg)+' +':'—')}</td></tr>`).join('')}</tbody></table>`:'';
-  const sinR=L.sinRelleno.length?`<h2>Sin relleno identificado (revisar la receta)</h2><table><tbody>${L.sinRelleno.map(x=>`<tr><td class="hr">${minToHHMM(x.ini)}</td><td>${remEsc(x.p.nombre)}</td><td>${remEsc(x.maq)}</td><td class="n">${Math.round(x.cantidad).toLocaleString('es-AR')}</td></tr>`).join('')}</tbody></table>`:'';
-  const sinH=L.sinHora.length?`<h2>Sin hora (no tienen rendimiento histórico)</h2><table><tbody>${L.sinHora.map(x=>`<tr><td>${remEsc(x.p.nombre)}</td><td>${remEsc(x.maq)}</td><td>${x.rellenos.length?remEsc(x.rellenos.join(' + ')):'—'}</td><td class="n">${Math.round(x.cantidad).toLocaleString('es-AR')}</td></tr>`).join('')}</tbody></table>`:'';
+  const res='';
+  const sinR=L.sinRelleno.length?`<h2>Sin relleno identificado (revisar la receta)</h2><table><tbody>${L.sinRelleno.map(x=>`<tr><td class="hr">${minToHHMM(x.ini)}</td><td>${remEsc(x.p.nombre)}</td><td>${remEsc(x.maq)}</td></tr>`).join('')}</tbody></table>`:'';
+  const sinH=L.sinHora.length?`<h2>Sin hora (no tienen rendimiento histórico)</h2><table><tbody>${L.sinHora.map(x=>`<tr><td>${remEsc(x.p.nombre)}</td><td>${remEsc(x.maq)}</td><td>${x.rellenos.length?remEsc(x.rellenos.join(' + ')):'—'}</td></tr>`).join('')}</tbody></table>`:'';
   simEqAbrirImpresion(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"/><title>Rellenos — hora en máquina</title><style>${SIMEQ_CSS}</style></head><body>
     <h1>RELLENOS — HORA EN MÁQUINA</h1><div class="sub">${simEqEncabezadoSub()}</div>
-    <div class="nota" style="margin:0 0 10px">La hora es la de inicio de cada variedad en su equipo: a esa hora tiene que estar el relleno en la máquina. Los kg son aproximados (según la receta o el vínculo del relleno).</div>
+    <div class="nota" style="margin:0 0 10px">La hora es la de inicio de cada variedad en su equipo: a esa hora tiene que estar el relleno en la máquina.</div>
     ${cron}${res}${sinR}${sinH}
     <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script></body></html>`);
 }
