@@ -273,7 +273,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.342</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.343</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -2964,11 +2964,17 @@ function simProdNuevoIdMaq(){
 }
 // Arma la secuencia de UNA máquina (puro): items=[{r:resultadoFila,...}] en orden, devuelve cada item con
 // ini/fin (minutos del día; null si la fila no tiene duración calculable) + totales.
+// v4.343: cada fila puede tener su propio cambio previo (min); si está vacío usa el general de la máquina.
+function simProdCambioFila(f,cambioMaq){
+  if(!f||f.cambio===''||f.cambio==null)return cambioMaq;
+  const n=parseInt(f.cambio,10);
+  return isNaN(n)?cambioMaq:Math.max(0,n);
+}
 function simProdPlanMaquina(items,inicioMin,cambioMin){
   let cursor=inicioMin,primero=true,totalProd=0,totalCamb=0;
   const out=items.map(it=>{
     if(!it.r||it.r.estado!=='ok')return{...it,ini:null,fin:null};
-    if(!primero){cursor+=cambioMin;totalCamb+=cambioMin;}
+    if(!primero){const c=simProdCambioFila(it.f,cambioMin);cursor+=c;totalCamb+=c;}
     const ini=cursor;cursor+=it.r.durMin;totalProd+=it.r.durMin;primero=false;
     return{...it,ini,fin:cursor};
   });
@@ -3030,7 +3036,7 @@ async function simProdCargarEstado(){
     const rows=await get('sim_producto_estado','id=eq.default');
     const d=(rows&&rows[0]&&rows[0].datos)||{};
     if(Array.isArray(d.filas)&&d.filas.length){
-      simProdFilas=d.filas.map(f=>({prodId:f.prodId||'',cantidad:f.cantidad==null?'':f.cantidad,maq:f.maq||''}));
+      simProdFilas=d.filas.map(f=>({prodId:f.prodId||'',cantidad:f.cantidad==null?'':f.cantidad,maq:f.maq||'',cambio:(f.cambio===''||f.cambio==null||isNaN(parseInt(f.cambio,10)))?'':Math.max(0,parseInt(f.cambio,10))}));
     }
     if(Array.isArray(d.maquinas)&&d.maquinas.length){
       simProdMaquinas=d.maquinas.map((m,i)=>({id:String(m.id||('m'+(i+1))),nombre:String(m.nombre||('Máquina '+(i+1))),inicio:/^\d{1,2}:\d{2}/.test(m.inicio||'')?m.inicio:'08:00',cambio:Math.max(0,parseInt(m.cambio,10)||0)}));
@@ -3050,7 +3056,7 @@ function simProdGuardarDebounced(){
   clearTimeout(simProdGuardarTimer);
   simProdGuardarTimer=setTimeout(async()=>{
     try{
-      const datos={filas:simProdFilas.map(f=>({prodId:f.prodId||'',cantidad:f.cantidad===''?'':(parseFloat(f.cantidad)||0),maq:simProdMaqDeFila(f)})),maquinas:simProdMaquinas.map(m=>({id:m.id,nombre:m.nombre,inicio:m.inicio,cambio:m.cambio})),empresa:simProdEmpresa,area:simProdAreaF};
+      const datos={filas:simProdFilas.map(f=>({prodId:f.prodId||'',cantidad:f.cantidad===''?'':(parseFloat(f.cantidad)||0),maq:simProdMaqDeFila(f),cambio:(f.cambio===''||f.cambio==null)?'':Math.max(0,parseInt(f.cambio,10)||0)})),maquinas:simProdMaquinas.map(m=>({id:m.id,nombre:m.nombre,inicio:m.inicio,cambio:m.cambio})),empresa:simProdEmpresa,area:simProdAreaF};
       const res=await fetch(`${SB}/rest/v1/sim_producto_estado?on_conflict=id`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:'default',datos,updated_at:new Date().toISOString()})});
       if(!res.ok)throw new Error(await res.text());
       simProdMsg('Guardado ✓');
@@ -3132,6 +3138,12 @@ function simProdSetMaqNombre(mi,val){
 function simProdSetMaqInicio(mi,val){
   if(!simProdMaquinas[mi])return;
   simProdMaquinas[mi].inicio=val||'08:00';
+  renderSimPorProducto();
+}
+function simProdSetCambioFila(idx,val){
+  const f=simProdFilas[idx];if(!f)return;
+  const t=String(val==null?'':val).trim();
+  f.cambio=t===''?'':Math.max(0,parseInt(t,10)||0);
   renderSimPorProducto();
 }
 function simProdSetMaqCambio(mi,val){
@@ -3255,6 +3267,7 @@ function renderSimPorProducto(){
       :(plan.totalCamb>0
         ?`Producción: <b style="color:var(--text)">${simProdFmtDur(plan.totalProd)}</b> + cambios: <b style="color:var(--text)">${simProdFmtDur(plan.totalCamb)}</b> = <b style="color:var(--text)">${simProdFmtDur(plan.total)}</b> en total`
         :`<b style="color:var(--text)">${simProdFmtDur(plan.totalProd)}</b> en total`);
+    const primerOk=plan.items.findIndex(x=>x.ini!=null);
     const filasHtml=plan.items.map((it,pos)=>{
       const {f,idx,p,r}=it;
       let resultadoHtml='<span style="color:var(--text3);font-size:12px">—</span>';
@@ -3278,6 +3291,7 @@ function renderSimPorProducto(){
         <td style="min-width:240px">${prodCellHtml}</td>
         <td style="width:120px"><input type="number" min="0" step="0.01" value="${f.cantidad||''}" placeholder="Cantidad" onchange="simProdSetCantidad(${idx},this.value)" onkeydown="if(event.key==='Enter')this.blur()" style="width:100%;padding:6px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);text-align:right"/></td>
         <td>${resultadoHtml}</td>
+        <td style="text-align:center;width:1%;white-space:nowrap">${pos===primerOk?'<span style="color:var(--text3)" title="El primero no lleva cambio previo">—</span>':`<input type="number" min="0" value="${(f.cambio===''||f.cambio==null)?'':f.cambio}" placeholder="${m.cambio}" onchange="simProdSetCambioFila(${idx},this.value)" onkeydown="if(event.key==='Enter')this.blur()" title="Cambio previo a este producto (min). Vacío = el general de la máquina (${m.cambio} min)" style="${INP};width:52px;text-align:center${(f.cambio===''||f.cambio==null)?'':';border-color:var(--amber);color:var(--amber);font-weight:700'}"/>`}</td>
         <td style="text-align:center;font-weight:600;color:var(--green)">${it.ini!=null?minToHHMM(it.ini):'—'}</td>
         <td style="text-align:center;font-weight:600;color:var(--red)">${it.fin!=null?minToHHMM(it.fin):'—'}</td>
         <td style="white-space:nowrap;width:1%"><div style="display:flex;gap:4px;align-items:center">
@@ -3307,7 +3321,7 @@ function renderSimPorProducto(){
         </div>
       </div>
       <div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
-        <th>Producto</th><th style="text-align:right">Cantidad</th><th>Resultado</th><th style="text-align:center">Inicio</th><th style="text-align:center">Fin</th><th></th>
+        <th>Producto</th><th style="text-align:right">Cantidad</th><th>Resultado</th><th style="text-align:center" title="Minutos de cambio antes de este producto. Vacío = el general de la máquina">Cambio (min)</th><th style="text-align:center">Inicio</th><th style="text-align:center">Fin</th><th></th>
       </tr></thead><tbody>${filasHtml}</tbody></table></div>
       <div style="padding:8px 14px;border-top:.5px solid var(--border)">
         <button class="btn btn-sm" onclick="simProdAgregarFila('${m.id}')"><i class="ti ti-plus"></i> Agregar producto</button>
@@ -3431,7 +3445,7 @@ function simEqArmar(dia,filas,maquinas,hist,ov){
   });
   const maqs=maquinas.map(m=>{
     const items=(asign[m.id]||[]).slice().sort((a,b)=>idx[a.p.id]-idx[b.p.id])
-      .map(d=>({p:d.p,r:simProdCalcularFila(d.p,d.cantidad,hist)}));
+      .map(d=>({p:d.p,f:filas[idx[d.p.id]],r:simProdCalcularFila(d.p,d.cantidad,hist)}));
     const o=ov[m.id]||{};
     const inicio=/^\d{1,2}:\d{2}/.test(o.inicio||'')?o.inicio:m.inicio;
     const cambio=(o.cambio!==undefined&&o.cambio!=='')?Math.max(0,parseInt(o.cambio,10)||0):m.cambio;
