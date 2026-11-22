@@ -37,6 +37,17 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 .logo{font-size:15px;font-weight:600;display:flex;align-items:center;gap:8px}
 .logo i{color:var(--blue);font-size:20px}
 .logo .logo-s{width:26px;height:26px;flex:none}
+.simprod-grid{display:grid;gap:12px;align-items:start;margin-bottom:16px}
+.sp-row{padding:8px 10px;border-bottom:.5px solid var(--border)}
+.sp-row:last-child{border-bottom:none}
+.sp-row{cursor:pointer;transition:background .15s}
+.sp-ck{display:none;color:var(--green)}
+.sp-hecho{background:var(--green-bg);box-shadow:inset 3px 0 0 var(--green)}
+.sp-hecho .sp-ck{display:inline}
+.sp-ck2{display:none;color:#e8871e}
+.sp-naranja{background:#FDEBD3;box-shadow:inset 3px 0 0 #e8871e}
+.sp-naranja .sp-ck2{display:inline}
+@media(max-width:1000px){.simprod-grid{grid-template-columns:1fr!important}}
 .logo .sub{font-weight:500;font-size:13px;color:var(--text2)}
 @media(max-width:700px){.logo .sub{display:none}}
 .status-dot{width:8px;height:8px;border-radius:50%;background:#ccc;display:inline-block;margin-right:5px;transition:background .3s}
@@ -273,7 +284,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.343</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.357</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -343,18 +354,13 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
         <label>Semana:</label>
         <select id="rell-wsel" onchange="onRellSemana()"></select>
         <button class="btn btn-sm" onclick="onRellSemana()" title="Recargar"><i class="ti ti-refresh"></i></button>
-        <button class="btn btn-sm" onclick="copiarRellenosSemanaAnterior()" title="Copiar las cantidades de rellenos de la semana anterior" style="gap:5px"><i class="ti ti-copy"></i> Copiar sem. anterior</button>
+        <button class="btn btn-sm" style="display:none" onclick="copiarRellenosSemanaAnterior()" title="Copiar las cantidades de rellenos de la semana anterior" style="gap:5px"><i class="ti ti-copy"></i> Copiar sem. anterior</button>
       </div>
       <div class="btns">
         <button class="btn btn-pdf" onclick="imprimirRellenos()"><i class="ti ti-file-type-pdf"></i> PDF</button>
-        <button class="btn btn-primary" id="btnsave-rell" onclick="savePlan('btnsave-rell')"><i class="ti ti-device-floppy"></i> Guardar plan</button>
       </div>
     </div>
-    <div style="font-size:12px;color:var(--text2);margin:-6px 0 10px">Mismo plan que "Planificación" — cambiar la semana acá también la cambia allá (y viceversa).</div>
-    <div class="alert alert-info" style="margin-bottom:1rem">
-      <i class="ti ti-info-circle"></i>
-      <span>Cargá cuánto rinde una tanda de cada relleno (columna "Tandas") -- una vez cargada, los días solo van a dejar elegir múltiplos de esa cantidad. Usá las flechitas ↑↓ para ordenar los rellenos dentro de cada categoría (el orden es independiente por categoría).</span>
-    </div>
+    <div style="font-size:12px;color:var(--text2);margin:-6px 0 10px">Se calcula automáticamente del plan de "Planificación": cambiar la semana acá también la cambia allá (y viceversa).</div>
     <div id="rell-content"></div>
   </div>
 
@@ -3036,7 +3042,7 @@ async function simProdCargarEstado(){
     const rows=await get('sim_producto_estado','id=eq.default');
     const d=(rows&&rows[0]&&rows[0].datos)||{};
     if(Array.isArray(d.filas)&&d.filas.length){
-      simProdFilas=d.filas.map(f=>({prodId:f.prodId||'',cantidad:f.cantidad==null?'':f.cantidad,maq:f.maq||'',cambio:(f.cambio===''||f.cambio==null||isNaN(parseInt(f.cambio,10)))?'':Math.max(0,parseInt(f.cambio,10))}));
+      simProdFilas=d.filas.map(f=>({prodId:f.prodId||'',cantidad:f.cantidad==null?'':f.cantidad,maq:f.maq||'',hecho:simProdEstadoMarca(f.hecho),cambio:(f.cambio===''||f.cambio==null||isNaN(parseInt(f.cambio,10)))?'':Math.max(0,parseInt(f.cambio,10))}));
     }
     if(Array.isArray(d.maquinas)&&d.maquinas.length){
       simProdMaquinas=d.maquinas.map((m,i)=>({id:String(m.id||('m'+(i+1))),nombre:String(m.nombre||('Máquina '+(i+1))),inicio:/^\d{1,2}:\d{2}/.test(m.inicio||'')?m.inicio:'08:00',cambio:Math.max(0,parseInt(m.cambio,10)||0)}));
@@ -3056,7 +3062,7 @@ function simProdGuardarDebounced(){
   clearTimeout(simProdGuardarTimer);
   simProdGuardarTimer=setTimeout(async()=>{
     try{
-      const datos={filas:simProdFilas.map(f=>({prodId:f.prodId||'',cantidad:f.cantidad===''?'':(parseFloat(f.cantidad)||0),maq:simProdMaqDeFila(f),cambio:(f.cambio===''||f.cambio==null)?'':Math.max(0,parseInt(f.cambio,10)||0)})),maquinas:simProdMaquinas.map(m=>({id:m.id,nombre:m.nombre,inicio:m.inicio,cambio:m.cambio})),empresa:simProdEmpresa,area:simProdAreaF};
+      const datos={filas:simProdFilas.map(f=>({prodId:f.prodId||'',cantidad:f.cantidad===''?'':(parseFloat(f.cantidad)||0),maq:simProdMaqDeFila(f),hecho:simProdEstadoMarca(f.hecho),cambio:(f.cambio===''||f.cambio==null)?'':Math.max(0,parseInt(f.cambio,10)||0)})),maquinas:simProdMaquinas.map(m=>({id:m.id,nombre:m.nombre,inicio:m.inicio,cambio:m.cambio})),empresa:simProdEmpresa,area:simProdAreaF};
       const res=await fetch(`${SB}/rest/v1/sim_producto_estado?on_conflict=id`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:'default',datos,updated_at:new Date().toISOString()})});
       if(!res.ok)throw new Error(await res.text());
       simProdMsg('Guardado ✓');
@@ -3099,6 +3105,14 @@ function simProdCodigo(p){
   const m=mpData.find(x=>normTxt(x.nombre)===normTxt(p.nombre));
   return(m&&m.codigo)?m.codigo:'';
 }
+// v4.344: alias de Maestro (mismo orden de resolución que simProdCodigo); si no tiene, el nombre completo.
+function simProdAlias(p){
+  let m=null;
+  if(p.mp_id)m=mpData.find(x=>x.id===p.mp_id);
+  if(!m&&p.codigo_articulo)m=mpData.find(x=>String(x.codigo)===String(p.codigo_articulo));
+  if(!m)m=mpData.find(x=>normTxt(x.nombre)===normTxt(p.nombre));
+  return(m&&m.alias)?m.alias:p.nombre;
+}
 function simProdArea(p){
   return(st.A.find(a=>a.id===p.area_id)||{}).nombre||'';
 }
@@ -3138,6 +3152,26 @@ function simProdSetMaqNombre(mi,val){
 function simProdSetMaqInicio(mi,val){
   if(!simProdMaquinas[mi])return;
   simProdMaquinas[mi].inicio=val||'08:00';
+  renderSimPorProducto();
+}
+// v4.346: tocar una variedad cicla: sin marca -> verde (1 clic) -> naranja (2 clics) -> sin marca (3). Se guarda en f.hecho (0/1/2).
+function simProdEstadoMarca(v){const n=v===true?1:parseInt(v,10);return(n===1||n===2)?n:0;}
+function simProdContadorHtml(){
+  const c=simProdFilas.filter(x=>x.prodId),v=c.filter(x=>simProdEstadoMarca(x.hecho)===1).length,o=c.filter(x=>simProdEstadoMarca(x.hecho)===2).length;
+  return(v||o)?`<span style="color:var(--green)">Verde: ${v}</span> · <span style="color:#d9730d">Naranja: ${o}</span> <span style="color:var(--text3);font-weight:400">de ${c.length}</span>`:'';
+}
+function simProdToggleHecho(ev,idx){
+  if(ev.target.closest('input,button,select,textarea,a'))return;
+  const f=simProdFilas[idx];if(!f||!f.prodId)return;
+  f.hecho=(simProdEstadoMarca(f.hecho)+1)%3;
+  ev.currentTarget.classList.toggle('sp-hecho',f.hecho===1);
+  ev.currentTarget.classList.toggle('sp-naranja',f.hecho===2);
+  const b=document.getElementById('simprodHechosTxt');if(b)b.innerHTML=simProdContadorHtml();
+  const bt=document.getElementById('simprodDesmarcar');if(bt)bt.style.display=simProdFilas.some(x=>x.prodId&&simProdEstadoMarca(x.hecho))?'':'none';
+  simProdGuardarDebounced();
+}
+function simProdDesmarcarTodos(){
+  simProdFilas.forEach(f=>{f.hecho=0;});
   renderSimPorProducto();
 }
 function simProdSetCambioFila(idx,val){
@@ -3287,22 +3321,31 @@ function renderSimPorProducto(){
           <input type="text" placeholder="Elegí o escribí para buscar producto..." oninput="simProdAC(this,${idx})" onfocus="simProdAC(this,${idx})" onblur="setTimeout(()=>simProdHideAC(this),200)" autocomplete="off" style="width:100%;padding:6px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
           </div>`;
       const selMaq=nMaq>1?`<select onchange="simProdSetMaqFila(${idx},this.value)" title="Pasar a otra máquina" style="${INP};max-width:110px">${simProdMaquinas.map(x=>`<option value="${x.id}"${x.id===m.id?' selected':''}>${remEsc(x.nombre)}</option>`).join('')}</select>`:'';
-      return`<tr>
-        <td style="min-width:240px">${prodCellHtml}</td>
-        <td style="width:120px"><input type="number" min="0" step="0.01" value="${f.cantidad||''}" placeholder="Cantidad" onchange="simProdSetCantidad(${idx},this.value)" onkeydown="if(event.key==='Enter')this.blur()" style="width:100%;padding:6px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);text-align:right"/></td>
-        <td>${resultadoHtml}</td>
-        <td style="text-align:center;width:1%;white-space:nowrap">${pos===primerOk?'<span style="color:var(--text3)" title="El primero no lleva cambio previo">—</span>':`<input type="number" min="0" value="${(f.cambio===''||f.cambio==null)?'':f.cambio}" placeholder="${m.cambio}" onchange="simProdSetCambioFila(${idx},this.value)" onkeydown="if(event.key==='Enter')this.blur()" title="Cambio previo a este producto (min). Vacío = el general de la máquina (${m.cambio} min)" style="${INP};width:52px;text-align:center${(f.cambio===''||f.cambio==null)?'':';border-color:var(--amber);color:var(--amber);font-weight:700'}"/>`}</td>
-        <td style="text-align:center;font-weight:600;color:var(--green)">${it.ini!=null?minToHHMM(it.ini):'—'}</td>
-        <td style="text-align:center;font-weight:600;color:var(--red)">${it.fin!=null?minToHHMM(it.fin):'—'}</td>
-        <td style="white-space:nowrap;width:1%"><div style="display:flex;gap:4px;align-items:center">
+      const sub=r.estado==='ok'?`${Math.round(r.udsHora).toLocaleString('es-AR')} uds/h · <b style="color:var(--text)">${simProdFmtDur(r.durMin)}</b>`
+        :(r.estado==='sin-historico'?'<span style="color:var(--amber)"><i class="ti ti-alert-triangle"></i> Sin rendimiento histórico</span>'
+        :(r.estado==='sin-cantidad'?'Ingresá una cantidad':''));
+      const prodCell=p
+        ?`<div style="display:flex;align-items:flex-start;gap:5px"><div style="min-width:0;flex:1"><div style="font-weight:600;font-size:12.5px;line-height:1.25;word-break:break-word" title="${remEsc(p.nombre).replace(/"/g,'&quot;')}"><span class="sp-ck">✓ </span><span class="sp-ck2">● </span>${remEsc(simProdAlias(p))}</div><div style="font-size:11px;color:var(--text2);margin-top:1px">${sub}</div></div><button class="btn btn-xs" style="flex:none" onclick="simProdCambiarProducto(${idx})" title="Cambiar producto"><i class="ti ti-edit"></i></button></div>`
+        :prodCellHtml;
+      const cambioCell=pos===primerOk?'<span style="color:var(--text3);font-size:11px" title="El primero no lleva cambio previo">sin cambio</span>':`<span style="font-size:11px;color:var(--text3)">Cambio</span><input type="number" min="0" value="${(f.cambio===''||f.cambio==null)?'':f.cambio}" placeholder="${m.cambio}" onchange="simProdSetCambioFila(${idx},this.value)" onkeydown="if(event.key==='Enter')this.blur()" title="Cambio previo a este producto (min). Vacío = el general de la máquina (${m.cambio} min)" style="padding:4px 5px;font-size:12px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text);width:44px;text-align:center${(f.cambio===''||f.cambio==null)?'':';border-color:var(--amber);color:var(--amber);font-weight:700'}"/>`;
+      const selMaqC=nMaq>1?`<select onchange="simProdSetMaqFila(${idx},this.value)" title="Pasar a otra máquina" style="padding:4px 5px;font-size:12px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text);width:88px">${simProdMaquinas.map(x=>`<option value="${x.id}"${x.id===m.id?' selected':''}>${remEsc(x.nombre)}</option>`).join('')}</select>`:'';
+      return`<div class="sp-row${simProdEstadoMarca(f.hecho)===1?' sp-hecho':(simProdEstadoMarca(f.hecho)===2?' sp-naranja':'')}" onclick="simProdToggleHecho(event,${idx})">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+          <div style="flex:1;min-width:0">${prodCell}</div>
+          <div style="white-space:nowrap;font-weight:600;font-size:13px;padding-top:1px"><span style="color:var(--green)">${it.ini!=null?minToHHMM(it.ini):'—'}</span><span style="color:var(--text3);font-weight:400"> → </span><span style="color:var(--red)">${it.fin!=null?minToHHMM(it.fin):'—'}</span></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:6px;flex-wrap:wrap">
+          <input type="number" min="0" step="0.01" value="${f.cantidad||''}" placeholder="Cant." onchange="simProdSetCantidad(${idx},this.value)" onkeydown="if(event.key==='Enter')this.blur()" style="padding:4px 5px;font-size:12px;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text);width:70px;text-align:right"/>
+          ${cambioCell}
+          <span style="flex:1"></span>
           <button class="btn btn-xs" onclick="simProdMover(${idx},-1)" title="Subir"${pos===0?' disabled':''}><i class="ti ti-arrow-up"></i></button>
           <button class="btn btn-xs" onclick="simProdMover(${idx},1)" title="Bajar"${pos===plan.items.length-1?' disabled':''}><i class="ti ti-arrow-down"></i></button>
-          ${selMaq}
+          ${selMaqC}
           <button class="btn btn-xs btn-danger" onclick="simProdQuitarFila(${idx})" title="Quitar"><i class="ti ti-trash"></i></button>
-        </div></td>
-      </tr>`;
+        </div>
+      </div>`;
     }).join('');
-    return`<div class="stock-card" style="margin-bottom:16px">
+    return`<div class="stock-card" style="margin-bottom:0;min-width:0">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--bg2);border-bottom:.5px solid var(--border);border-radius:var(--radius-lg) var(--radius-lg) 0 0;flex-wrap:wrap;gap:8px">
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <i class="ti ti-building-factory-2" style="color:var(--text2)"></i>
@@ -3320,18 +3363,20 @@ function renderSimPorProducto(){
           <div>${totTxt}</div>
         </div>
       </div>
-      <div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
-        <th>Producto</th><th style="text-align:right">Cantidad</th><th>Resultado</th><th style="text-align:center" title="Minutos de cambio antes de este producto. Vacío = el general de la máquina">Cambio (min)</th><th style="text-align:center">Inicio</th><th style="text-align:center">Fin</th><th></th>
-      </tr></thead><tbody>${filasHtml}</tbody></table></div>
+      <div>${filasHtml}</div>
       <div style="padding:8px 14px;border-top:.5px solid var(--border)">
         <button class="btn btn-sm" onclick="simProdAgregarFila('${m.id}')"><i class="ti ti-plus"></i> Agregar producto</button>
       </div>
     </div>`;
   }).join('');
 
-  el.innerHTML=`${cards}
+  const cols=Math.min(Math.max(nMaq,1),3);
+  const nConProd=simProdFilas.filter(x=>x.prodId).length,nHechas=simProdFilas.filter(x=>x.prodId&&simProdEstadoMarca(x.hecho)).length;
+  el.innerHTML=`<div class="simprod-grid" style="grid-template-columns:repeat(${cols},minmax(0,1fr))">${cards}</div>
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">
-      <button class="btn btn-sm" onclick="simProdAgregarMaquina()"><i class="ti ti-plus"></i> Agregar máquina</button>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="btn btn-sm" onclick="simProdAgregarMaquina()"><i class="ti ti-plus"></i> Agregar máquina</button>
+      <button class="btn btn-sm" id="simprodDesmarcar" onclick="simProdDesmarcarTodos()" style="${nHechas?'':'display:none'}">Quitar marcas</button>
+      <span id="simprodHechosTxt" style="font-size:12px;color:var(--green);font-weight:600">${simProdContadorHtml()}</span></div>
       <div style="font-size:13px;display:flex;gap:18px;flex-wrap:wrap;align-items:center">
         ${filasOcultas?`<span style="color:var(--text3);font-size:12px">${filasOcultas} fila${filasOcultas>1?'s':''} oculta${filasOcultas>1?'s':''} por el filtro</span>`:''}
         ${totalCantidad>0?`<span><span style="color:var(--text2)">Cantidad total:</span> <b style="color:var(--text)">${totalCantidad.toLocaleString('es-AR')}</b></span>`:''}
@@ -3358,52 +3403,57 @@ function imprimirSimPorProducto(){
   const p2=n=>String(n).padStart(2,'0');
   const fechaImpresion=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()} ${p2(ahora.getHours())}:${p2(ahora.getMinutes())}`;
   const bloques=maqs.map(({m,plan})=>{
-    const filasHtml=plan.items.map(it=>{
-      const {p,r}=it;
-      const cod=simProdCodigo(p)||'—';
-      const uph=r.estado==='ok'?Math.round(r.udsHora).toLocaleString('es-AR'):'—';
-      const tiempo=r.estado==='ok'?simProdFmtDur(r.durMin):(r.estado==='sin-historico'?'Sin histórico':'—');
-      return`<tr><td class="cod">${cod}</td><td class="ali">${remEsc(p.nombre)}<div style="font-size:8pt;color:#777;font-weight:400">${remEsc(en(p.empresa_id)||'')} · ${remEsc(simProdArea(p))}</div></td><td class="cant">${r.cantidad.toLocaleString('es-AR')}</td><td class="uph">${uph}</td><td class="uph">${tiempo}</td><td class="hor">${it.ini!=null?minToHHMM(it.ini):'—'}</td><td class="hor">${it.fin!=null?minToHHMM(it.fin):'—'}</td></tr>`;
+    const primerOk=plan.items.findIndex(x=>x.ini!=null);
+    const filasHtml=plan.items.map((it,pos)=>{
+      const {p,r,f}=it;
+      const uph=r.estado==='ok'?`${Math.round(r.udsHora).toLocaleString('es-AR')} uds/h · ${simProdFmtDur(r.durMin)}`:(r.estado==='sin-historico'?'Sin rendimiento histórico':'');
+      const camb=(it.ini!=null&&pos!==primerOk)?simProdCambioFila(f,m.cambio):0;
+      const cambTxt=camb>0?` · cambio ${camb}'`:'';
+      const mk=f?simProdEstadoMarca(f.hecho):0;
+      return`<div class="r${mk===1?' h':(mk===2?' o':'')}"><div class="a"><b>${mk===1?'✓ ':(mk===2?'● ':'')}${remEsc(simProdAlias(p))}</b><span class="s">${uph}${cambTxt}</span></div><div class="q">${r.cantidad.toLocaleString('es-AR')}</div><div class="t">${it.ini!=null?minToHHMM(it.ini):'—'}<i>→</i>${it.fin!=null?minToHHMM(it.fin):'—'}</div></div>`;
     }).join('');
     const tot=plan.nProd===0?'':(plan.totalCamb>0
       ?`Producción ${simProdFmtDur(plan.totalProd)} + cambios ${simProdFmtDur(plan.totalCamb)} = ${simProdFmtDur(plan.total)}`
       :`Total ${simProdFmtDur(plan.totalProd)}`);
     return`<div class="maq">
-      <div class="mh"><span class="mn">${remEsc(m.nombre)}</span><span class="mi">Inicio ${minToHHMM(plan.iniMin)}${plan.nProd?' · Fin '+minToHHMM(plan.finMin):''}${m.cambio>0?' · Cambio de variedad '+m.cambio+' min':''}</span></div>
-      <table>
-        <thead><tr><th>ID</th><th>Producto</th><th style="text-align:right">Cantidad</th><th style="text-align:right">Uds/h</th><th style="text-align:right">Duración</th><th style="text-align:right">Inicio</th><th style="text-align:right">Fin</th></tr></thead>
-        <tbody>${filasHtml}</tbody>
-      </table>
+      <div class="mh"><span class="mn">${remEsc(m.nombre)}</span><span class="mi">${minToHHMM(plan.iniMin)}${plan.nProd?' a '+minToHHMM(plan.finMin):''}${m.cambio>0?' · cambio de variedad '+m.cambio+' min':''}</span></div>
       ${tot?`<div class="mt">${tot}</div>`:''}
+      <div class="rh"><span class="a">Producto</span><span class="q">Cant.</span><span class="t">Inicio → Fin</span></div>
+      ${filasHtml}
     </div>`;
   }).join('');
+  const cols=Math.min(maqs.length,3);
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
   <title>Simulación por producto</title>
   <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:Arial,sans-serif;padding:8mm;font-size:12pt}
-    h1{font-size:16pt;margin-bottom:2px}
-    .sub{font-size:11pt;color:#555;margin-bottom:10px}
-    .maq{margin-bottom:14px;page-break-inside:avoid}
-    .mh{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #333;padding:4px 0;margin-bottom:2px}
-    .mn{font-size:14pt;font-weight:700}
-    .mi{font-size:10.5pt;color:#444}
-    .mt{text-align:right;font-weight:700;font-size:11pt;padding-top:5px}
-    table{width:100%;border-collapse:collapse}
-    th{text-align:left;padding:4px 6px;font-size:10.5pt;border-bottom:1px solid #333}
-    td{padding:4px 6px;font-size:11pt;border-bottom:1px solid #ccc;vertical-align:top}
-    td.cod{width:11%;font-family:monospace}
-    td.ali{width:34%}
-    td.cant{width:11%;text-align:right;font-weight:700}
-    td.uph{width:12%;text-align:right}
-    td.hor{width:10%;text-align:right;font-weight:700}
-    .tot{border-top:2px solid #333;padding-top:8px;font-weight:700;font-size:12pt;display:flex;justify-content:space-between}
-    @media print{@page{size:A4;margin:10mm}body{padding:0}}
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{font-family:Arial,sans-serif;padding:6mm;font-size:9.5pt}
+    h1{font-size:14pt;margin-bottom:1px}
+    .sub{font-size:9.5pt;color:#555;margin-bottom:6px}
+    .grid{display:grid;grid-template-columns:repeat(${cols},minmax(0,1fr));gap:8px;align-items:start}
+    .maq{border:1px solid #999;border-radius:4px;overflow:hidden}
+    .mh{display:flex;justify-content:space-between;align-items:baseline;gap:6px;background:#eee;border-bottom:1px solid #999;padding:4px 6px}
+    .mn{font-size:11.5pt;font-weight:700}
+    .mi{font-size:8.5pt;color:#444;text-align:right}
+    .mt{font-size:8.5pt;font-weight:700;padding:3px 6px;border-bottom:1px solid #ccc}
+    .rh,.r{display:flex;align-items:center;gap:6px;padding:2px 6px}
+    .rh{font-size:7.5pt;color:#666;border-bottom:1px solid #999;text-transform:uppercase}
+    .r{border-bottom:1px solid #ddd;page-break-inside:avoid}
+    .r.h{background:#CDEBDD}
+    .r.o{background:#FAD9B0}
+    .a{flex:1;min-width:0}
+    .a b{display:block;font-size:9.5pt;line-height:1.15}
+    .s{display:block;font-size:7.5pt;color:#666}
+    .q{width:44px;text-align:right;font-weight:700}
+    .t{width:80px;text-align:right;font-weight:700;white-space:nowrap}
+    .t i{font-style:normal;color:#888;margin:0 2px;font-weight:400}
+    .tot{border-top:2px solid #333;margin-top:8px;padding-top:5px;font-weight:700;font-size:10pt;display:flex;justify-content:space-between}
+    @media print{@page{size:A4 landscape;margin:7mm}body{padding:0}}
   </style></head>
   <body>
     <h1>SIMULACIÓN POR PRODUCTO</h1>
     <div class="sub">${[simProdEmpresa!=='all'?en(simProdEmpresa):'',simProdAreaF!=='all'?((st.A.find(a=>a.id===simProdAreaF)||{}).nombre||''):''].filter(Boolean).join(' · ')||'Todas las empresas y áreas'} · Impreso ${fechaImpresion}</div>
-    ${bloques}
+    <div class="grid">${bloques}</div>
     <div class="tot"><span>Total${maqs.length>1?' ('+maqs.length+' máquinas)':''}${totalMin>0?' · producción combinada '+simProdFmtDur(totalMin)+(totalCamb>0?' + cambios '+simProdFmtDur(totalCamb):''):''}</span><span>Cantidad ${totalCantidad.toLocaleString('es-AR')}</span></div>
   <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
   </body></html>`;
@@ -3457,6 +3507,16 @@ function simEqArmar(dia,filas,maquinas,hist,ov){
 // Qué relleno(s) lleva un producto y cuántos kg por unidad (null si no se puede saber):
 //  1) vínculo explícito Rellenos → producto (productos.vinculo_productos, con gramos por unidad);
 //  2) receta del producto: ingredientes que son un producto del área "Rellenos" o cuyo nombre dice RELLENO.
+// Clave de la receta de un producto: su propio nombre o, si no hay, la del artículo de Maestro vinculado.
+function simEqRecKey(p){
+  if(st.Rec&&st.Rec[p.nombre])return p.nombre;
+  let m=null;
+  if(p.mp_id)m=mpData.find(x=>x.id===p.mp_id);
+  if(!m&&p.codigo_articulo)m=mpData.find(x=>String(x.codigo)===String(p.codigo_articulo));
+  if(!m)m=mpData.find(x=>normTxt(x.nombre)===normTxt(p.nombre));
+  const k=m&&typeof recKeyForMp==='function'?recKeyForMp(m):null;
+  return k||p.nombre;
+}
 function simEqRellenosDeProducto(p){
   const out=[],vistos=new Set();
   const add=(nombre,kgUd)=>{const k=normTxt(nombre);if(!k||vistos.has(k))return;vistos.add(k);out.push({nombre:String(nombre),kgUd});};
@@ -3466,8 +3526,9 @@ function simEqRellenosDeProducto(p){
     const l=v.find(x=>x&&x.producto_id===p.id);
     if(l){const g=parseFloat(l.gramos_por_unidad);add(rp.nombre,(isFinite(g)&&g>0)?g/1000:null);}
   });
-  const rec=(st.Rec&&st.Rec[p.nombre])||[];
-  const tanda=Number((st.RecTanda&&st.RecTanda[p.nombre])||1)||1;
+  const rk=simEqRecKey(p);
+  const rec=(st.Rec&&st.Rec[rk])||[];
+  const tanda=Number((st.RecTanda&&(st.RecTanda[rk]||st.RecTanda[p.nombre]))||1)||1;
   const nomRell=new Set((st.Pr||[]).filter(x=>simEqEsRellenos(x)&&String(x.empresa_id)===String(p.empresa_id)).map(x=>normTxt(x.nombre)));
   rec.forEach(si=>{
     const n=normTxt(si.ingrediente);
@@ -4196,11 +4257,48 @@ function pdadResumen(grupos,semanas,horasPorSemana){
 // Carga las horas guardadas para estas semanas + este filtro de empresa (tabla nueva
 // `productividad_horas`, SQL en la entrega). Guarda la fila completa (con su id) en caché para
 // que guardarHorasSemana sepa si tiene que hacer PATCH o INSERT.
+let horasProdSuma={};
+let horasProdAuto={};      // semana -> horas tomadas solas de Control de horas (si esa semana no se guardó a mano)
+let horasProdAutoInfo={};  // semana -> texto de qué empresas entran / faltan
 async function cargarHorasProductividad(semanas,ef){
-  horasProdCache={};
+  horasProdCache={};horasProdSuma={};horasProdAuto={};horasProdAutoInfo={};
   try{
-    const rows=await get('productividad_horas',`semana=in.(${semanas.join(',')})&empresa_filtro=eq.${ef}`);
-    rows.forEach(r=>{horasProdCache[r.semana]=r;});
+    const emps=pdadEmpresas();const ids=new Set(emps.map(e=>e.id));
+    const rows=await get('productividad_horas',`semana=in.(${semanas.join(',')})`);
+    const guardada=new Set();
+    (rows||[]).forEach(r=>{
+      const k=String(r.empresa_filtro);
+      if(k==='all'){if(ef==='all')horasProdCache[r.semana]=r;if(ef==='all'&&r.horas!=null)guardada.add(r.semana);return;}
+      if(!ids.has(k))return;
+      guardada.add(r.semana);
+      if(ef==='all'){if(r.horas!=null)horasProdSuma[r.semana]=Math.round(((horasProdSuma[r.semana]||0)+parseFloat(r.horas))*100)/100;}
+      else if(k===String(ef))horasProdCache[r.semana]=r;
+    });
+    // v4.356: "tengo subido el archivo de la semana del 9 al 15 pero no lo veo reflejado en productividad" --
+    // las semanas que no se guardaron a mano toman solas las horas de Control de horas (sin tocar nada).
+    for(const sem of semanas){
+      if(guardada.has(sem))continue;
+      try{
+        const r=await pdadPersonasDeControl(sem);
+        if(!r.informes.length)continue;
+        const por={};r.personas.forEach(p=>{por[p.empresa]=Math.round(((por[p.empresa]||0)+p.horas)*100)/100;});
+        const nom=id=>(emps.find(e=>e.id===id)||{}).nombre||'';
+        const con=[...new Set(r.informes.filter(i=>!r.sinHs.includes(i)).map(i=>i.empresa))];
+        const falta=emps.filter(e=>!r.informes.some(i=>i.empresa===e.id)).map(e=>e.nombre);
+        const sinHs=[...new Set(r.sinHs.map(i=>nom(i.empresa)))];
+        const info='Automático desde Control de horas ('+(con.map(nom).join(' + ')||'sin horas por día')+')'
+          +(falta.length&&ef==='all'?'. Falta subir: '+falta.join(', '):'')
+          +(sinHs.length?'. Volvé a subir en Control de horas: '+sinHs.join(', '):'');
+        if(ef==='all'){
+          if(!r.personas.length)continue;
+          horasProdAuto[sem]=Math.round(Object.values(por).reduce((a,v)=>a+v,0)*100)/100;
+        }else{
+          if(por[String(ef)]==null)continue;
+          horasProdAuto[sem]=por[String(ef)];
+        }
+        horasProdAutoInfo[sem]=info;
+      }catch(e){console.error('Horas automáticas',sem,e);}
+    }
   }catch(e){console.error('No se pudieron cargar las horas de productividad:',e);}
 }
 
@@ -4310,7 +4408,9 @@ async function pdadProcesarArchivoHoras(input,horasKey){
     // semana" arriba), que es la que normalmente corresponde al informe que acabás de subir --
     // igual podés cambiarla vos antes de confirmar.
     const semDefault=infPdadMeta.semanas[infPdadMeta.semanas.length-1]||null;
-    renderModalHorasPersonas(personas,horasKey,infPdadMeta.semanas,semDefault);
+    let empArch=pdadDetectarEmpresaArchivo(rows);
+    if(!empArch)empArch=(horasKey&&horasKey!=='all'&&pdadEmpresas().some(e=>e.id===String(horasKey)))?String(horasKey):(pdadEmpresas()[0]?pdadEmpresas()[0].id:'');
+    await pdadAbrirModalArchivo(personas,empArch,semDefault);
   }catch(e){
     console.error(e);
     alert('No pude leer el archivo: '+e.message);
@@ -4328,55 +4428,200 @@ async function pdadProcesarArchivoHoras(input,horasKey){
 // El ojito de la fila "Horas consumidas" (`pdadVerHorasPersonas`) abre este mismo modal pero
 // cargando lo ya guardado para esa semana en vez de un archivo nuevo, así sirve tanto para subir
 // como para consultar/corregir después.
-async function cargarHorasEmpleados(semana,ef){
+// v4.354: "cuando subo las horas semanales de Planeta y de Joselito que me ponga las horas totales, y que
+// pueda seleccionar al personal, que quede guardado cada vez que modifico el personal siempre por semana,
+// porque a veces un personal de Planeta se va a Joselito toda la semana". Ahora el detalle por persona es
+// UNA lista por semana con todas las empresas (tabla `productividad_horas_empleado`, `empresa_filtro` =
+// empresa a la que se asigna esa persona ESA semana). Cada persona se destilda (no suma) o se pasa de
+// empresa; al guardar se recalcula el total de cada empresa (`productividad_horas`) y "Todas" muestra la suma.
+const pdadEmpId=e=>String(e&&e.id!=null?e.id:'');
+const pdadEmpresas=()=>(st.E||[]).map(e=>({id:pdadEmpId(e),nombre:e.nombre}));
+let pdadModalEst={archivo:null,empArchivo:'',semana:null,personas:[],guardadasCache:{}};
+
+// Puro: une lo que trae un archivo con lo ya guardado de la semana. Quien ya estaba guardado conserva su
+// empresa y su tilde (así un traslado de empresa sobrevive a volver a subir el archivo); quien es nuevo
+// va a la empresa del archivo; los guardados que no están en el archivo se mantienen salvo los que estaban
+// asignados a la empresa del archivo (el archivo nuevo "aplasta" lo de esa empresa).
+function pdadMezclarPersonas(archivo,empArchivo,guardadas){
+  const k=n=>normTxt(n);
+  const empDe=p=>String(p.empresa!=null&&p.empresa!==''?p.empresa:empArchivo);
+  const cuenta={};(archivo||[]).forEach(p=>{cuenta[k(p.nombre)]=(cuenta[k(p.nombre)]||0)+1;});
+  const emps=new Set((archivo||[]).map(empDe));
+  const usadas=new Set(),out=[];
+  (archivo||[]).forEach(p=>{
+    const e=empDe(p);
+    // nombre único en el archivo: conserva la empresa ya guardada (un traslado sobrevive); repetido en dos empresas: se casa por nombre+empresa
+    const g=(guardadas||[]).find((x,ix)=>!usadas.has(ix)&&k(x.nombre)===k(p.nombre)&&(cuenta[k(p.nombre)]===1||String(x.empresa)===e));
+    if(g)usadas.add(guardadas.indexOf(g));
+    out.push({nombre:p.nombre,horas:p.horas,incluido:g?g.incluido:true,empresa:g?String(g.empresa):e});
+  });
+  (guardadas||[]).forEach((g,ix)=>{
+    if(usadas.has(ix))return;
+    if(!emps.has(String(g.empresa)))out.push({...g});
+  });
+  return out.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+}
+
+// Detecta a qué empresa pertenece el archivo por su título (primeras filas), igual que Control de horas.
+function pdadDetectarEmpresaArchivo(rows){
+  const txt=(rows||[]).slice(0,6).map(r=>(r||[]).filter(v=>typeof v==='string').join(' ')).join(' ');
+  const emps=pdadEmpresas();
+  const m=emps.find(e=>/joselito/i.test(txt)&&/joselito/i.test(e.nombre))||emps.find(e=>/planeta/i.test(txt)&&/planeta/i.test(e.nombre));
+  return m?m.id:'';
+}
+
+// Puro: el mismo archivo subido en varias vistas (Todas / Planeta / Joselito) dejó a cada persona repetida.
+// Se queda con una sola por nombre: gana la que ya tiene empresa asignada (no la de la carga vieja "Todas"),
+// y entre iguales la tildada. Si el mismo nombre aparece con horas DISTINTAS se respetan las dos (es otra carga).
+function pdadSinDuplicados(lista){
+  const grupos=new Map();
+  (lista||[]).forEach(p=>{const k=normTxt(p.nombre);if(!grupos.has(k))grupos.set(k,[]);grupos.get(k).push(p);});
+  const out=[];
+  grupos.forEach(g=>{
+    const vistas=[];
+    g.slice().sort((a,b)=>(a.legacy?1:0)-(b.legacy?1:0)||(b.incluido?1:0)-(a.incluido?1:0)).forEach(p=>{
+      if(!vistas.some(v=>Math.abs(v.horas-p.horas)<0.01))vistas.push(p);
+    });
+    out.push(...vistas);
+  });
+  return out.sort((a,b)=>a.nombre.localeCompare(b.nombre,'es'));
+}
+
+async function cargarHorasEmpleadosSemana(semana){
   try{
-    const rows=await get('productividad_horas_empleado',`semana=eq.${semana}&empresa_filtro=eq.${encodeURIComponent(ef)}&order=nombre.asc`);
-    return(rows||[]).map(r=>({nombre:r.nombre,horas:r.horas!=null?parseFloat(r.horas):0,incluido:r.incluido!==false}));
+    const emps=pdadEmpresas();const ids=new Set(emps.map(e=>e.id));
+    const rows=await get('productividad_horas_empleado',`semana=eq.${semana}&order=nombre.asc`);
+    const def=emps[0]?emps[0].id:'';
+    const lista=(rows||[]).map(r=>({nombre:r.nombre,horas:r.horas!=null?parseFloat(r.horas):0,incluido:r.incluido!==false,empresa:ids.has(String(r.empresa_filtro))?String(r.empresa_filtro):def,legacy:!ids.has(String(r.empresa_filtro))}));
+    return pdadSinDuplicados(lista);
   }catch(e){
     console.error('No se pudo cargar el detalle de horas por persona:',e);
     return[];
   }
 }
 
-async function pdadVerHorasPersonas(semana,horasKey){
-  const personas=await cargarHorasEmpleados(semana,horasKey);
-  if(!personas.length){alert('Todavía no hay horas por persona guardadas para esta semana. Subí un informe de liquidación con "Subir informe de horas".');return}
-  renderModalHorasPersonas(personas,horasKey,infPdadMeta.semanas,semana);
+// v4.355: "el archivo lo subo siempre en RRHH > Control de horas" -- las horas por persona se toman de los
+// informes ya guardados ahí (columna HS. TRABAJADAS de cada día), sumando lunes a domingo de la semana
+// elegida; cada persona entra en la empresa de su informe (después se puede cambiar de empresa).
+function pdadFechaISOmas(iso,d){const t=new Date(iso+'T00:00:00Z');t.setUTCDate(t.getUTCDate()+d);return t.toISOString().slice(0,10);}
+async function pdadPersonasDeControl(semana){
+  const lun=semana,dom=pdadFechaISOmas(semana,6);
+  const emps=pdadEmpresas();
+  const infs=await get('control_horas_informes',`select=id,empresa_id,empresa_nombre,desde,hasta,detalle,updated_at&hasta=gte.${lun}&desde=lte.${dom}&order=updated_at.asc`);
+  const emp=i=>{const ok=emps.find(e=>e.id===String(i.empresa_id));if(ok)return ok.id;const n=/joselito/i.test(i.empresa_nombre||'')?'joselito':/planeta/i.test(i.empresa_nombre||'')?'planeta':'';const m=n&&emps.find(e=>new RegExp(n,'i').test(e.nombre));return m?m.id:'';};
+  const dias=new Map(),sinHs=[],usados=[];
+  (infs||[]).forEach(inf=>{
+    const e=emp(inf);if(!e)return;
+    const tiene=(inf.detalle||[]).some(x=>(x.dias||[]).some(d=>d.hs!=null));
+    usados.push({empresa:e,desde:inf.desde,hasta:inf.hasta});
+    if(!tiene){sinHs.push({empresa:e,desde:inf.desde,hasta:inf.hasta});return;}
+    (inf.detalle||[]).forEach(x=>(x.dias||[]).forEach(d=>{
+      if(!d.fecha||d.fecha<lun||d.fecha>dom||d.hs==null)return;
+      dias.set(e+'|'+normTxt(x.nombre)+'|'+d.fecha,{e,nombre:x.nombre,min:d.hs});   // informes más nuevos pisan a los viejos
+    }));
+  });
+  const por=new Map();
+  dias.forEach(v=>{const k=v.e+'|'+normTxt(v.nombre);const p=por.get(k)||{nombre:v.nombre,empresa:v.e,min:0};p.min+=v.min;por.set(k,p);});
+  const personas=[...por.values()].filter(p=>p.min>0).map(p=>({nombre:p.nombre,empresa:p.empresa,horas:Math.round(p.min/60*100)/100}));
+  return{personas,informes:usados,sinHs};
+}
+// Abre el modal en la semana más reciente (de las 4 mostradas) que tenga un informe de Control de horas;
+// si no hay ninguna avisa. Dentro del modal se puede cambiar de semana.
+async function pdadTraerDeControl(){
+  const sems=infPdadMeta.semanas||[];
+  if(!sems.length)return;
+  let infs=[];
+  try{infs=await get('control_horas_informes',`select=id,empresa_id,desde,hasta&hasta=gte.${sems[0]}&desde=lte.${pdadFechaISOmas(sems[sems.length-1],6)}`);}
+  catch(e){alert('No pude leer Control de horas: '+e.message);return;}
+  for(let i=sems.length-1;i>=0;i--){
+    const a=sems[i],b=pdadFechaISOmas(a,6);
+    if((infs||[]).some(x=>x.hasta>=a&&x.desde<=b)){await pdadAbrirModalControl(a);return;}
+  }
+  alert('No hay informes de Control de horas que cubran estas semanas. Subí el archivo en RRHH > Control de horas.');
+}
+async function pdadAbrirModalControl(semana){
+  let r;
+  try{r=await pdadPersonasDeControl(semana);}catch(e){alert('No pude leer Control de horas: '+e.message);return;}
+  const emps=pdadEmpresas();
+  if(!r.informes.length){alert('No hay informes de Control de horas que cubran esa semana. Subí el archivo en RRHH > Control de horas.');return;}
+  if(!r.personas.length){alert('Los informes de Control de horas de esa semana todavía no tienen las horas trabajadas por día. Volvé a subir el archivo en RRHH > Control de horas (reemplaza el período, no se pierden las exclusiones) y probá de nuevo.');return;}
+  const nom=id=>(emps.find(e=>e.id===id)||{}).nombre||'';
+  const fd=iso=>iso?iso.split('-').reverse().join('/'):'';
+  const aviso=r.informes.map(i=>nom(i.empresa)+' '+fd(i.desde)+' al '+fd(i.hasta)).join(' · ')
+    +(r.sinHs.length?'. FALTAN horas en: '+r.sinHs.map(i=>nom(i.empresa)+' '+fd(i.desde)+' al '+fd(i.hasta)).join(', ')+' (volvé a subir ese archivo en Control de horas)':'');
+  const guardadas=await cargarHorasEmpleadosSemana(semana);
+  pdadModalEst={fuente:'control',aviso,archivo:r.personas,empArchivo:'',semana,personas:pdadMezclarPersonas(r.personas,'',guardadas),guardadasCache:{[semana]:guardadas}};
+  renderModalHorasPersonas();
 }
 
-function renderModalHorasPersonas(personas,horasKey,semanas,semanaDefault){
+async function pdadVerHorasPersonas(semana,horasKey){
+  const personas=await cargarHorasEmpleadosSemana(semana);
+  if(!personas.length){await pdadAbrirModalControl(semana);return}
+  pdadModalEst={archivo:null,empArchivo:'',semana,personas,guardadasCache:{}};
+  renderModalHorasPersonas();
+}
+
+// Abre el modal con las personas del archivo recién subido, mezcladas con lo guardado de la semana elegida.
+async function pdadAbrirModalArchivo(personas,empArchivo,semana){
+  const guardadas=await cargarHorasEmpleadosSemana(semana);
+  pdadModalEst={archivo:personas,empArchivo,semana,personas:pdadMezclarPersonas(personas,empArchivo,guardadas),guardadasCache:{[semana]:guardadas}};
+  renderModalHorasPersonas();
+}
+
+async function pdadModalCambiaArchivoSemana(){
+  const e=pdadModalEst;
+  const sem=document.getElementById('hp-semana');
+  const emp=document.getElementById('hp-emp-archivo');
+  if(sem)e.semana=sem.value;
+  if(emp)e.empArchivo=emp.value;
+  if(e.fuente==='control'){await pdadAbrirModalControl(e.semana);return;}
+  if(e.archivo){
+    if(!e.guardadasCache[e.semana])e.guardadasCache[e.semana]=await cargarHorasEmpleadosSemana(e.semana);
+    e.personas=pdadMezclarPersonas(e.archivo,e.empArchivo,e.guardadasCache[e.semana]);
+  }
+  renderModalHorasPersonas();
+}
+
+function renderModalHorasPersonas(){
+  const e=pdadModalEst;
+  const semanas=infPdadMeta.semanas||[];
+  const emps=pdadEmpresas();
   let overlay=document.getElementById('modal-horas-personas');
   if(!overlay){
     overlay=document.createElement('div');
     overlay.className='modal-overlay';overlay.id='modal-horas-personas';
-    overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove();});
+    overlay.addEventListener('click',ev=>{if(ev.target===overlay)overlay.remove();});
     document.body.appendChild(overlay);
   }
-  // v4.306: si no vino semanaDefault o no está entre las semanas mostradas, el <select> de HTML cae
-  // solo en la PRIMERA opción apenas ninguna tiene "selected" -- forzamos acá la última semana del
-  // rango como respaldo, para no volver a depender de ese comportamiento implícito del navegador.
-  const semEfectiva=(semanas||[]).includes(semanaDefault)?semanaDefault:(semanas&&semanas.length?semanas[semanas.length-1]:null);
-  const semOpts=(semanas||[]).map(k=>`<option value="${k}"${k===semEfectiva?' selected':''}>${wlbCorta(k)}</option>`).join('');
-  const filas=personas.map((p,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:.5px solid var(--border)" data-nombre="${remEsc(p.nombre)}">
+  const semEfectiva=semanas.includes(e.semana)?e.semana:(semanas.length?semanas[semanas.length-1]:null);
+  e.semana=semEfectiva;
+  const semOpts=semanas.map(k=>`<option value="${k}"${k===semEfectiva?' selected':''}>${wlbCorta(k)}</option>`).join('');
+  const empOpts=sel=>emps.map(x=>`<option value="${remEsc(x.id)}"${x.id===String(sel)?' selected':''}>${remEsc(x.nombre)}</option>`).join('');
+  const sel='padding:5px 8px;font-size:12.5px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)';
+  const filas=e.personas.map((p,i)=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:.5px solid var(--border)" data-nombre="${remEsc(p.nombre)}">
     <input type="checkbox" id="hp-chk-${i}" ${p.incluido!==false?'checked':''} onchange="pdadRecalcTotalHoras()" style="width:16px;height:16px"/>
-    <span style="font-size:12.5px;flex:1">${remEsc(p.nombre)}</span>
+    <span style="font-size:12.5px;flex:1;min-width:0">${remEsc(p.nombre)}</span>
+    <select id="hp-emp-${i}" onchange="pdadRecalcTotalHoras()" style="${sel};width:165px">${empOpts(p.empresa)}</select>
     <span style="font-size:12.5px;font-weight:600;width:70px;text-align:right" id="hp-val-${i}" data-horas="${p.horas}">${p.horas.toLocaleString('es-AR')} hs</span>
   </div>`).join('');
-  overlay.innerHTML=`<div class="modal" style="width:480px;max-height:85vh;overflow-y:auto;display:flex;flex-direction:column">
+  const bloqueArchivo=(e.archivo&&e.fuente!=='control')?`<div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+      <label style="font-size:13px;color:var(--text2)">El archivo es de:</label>
+      <select id="hp-emp-archivo" onchange="pdadModalCambiaArchivoSemana()" style="${sel};flex:1">${empOpts(e.empArchivo)}</select>
+    </div>`:'';
+  overlay.innerHTML=`<div class="modal" style="width:560px;max-width:96vw;max-height:88vh;overflow-y:auto;display:flex;flex-direction:column">
     <div class="modal-title"><i class="ti ti-clock-hour-4"></i> Horas por persona</div>
-    <div class="modal-sub">${personas.length} personas (HS. TRAB. + Excedente + Extra 50%). Destildá a quien no quieras que sume al total del indicador. Al confirmar, esto reemplaza lo que hubiera guardado antes para la semana elegida.</div>
-    <div id="hp-lista" style="margin-top:8px;max-height:40vh;overflow-y:auto">${filas}</div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-weight:700">
-      <span>Total seleccionado</span>
-      <span id="hp-total">-- hs</span>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+    <div class="modal-sub">${e.personas.length} personas (horas trabajadas de lunes a domingo). Destildá a quien no quieras que sume, y elegí a qué empresa va cada persona esta semana (si se fue de Planeta a Joselito, cambiale la empresa). Al guardar queda registrado por semana y se recalculan las horas de cada empresa y el total.</div>
+    ${e.aviso?`<div style="font-size:12px;color:var(--text2);margin-top:6px">Tomado de Control de horas: ${remEsc(e.aviso)}</div>`:''}
+    ${bloqueArchivo}
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
       <label style="font-size:13px;color:var(--text2)">Semana:</label>
-      <select id="hp-semana" style="flex:1;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)">${semOpts}</select>
+      <select id="hp-semana" ${e.archivo?'onchange="pdadModalCambiaArchivoSemana()"':'disabled'} style="${sel};flex:1">${semOpts}</select>
     </div>
+    <div id="hp-lista" style="margin-top:8px;max-height:38vh;overflow-y:auto">${filas}</div>
+    <div id="hp-totales" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"></div>
     <div class="modal-btns" style="margin-top:16px">
       <button class="btn" onclick="document.getElementById('modal-horas-personas').remove()">Cancelar</button>
-      <button class="btn btn-primary" onclick="pdadConfirmarHoras('${horasKey}')">Guardar</button>
+      <button class="btn btn-primary" onclick="pdadConfirmarHoras()">Guardar</button>
     </div>
   </div>`;
   pdadRecalcTotalHoras();
@@ -4388,45 +4633,68 @@ function pdadListaPersonasActual(){
   return Array.from(lista.children).map(fila=>{
     const chk=fila.querySelector('input[type=checkbox]');
     const val=fila.querySelector('[id^="hp-val-"]');
+    const emp=fila.querySelector('select');
     return{
       nombre:fila.getAttribute('data-nombre')||'',
       horas:val?parseFloat(val.getAttribute('data-horas'))||0:0,
       incluido:chk?chk.checked:true,
+      empresa:emp?emp.value:'',
     };
   });
 }
 
-function pdadSumaHorasSeleccionadas(){
-  return Math.round(pdadListaPersonasActual().filter(p=>p.incluido).reduce((s,p)=>s+p.horas,0)*100)/100;
+// Puro: total de horas por empresa (solo las personas tildadas) y total general.
+function pdadTotalesPorEmpresa(personas){
+  const por={};let total=0;
+  (personas||[]).forEach(p=>{if(p.incluido===false)return;por[p.empresa]=Math.round(((por[p.empresa]||0)+p.horas)*100)/100;total+=p.horas;});
+  return{por,total:Math.round(total*100)/100};
 }
+
+function pdadSumaHorasSeleccionadas(){return pdadTotalesPorEmpresa(pdadListaPersonasActual()).total;}
 
 function pdadRecalcTotalHoras(){
-  const totalEl=document.getElementById('hp-total');
-  if(!totalEl)return;
-  totalEl.textContent=pdadSumaHorasSeleccionadas().toLocaleString('es-AR')+' hs';
+  const box=document.getElementById('hp-totales');
+  if(!box)return;
+  const t=pdadTotalesPorEmpresa(pdadListaPersonasActual());
+  const f=v=>(v||0).toLocaleString('es-AR')+' hs';
+  box.innerHTML=pdadEmpresas().map(e=>`<div style="display:flex;justify-content:space-between;font-size:13px;color:var(--text2)"><span>${remEsc(e.nombre)}</span><span>${f(t.por[e.id])}</span></div>`).join('')
+    +`<div style="display:flex;justify-content:space-between;font-weight:700;margin-top:4px"><span>Total (todas las empresas)</span><span>${f(t.total)}</span></div>`;
 }
 
-async function pdadConfirmarHoras(horasKey){
+// Guarda el total de horas de una empresa (o 'all') para una semana: PATCH si ya hay fila, INSERT si no.
+async function pdadGuardarHorasKey(semana,key,horas){
+  const rows=await get('productividad_horas',`semana=eq.${semana}&empresa_filtro=eq.${encodeURIComponent(key)}`);
+  if(rows&&rows[0]&&rows[0].id)await pat('productividad_horas',rows[0].id,{horas});
+  else if(horas!=null)await ins('productividad_horas',{semana,empresa_filtro:key,horas});
+}
+
+async function pdadConfirmarHoras(){
   const semEl=document.getElementById('hp-semana');
-  if(!semEl||!semEl.value)return;
-  const semana=semEl.value;
+  const semana=pdadModalEst.semana||(semEl&&semEl.value);
+  if(!semana)return;
   const personas=pdadListaPersonasActual();
-  const total=pdadSumaHorasSeleccionadas();
+  const t=pdadTotalesPorEmpresa(personas);
   const overlay=document.getElementById('modal-horas-personas');
   if(overlay)overlay.remove();
   try{
-    // "aplasta" lo que hubiera antes para esta semana+filtro: borra todo y vuelve a insertar la
-    // lista completa (incluidas las personas destildadas, para no perder el detalle de quién se
-    // excluyó si vuelve a mirarlo después).
-    await fetch(`${SB}/rest/v1/productividad_horas_empleado?semana=eq.${semana}&empresa_filtro=eq.${encodeURIComponent(horasKey)}`,{method:'DELETE',headers:H});
+    // "aplasta" lo guardado de esa semana (todas las empresas) y vuelve a insertar la lista completa,
+    // incluidas las personas destildadas para no perder el detalle de a quién se excluyó.
+    const r=await fetch(`${SB}/rest/v1/productividad_horas_empleado?semana=eq.${semana}`,{method:'DELETE',headers:H});
+    if(!r.ok)throw new Error(await r.text());
     if(personas.length){
-      await ins('productividad_horas_empleado',personas.map(p=>({semana,empresa_filtro:horasKey,nombre:p.nombre,horas:p.horas,incluido:p.incluido})));
+      await ins('productividad_horas_empleado',personas.map(p=>({semana,empresa_filtro:p.empresa,nombre:p.nombre,horas:p.horas,incluido:p.incluido})));
     }
+    const conPersonas=new Set(personas.map(p=>p.empresa));
+    for(const e of pdadEmpresas()){
+      if(conPersonas.has(e.id))await pdadGuardarHorasKey(semana,e.id,t.por[e.id]||0);
+      else await pdadGuardarHorasKey(semana,e.id,null);
+    }
+    await pdadGuardarHorasKey(semana,'all',null); // el total "Todas" ahora sale de sumar las empresas
   }catch(e){
     console.error(e);
-    alert('No se pudo guardar el detalle por persona (el total igual se va a guardar): '+e.message);
+    alert('No se pudieron guardar las horas: '+e.message);
   }
-  await guardarHorasSemana(semana,horasKey,String(total));
+  renderInformeProductividad();
 }
 
 const fmtKg=v=>v==null?'':(v<1?v.toFixed(2):v.toFixed(1));
@@ -4466,14 +4734,14 @@ async function renderInformeProductividad(){
   // semanas elegidas, independientemente de si hay producción real cargada o no -- el bloque por
   // área de abajo sí se reemplaza por un aviso cuando no hay nada que mostrar.
   if(btnImp)btnImp.disabled=false;
-  const horasPorSemana={};semanas.forEach(k=>{horasPorSemana[k]=horasProdCache[k]?horasProdCache[k].horas:null});
+  const horasPorSemana={};semanas.forEach(k=>{horasPorSemana[k]=(ef==='all'&&horasProdSuma[k]!=null)?horasProdSuma[k]:(horasProdCache[k]&&horasProdCache[k].horas!=null?horasProdCache[k].horas:(horasProdAuto[k]!=null?horasProdAuto[k]:null))});
   const resumen=pdadResumen(grupos,semanas,horasPorSemana);
   infPdadResumen=resumen;
   const thSemanas=semanas.map(k=>`<th style="text-align:right">${wlbCorta(k)}</th>`).join('');
   const resumenHtml=`<div class="stock-card" style="margin-bottom:14px">
     <div style="padding:9px 12px;font-weight:700;font-size:13px;background:var(--bg2);border-bottom:.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
       <span>Resumen</span>
-      <button class="btn btn-sm" type="button" onclick="pdadAbrirSubirHoras('${horasKey}')" style="font-weight:500"><i class="ti ti-file-upload"></i> Subir informe de horas</button>
+      <button class="btn btn-sm" type="button" onclick="pdadTraerDeControl()" title="Toma las horas de lo que ya subiste en RRHH > Control de horas" style="font-weight:500"><i class="ti ti-clock-down"></i> Traer horas de Control de horas</button>
     </div>
     <div class="grid-scroll">
     <table class="stock-tbl"><thead><tr>
@@ -4489,7 +4757,7 @@ async function renderInformeProductividad(){
       </tr>
       <tr>
         <td style="text-align:left;font-weight:500">Horas consumidas</td>
-        ${semanas.map(k=>`<td style="text-align:right"><span style="display:inline-flex;align-items:center;gap:3px"><input type="number" min="0" step="0.5" value="${horasPorSemana[k]!=null?horasPorSemana[k]:''}" placeholder="—" onchange="guardarHorasSemana('${k}','${horasKey}',this.value)" style="width:72px;padding:3px 6px;font-size:12px;text-align:right;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/><button type="button" class="btn btn-sm" title="Ver/corregir horas por persona de esta semana" onclick="pdadVerHorasPersonas('${k}','${horasKey}')" style="padding:3px 5px"><i class="ti ti-eye" style="font-size:13px"></i></button></span></td>`).join('')}
+        ${semanas.map(k=>`<td style="text-align:right"><span style="display:inline-flex;align-items:center;gap:3px"><input type="number" min="0" step="0.5" value="${horasPorSemana[k]!=null?horasPorSemana[k]:''}" placeholder="—" ${(ef==='all'&&horasProdSuma[k]!=null)?'readonly title="Suma de las horas de cada empresa. Se cambia desde el ojito (personal por empresa)."':(horasProdAuto[k]!=null&&!(horasProdCache[k]&&horasProdCache[k].horas!=null)?(ef==='all'?'readonly ':'')+'title="'+remEsc(horasProdAutoInfo[k]||'')+'. Para destildar personas o pasarlas de empresa usá Traer horas de Control de horas."':'')} onchange="guardarHorasSemana('${k}','${horasKey}',this.value)" style="width:72px;padding:3px 6px;font-size:12px;text-align:right;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:${(horasProdAuto[k]!=null&&!(horasProdCache[k]&&horasProdCache[k].horas!=null)&&!(ef==='all'&&horasProdSuma[k]!=null))?'var(--text2);font-style:italic':'var(--text)'}"/><button type="button" class="btn btn-sm" title="Ver/corregir horas por persona de esta semana" onclick="pdadVerHorasPersonas('${k}','${horasKey}')" style="padding:3px 5px"><i class="ti ti-eye" style="font-size:13px"></i></button></span></td>`).join('')}
         <td style="text-align:right;font-size:11px;color:var(--text2)">${resumen.horasTotal?resumen.horasTotal.toLocaleString('es-AR')+' hs':''}</td>
       </tr>
       <tr style="font-weight:700;background:var(--bg2);border-top:1.5px solid var(--border)">
@@ -6497,6 +6765,7 @@ async function sincronizarNombreProdConMp(prodId){
 function rProdDetail(aid){
   const area=st.A.find(a=>a.id===aid);if(!area)return;
   const emp=st.E.find(e=>e.id===area.empresa_id);
+  const esRellArea=normTxt(area.nombre||'')==='RELLENOS';
   let prods=st.Pr.filter(p=>p.area_id===aid);
   if(prodSort.field==='descripcion'){
     prods=prods.sort((a,b)=>{
@@ -6568,10 +6837,10 @@ function rProdDetail(aid){
             <span style="font-size:11px;color:var(--text2)">Det. proc.</span>
             <input type="checkbox" ${p.detalle_proceso?'checked':''} onchange="updP('${p.id}','detalle_proceso',this.checked)" style="width:14px;height:14px;cursor:pointer"/>
           </label>
-          <label style="display:flex;align-items:center;gap:5px" title="Cajas que salen de una tanda. La planificación calcula: 1 tanda = esta cantidad x unidades por caja (Stock > Configuración stock > Cantidad de producto por caja).">
-            <span style="font-size:11px;color:var(--text2);white-space:nowrap">Caj/tanda</span>
-            <input type="number" min="0" step="1" value="${p.unidades_tanda||''}" placeholder="—"
-              onchange="updP('${p.id}','unidades_tanda',this.value?parseInt(this.value):null)"
+          <label style="display:flex;align-items:center;gap:5px" title="${esRellArea?'Kilos que rinde una tanda de este relleno. La pestaña Rellenos redondea los kg necesarios hacia arriba a un múltiplo de este número.':'Cajas que salen de una tanda. La planificación calcula: 1 tanda = esta cantidad x unidades por caja (Stock > Configuración stock > Cantidad de producto por caja).'}">
+            <span style="font-size:11px;color:var(--text2);white-space:nowrap">${esRellArea?'Kg/tanda':'Caj/tanda'}</span>
+            <input type="number" min="0" step="${esRellArea?'any':'1'}" value="${p.unidades_tanda||''}" placeholder="—"
+              onchange="updP('${p.id}','unidades_tanda',this.value?${esRellArea?'parseFloat':'parseInt'}(this.value):null)"
               style="width:64px;padding:3px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
           </label>
           <label style="display:flex;align-items:center;gap:5px" title="Unidades por bandeja">
@@ -14259,9 +14528,11 @@ function ctrlhParsear(rows){
   }
   if(/joselito/i.test(res.titulo))res.empresaTexto='joselito';
   else if(/planeta/i.test(res.titulo))res.empresaTexto='planeta';
-  let cur=null;
+  let cur=null,hsCol=-1;
   for(let i=0;i<rows.length;i++){
     const r=rows[i]||[];
+    // v4.355: columna " HS. TRABAJADAS" (horas del día) -- el valor cae en esa columna o en la siguiente
+    if(typeof r[0]==='string'&&/^FECHA$/i.test(r[0].trim())){hsCol=r.findIndex(x=>typeof x==='string'&&/TRABAJADAS/i.test(x));continue;}
     if(typeof r[0]==='string'&&/^LEGAJO/i.test(r[0].trim())){
       const prev=rows[i-1]||[];
       const nombre=String(prev.find(x=>typeof x==='string'&&x.trim())||'').trim();
@@ -14283,8 +14554,9 @@ function ctrlhParsear(rows){
       if(descanso>180){estado='incompleta';descanso=null;}
     }
     else if(n===3)estado='incompleta';
+    const hsRaw=hsCol>=0?[r[hsCol+1],r[hsCol]].find(x=>ctrlhMin(x)!==null):undefined;
     cur.dias.push({fecha:ctrlhFechaISO(f),dia:String(r[1]||'').trim(),horario:typeof r[2]==='string'?r[2].trim():'',
-      fich:marcasTxt.map((x,k)=>fich[k]!==null?String(x).trim():null),descanso,estado});
+      fich:marcasTxt.map((x,k)=>fich[k]!==null?String(x).trim():null),descanso,estado,hs:hsRaw!==undefined?ctrlhMin(hsRaw):null});
   }
   if(!res.desde||!res.hasta){
     const fs=res.empleados.flatMap(e=>e.dias.map(d=>d.fecha)).filter(Boolean).sort();
@@ -17328,122 +17600,152 @@ function filaRelleno(it,cat,idxInCat,lenInCat,alfaOn){
   return h;
 }
 
-function renderRellenos(){
-  const el=document.getElementById('rell-content');
-  const grupos=rellenosPorCategoria();
-  const totalItems=rellenosConFila().length;
-  if(!totalItems){
-    el.innerHTML='<div class="empty"><i class="ti ti-info-circle"></i> Todavía no hay productos en el área "Rellenos" de Configuración > Producción. Cargalos ahí primero (con su código de Configuración vinculado).</div>';
-    return;
-  }
-
-  const DIAS=['Lun','Mar','Mie','Jue','Vie','Sab','Dom'];
-  const fechasDia=DIAS.map((_,di)=>{
-    const d=new Date(st.w+'T00:00:00');
-    d.setDate(d.getDate()+di);
-    return d;
+// v4.348: Rellenos automático. Kg de relleno necesarios según el plan de producción de la semana
+// (el plan que se está editando), por relleno y por día, redondeados HACIA ARRIBA a la tanda de cada relleno
+// (productos.unidades_tanda del producto del área Rellenos = kg por tanda, se carga en Configuración).
+// Planeta: todos los productos; Joselito: solo ravioles y sorrentinos.
+function rellNecEmpresas(){
+  const eP=st.E.find(e=>/planeta/i.test(e.nombre)),eJ=st.E.find(e=>/joselito/i.test(e.nombre));
+  const secs=[];
+  if(eP)secs.push({emp:eP,titulo:'Planeta Empanada — todos los productos',filtro:null});
+  if(eJ)secs.push({emp:eJ,titulo:'Joselito — solo ravioles y sorrentinos',filtro:(p,r)=>/RAVIOL|SORRENT/.test(normTxt(p.nombre+' '+(r.area||'')))});
+  return secs;
+}
+// Orden pedido: Planeta, Burritos, Criollo 13, Pizzeta; el resto de las áreas (si las hay) después, alfabético.
+const RELL_AREAS_ORDEN=['PLANETA','BURRITOS','CRIOLLO 13','PIZZETA'];
+function rellNecAgrupar(lista){
+  const m={};
+  lista.forEach(g=>{const k=normTxt(g.area);(m[k]=m[k]||{area:g.area,items:[]}).items.push(g);});
+  const pos=a=>{const i=RELL_AREAS_ORDEN.findIndex(x=>normTxt(a)===x||normTxt(a)===x+'S');return i<0?99:i;};
+  const areas=Object.values(m).sort((a,b)=>pos(a.area)-pos(b.area)||a.area.localeCompare(b.area,'es',{numeric:true}));
+  // v4.351: dentro de cada área, calientes por un lado y fríos por otro (cada uno alfabético).
+  const out=[];
+  areas.forEach(a=>{
+    const alf=l=>l.slice().sort((x,y)=>x.nombre.localeCompare(y.nombre,'es',{numeric:true}));
+    const cal=alf(a.items.filter(g=>g.caliente)),fri=alf(a.items.filter(g=>!g.caliente));
+    if(cal.length)out.push({area:a.area,tipo:'Calientes',label:a.area+' · Calientes',items:cal});
+    if(fri.length)out.push({area:a.area,tipo:'Fríos',label:a.area+' · Fríos',items:fri});
   });
-
-  const theadCols=()=>{
-    let t=`<th style="width:40px" title="Orden dentro de esta categoría"><i class="ti ti-arrows-sort" style="font-size:13px"></i></th><th style="min-width:70px">ID</th><th style="min-width:190px">Descripción</th><th style="width:90px" title="Cantidad que rinde una tanda de este relleno">Tandas</th>`;
-    DIAS.forEach((d,di)=>{
-      const f=fechasDia[di];
-      const dd=f.getDate().toString().padStart(2,'0'), mm=(f.getMonth()+1).toString().padStart(2,'0');
-      t+=`<th style="text-align:center;width:110px">${d}<br><span style="font-size:10px;font-weight:400">${dd}/${mm}</span></th>`;
+  return out;
+}
+function rellNecRedondear(kg,tanda){
+  if(!(kg>1e-9))return 0;
+  if(!(tanda>0))return kg;
+  return Math.ceil(kg/tanda-1e-9)*tanda;
+}
+function rellNecCalcular(emp,filtro){
+  const rows=gE();
+  const porRell={},sinRelleno=new Set(),sinKg=new Set();
+  const relProd={};
+  (st.Pr||[]).forEach(p=>{if(simEqEsRellenos(p)&&String(p.empresa_id)===String(emp.id))relProd[normTxt(p.nombre)]=p;});
+  rows.forEach(r=>{
+    if(String(r.empresa_id)!==String(emp.id))return;
+    if(normTxt(r.area)==='RELLENOS')return;
+    const dias=(r.days||[]).map(v=>Number(v)||0);
+    if(!dias.some(v=>v>0))return;
+    const p=st.Pr.find(x=>x.nombre===r.producto&&String(x.empresa_id)===String(r.empresa_id));
+    if(!p)return;
+    if(filtro&&!filtro(p,r))return;
+    const rs=simEqRellenosDeProducto(p);
+    if(!rs.length){sinRelleno.add(r.producto);return;}
+    rs.forEach(x=>{
+      if(x.kgUd==null){sinKg.add(r.producto+' — '+x.nombre);return;}
+      const areaNom=areaCanon(r.empresa_id,r.area)||r.area||'';
+      const rp0=relProd[normTxt(x.nombre)]||null;
+      // v4.352/353: "caliente/frío" se lee de la Elaboración del producto que consume el relleno (la empanada); si ese está vacío, la del relleno.
+      const cal=p.elaboracion?p.elaboracion==='caliente':!!(rp0&&rp0.elaboracion==='caliente');
+      const k=normTxt(areaNom)+'||'+normTxt(x.nombre);
+      let g=porRell[k];
+      if(!g){
+        const rp=rp0;
+        const mp=rp?mpParaProducto({producto:rp.nombre,empresa_id:rp.empresa_id}):null;
+        const tanda=rp&&parseFloat(rp.unidades_tanda)>0?parseFloat(rp.unidades_tanda):0;
+        g=porRell[k]={area:areaNom,caliente:cal,nombre:mp?(mp.alias||mp.nombre):x.nombre,codigo:mp?(mp.codigo||''):'',tanda,dias:[0,0,0,0,0,0,0],det:[]};
+      }
+      if(cal)g.caliente=true; // v4.353: un relleno va en UNA sola tabla; si alguna empanada que lo usa (o el relleno) es caliente, todo el relleno es caliente
+      const det={prod:r.producto,cant:dias.reduce((a,v)=>a+v,0),kgUd:x.kgUd};
+      det.kg=det.cant*x.kgUd;g.det.push(det);
+      for(let i=0;i<7;i++)g.dias[i]+=dias[i]*x.kgUd;
     });
-    return t+`<th style="width:90px;text-align:right">Total</th><th style="width:40px"></th>`;
-  };
-
+  });
+  const lista=Object.values(porRell).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es',{numeric:true}));
+  const grupos=rellNecAgrupar(lista);
+  lista.forEach(g=>{
+    // v4.350: día de elaboración. Frío: el mismo día que se consume. Caliente (Config > Producto > Elaboración del producto que lleva el relleno): un día antes;
+    // lo del lunes se hace el sábado anterior. elab[0]=sábado anterior, elab[1..7]=Lun..Dom (indica el día de ELABORACIÓN).
+    g.elabEx=[0,0,0,0,0,0,0,0];
+    g.dias.forEach((v,di)=>{g.elabEx[g.caliente?di:di+1]+=v;});
+    g.red=g.elabEx.map(v=>rellNecRedondear(v,g.tanda));
+    g.total=g.red.reduce((a,v)=>a+v,0);
+    g.totalExacto=g.dias.reduce((a,v)=>a+v,0);
+    g.nTandas=g.tanda>0?Math.round(g.total/g.tanda):null;
+  });
+  return{lista,grupos,sinRelleno:[...sinRelleno].sort(),sinKg:[...sinKg].sort(),sinTanda:[...new Set(lista.filter(g=>!(g.tanda>0)).map(g=>g.nombre))]};
+}
+const RELL_DIAS=['Lun','Mar','Mie','Jue','Vie','Sab','Dom'];
+// Fechas de elaboración: [sábado anterior, Lun..Dom] en dd/mm.
+function rellNecFechas(){
+  const f=o=>{const d=new Date(st.w+'T00:00:00');d.setDate(d.getDate()+o);return String(d.getDate()).padStart(2,'0')+'/'+String(d.getMonth()+1).padStart(2,'0');};
+  return [f(-2),...RELL_DIAS.map((_,di)=>f(di))];
+}
+function rellNecF1(n){return n?n.toLocaleString('es-AR',{maximumFractionDigits:1}):'';}
+// Columnas visibles: el sábado anterior solo si algún relleno de la tabla lo necesita.
+function rellNecCols(items){const sab=items.some(g=>g.red[0]>0);const cols=[];if(sab)cols.push({i:0,lbl:'Sab',ant:true});RELL_DIAS.forEach((d,di)=>cols.push({i:di+1,lbl:d}));return cols;}
+function rellNecHtml(){
+  const secs=rellNecEmpresas();
+  if(!secs.length)return'<div class="empty">No encontré las empresas Planeta/Joselito.</div>';
+  const fechas=rellNecFechas(),f1=rellNecF1;
   let h='';
-  RELLENO_CATS.forEach(cat=>{
-    const alfaOn=!!rellAlfa[cat];
-    const list=alfaOn?[...grupos[cat]].sort((a,b)=>a.descripcion.localeCompare(b.descripcion,'es')):grupos[cat];
-    const slug=catSlug(cat);
-    const alfaLink=alfaOn
-      ?`<span style="font-size:10px;font-weight:400;color:var(--accent);cursor:pointer;text-transform:none" onclick="rellToggleAlfa('${cat}')" title="Volver al orden manual guardado">· Orden manual</span>`
-      :`<span style="font-size:10px;font-weight:400;color:var(--accent);cursor:pointer;text-transform:none" onclick="rellToggleAlfa('${cat}')" title="Ver esta categoría ordenada alfabéticamente (no borra el orden manual guardado)">· Ordenar alfabético</span>`;
-    h+=`<div class="grid-card" style="overflow-x:auto;margin-bottom:14px">
-      <div style="padding:8px 12px;font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px"><i class="ti ti-tag" style="font-size:14px"></i> ${cat} <span style="font-weight:400;text-transform:none;font-size:12px;color:var(--text3)">(${list.length})</span> ${alfaLink}</div>
-      <div style="display:flex;gap:8px;align-items:center;padding:0 12px 10px;flex-wrap:wrap">
-        <span style="font-size:12px;color:var(--text2)">Agregar relleno por ID:</span>
-        <input type="text" id="rell-add-${slug}" placeholder="Código..." inputmode="numeric" style="width:120px;padding:5px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)" onkeydown="if(event.key==='Enter')agregarRellenoACategoria('${cat}',this.value)"/>
-        <button class="btn btn-sm" onclick="agregarRellenoACategoria('${cat}',document.getElementById('rell-add-${slug}').value)"><i class="ti ti-plus"></i> Agregar</button>
-      </div>`;
-    if(list.length){
-      h+=`<table class="ptbl"><thead><tr>${theadCols()}</tr></thead><tbody>`;
-      list.forEach((it,i)=>{h+=filaRelleno(it,cat,i,list.length,alfaOn);});
-      h+='</tbody></table>';
-    }else{
-      h+='<div style="padding:0 12px 12px;font-size:12px;color:var(--text3)">Todavía no hay rellenos en esta categoría.</div>';
+  secs.forEach(sc=>{
+    const c=rellNecCalcular(sc.emp,sc.filtro);
+    if(!c.lista.length){h+=`<div class="grid-card" style="margin-bottom:14px"><div style="padding:8px 12px;font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px"><i class="ti ti-scale" style="font-size:14px"></i> ${remEsc(sc.titulo)}</div><div style="padding:0 12px 10px;font-size:12px;color:var(--text3)">No hay producción cargada en el plan de esta semana con relleno identificado.</div>`;}
+    else{
+      h+=`<div style="font-size:13px;font-weight:700;margin:14px 2px 6px">${remEsc(sc.titulo)}</div>`;
+      c.grupos.forEach(gr=>{
+        const cols=rellNecCols(gr.items);
+        const th=`<th style="width:84px">ID</th><th style="min-width:170px">Relleno</th><th style="width:76px;text-align:right" title="Kg por tanda (se define en Configuración > Producción > Rellenos)">Tanda (kg)</th>${cols.map(c2=>`<th style="text-align:center;width:78px${c2.ant?';color:var(--amber)':''}">${c2.ant?'Sáb ant.':c2.lbl}<br><span style="font-size:10px;font-weight:400">${fechas[c2.i]}</span></th>`).join('')}<th style="text-align:right;width:110px">Total kg</th>`;
+        const tot=Array(8).fill(0);gr.items.forEach(g=>g.red.forEach((v,i)=>tot[i]+=v));
+        const totAll=tot.reduce((a,v)=>a+v,0);
+        h+=`<div class="grid-card" style="margin-bottom:12px;overflow-x:auto"><div style="padding:8px 12px;font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px"><i class="ti ti-scale" style="font-size:14px"></i> ${remEsc(gr.label)}</div>
+        <table class="ptbl"><thead><tr>${th}</tr></thead><tbody>`;
+        gr.items.forEach(g=>{
+          h+=`<tr><td style="font-size:12px;color:var(--text2);font-family:monospace">${remEsc(g.codigo||'—')}</td><td style="font-weight:600">${remEsc(g.nombre)}${g.caliente?' <span title="Relleno caliente: se elabora un día antes (lo del lunes, el sábado anterior)" style="font-size:10px;font-weight:600;color:#d9730d;background:#fdebd3;border-radius:4px;padding:1px 5px;white-space:nowrap">caliente</span>':''}</td><td style="text-align:right;color:${g.tanda>0?'var(--text2)':'var(--amber)'}">${g.tanda>0?f1(g.tanda):'falta'}</td>${cols.map(c2=>{const v=g.red[c2.i],ex=g.elabEx[c2.i];return`<td style="text-align:center">${v?`<b>${f1(v)}</b>${g.tanda>0&&Math.abs(v-ex)>0.05?`<div style="font-size:10px;color:var(--text3)">(${f1(ex)})</div>`:''}`:''}</td>`;}).join('')}<td style="text-align:right;font-weight:700;color:var(--amber)">${f1(g.total)}${g.nTandas!=null?`<div style="font-size:10px;font-weight:400;color:var(--text3)">${g.nTandas} tanda${g.nTandas===1?'':'s'}</div>`:''}</td></tr>`;
+        });
+        h+=`<tr style="background:var(--bg2)"><td></td><td style="font-weight:700">Total ${remEsc(gr.label)}</td><td></td>${cols.map(c2=>`<td style="text-align:center;font-weight:700">${f1(tot[c2.i])}</td>`).join('')}<td style="text-align:right;font-weight:700">${f1(totAll)}</td></tr></tbody></table></div>`;
+      });
+      h+=`<div class="grid-card" style="margin-bottom:12px"><details style="padding:8px 12px;font-size:12px"><summary style="cursor:pointer;color:var(--text2)">Ver de qué variedades sale cada relleno (kg exactos, sin redondear)</summary>${c.lista.map(g=>`<div style="margin:6px 0 2px;font-weight:600">${remEsc(g.area)} · ${remEsc(g.nombre)} <span style="font-weight:400;color:var(--text3)">· exacto ${f1(g.totalExacto)} kg</span></div><div style="color:var(--text2)">${g.det.sort((a,b)=>b.kg-a.kg).map(d=>`${remEsc(d.prod)}: ${d.cant.toLocaleString('es-AR')} u. × ${(d.kgUd*1000).toLocaleString('es-AR',{maximumFractionDigits:1})} g = <b>${f1(d.kg)} kg</b>`).join('<br>')}</div>`).join('')}</details></div>`;
+      h+='<div>';
     }
+    if(c.sinTanda.length)h+=`<div style="padding:4px 12px 8px;font-size:12px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> Sin tanda definida (se muestran los kg exactos): ${c.sinTanda.map(remEsc).join(' · ')}. Cargala en Configuración > Producción > Rellenos, campo "Kg/tanda".</div>`;
+    if(c.sinRelleno.length)h+=`<div style="padding:4px 12px 8px;font-size:12px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> Con producción pero sin relleno identificado (revisar receta o vínculo): ${c.sinRelleno.map(remEsc).join(' · ')}</div>`;
+    if(c.sinKg.length)h+=`<div style="padding:4px 12px 8px;font-size:12px;color:var(--amber)"><i class="ti ti-alert-triangle"></i> Relleno identificado pero sin cantidad por unidad (falta gramos en el vínculo o la cantidad en la receta): ${c.sinKg.map(remEsc).join(' · ')}</div>`;
     h+='</div>';
   });
-
-  const sinCat=grupos['Sin categoría'];
-  if(sinCat.length){
-    h+=`<div class="grid-card" style="overflow-x:auto">
-      <div style="padding:8px 12px;font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px"><i class="ti ti-tag-off" style="font-size:14px"></i> Sin categoría todavía <span style="font-weight:400;text-transform:none;font-size:12px;color:var(--text3)">(${sinCat.length})</span></div>
-      <div style="padding:0 12px 8px;font-size:12px;color:var(--text2)">Usá el cuadro "Agregar por ID" de la categoría que corresponda (arriba) con alguno de estos códigos.</div>
-      <table class="ptbl"><thead><tr><th style="min-width:70px">ID</th><th style="min-width:190px">Descripción</th><th style="width:90px">Tandas</th></tr></thead><tbody>`;
-    sinCat.forEach(it=>{
-      h+=`<tr><td style="font-size:12px;color:var(--text2);font-family:monospace">${it.codigo||'—'}</td><td style="font-weight:500">${it.descripcion}</td>
-        <td><input type="number" min="0" step="any" value="${it.p.unidades_tanda||''}" placeholder="—" style="width:100%;padding:4px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)" onchange="updRellenoTanda('${it.p.id}',this.value)"/></td></tr>`;
-    });
-    h+='</tbody></table></div>';
-  }
-
-  h+=`<div style="font-size:12px;color:var(--text2);margin-top:8px">Los valores de los días se guardan junto con el resto del plan de la semana — acordate de tocar "Guardar plan". Un relleno puede estar en más de una categoría; la tanda y los días son los mismos en todas (no se duplican). Una vez que cargás cuánto rinde una tanda, los días solo dejan elegir múltiplos de esa cantidad.</div>`;
-  el.innerHTML=h;
+  return h;
+}
+function renderRellenos(){
+  const el=document.getElementById('rell-content');
+  if(!el)return;
+  el.innerHTML=rellNecHtml()+`<div style="font-size:12px;color:var(--text2);margin-top:4px">Se calcula solo con el plan de producción de la semana elegida (Planificación). Las columnas son el día en que hay que ELABORAR el relleno: los rellenos marcados como <b>caliente</b> en su Elaboración (Configuración > Producto): si alguna empanada que lleva el relleno, o el relleno mismo, es caliente, todo ese relleno se elabora caliente se hacen un día antes del consumo, y lo del lunes se hace el sábado anterior; los fríos, el mismo día. Cada día se redondea hacia arriba a la tanda del relleno: por ejemplo, con tanda de 10 kg, 45 kg pasan a 50 kg. El número gris entre paréntesis es el kg exacto.</div>`;
 }
 
 function imprimirRellenos(){
-  const grupos=rellenosPorCategoria();
-  const totalItems=rellenosConFila().length;
-  if(!totalItems){alert('No hay rellenos para imprimir.');return}
-  const sem=st.w;
-  const DIAS=['Lun','Mar','Mie','Jue','Vie','Sab','Dom'];
-  const fechasDia=DIAS.map((_,di)=>{const d=new Date(sem+'T00:00:00');d.setDate(d.getDate()+di);return d;});
-  const DIAS_HDR=DIAS.map((d,di)=>{
-    const f=fechasDia[di];
-    return `${d}<br><span style="font-size:7pt;font-weight:400">${f.getDate().toString().padStart(2,'0')}/${(f.getMonth()+1).toString().padStart(2,'0')}</span>`;
-  });
-
-  let tablas='';
-  [...RELLENO_CATS,'Sin categoría'].forEach(cat=>{
-    const list=grupos[cat];
-    if(!list.length)return;
-    let filas='';
-    list.forEach(it=>{
-      const total=(it.row.days||[]).reduce((s,v)=>s+(v||0),0);
-      filas+=`<tr><td class="cod">${it.codigo||''}</td><td class="prod">${it.descripcion}</td>`;
-      (it.row.days||[]).forEach(v=>{
-        filas+=`<td class="num ${v>0?'hasval':''}">${v>0?v.toLocaleString('es-AR'):''}</td>`;
-      });
-      filas+=`<td class="num tot">${total>0?total.toLocaleString('es-AR'):''}</td></tr>`;
+  const secs=rellNecEmpresas();
+  const fechas=rellNecFechas(),f1=rellNecF1,sem=st.w;
+  let tablas='',hay=false;
+  secs.forEach(sc=>{
+    const c=rellNecCalcular(sc.emp,sc.filtro);
+    if(!c.lista.length)return;hay=true;
+    c.grupos.forEach(gr=>{
+      const cols=rellNecCols(gr.items);
+      const tot=Array(8).fill(0);gr.items.forEach(g=>g.red.forEach((v,i)=>tot[i]+=v));
+      const filas=gr.items.map(g=>`<tr><td class="cod">${remEsc(g.codigo||'')}</td><td class="prod">${remEsc(g.nombre)}${g.caliente?' <span class="cal">caliente</span>':''}</td><td class="num">${g.tanda>0?f1(g.tanda):'—'}</td>${cols.map(c2=>{const v=g.red[c2.i];return`<td class="num ${v>0?'hasval':''}">${v?f1(v):''}</td>`;}).join('')}<td class="num tot">${f1(g.total)}${g.nTandas!=null?`<div class="tn">${g.nTandas} tanda${g.nTandas===1?'':'s'}</div>`:''}</td></tr>`).join('');
+      tablas+=`<div class="bloque"><div class="area-titulo">${remEsc(sc.emp.nombre)} — ${remEsc(gr.label)}</div><table><thead><tr><th class="h-cod">ID</th><th class="h-prod">Relleno</th><th class="h-num">Tanda kg</th>${cols.map(c2=>`<th class="h-num">${c2.ant?'Sáb ant.':c2.lbl}<br><span style="font-size:7pt;font-weight:400">${fechas[c2.i]}</span></th>`).join('')}<th class="h-tot">Total kg</th></tr></thead><tbody>${filas}<tr class="tot-row"><td></td><td class="prod">TOTAL ${remEsc(gr.label)}</td><td></td>${cols.map(c2=>`<td class="num tot">${f1(tot[c2.i])}</td>`).join('')}<td class="num tot">${f1(tot.reduce((a,v)=>a+v,0))}</td></tr></tbody></table></div>`;
     });
-    let totFila='<tr class="tot-row"><td class="cod"></td><td class="prod">TOTAL</td>';
-    DIAS.forEach((_,di)=>{
-      const tot=list.reduce((s,it)=>s+((it.row.days&&it.row.days[di])||0),0);
-      totFila+=`<td class="num tot">${tot>0?tot.toLocaleString('es-AR'):''}</td>`;
-    });
-    const gtot=list.reduce((s,it)=>s+(it.row.days||[]).reduce((a,v)=>a+(v||0),0),0);
-    totFila+=`<td class="num tot">${gtot>0?gtot.toLocaleString('es-AR'):''}</td></tr>`;
-
-    tablas+=`
-      <div class="area-titulo">${cat}</div>
-      <table>
-        <thead><tr>
-          <th class="h-cod">ID</th>
-          <th class="h-prod">Relleno</th>
-          ${DIAS_HDR.map(d=>`<th class="h-num">${d}</th>`).join('')}
-          <th class="h-tot">Total</th>
-        </tr></thead>
-        <tbody>${filas}${totFila}</tbody>
-      </table>`;
   });
-
+  if(!hay){alert('No hay rellenos calculados para imprimir (cargá producción en el plan de esta semana).');return}
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
-  <title>Planificación Rellenos ${sem}</title>
+  <title>Rellenos ${sem}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:Arial,sans-serif;font-size:9pt;padding:8mm}
@@ -17453,34 +17755,35 @@ function imprimirRellenos(){
     table{width:100%;border-collapse:collapse;margin-bottom:4px}
     th{background:#1B3A6B;color:#fff;padding:4px 5px;font-size:7.5pt;text-align:right;border:1px solid #0f2a52}
     th.h-cod{text-align:left;width:60px}
-    th.h-prod{text-align:left;min-width:160px}
-    th.h-num{width:70px}
-    th.h-tot{background:#16a34a;width:70px}
-    td{padding:3px 5px;font-size:8pt;border-top:.5px solid #ddd;border-bottom:.5px solid #ddd;border-left:1.5px solid #c8d5e8;border-right:none}
+    th.h-prod{text-align:left;min-width:150px}
+    th.h-num{width:62px}
+    th.h-tot{background:#16a34a;width:80px}
+    td{padding:3px 5px;font-size:8.5pt;border-top:.5px solid #ddd;border-bottom:.5px solid #ddd;border-left:1.5px solid #c8d5e8}
     td:last-child{border-right:1.5px solid #c8d5e8}
     td.cod{text-align:left;font-family:monospace;color:#555}
     td.prod{text-align:left;font-weight:600}
     td.num{text-align:right;color:#aaa}
-    td.hasval{color:#111;font-weight:600}
+    td.hasval{color:#111;font-weight:700}
     td.tot{font-weight:700;color:#16a34a;background:#f0fdf4}
-    tr:nth-child(even) td{background:#f8fafc}
-    tr:nth-child(even) td.tot{background:#dcfce7}
+    .tn{font-size:6.5pt;font-weight:400;color:#777}
     tr.tot-row td{background:#dde8ff!important;font-weight:700;border-top:1.5px solid #9ab0d8;color:#1B3A6B}
-    tr.tot-row td.tot{background:#c8d9f8!important;color:#16a34a}
-    @media print{@page{size:A4 landscape;margin:7mm}body{padding:0}.area-titulo{page-break-before:auto}}
+    tr.tot-row td.tot{color:#16a34a}
+    .nota{font-size:7.5pt;color:#666;margin-top:8px}
+    .bloque{page-break-inside:avoid}
+    .cal{font-size:6.5pt;font-weight:700;color:#d9730d;background:#fdebd3;border-radius:3px;padding:0 3px}
+    @media print{@page{size:A4 landscape;margin:7mm}body{padding:0}}
   </style></head>
   <body>
-    <h1>Planificación de Rellenos — ${wlb(sem)}</h1>
-    <div class="sub">SOPE · Generado ${new Date().toLocaleDateString('es-AR')}</div>
+    <h1>Kg de relleno necesarios — ${wlb(sem)}</h1>
+    <div class="sub">SOPE · Generado ${new Date().toLocaleDateString('es-AR')} · día de elaboración (calientes: 1 día antes; lunes → sábado anterior), redondeado hacia arriba a la tanda de cada relleno</div>
     ${tablas}
   <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
   </body></html>`;
-
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const w=window.open(url,'_blank');
   setTimeout(()=>URL.revokeObjectURL(url),15000);
-  if(!w)alert('Habilitá popups para imprimir.');
+  if(!w)alert('Habilitá popups para este sitio para imprimir.');
 }
 
 // ===== STOCK JOSELITO (Proyección) =====
