@@ -284,7 +284,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.357</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.358</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -5336,8 +5336,9 @@ function renderPlanEmpresa(eid, items){
       if(xTanda>0){
         const maxT=6;let opts='';
         for(let t2=0;t2<=maxT;t2++){
-          const val=Math.round(t2*xTanda*100)/100;
-          const cTotal=t2*cajasTanda;
+          // v4.358: las cajas por tanda pueden ser decimales (ej. 4,2): las unidades del plan se redondean a entero
+          const val=Math.round(t2*xTanda);
+          const cTotal=Math.round(t2*cajasTanda*100)/100;
           const label=t2===0?'--':`${t2}T - ${cTotal.toLocaleString('es-AR')}C - ${val.toLocaleString('es-AR')}U`;
           opts+=`<option value="${val}"${val===v?' selected':''}>${label}</option>`;
         }
@@ -6837,10 +6838,10 @@ function rProdDetail(aid){
             <span style="font-size:11px;color:var(--text2)">Det. proc.</span>
             <input type="checkbox" ${p.detalle_proceso?'checked':''} onchange="updP('${p.id}','detalle_proceso',this.checked)" style="width:14px;height:14px;cursor:pointer"/>
           </label>
-          <label style="display:flex;align-items:center;gap:5px" title="${esRellArea?'Kilos que rinde una tanda de este relleno. La pestaña Rellenos redondea los kg necesarios hacia arriba a un múltiplo de este número.':'Cajas que salen de una tanda. La planificación calcula: 1 tanda = esta cantidad x unidades por caja (Stock > Configuración stock > Cantidad de producto por caja).'}">
+          <label style="display:flex;align-items:center;gap:5px" title="${esRellArea?'Kilos que rinde una tanda de este relleno. La pestaña Rellenos redondea los kg necesarios hacia arriba a un múltiplo de este número.':'Cajas que salen de una tanda (admite decimales, ej. 4,2). La planificación calcula: 1 tanda = esta cantidad x unidades por caja (Stock > Configuración stock > Cantidad de producto por caja).'}">
             <span style="font-size:11px;color:var(--text2);white-space:nowrap">${esRellArea?'Kg/tanda':'Caj/tanda'}</span>
-            <input type="number" min="0" step="${esRellArea?'any':'1'}" value="${p.unidades_tanda||''}" placeholder="—"
-              onchange="updP('${p.id}','unidades_tanda',this.value?${esRellArea?'parseFloat':'parseInt'}(this.value):null)"
+            <input type="number" min="0" step="any" value="${p.unidades_tanda||''}" placeholder="—"
+              onchange="updP('${p.id}','unidades_tanda',this.value?parseFloat(this.value):null)"
               style="width:64px;padding:3px 6px;font-size:12px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
           </label>
           <label style="display:flex;align-items:center;gap:5px" title="Unidades por bandeja">
