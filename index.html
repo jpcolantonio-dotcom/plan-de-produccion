@@ -294,7 +294,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.361</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.362</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -19497,14 +19497,35 @@ function envFmt(n){
   return n.toLocaleString('es-AR',{maximumFractionDigits:2});
 }
 // items = materias primas (mp) en el orden de la planilla -> hojas: empanadas / el resto
+// v4.362: "necesito que en pedido por locales esté dividido por áreas" -- antes eran 2 grupos fijos (Empanadas / Burritos-
+// Pizzetas-Salsas, por el nombre). Ahora un grupo por ÁREA del producto vinculado a cada artículo (mp_id, código de artículo
+// o nombre, en ese orden), en un orden fijo de áreas conocidas; lo que no se puede ubicar va al final como "Sin área".
+const ENV_AREAS_ORDEN=['PLANETA','CRIOLLO 13','HOJALDRE 13','T&C 15','NAPOLITANA','BURRITOS','PIZZETA','SALSA'];
+function envAreaDirecta(m){
+  const n=normTxt(m.nombre||'');
+  const conArea=(st.Pr||[]).filter(p=>p.area_id);
+  const p=conArea.find(x=>x.mp_id&&x.mp_id===m.id)
+    ||conArea.find(x=>m.codigo&&x.codigo_articulo&&String(x.codigo_articulo)===String(m.codigo))
+    ||conArea.find(x=>normTxt(x.nombre)===n)
+    ||conArea.find(x=>{const pn=normTxt(x.nombre);return pn.length>=12&&n.startsWith(pn);}); // ej. "SALSA ... PIZZETAS" vs "... POTE DE 200 GRS."
+  const a=p?(st.A||[]).find(x=>x.id===p.area_id):null;
+  return a?a.nombre:'';
+}
+// Los artículos de la lista suelen ser la CAJA ("BP Caja"), que no tiene producto propio: se busca por el artículo "hermano"
+// (misma sigla o mismo alias sin "Caja/Unidad", la versión por unidad) y se toma el área de su producto.
+function envAreaDeMp(m){
+  const a=envAreaDirecta(m);if(a)return a;
+  const base=x=>normTxt(x||'').replace(/[\s-]*(CAJA|UNIDAD)\s*$/,'').trim();
+  const bm=base(m.alias);
+  const hermanos=(typeof mpData!=='undefined'?mpData:[]).filter(x=>x.id!==m.id&&((m.sigla&&x.sigla===m.sigla)||(bm&&base(x.alias)===bm)));
+  for(const x of hermanos){const r=envAreaDirecta(x);if(r)return r;}
+  return '';
+}
 function envArmarGrupos(items){
-  const esEmp=m=>normTxt(m.nombre||'').includes('EMPANADA');
-  const g=[
-    {titulo:'Empanadas',idxs:[]},
-    {titulo:'Burritos / Pizzetas / Salsas',idxs:[]}
-  ];
-  items.forEach((m,i)=>{(esEmp(m)?g[0]:g[1]).idxs.push(i);});
-  return g.filter(x=>x.idxs.length);
+  const por={};
+  items.forEach((m,i)=>{const a=envAreaDeMp(m)||'Sin área';(por[a]=por[a]||{titulo:a,idxs:[]}).idxs.push(i);});
+  const pos=t=>{const k=ENV_AREAS_ORDEN.indexOf(normTxt(t));return t==='Sin área'?999:k===-1?500:k;};
+  return Object.values(por).sort((a,b)=>pos(a.titulo)-pos(b.titulo)||a.titulo.localeCompare(b.titulo,'es',{numeric:true}));
 }
 // cant = {mpId:{COL:n}} -> {fila:{mpId:suma}, col:{COL:suma}, total}
 function envTotales(items,idxs,cant,cols){
