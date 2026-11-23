@@ -294,7 +294,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.360</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.361</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -17637,7 +17637,24 @@ function rellNecCalcular(emp,filtro){
   const rows=gE();
   const porRell={},sinRelleno=new Set(),sinKg=new Set();
   const relProd={};
-  (st.Pr||[]).forEach(p=>{if(simEqEsRellenos(p)&&String(p.empresa_id)===String(emp.id))relProd[normTxt(p.nombre)]=p;});
+  // v4.361: muchos rellenos están duplicados (una copia en el área Rellenos y otra sin área, con datos repartidos:
+  // la tanda en una, "caliente" en la otra). Se unen por nombre: tanda y elaboración salen de cualquiera de las
+  // copias (primero la del área Rellenos) y lo que se edita en esta tabla se guarda en la del área Rellenos
+  // (o en la única que exista, como RELLENO CE / CL que solo están sin área).
+  const copias={};
+  (st.Pr||[]).forEach(p=>{
+    if(String(p.empresa_id)!==String(emp.id))return;
+    const esRel=simEqEsRellenos(p),sinArea=!p.area_id&&/^RELLENO\b/.test(normTxt(p.nombre));
+    if(!esRel&&!sinArea)return;
+    (copias[normTxt(p.nombre)]=copias[normTxt(p.nombre)]||[]).push(p);
+  });
+  Object.entries(copias).forEach(([k,l])=>{
+    l.sort((a,b)=>(simEqEsRellenos(b)?1:0)-(simEqEsRellenos(a)?1:0));
+    const main=l[0];
+    const t=l.find(x=>parseFloat(x.unidades_tanda)>0);
+    const e=l.find(x=>x.elaboracion);
+    relProd[k]={...main,unidades_tanda:t?t.unidades_tanda:null,elaboracion:e?e.elaboracion:main.elaboracion,_idEditar:main.id};
+  });
   rows.forEach(r=>{
     if(String(r.empresa_id)!==String(emp.id))return;
     if(normTxt(r.area)==='RELLENOS')return;
@@ -17660,7 +17677,7 @@ function rellNecCalcular(emp,filtro){
         const rp=rp0;
         const mp=rp?mpParaProducto({producto:rp.nombre,empresa_id:rp.empresa_id}):null;
         const tanda=rp&&parseFloat(rp.unidades_tanda)>0?parseFloat(rp.unidades_tanda):0;
-        g=porRell[k]={area:areaNom,caliente:cal,nombre:mp?(mp.alias||mp.nombre):x.nombre,codigo:mp?(mp.codigo||''):'',tanda,dias:[0,0,0,0,0,0,0],det:[]};
+        g=porRell[k]={area:areaNom,caliente:cal,relId:rp?rp._idEditar:null,nombre:mp?(mp.alias||mp.nombre):x.nombre,codigo:mp?(mp.codigo||''):'',tanda,dias:[0,0,0,0,0,0,0],det:[]};
       }
       if(cal)g.caliente=true; // v4.353: un relleno va en UNA sola tabla; si alguna empanada que lo usa (o el relleno) es caliente, todo el relleno es caliente
       const det={prod:r.producto,cant:dias.reduce((a,v)=>a+v,0),kgUd:x.kgUd};
@@ -17709,7 +17726,7 @@ function rellNecHtml(){
         h+=`<div class="grid-card" style="margin-bottom:12px;overflow-x:auto"><div style="padding:8px 12px;font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px"><i class="ti ti-scale" style="font-size:14px"></i> ${remEsc(gr.label)}</div>
         <table class="ptbl"><thead><tr>${th}</tr></thead><tbody>`;
         gr.items.forEach(g=>{
-          h+=`<tr><td style="font-size:12px;color:var(--text2);font-family:monospace">${remEsc(g.codigo||'—')}</td><td style="font-weight:600">${remEsc(g.nombre)}${g.caliente?' <span title="Relleno caliente: se elabora un día antes (lo del lunes, el sábado anterior)" style="font-size:10px;font-weight:600;color:#d9730d;background:#fdebd3;border-radius:4px;padding:1px 5px;white-space:nowrap">caliente</span>':''}</td><td style="text-align:right;color:${g.tanda>0?'var(--text2)':'var(--amber)'}">${g.tanda>0?f1(g.tanda):'falta'}</td>${cols.map(c2=>{const v=g.red[c2.i],ex=g.elabEx[c2.i];return`<td style="text-align:center">${v?`<b>${f1(v)}</b>${g.tanda>0&&Math.abs(v-ex)>0.05?`<div style="font-size:10px;color:var(--text3)">(${f1(ex)})</div>`:''}`:''}</td>`;}).join('')}<td style="text-align:right;font-weight:700;color:var(--amber)">${f1(g.total)}${g.nTandas!=null?`<div style="font-size:10px;font-weight:400;color:var(--text3)">${g.nTandas} tanda${g.nTandas===1?'':'s'}</div>`:''}</td></tr>`;
+          h+=`<tr><td style="font-size:12px;color:var(--text2);font-family:monospace">${remEsc(g.codigo||'—')}</td><td style="font-weight:600">${remEsc(g.nombre)}${g.caliente?' <span title="Relleno caliente: se elabora un día antes (lo del lunes, el sábado anterior)" style="font-size:10px;font-weight:600;color:#d9730d;background:#fdebd3;border-radius:4px;padding:1px 5px;white-space:nowrap">caliente</span>':''}</td><td style="text-align:right">${g.relId?`<input type="number" min="0" step="any" value="${g.tanda>0?g.tanda:''}" placeholder="falta" title="Kg que rinde una tanda de este relleno (se guarda en Configuración > Rellenos)" onchange="updRellenoTanda('${g.relId}',this.value)" style="width:58px;padding:3px 5px;font-size:12px;text-align:right;border:.5px solid ${g.tanda>0?'var(--border2)':'var(--amber)'};border-radius:var(--radius);background:var(--bg);color:var(--text)"/>`:`<span style="color:var(--amber)">falta</span>`}</td>${cols.map(c2=>{const v=g.red[c2.i],ex=g.elabEx[c2.i];return`<td style="text-align:center">${v?`<b>${f1(v)}</b>${g.tanda>0&&Math.abs(v-ex)>0.05?`<div style="font-size:10px;color:var(--text3)">(${f1(ex)})</div>`:''}`:''}</td>`;}).join('')}<td style="text-align:right;font-weight:700;color:var(--amber)">${f1(g.total)}${g.nTandas!=null?`<div style="font-size:10px;font-weight:400;color:var(--text3)">${g.nTandas} tanda${g.nTandas===1?'':'s'}</div>`:''}</td></tr>`;
         });
         h+=`<tr style="background:var(--bg2)"><td></td><td style="font-weight:700">Total ${remEsc(gr.label)}</td><td></td>${cols.map(c2=>`<td style="text-align:center;font-weight:700">${f1(tot[c2.i])}</td>`).join('')}<td style="text-align:right;font-weight:700">${f1(totAll)}</td></tr></tbody></table></div>`;
       });
