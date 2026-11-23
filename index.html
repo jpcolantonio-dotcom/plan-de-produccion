@@ -196,10 +196,20 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 .desv-tbl tbody tr:last-child td{border-bottom:none}
 .desv-tbl tr:hover td{background:var(--bg2)}
 /* DASHBOARD */
-.dash-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:1rem;transition:opacity .35s,transform .35s}
+.dash-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:10px 8px;margin-bottom:1rem;transition:opacity .35s,transform .35s}
+/* v4.360: cada variedad es un círculo-semáforo (verde/amarillo/rojo) con el % adentro */
+.dash-dot{display:flex;flex-direction:column;align-items:center;text-align:center;min-width:0;padding:2px}
+.dash-dot-circle{position:relative;width:78px;height:78px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;box-shadow:inset 0 0 0 3px rgba(255,255,255,.25),0 1px 3px rgba(0,0,0,.18);transition:background .4s}
+.dash-dot-circle.s-ok{background:#1D9E75}
+.dash-dot-circle.s-warn{background:#EF9F27;color:#412402}
+.dash-dot-circle.s-bad{background:#E24B4A}
+.dash-dot-circle.s-empty{background:var(--bg3);color:var(--text3);box-shadow:inset 0 0 0 2px var(--border)}
+.dash-dot-thumb{position:absolute;right:-4px;bottom:-4px;width:26px;height:26px;border-radius:50%;object-fit:cover;border:2px solid var(--bg);background:var(--bg3)}
+.dash-dot-name{margin-top:6px;font-size:11px;font-weight:600;color:var(--text);line-height:1.25;max-width:100%;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:break-word}
+.dash-dot-nums{margin-top:2px;font-size:10px;color:var(--text2);white-space:nowrap}
 .dash-area-header{grid-column:1/-1;display:flex;align-items:center;gap:8px;padding:6px 4px 2px}
-@media(max-width:1100px){.dash-grid{grid-template-columns:repeat(4,1fr)}}
-@media(max-width:700px){.dash-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:1100px){.dash-grid{grid-template-columns:repeat(5,1fr)}}
+@media(max-width:700px){.dash-grid{grid-template-columns:repeat(3,1fr)}}
 .dash-card{border-radius:var(--radius);overflow:hidden;border:.5px solid var(--border)}
 .dash-card-header{background:var(--bg);padding:6px 8px;border-bottom:.5px solid var(--border);display:flex;align-items:center;gap:6px}
 .dash-card-titles{min-width:0;flex:1}
@@ -284,7 +294,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.358</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.360</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -10392,17 +10402,21 @@ function buildDashItems(k,ef){
     const pv=(r.days&&r.days[dia])||0;
     const rv=realDia(real,r,dia);
     if(pv>0){
-      if(!byArea[r.area])byArea[r.area]={empresa_id:r.empresa_id,items:[]};
-      byArea[r.area].items.push({produto:r.producto,area:r.area,unidad:r.unidad,empresa_id:r.empresa_id,pv,rv});
+      const ka=r.empresa_id+'||'+r.area;   // v4.359: clave por empresa+área (antes solo área: mezclaba empresas con el mismo nombre de área)
+      if(!byArea[ka])byArea[ka]={area:r.area,empresa_id:r.empresa_id,items:[]};
+      byArea[ka].items.push({produto:r.producto,area:r.area,unidad:r.unidad,empresa_id:r.empresa_id,pv,rv});
     }
   });
-  // Construir páginas: 3 áreas por página, hasta 6 productos por área
-  const areaList=Object.entries(byArea);
+  // Construir páginas: 3 filas por página, hasta 6 productos por fila. v4.359: "no me aparecen todas las
+  // variedades" -- antes cada área se cortaba en los primeros 6 productos (items.slice(0,6)) y el resto
+  // nunca se veía. Ahora un área con más de 6 variedades sigue en filas siguientes ("2/3"), todas visibles.
+  const filas=[];
+  Object.values(byArea).forEach(({area,empresa_id,items})=>{
+    const partes=Math.ceil(items.length/8);
+    for(let p=0;p<partes;p++)filas.push({area,empresa_id,items:items.slice(p*8,p*8+8),parte:p+1,partes});
+  });
   dashPages=[];
-  for(let i=0;i<areaList.length;i+=3){
-    const grupo=areaList.slice(i,i+3).map(([area,{empresa_id,items}])=>({area,empresa_id,items:items.slice(0,6)}));
-    dashPages.push(grupo);
-  }
+  for(let i=0;i<filas.length;i+=3)dashPages.push(filas.slice(i,i+3));
   dashItems=filtered;
   dashTotalPages=dashPages.length||1;
 }
@@ -10418,7 +10432,7 @@ function renderDashPage(animate=true){
     return;
   }
   const grupo=dashPages[dashPage]||dashPages[0];
-  const areaNames=grupo.map(g=>g.area).join(' · ');
+  const areaNames=[...new Set(grupo.map(g=>g.area))].join(' · ');
   document.getElementById('dash-page-info').textContent=
     `${areaNames} — Pagina ${dashPage+1} de ${dashTotalPages}`;
   const prev=document.getElementById('dash-prev');
@@ -10427,40 +10441,25 @@ function renderDashPage(animate=true){
   if(next)next.disabled=dashTotalPages<=1;
 
   let html='';
-  grupo.forEach(({area,empresa_id,items})=>{
+  grupo.forEach(({area,empresa_id,items,parte,partes})=>{
     const clr=ec(empresa_id)||'var(--blue)';
     html+=`<div class="dash-area-header" style="margin-bottom:4px">
       <span style="width:10px;height:10px;border-radius:50%;background:${clr};display:inline-block;flex-shrink:0"></span>
-      <span style="font-size:12px;font-weight:700;color:${clr};text-transform:uppercase;letter-spacing:.5px">${area}</span>
+      <span style="font-size:12px;font-weight:700;color:${clr};text-transform:uppercase;letter-spacing:.5px">${area}${partes>1?` <span style="font-weight:500;opacity:.7">(${parte}/${partes})</span>`:''}</span>
       <div style="flex:1;height:1px;background:${clr}33"></div>
       <span style="font-size:10px;color:var(--text2)">${en(empresa_id)||''}</span>
     </div>`;
     items.forEach(item=>{
       const pct=item.pv>0?Math.round(item.rv/item.pv*100):0;
       const hasReal=item.rv>0;
-      const cls=!hasReal?'dash-empty':pct>=100?'dash-ok':pct>=90?'dash-warn':'dash-bad';
-      const pctLabel=item.pv>0?(hasReal?pct+'%':'--'):'--';
+      const sem=!hasReal?'s-empty':pct>=100?'s-ok':pct>=90?'s-warn':'s-bad';
+      const pctLabel=hasReal?pct+'%':'--';
       const fotoUrl=dashFotos[item.empresa_id+'||'+normTxt(item.produto)];
-      const thumb=fotoUrl?`<a href="${fotoUrl}" target="_blank" title="Ver foto cargada en Trazabilidad"><img class="dash-card-thumb" src="${fotoUrl}"/></a>`:'';
-      html+=`<div class="dash-card">
-        <div class="dash-card-header">
-          ${thumb}
-          <div class="dash-card-titles">
-            <div class="dash-card-title">${item.produto}</div>
-            <div class="dash-card-sub">${item.unidad}</div>
-          </div>
-        </div>
-        <div class="dash-halves">
-          <div class="dash-half dash-plan">
-            <div class="dash-half-label">Plan</div>
-            <div class="dash-half-num">${item.pv>0?item.pv.toLocaleString('es-AR'):'--'}</div>
-          </div>
-          <div class="dash-half ${cls}">
-            <div class="dash-half-label">Real · ${pctLabel}</div>
-            <div class="dash-half-num">${hasReal?item.rv.toLocaleString('es-AR'):'--'}</div>
-          </div>
-        </div>
-        ${item.pv>0&&hasReal?`<div class="dash-progress"><div class="dash-progress-bar" style="width:${Math.min(pct,100)}%;background:${pct>=100?'#1D9E75':pct>=90?'#EF9F27':'#E24B4A'}"></div></div>`:''}
+      const thumb=fotoUrl?`<a href="${fotoUrl}" target="_blank" title="Ver foto cargada en Trazabilidad"><img class="dash-dot-thumb" src="${fotoUrl}"/></a>`:'';
+      html+=`<div class="dash-dot" title="${remEsc(item.produto)} — Plan ${item.pv.toLocaleString('es-AR')} · Real ${hasReal?item.rv.toLocaleString('es-AR'):'--'}">
+        <div class="dash-dot-circle ${sem}">${pctLabel}${thumb}</div>
+        <div class="dash-dot-name">${remEsc(item.produto)}</div>
+        <div class="dash-dot-nums">${hasReal?item.rv.toLocaleString('es-AR'):'--'} / ${item.pv.toLocaleString('es-AR')}</div>
       </div>`;
     });
   });
