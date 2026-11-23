@@ -294,7 +294,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.363</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.364</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -537,6 +537,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab" id="inftab-tiempos" onclick="showInfSubTab('tiempos')"><i class="ti ti-clock-hour-4"></i> Producción con tiempos</button>
     <button class="proy-tab" id="inftab-sim" onclick="showInfSubTab('sim')"><i class="ti ti-flask"></i> Simulación</button>
     <button class="proy-tab" id="inftab-vsp" onclick="showInfSubTab('vsp')"><i class="ti ti-traffic-lights"></i> Real vs Promedio</button>
+    <button class="proy-tab" id="inftab-sal" onclick="showInfSubTab('sal')"><i class="ti ti-truck-delivery"></i> Salidas</button>
   </div>
 
   <!-- SUB-TAB DESVIOS -->
@@ -666,6 +667,27 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <button class="btn btn-sm" id="btnImprimirInfRango" onclick="imprimirInformeRango()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
     </div>
     <div id="inf-rango-content"></div>
+  </div>
+
+  <!-- SUB-TAB SALIDAS (nueva v4.364) -->
+  <div id="tab-sal" style="display:none">
+    <div class="toolbar">
+      <div>
+        <div style="font-size:16px;font-weight:600">Salidas de producto</div>
+        <div style="font-size:13px;color:var(--text2)">Lo que salió de cada producto por día, según los remitos de Flexxus cargados en Remitos</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:1.25rem;flex-wrap:wrap">
+      <label style="font-size:13px;color:var(--text2)">Semana:</label>
+      <select id="inf-sal-wsel" onchange="renderInformeSalidas(false)" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
+      <label style="font-size:13px;color:var(--text2)">Local:</label>
+      <select id="inf-sal-lsel" onchange="renderInformeSalidas(false)" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todos los locales</option></select>
+      <label style="font-size:13px;color:var(--text2)">Unidad:</label>
+      <select id="inf-sal-usel" onchange="renderInformeSalidas(false)" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="uni">Unidades</option><option value="doc">Docenas (empanadas)</option></select>
+      <button class="btn btn-sm" onclick="renderInformeSalidas(true)" title="Volver a leer los remitos"><i class="ti ti-refresh"></i> Actualizar</button>
+      <button class="btn btn-sm" id="btnImprimirInfSal" onclick="imprimirInformeSalidas()" style="margin-left:auto"><i class="ti ti-printer"></i> Imprimir</button>
+    </div>
+    <div id="inf-sal-content"></div>
   </div>
 
   <!-- SUB-TAB PRODUCTIVIDAD (nueva v4.297) -->
@@ -2027,7 +2049,7 @@ function T(t){
 let infActiveSubTab='desv';
 function showInfSubTab(t){
   infActiveSubTab=t;
-  ['desv','dash','rend','diario','rango','pdad','tiempos','sim','vsp'].forEach(x=>{
+  ['desv','dash','rend','diario','rango','pdad','tiempos','sim','vsp','sal'].forEach(x=>{
     document.getElementById('tab-'+x).style.display=x===t?'':'none';
     document.getElementById('inftab-'+x).classList.toggle('active',x===t);
   });
@@ -2039,6 +2061,7 @@ function showInfSubTab(t){
   if(t==='tiempos')initInformeTiempos();
   if(t==='sim')initInformeSimulacion();
   if(t==='vsp')initVsp();
+  if(t==='sal')initInformeSalidas();
   if(t==='pdad')initInformeProductividad();
 }
 
@@ -4800,6 +4823,196 @@ async function renderInformeProductividad(){
   el.innerHTML=`<div style="font-size:12px;color:var(--text2);margin-bottom:10px">${semanas.length} semana${semanas.length!==1?'s':''}: ${semanas.map(wlbCorta).join(' · ')}</div>
   ${resumenHtml}
   ${detalleHtml}`;
+}
+
+// v4.364: Informes > Salidas. "ya que tenemos los remitos cargados de Flexxus, en informes armá informes de
+// salida y pueda trabajar en la cantidad de producto que se va de los locales" + "cantidades totales por día,
+// tipo un calendario como el de producción". Calendario semanal (Lun-Dom, por la FECHA del remito) de lo que
+// salió de cada producto según los remitos guardados (remitos/remito_items; las notas de crédito restan solas
+// porque vienen en negativo). Filtro por local (cliente del remito) y unidad: unidades reales, o docenas en
+// empanadas (resto igual). Un remito (mismo número de documento) guardado varias veces se cuenta una sola vez.
+const SAL_DIAS=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+let salDatos={sem:null,remitos:[],itemsPorRemito:{}};
+let salUltimo=null;
+function salFechaARemito(f){const m=String(f||'').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);return m?`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`:null;}
+function salDiaIdx(iso,semIso){
+  if(!iso||!semIso)return -1;
+  const d=Math.round((Date.parse(iso+'T00:00:00Z')-Date.parse(semIso+'T00:00:00Z'))/864e5);
+  return d>=0&&d<=6?d:-1;
+}
+function salFmt(v,dec){
+  if(!v)return'—';
+  const r=Math.round(v*(dec?10:1))/(dec?10:1);
+  if(!r)return'—';
+  return r.toLocaleString('es-AR',{maximumFractionDigits:dec?1:0});
+}
+// Puro: h={alias(it),nombre(it),cat(it),orden(alias),cats:[orden de categorías]} (se inyecta para poder testearlo aparte).
+function salArmar(remitos,itemsPorRemito,semIso,local,modo,h){
+  const vistos=new Map();
+  (remitos||[]).forEach(r=>{
+    // El número de documento es único: el mismo remito guardado varias veces (cada reimpresión lo vuelve a guardar)
+    // cuenta UNA sola vez; si una copia perdió el cliente (ej. traspasos 0040-...), gana la que lo tiene, y después la más nueva.
+    const k=String(r.numero||r.id);
+    const prev=vistos.get(k);
+    const tieneCli=x=>!!(x.cliente&&x.cliente!=='null');
+    if(!prev||(tieneCli(r)&&!tieneCli(prev))||(tieneCli(r)===tieneCli(prev)&&(r.creado_en||'')>(prev.creado_en||'')))vistos.set(k,r);
+  });
+  const locales=new Set(),filas=new Map(),porLocal=new Map();
+  let nRemitos=0;
+  vistos.forEach(r=>{
+    const di=salDiaIdx(salFechaARemito(r.fecha),semIso);
+    if(di<0)return;
+    const loc=(r.cliente&&r.cliente!=='null')?String(r.cliente):'Sin cliente';
+    locales.add(loc);
+    if(local&&local!=='all'&&loc!==local)return;
+    nRemitos++;
+    (itemsPorRemito[r.id]||[]).forEach(it=>{
+      const u=Number(it.unidades_reales!=null?it.unidades_reales:it.cantidad_mostrada)||0;
+      if(!u)return;
+      const alias=h.alias(it);
+      const key=(alias||String(it.codigo||it.descripcion)).toString().toLowerCase();
+      let f=filas.get(key);
+      if(!f){f={key,alias:alias||'',nombre:h.nombre(it),cat:h.cat(it),tipo:it.tipo,dias:[0,0,0,0,0,0,0]};filas.set(key,f);}
+      f.dias[di]+=u;
+      let pl=porLocal.get(loc);
+      if(!pl){pl={loc,dias:[0,0,0,0,0,0,0]};porLocal.set(loc,pl);}
+      pl.dias[di]+=u;
+    });
+  });
+  const conv=(f,v)=>(modo==='doc'&&f.tipo==='empanada')?v/12:v;
+  const porCat=new Map();
+  filas.forEach(f=>{
+    f.disp=f.dias.map(v=>conv(f,v));
+    f.total=f.disp.reduce((a,v)=>a+v,0);
+    if(!f.dias.some(v=>v))return;
+    if(!porCat.has(f.cat))porCat.set(f.cat,[]);
+    porCat.get(f.cat).push(f);
+  });
+  const ordenCats=[...(h.cats||[])];
+  const cats=[...porCat.keys()].sort((a,b)=>{
+    const ia=ordenCats.indexOf(a),ib=ordenCats.indexOf(b);
+    return (ia<0?99:ia)-(ib<0?99:ib)||String(a).localeCompare(String(b),'es');
+  }).map(cat=>{
+    const fl=porCat.get(cat).sort((a,b)=>{
+      const ia=h.orden(a.alias||a.nombre),ib=h.orden(b.alias||b.nombre);
+      return ia-ib||(a.alias||a.nombre).localeCompare(b.alias||b.nombre,'es',{numeric:true});
+    });
+    const tot=[0,0,0,0,0,0,0];
+    fl.forEach(f=>f.disp.forEach((v,i)=>tot[i]+=v));
+    return{cat,filas:fl,tot,total:tot.reduce((a,v)=>a+v,0),esEmp:fl.every(f=>f.tipo==='empanada')};
+  });
+  const totEmp=[0,0,0,0,0,0,0],totOtros=[0,0,0,0,0,0,0];
+  cats.forEach(c=>c.filas.forEach(f=>f.disp.forEach((v,i)=>{(f.tipo==='empanada'?totEmp:totOtros)[i]+=v;})));
+  const locs=[...porLocal.values()].map(p=>({...p,total:p.dias.reduce((a,v)=>a+v,0)})).sort((a,b)=>b.total-a.total);
+  return{cats,totEmp,totOtros,porLocal:locs,locales:[...locales].sort((a,b)=>a.localeCompare(b,'es')),nRemitos,modo};
+}
+function salFechasSemana(semIso){
+  const d0=new Date(semIso+'T00:00:00');
+  return SAL_DIAS.map((n,i)=>{const d=new Date(d0);d.setDate(d.getDate()+i);return`${n} ${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;});
+}
+function salHtml(d,semIso){
+  const cols=salFechasSemana(semIso);
+  const th=`<th>Producto</th>${cols.map(c=>`<th style="text-align:right;width:84px">${c}</th>`).join('')}<th style="text-align:right;width:90px">Total</th>`;
+  const dec=d.modo==='doc';
+  let h='';
+  d.cats.forEach(c=>{
+    const dc=c.esEmp&&dec;
+    const filas=c.filas.map(f=>`<tr><td style="font-weight:600">${remEsc(f.alias||f.nombre)}${f.alias?` <span style="font-weight:400;font-size:11px;color:var(--text3)">${remEsc(f.nombre)}</span>`:''}</td>${f.disp.map(v=>`<td style="text-align:right">${salFmt(v,f.tipo==='empanada'&&dec)}</td>`).join('')}<td style="text-align:right;font-weight:700">${salFmt(f.total,f.tipo==='empanada'&&dec)}</td></tr>`).join('');
+    h+=`<div class="grid-card" style="margin-bottom:12px;overflow-x:auto"><div style="padding:8px 12px;font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px"><i class="ti ti-truck-delivery" style="font-size:14px"></i> ${remEsc(c.cat)}</div>
+    <table class="ptbl"><thead><tr>${th}</tr></thead><tbody>${filas}<tr style="background:var(--bg2)"><td style="font-weight:700">Total ${remEsc(c.cat)}</td>${c.tot.map(v=>`<td style="text-align:right;font-weight:700">${salFmt(v,dc)}</td>`).join('')}<td style="text-align:right;font-weight:700">${salFmt(c.total,dc)}</td></tr></tbody></table></div>`;
+  });
+  const sum=a=>a.reduce((x,v)=>x+v,0);
+  const filaTot=(lbl,arr,dc)=>`<tr><td style="font-weight:700">${lbl}</td>${arr.map(v=>`<td style="text-align:right;font-weight:700">${salFmt(v,dc)}</td>`).join('')}<td style="text-align:right;font-weight:700">${salFmt(sum(arr),dc)}</td></tr>`;
+  const totUn=[0,0,0,0,0,0,0];d.porLocal.forEach(p=>p.dias.forEach((v,i)=>totUn[i]+=v));
+  h+=`<div class="grid-card" style="margin-bottom:12px;overflow-x:auto"><div style="padding:8px 12px;font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px"><i class="ti ti-sum" style="font-size:14px"></i> Total por día</div>
+  <table class="ptbl"><thead><tr><th>Concepto</th>${cols.map(c=>`<th style="text-align:right;width:84px">${c}</th>`).join('')}<th style="text-align:right;width:90px">Total</th></tr></thead><tbody>
+  ${filaTot(dec?'Empanadas (docenas)':'Empanadas (unidades)',d.totEmp,dec)}${filaTot('Otros productos (unidades)',d.totOtros,false)}</tbody></table></div>`;
+  if(d.porLocal.length){
+    h+=`<div class="grid-card" style="margin-bottom:12px;overflow-x:auto"><div style="padding:8px 12px;font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px"><i class="ti ti-building-store" style="font-size:14px"></i> Total por local (unidades, todo junto)</div>
+    <table class="ptbl"><thead><tr><th>Local</th>${cols.map(c=>`<th style="text-align:right;width:84px">${c}</th>`).join('')}<th style="text-align:right;width:90px">Total</th></tr></thead><tbody>
+    ${d.porLocal.map(p=>`<tr><td style="font-weight:600">${remEsc(p.loc)}</td>${p.dias.map(v=>`<td style="text-align:right">${salFmt(v,false)}</td>`).join('')}<td style="text-align:right;font-weight:700">${salFmt(p.total,false)}</td></tr>`).join('')}
+    ${filaTot('Total',totUn,false)}</tbody></table></div>`;
+  }
+  return h;
+}
+function salHelpers(){
+  return{
+    alias:it=>remAliasLimpio(remAliasInfo(it.codigo).alias)||'',
+    nombre:it=>remNombreLimpio(it.descripcion),
+    cat:it=>remCategoriaDeItem(it),
+    orden:a=>remOrdenAliasIndex(a),
+    cats:CATEGORIAS_PRODUCTO_SUGERIDAS
+  };
+}
+function initInformeSalidas(){
+  pS('inf-sal-wsel');
+  renderInformeSalidas(true);
+}
+async function salCargarSemana(semIso){
+  const remitos=[];
+  for(let off=0;;off+=1000){
+    const page=await get('remitos',`select=id,numero,fecha,cliente,creado_en&order=creado_en.desc&limit=1000&offset=${off}`);
+    remitos.push(...page);
+    if(page.length<1000)break;
+  }
+  const enSemana=remitos.filter(r=>salDiaIdx(salFechaARemito(r.fecha),semIso)>=0);
+  const itemsPorRemito={};
+  const ids=enSemana.map(r=>r.id);
+  for(let i=0;i<ids.length;i+=40){
+    const trozo=ids.slice(i,i+40);
+    let off=0;
+    for(;;){
+      const filas=await get('remito_items',`select=remito_id,codigo,descripcion,unidades_reales,cantidad_mostrada,tipo&remito_id=in.(${trozo.join(',')})&limit=1000&offset=${off}`);
+      filas.forEach(it=>(itemsPorRemito[it.remito_id]=itemsPorRemito[it.remito_id]||[]).push(it));
+      if(filas.length<1000)break;
+      off+=1000;
+    }
+  }
+  salDatos={sem:semIso,remitos:enSemana,itemsPorRemito};
+}
+async function renderInformeSalidas(recargar){
+  const el=document.getElementById('inf-sal-content');
+  if(!el)return;
+  const semIso=document.getElementById('inf-sal-wsel').value;
+  if(!semIso){el.innerHTML='';return;}
+  if(recargar||salDatos.sem!==semIso){
+    el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span> Cargando remitos...</div>';
+    try{await salCargarSemana(semIso);}
+    catch(e){el.innerHTML=`<div class="empty" style="color:var(--red)">No pude leer los remitos: ${remEsc(e.message)}</div>`;return;}
+  }
+  const lsel=document.getElementById('inf-sal-lsel');
+  const modo=document.getElementById('inf-sal-usel').value;
+  const previo=lsel.value||'all';
+  const todos=salArmar(salDatos.remitos,salDatos.itemsPorRemito,semIso,'all',modo,salHelpers());
+  lsel.innerHTML='<option value="all">Todos los locales</option>'+todos.locales.map(l=>`<option value="${remEsc(l)}">${remEsc(l)}</option>`).join('');
+  lsel.value=todos.locales.includes(previo)?previo:'all';
+  const d=salArmar(salDatos.remitos,salDatos.itemsPorRemito,semIso,lsel.value,modo,salHelpers());
+  salUltimo={d,semIso,local:lsel.value};
+  const btn=document.getElementById('btnImprimirInfSal');if(btn)btn.disabled=!d.cats.length;
+  if(!d.cats.length){el.innerHTML=`<div class="empty"><i class="ti ti-truck-delivery"></i> No hay remitos cargados con fecha en ${remEsc(wlb(semIso))}${lsel.value!=='all'?' para ese local':''}.</div>`;return;}
+  el.innerHTML=`<div style="font-size:12px;color:var(--text2);margin-bottom:8px">${d.nRemitos} remito${d.nRemitos!==1?'s':''} · cada columna es la fecha del remito${modo==='doc'?' · empanadas en docenas (unidades ÷ 12)':''}</div>`+salHtml(d,semIso);
+}
+function imprimirInformeSalidas(){
+  if(!salUltimo||!salUltimo.d.cats.length)return;
+  const{d,semIso,local}=salUltimo;
+  const ahora=new Date();const p2=n=>String(n).padStart(2,'0');
+  const fi=`${p2(ahora.getDate())}/${p2(ahora.getMonth()+1)}/${ahora.getFullYear()} ${p2(ahora.getHours())}:${p2(ahora.getMinutes())}`;
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Salidas — ${remEsc(wlb(semIso))}</title><style>
+  *{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:8mm;font-size:10pt;color:#111}
+  h1{font-size:15pt;margin-bottom:2px}.sub{font-size:10pt;color:#555;margin-bottom:8px}
+  .grid-card{page-break-inside:avoid;margin-bottom:8px}.grid-card>div{font-size:10pt;font-weight:700;text-transform:uppercase;padding:4px 0}
+  table{width:100%;border-collapse:collapse}th{padding:4px 6px;font-size:8.5pt;border-bottom:2px solid #333;text-align:right;white-space:nowrap}th:first-child{text-align:left}
+  td{padding:3px 6px;font-size:9pt;border-bottom:1px solid #ccc;white-space:nowrap}td:first-child{text-align:left}
+  .ti{display:none}span{color:#666}
+  @media print{@page{size:A4 landscape;margin:8mm}}</style></head><body>
+  <h1>Salidas de producto</h1><div class="sub">${remEsc(wlb(semIso))} · ${local==='all'?'Todos los locales':remEsc(local)} · ${d.nRemitos} remitos${d.modo==='doc'?' · empanadas en docenas':' · unidades'} · Impreso ${fi}</div>
+  ${salHtml(d,semIso)}
+  <script>window.onload=function(){setTimeout(function(){window.print()},350)};<\/script></body></html>`;
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para imprimir.');
 }
 
 function imprimirInformeProductividad(){
