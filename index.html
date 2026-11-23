@@ -294,7 +294,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.362</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.363</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -19893,7 +19893,7 @@ function calcularConsumoMpSemana(){
     if(!dias.some(v=>v>0))return;
     if(!porProducto[mp.id]){
       const prodPlan=st.Pr.find(p=>p.nombre===r.producto&&p.empresa_id===r.empresa_id);
-      porProducto[mp.id]={mp,producto:r.producto,unidad:(prodPlan&&prodPlan.unidad)||'u.',diasQty:[0,0,0,0,0,0,0]};
+      porProducto[mp.id]={mp,producto:r.producto,prod:prodPlan||null,unidad:(prodPlan&&prodPlan.unidad)||'u.',diasQty:[0,0,0,0,0,0,0]};
     }
     const pp=porProducto[mp.id];
     for(let di=0;di<7;di++){
@@ -19917,18 +19917,41 @@ function calcularConsumoMpSemana(){
     const ingsProducto=st.Rec[recKey]||[];
     if(!ingsProducto.length){ sinReceta.push(x); return; }
 
-    // Dentro de la receta del producto, separar los ingredientes que son en realidad un relleno
-    // (coinciden con una fila de Configuración que tiene su propia receta) de los que son un
-    // ingrediente crudo de la masa (no tienen receta propia, así que quedan afuera).
+    // v4.363: los kg de relleno salen del MISMO cálculo que la pestaña Rellenos (kg de relleno por unidad de cada
+    // producto x unidades del plan, simEqRellenosDeProducto) y la materia prima sale directamente de la receta del
+    // RELLENO escalada a esos kg ("para hacer 30 kg de relleno necesito esta MP"). Si el producto no tiene relleno
+    // identificado de esa forma, se usa el método anterior (ingrediente de la receta del producto que tiene receta propia).
     const candidatosSinReceta=[];
-    const rellenosEnReceta=ingsProducto.map(ing=>{
-      const cand=mpData.find(m=>normTxt(m.nombre)===normTxt(ing.ingrediente));
-      if(!cand)return null;
-      const subKey=recKeyForMp(cand);
+    const subDe=cand=>{
+      const subKey=recKeyForMp(cand)||Object.keys(st.Rec).find(k=>normTxt(k)===normTxt(cand.nombre));
       const subIngs=subKey?(st.Rec[subKey]||[]):[];
-      if(!subIngs.length){ candidatosSinReceta.push(cand.alias||cand.nombre); return null; }
-      return{ing,cand,subKey,subIngs};
-    }).filter(Boolean);
+      return{subKey,subIngs};
+    };
+    let rellenosEnReceta=[];
+    const ppX=porProducto[x.mp.id];
+    if(ppX&&ppX.prod){
+      simEqRellenosDeProducto(ppX.prod).forEach(rl=>{
+        if(rl.kgUd==null)return;
+        const kNom=normTxt(rl.nombre);
+        let cand=mpData.find(m=>normTxt(m.nombre)===kNom);
+        let subKey=Object.keys(st.Rec).find(k=>normTxt(k)===kNom);
+        if(!subKey&&cand)subKey=subDe(cand).subKey;
+        if(!cand)cand={nombre:rl.nombre,alias:null};
+        const subIngs=subKey?(st.Rec[subKey]||[]):[];
+        if(!subIngs.length){candidatosSinReceta.push(rl.nombre);return;}
+        rellenosEnReceta.push({kgUd:rl.kgUd,cand,subKey,subIngs});
+      });
+    }
+    if(!rellenosEnReceta.length){
+      const rk0=ingsProducto.map(ing=>{
+        const cand=mpData.find(m=>normTxt(m.nombre)===normTxt(ing.ingrediente));
+        if(!cand)return null;
+        const sd=subDe(cand);
+        if(!sd.subIngs.length){ candidatosSinReceta.push(cand.alias||cand.nombre); return null; }
+        return{ing,cand,subKey:sd.subKey,subIngs:sd.subIngs};
+      }).filter(Boolean);
+      rellenosEnReceta=rk0;
+    }
 
     if(!rellenosEnReceta.length){ sinRellenoEnReceta.push({x,candidatos:candidatosSinReceta}); return; }
 
@@ -19939,8 +19962,8 @@ function calcularConsumoMpSemana(){
     if(!diasActivos.length)return;
     const tandaProducto=(st.RecTanda&&st.RecTanda[pp.producto])||1;
 
-    rellenosEnReceta.forEach(({ing,cand,subKey,subIngs})=>{
-      const cantXUnidad=tandaProducto>0?ing.cantidad/tandaProducto:ing.cantidad;
+    rellenosEnReceta.forEach(({ing,kgUd,cand,subKey,subIngs})=>{
+      const cantXUnidad=kgUd!=null?kgUd:(tandaProducto>0?ing.cantidad/tandaProducto:ing.cantidad);
       const kgRellenoPorDia=diasActivos.map(di=>fn(cantXUnidad*pp.diasQty[di]));
       const totalKgRellenoSemana=fn(kgRellenoPorDia.reduce((a,v)=>a+v,0));
 
