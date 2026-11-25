@@ -294,7 +294,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.370</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.371</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1022,33 +1022,28 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <div class="proy-subtabs" style="margin-bottom:1rem">
       <button class="proy-tab active" id="cmtab-cargar" onclick="showConteoManualTab('cargar')"><i class="ti ti-clipboard-check"></i> Cargar conteo</button>
       <button class="proy-tab" id="cmtab-impresion" onclick="showConteoManualTab('impresion')"><i class="ti ti-printer"></i> Impresión por depósito</button>
+      <button class="proy-tab" id="cmtab-impresionpt" onclick="showConteoManualTab('impresionpt')"><i class="ti ti-printer"></i> Impresión conteo producto terminado</button>
     </div>
     <div id="cm-cargar">
-      <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Elegí un depósito (mismo listado que se imprime en "Impresión por depósito": código, nombre y cantidad) y completá el stock contado físicamente ahí. El número junto a cada depósito muestra cuántos productos ya tienen cantidad cargada hoy.</div>
+      <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Cargá acá el stock contado a mano de cada producto terminado, en <b>cajas</b> (decimales con coma). Las filas son las mismas del Objetivo de stock, con su Stock Máximo. Se guarda solo al escribir, por fecha y empresa, y después aparece en <b>Objetivo de stock</b> como "Stock manual" para compararlo contra el Stock Máximo y contra Flexxus.</div>
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
         <label style="font-size:13px;color:var(--text2)">Fecha:</label>
-        <input type="date" id="stock-conteo-fecha" onchange="loadStockConteo()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-        <button class="btn btn-sm" onclick="loadStockConteo()"><i class="ti ti-refresh"></i> Actualizar</button>
-        <button class="btn btn-sm" onclick="mostrarResumenConteo()" style="margin-left:auto"><i class="ti ti-clipboard-list"></i> Resumen de todos los depósitos</button>
+        <input type="date" id="stock-conteo-fecha" onchange="renderConteoManualPT()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        <select id="cmpt-esel" onchange="renderConteoManualPT()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
+        <button class="btn btn-sm" onclick="renderConteoManualPT()"><i class="ti ti-refresh"></i> Actualizar</button>
+        <input type="text" id="cmpt-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="cmptFiltrar()" style="flex:1;min-width:200px;max-width:320px;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+        <span id="cmpt-msg" style="font-size:12px;color:var(--text3)"></span>
       </div>
-      <div id="stock-conteo-dep-grid" style="margin-bottom:1rem"></div>
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:.75rem;flex-wrap:wrap">
-        <input type="text" id="mp-conteo-filtro" placeholder="🔍 Buscar por nombre o código..." oninput="filtrarMpConteo()"
-          style="flex:1;min-width:200px;max-width:320px;padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
-      </div>
-      <div id="stock-conteo-content"></div>
-      <div style="display:flex;justify-content:space-between;margin-top:1rem;flex-wrap:wrap;gap:8px">
-        <div style="font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px"><i class="ti ti-info-circle"></i> Podes guardar varias veces durante el dia. Los valores se actualizan sin borrar el resto.</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn" onclick="exportarTerminadoPlanetaExcel()"><i class="ti ti-file-spreadsheet"></i> Exportar Excel (migración Planeta)</button>
-          <button class="btn btn-primary" id="btnGuardarConteo" onclick="guardarStockConteo()" style="display:none"><i class="ti ti-device-floppy"></i> Guardar conteo</button>
-        </div>
-      </div>
+      <div id="cmpt-content"></div>
     </div>
     <!-- IMPRESIÓN: un botón por depósito, imprime una hoja para tomar stock físico con todos los
          productos asignados a ese depósito (por materias_primas.deposito_id o por mp_depositos). -->
     <div id="cm-impresion" style="display:none">
       <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Elegí un depósito para imprimir una hoja de toma de stock físico con todos sus productos (código, nombre y una columna vacía para anotar la cantidad).</div>
+      <div id="impresion-depositos-content"></div>
+    </div>
+    <div id="cm-impresionpt" style="display:none">
+      <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Imprime la planilla para contar a mano los productos terminados: por área, con código, producto y Stock Máximo, y columnas vacías para anotar lo contado. Después lo cargás en "Cargar conteo".</div>
       <div class="grid-card" style="margin-bottom:1rem">
         <div style="font-weight:700;font-size:13px;margin-bottom:4px"><i class="ti ti-target-arrow"></i> Planilla de toma de stock según Objetivo de stock</div>
         <div style="font-size:12px;color:var(--text2);margin-bottom:8px">Una hoja por área con los productos del objetivo: código, producto, Stock Máximo (capacidad de las cámaras) y columnas vacías para anotar lo contado y lo que falta.</div>
@@ -1058,7 +1053,6 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
           <span id="impobj-msg" style="font-size:12px;color:var(--text3)"></span>
         </div>
       </div>
-      <div id="impresion-depositos-content"></div>
     </div>
   </div>
 
@@ -1189,7 +1183,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
        stock → Depósitos → Cálculo de stock, vía calcCajasDeposito()) y cuánto falta para llegar a ese
        objetivo, por producto terminado. -->
   <div id="stock-sub-objetivo" style="display:none">
-    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Stock Máximo sale del cálculo de depósitos (Configuración stock → Depósitos → Cálculo de stock). Stock Real sale del último conteo de Flexxus guardado para la fecha elegida. Solo aparecen productos con objetivo de depósito calculado.</div>
+    <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Stock Máximo sale del cálculo de depósitos (Configuración stock → Depósitos → Cálculo de stock). Stock manual sale del último conteo cargado en Conteo de stock manual (hasta la fecha elegida) y Stock Flexxus del conteo de Flexxus de esa fecha. Se compara el Stock Máximo contra cada uno. Solo aparecen productos con objetivo de depósito calculado.</div>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
       <select id="obj-esel" onchange="renderObjetivoStock()" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="">Empresa...</option></select>
       <label style="font-size:13px;color:var(--text2)">Fecha stock real:</label>
@@ -12101,7 +12095,7 @@ let flexxusStockUltimoDep=null; // {id,nombre} del último depósito importado e
                                  // haber importado de nuevo.
 
 // ── CONTEO DE STOCK (dentro de la pestaña Stock) ─────────────────
-async function loadStockConteo(){
+async function loadStockConteoViejo(){ // v4.371: ya no se usa (reemplazado por renderConteoManualPT)
   const fecha=document.getElementById('stock-conteo-fecha').value||hoyLocal();
   try{
     mpConteoData=await get('mp_conteo',`fecha=eq.${fecha}`);
@@ -12812,13 +12806,141 @@ function poblarImpObjEmpresas(){
   const pl=st.E.find(e=>/PLANETA/i.test(e.nombre||''));
   if(pl)se.value=pl.id;
 }
+
+// ── CONTEO MANUAL DE PRODUCTO TERMINADO (v4.371): "en conteo de stock manual borrar todo lo que es carga de conteo, ahí vamos a
+// tener una carga de conteo igual a la del objetivo de stock, así puedo completar". Mismas filas y Stock Máximo que Objetivo de
+// stock; el contado (en cajas) se guarda por fecha+empresa en `conteo_manual_pt` y Objetivo de stock lo trae como "Stock manual".
+const CMPT_SQL_TABLA=`create table if not exists conteo_manual_pt (
+  id text primary key,
+  fecha date not null,
+  empresa_id text not null,
+  items jsonb not null default '{}'::jsonb,
+  updated_at timestamptz default now()
+);`;
+const CMPT_SQL_RLS='alter table conteo_manual_pt disable row level security;';
+let cmpt={filas:[],items:{},fecha:'',eid:'',puedeGuardar:true,errTabla:'',timer:null,grupos:[]};
+function cmptClave(f){return f.area+'||'+f.producto;}
+function cmptFmt(n){return n==null?'':String(n).replace('.',',');}
+// Falta/ocupación de un stock (valor) contra el máximo. sdTxt = motivo cuando no hay dato.
+function objHtmlFaltaVal(valor,stockMax,sdTxt){
+  if(valor==null)return `<span style="color:var(--text3)" title="${sdTxt||'sin dato'}">s/d</span>`;
+  const falta=Math.round((stockMax-valor)*100)/100;
+  const pct=objPctOcupacion(valor,stockMax);
+  const pctTxt=pct!=null?` <span style="font-size:10px;font-weight:400;color:var(--text2)">(${pct.toLocaleString('es-AR')}% ocup.)</span>`:'';
+  if(falta<=0)return `<span style="color:var(--green);font-weight:700">✓ completo</span>`+(falta<0?` <span style="font-size:10px;color:var(--text2)">(+${Math.abs(falta).toLocaleString('es-AR')})</span>`:'')+pctTxt;
+  return `<span style="color:var(--red);font-weight:700">${falta.toLocaleString('es-AR')}</span>`+pctTxt;
+}
+function cmptMsg(t,err){const el=document.getElementById('cmpt-msg');if(!el)return;el.textContent=t||'';el.style.color=err?'var(--red)':'var(--text3)';}
+function cmptPoblarEmpresas(){
+  const se=document.getElementById('cmpt-esel');
+  if(!se||se.options.length)return;
+  st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se.appendChild(o)});
+  const pl=st.E.find(e=>/PLANETA/i.test(e.nombre||''));
+  if(pl)se.value=pl.id;
+}
+async function renderConteoManualPT(){
+  const el=document.getElementById('cmpt-content');
+  if(!el)return;
+  if(cmpt.timer)await cmptGuardarYa();
+  cmptPoblarEmpresas();
+  const fEl=document.getElementById('stock-conteo-fecha');
+  if(fEl&&!fEl.value)fEl.value=hoyLocal();
+  const eid=document.getElementById('cmpt-esel').value;
+  const fecha=(fEl&&fEl.value)||hoyLocal();
+  if(!eid){el.innerHTML='<div class="empty">Elegí una empresa.</div>';return}
+  el.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
+  try{
+    if(!st.Pr.length){const[ar,pr]=await Promise.all([get('areas','order=nombre.asc'),get('productos','order=nombre.asc')]);st.A=ar||[];st.Pr=pr||[];}
+    const filas=await objFilasParaPlanilla(eid);
+    cmpt.filas=filas;cmpt.fecha=fecha;cmpt.eid=eid;cmpt.items={};cmpt.errTabla='';cmpt.puedeGuardar=true;
+    try{
+      const rows=await get('conteo_manual_pt','id=eq.'+encodeURIComponent(fecha+'|'+eid));
+      if(rows[0]&&rows[0].items&&typeof rows[0].items==='object')cmpt.items=rows[0].items;
+    }catch(e){cmpt.puedeGuardar=false;cmpt.errTabla=String((e&&e.message)||e);}
+    cmptRender();
+  }catch(e){el.innerHTML=`<div class="alert alert-err"><i class="ti ti-alert-circle"></i> Error: ${remEsc(String((e&&e.message)||e))}</div>`;console.error(e)}
+}
+function cmptBannerSQL(){
+  const t=cmpt.errTabla;
+  const falta=/PGRST205|42P01|Could not find the table|does not exist|schema cache|42501|row-level/i.test(t);
+  if(!falta)return `<div class="alert alert-info" style="display:block;margin-bottom:12px"><b>No se pudo leer lo guardado.</b> No se va a guardar hasta que se arregle.<div style="margin-top:6px;font-size:12px;color:var(--text2)">${remEsc(t.slice(0,300))}</div></div>`;
+  const pre='background:var(--bg2);padding:10px;border-radius:6px;overflow:auto;font-size:12px;margin:4px 0';
+  return `<div class="alert alert-info" style="display:block;margin-bottom:12px"><b>Falta crear la tabla en Supabase para guardar el conteo manual.</b> Corré este SQL en el SQL Editor (en dos pasos) y después tocá Actualizar.
+    <div style="margin-top:8px;font-size:12px;color:var(--text2)">Paso 1 — tabla:</div><pre style="${pre}">${remEsc(CMPT_SQL_TABLA)}</pre>
+    <div style="font-size:12px;color:var(--text2)">Paso 2 — sin RLS (línea sola):</div><pre style="${pre}">${remEsc(CMPT_SQL_RLS)}</pre></div>`;
+}
+function cmptRender(){
+  const el=document.getElementById('cmpt-content');
+  if(!el)return;
+  const filas=cmpt.filas;
+  let h=cmpt.errTabla?cmptBannerSQL():'';
+  if(!filas.length){
+    el.innerHTML=h+'<div class="empty"><i class="ti ti-target-arrow"></i>No hay productos con objetivo de depósito calculado para esta empresa. Revisá Configuración stock → Depósitos → Cálculo de stock.</div>';return;
+  }
+  const grupos=objAgruparPorArea(filas);
+  cmpt.grupos=grupos;
+  let idx=0;
+  grupos.forEach((g,gi)=>{
+    g.idxs=[];
+    h+=`<div class="stock-card cmpt-card">
+      <div style="padding:9px 12px;font-weight:700;font-size:13px;background:var(--bg2);border-bottom:.5px solid var(--border);display:flex;align-items:center;gap:8px">${remEsc(g.area)} <span style="font-weight:400;color:var(--text2);font-size:11.5px">(${g.filas.length})</span><span id="cmpt-ta-${gi}" style="margin-left:auto;font-weight:400;font-size:11.5px;color:var(--text2)"></span></div>
+      <table class="stock-tbl"><thead><tr><th style="text-align:left;width:90px">Código</th><th style="text-align:left">Producto</th><th style="text-align:right">Stock Máximo</th><th style="text-align:right;width:130px">Contado (cajas)</th><th style="text-align:right">Falta (% ocup.)</th></tr></thead><tbody>`;
+    g.filas.forEach(f=>{
+      const i=idx++;g.idxs.push(i);f._i=i;
+      const v=cmpt.items[cmptClave(f)];
+      h+=`<tr class="cmpt-row" data-t="${remEsc(normTxt((f.codigo||'')+' '+f.producto))}"><td style="font-family:monospace;font-size:12px;color:var(--text2)">${remEsc(f.codigo||'')}</td><td style="font-weight:500">${remEsc(f.producto)}</td><td style="text-align:right">${f.stockMax.toLocaleString('es-AR')}</td><td style="text-align:right"><input class="proy-input" type="text" inputmode="decimal" id="cmpt-i-${i}" value="${v!=null?cmptFmt(v):''}" placeholder="—" style="width:90px;text-align:right" oninput="cmptSet(${i},this.value)"/></td><td style="text-align:right" id="cmpt-f-${i}">${objHtmlFaltaVal(v!=null?v:null,f.stockMax,'sin contar')}</td></tr>`;
+    });
+    h+='</tbody></table></div>';
+  });
+  el.innerHTML=h;
+  cmptTotales();cmptFiltrar();
+}
+function cmptTotales(){
+  (cmpt.grupos||[]).forEach((g,gi)=>{
+    let max=0,cont=0,n=0;
+    g.filas.forEach(f=>{max+=f.stockMax;const v=cmpt.items[cmptClave(f)];if(v!=null){cont+=v;n++;}});
+    const el=document.getElementById('cmpt-ta-'+gi);
+    if(el)el.textContent=`Contado ${n}/${g.filas.length} · ${(Math.round(cont*100)/100).toLocaleString('es-AR')} de ${(Math.round(max*100)/100).toLocaleString('es-AR')} cajas`;
+  });
+}
+function cmptSet(i,val){
+  const f=cmpt.filas.find(x=>x._i===i);if(!f)return;
+  const n=pedNum(val);
+  const k=cmptClave(f);
+  if(n==null)delete cmpt.items[k];else cmpt.items[k]=n;
+  const c=document.getElementById('cmpt-f-'+i);
+  if(c)c.innerHTML=objHtmlFaltaVal(n,f.stockMax,'sin contar');
+  cmptTotales();
+  if(!cmpt.puedeGuardar)return;
+  clearTimeout(cmpt.timer);cmptMsg('Guardando…');
+  cmpt.timer=setTimeout(cmptGuardarYa,700);
+}
+async function cmptGuardarYa(){
+  clearTimeout(cmpt.timer);cmpt.timer=null;
+  if(!cmpt.puedeGuardar||!cmpt.eid)return;
+  try{
+    const res=await fetch(`${SB}/rest/v1/conteo_manual_pt?on_conflict=id`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:cmpt.fecha+'|'+cmpt.eid,fecha:cmpt.fecha,empresa_id:cmpt.eid,items:cmpt.items,updated_at:new Date().toISOString()})});
+    if(!res.ok)throw new Error(await res.text());
+    cmptMsg('Guardado ✓');
+  }catch(e){cmptMsg('Error guardando: '+String((e&&e.message)||e).slice(0,160),true);}
+}
+function cmptFiltrar(){
+  const q=normTxt((document.getElementById('cmpt-filtro')||{}).value||'');
+  document.querySelectorAll('#cmpt-content tr.cmpt-row').forEach(tr=>{tr.style.display=!q||(tr.getAttribute('data-t')||'').includes(q)?'':'none';});
+}
+// Alias para los llamadores viejos (import de Flexxus, initStock): refresca la pantalla nueva solo si está a la vista.
+function loadStockConteo(){
+  const c=document.getElementById('cm-cargar');
+  if(c&&c.style.display!=='none'&&document.getElementById('stock-sub-conteomanual').style.display!=='none')return renderConteoManualPT();
+}
 function showConteoManualTab(t){
-  ['cargar','impresion'].forEach(id=>{
+  ['cargar','impresion','impresionpt'].forEach(id=>{
     document.getElementById('cm-'+id).style.display=id===t?'block':'none';
     document.getElementById('cmtab-'+id).classList.toggle('active',id===t);
   });
-  if(t==='cargar')loadStockConteo();
-  if(t==='impresion'){poblarImpObjEmpresas();renderImpresionDepositos();}
+  if(t==='cargar')renderConteoManualPT();
+  if(t==='impresion')renderImpresionDepositos();
+  if(t==='impresionpt')poblarImpObjEmpresas();
 }
 
 function showConfigStockTab(t){
@@ -13124,6 +13246,7 @@ async function initObjetivoStock(){
 }
 
 let objetivoStockFilas=[];
+let objetivoManualFecha='';
 
 async function renderObjetivoStock(){
   const eid=document.getElementById('obj-esel').value;
@@ -13139,6 +13262,12 @@ async function renderObjetivoStock(){
       get('cajas_producto',`empresa_id=eq.${eid}`),
       get('mp_conteo',`fecha=eq.${fecha}`)
     ]);
+    // v4.371: Stock manual = último conteo manual de productos terminados hasta la fecha elegida (conteo_manual_pt).
+    let manualItems={};objetivoManualFecha='';
+    try{
+      const mr=await get('conteo_manual_pt',`empresa_id=eq.${eid}&fecha=lte.${fecha}&order=fecha.desc&limit=1`);
+      if(mr[0]&&mr[0].items){manualItems=mr[0].items;objetivoManualFecha=String(mr[0].fecha).slice(0,10);}
+    }catch(e){}
     if(freshMix.length)mixData=freshMix;
     if(freshCajas.length)cajasData=freshCajas;
     const stockPorMp=new Map();
@@ -13153,7 +13282,9 @@ async function renderObjetivoStock(){
       const real=stockRealCajasProducto(p,area,stockPorMp);
       const realCajas=real.cajas!=null?Math.round(real.cajas*100)/100:null;
       const falta=realCajas!=null?Math.round((stockMax-realCajas)*100)/100:null;
-      filas.push({producto:p.nombre,area,codigo:real.codigo,stockMax,realCajas,falta,real});
+      const mv=manualItems[area+'||'+p.nombre];
+      const manualCajas=mv!=null?Math.round(mv*100)/100:null;
+      filas.push({producto:p.nombre,area,codigo:real.codigo,stockMax,realCajas,falta,real,manualCajas});
     });
     objetivoStockFilas=filas;
     if(!filas.length){el.innerHTML='<div class="empty"><i class="ti ti-target-arrow"></i>No hay productos con objetivo de depósito calculado para esta empresa. Revisá Configuración stock → Depósitos → Cálculo de stock.</div>';return}
@@ -13171,18 +13302,9 @@ function objPctOcupacion(realCajas,stockMax){
   return Math.round((realCajas/stockMax)*1000)/10;
 }
 
-function objHtmlFalta(f){
-  if(f.realCajas==null){
-    const motivo=f.real&&f.real.sinCodigo?'sin código vinculado':(f.real&&f.real.sinUjc?'falta unidades por caja':'sin dato de Flexxus');
-    return`<span style="color:var(--text3)" title="${motivo}">s/d</span>`;
-  }
-  const pct=objPctOcupacion(f.realCajas,f.stockMax);
-  const pctTxt=pct!=null?` <span style="font-size:10px;font-weight:400;color:var(--text2)">(${pct.toLocaleString('es-AR')}% ocup.)</span>`:'';
-  if(f.falta<=0){
-    return`<span style="color:var(--green);font-weight:700">✓ completo</span>`+(f.falta<0?` <span style="font-size:10px;color:var(--text2)">(+${Math.abs(f.falta).toLocaleString('es-AR')})</span>`:'')+pctTxt;
-  }
-  return`<span style="color:var(--red);font-weight:700">${f.falta.toLocaleString('es-AR')}</span>`+pctTxt;
-}
+function objMotivoSD(f){return f.real&&f.real.sinCodigo?'sin código vinculado':(f.real&&f.real.sinUjc?'falta unidades por caja':'sin dato de Flexxus');}
+function objHtmlFalta(f){return objHtmlFaltaVal(f.realCajas,f.stockMax,objMotivoSD(f));}
+function objHtmlFaltaManual(f){return objHtmlFaltaVal(f.manualCajas,f.stockMax,'sin conteo manual');}
 
 // v4.287: "necesito que aca me aparezca separado por area de producto" -- antes era una sola
 // tabla continua con el Área como una columna más; ahora arma un bloque (con título de área)
@@ -13208,21 +13330,24 @@ function objTotalesArea(filas){
   const conDato=filas.filter(f=>f.realCajas!=null);
   const totalReal=Math.round(conDato.reduce((s,f)=>s+f.realCajas,0)*100)/100;
   const sinDato=filas.length-conDato.length;
-  return{totalMax,totalReal,sinDato};
+  const conMan=filas.filter(f=>f.manualCajas!=null);
+  const totalManual=Math.round(conMan.reduce((s,f)=>s+f.manualCajas,0)*100)/100;
+  const sinManual=filas.length-conMan.length;
+  return{totalMax,totalReal,sinDato,totalManual,sinManual};
 }
 
-// v4.369: resumen general arriba -- capacidad total de las cámaras vs stock Flexxus (solo productos terminados).
+// v4.369/v4.371: resumen general arriba -- capacidad total de las cámaras vs stock manual y vs stock Flexxus (terminados).
 function objHtmlResumen(filas){
   const t=objTotalesArea(filas);
-  const pct=objPctOcupacion(t.totalReal,t.totalMax);
-  const dif=Math.round((t.totalMax-t.totalReal)*100)/100;
+  const pctF=objPctOcupacion(t.totalReal,t.totalMax),pctM=objPctOcupacion(t.totalManual,t.totalMax);
   const caja=(lbl,val,extra,clr)=>`<div style="flex:1;min-width:150px;padding:10px 14px;border:.5px solid var(--border);border-radius:var(--radius);background:var(--bg)"><div style="font-size:11px;color:var(--text2);text-transform:uppercase">${lbl}</div><div style="font-size:20px;font-weight:700${clr?';color:'+clr:''}">${val}</div>${extra?`<div style="font-size:11px;color:var(--text3)">${extra}</div>`:''}</div>`;
+  const pc=p=>p!=null?p.toLocaleString('es-AR')+'%':'s/d';
+  const hayMan=t.sinManual<filas.length;
   return`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
-    ${caja('Capacidad de cámaras (cajas)',t.totalMax.toLocaleString('es-AR'),'suma del Stock Máximo de los '+filas.length+' productos')}
-    ${caja('Stock Flexxus (terminados)',t.totalReal.toLocaleString('es-AR'),t.sinDato?t.sinDato+' producto(s) sin dato, no suman':'todos con dato')}
-    ${caja('Ocupación',pct!=null?pct.toLocaleString('es-AR')+'%':'s/d','',pct!=null&&pct>100?'var(--red)':'')}
-    ${caja(dif>=0?'Lugar libre (cajas)':'Excedido (cajas)',Math.abs(dif).toLocaleString('es-AR'),'capacidad − Flexxus',dif<0?'var(--red)':'var(--green)')}
-  </div>`;
+    ${caja('Stock Máximo (cajas)',t.totalMax.toLocaleString('es-AR'),'capacidad de cámaras · '+filas.length+' productos')}
+    ${caja('Stock manual',hayMan?t.totalManual.toLocaleString('es-AR'):'s/d',hayMan?(pc(pctM)+' del máximo'+(t.sinManual?' · '+t.sinManual+' sin contar':'')):'todavía no hay conteo manual',pctM!=null&&pctM>100?'var(--red)':'')}
+    ${caja('Stock Flexxus (terminados)',t.totalReal.toLocaleString('es-AR'),pc(pctF)+' del máximo'+(t.sinDato?' · '+t.sinDato+' sin dato':''),pctF!=null&&pctF>100?'var(--red)':'')}
+  </div>`+(objetivoManualFecha?`<div style="font-size:12px;color:var(--text2);margin:-6px 0 12px">Stock manual: conteo del ${objetivoManualFecha.split('-').reverse().join('/')} (el último hasta la fecha elegida).</div>`:'');
 }
 
 function objHtmlTabla(filas){
@@ -13234,27 +13359,34 @@ function objHtmlTabla(filas){
       <div style="padding:9px 12px;font-weight:700;font-size:13px;background:var(--bg2);border-bottom:.5px solid var(--border);display:flex;align-items:center;gap:8px">
         ${g.area} <span style="font-weight:400;color:var(--text2);font-size:11.5px">(${g.filas.length})</span>
       </div>
-      <table class="stock-tbl"><thead><tr>
+      <div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
         <th style="text-align:left;width:90px">Código</th>
         <th style="text-align:left">Producto</th>
         <th style="text-align:right">Stock Máximo</th>
-        <th style="text-align:right">Stock Real (Flexxus)</th>
-        <th style="text-align:right">Falta (% ocup.)</th>
+        <th style="text-align:right">Stock manual</th>
+        <th style="text-align:right">Stock Flexxus</th>
+        <th style="text-align:right">Máx. vs manual<div style="font-weight:400;font-size:10px">Falta (% ocup.)</div></th>
+        <th style="text-align:right">Máx. vs Flexxus<div style="font-weight:400;font-size:10px">Falta (% ocup.)</div></th>
       </tr></thead><tbody>`;
+    const sd='<span style="color:var(--text3)">s/d</span>';
     g.filas.forEach(f=>{
-      const realTxt=f.realCajas!=null?f.realCajas.toLocaleString('es-AR'):'<span style="color:var(--text3)">s/d</span>';
+      const realTxt=f.realCajas!=null?f.realCajas.toLocaleString('es-AR'):sd;
+      const manTxt=f.manualCajas!=null?f.manualCajas.toLocaleString('es-AR'):sd;
       const advertencia=f.real&&f.real.enUnidades&&f.real.sinUjc?' <span title="Solo hay stock por unidad y falta configurar cuántas unidades entran por caja (Stock → Configuración → Cantidad de producto por caja)" style="color:var(--amber)">⚠</span>':'';
-      h+=`<tr><td style="font-family:monospace;font-size:12px;color:var(--text2)">${f.codigo||''}</td><td style="font-weight:500">${f.producto}</td><td style="text-align:right">${f.stockMax.toLocaleString('es-AR')}</td><td style="text-align:right">${realTxt}${advertencia}</td><td style="text-align:right">${objHtmlFalta(f)}</td></tr>`;
+      h+=`<tr><td style="font-family:monospace;font-size:12px;color:var(--text2)">${f.codigo||''}</td><td style="font-weight:500">${f.producto}</td><td style="text-align:right">${f.stockMax.toLocaleString('es-AR')}</td><td style="text-align:right">${manTxt}</td><td style="text-align:right">${realTxt}${advertencia}</td><td style="text-align:right">${objHtmlFaltaManual(f)}</td><td style="text-align:right">${objHtmlFalta(f)}</td></tr>`;
     });
-    const totalPct=objPctOcupacion(t.totalReal,t.totalMax);
+    const pF=objPctOcupacion(t.totalReal,t.totalMax),pM=objPctOcupacion(t.totalManual,t.totalMax);
+    const hayMan=t.sinManual<g.filas.length;
     h+=`<tr style="font-weight:700;background:var(--bg2);border-top:1.5px solid var(--border)">
       <td></td>
       <td style="text-align:left">Total</td>
       <td style="text-align:right">${t.totalMax.toLocaleString('es-AR')}</td>
+      <td style="text-align:right">${hayMan?t.totalManual.toLocaleString('es-AR'):''}${t.sinManual&&hayMan?` <span style="font-size:10px;font-weight:400;color:var(--text3)">(${t.sinManual} s/d)</span>`:''}</td>
       <td style="text-align:right">${t.totalReal.toLocaleString('es-AR')}${t.sinDato?` <span style="font-size:10px;font-weight:400;color:var(--text3)" title="${t.sinDato} producto(s) sin dato de Flexxus, no entran en este total">(${t.sinDato} s/d)</span>`:''}</td>
-      <td style="text-align:right">${totalPct!=null?totalPct.toLocaleString('es-AR')+'% ocup.':''}</td>
+      <td style="text-align:right">${pM!=null&&hayMan?pM.toLocaleString('es-AR')+'% ocup.':''}</td>
+      <td style="text-align:right">${pF!=null?pF.toLocaleString('es-AR')+'% ocup.':''}</td>
     </tr>`;
-    h+='</tbody></table></div>';
+    h+='</tbody></table></div></div>';
   });
   return h;
 }
@@ -13266,6 +13398,14 @@ function pdfObjetivoStock(){
   const fecha=document.getElementById('obj-fecha').value||hoyLocal();
   const fechaTxt=new Date(fecha+'T00:00:00').toLocaleDateString('es-AR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
   const filas=[...objetivoStockFilas].sort((a,b)=>a.area.localeCompare(b.area,'es')||a.producto.localeCompare(b.producto,'es'));
+  const num=v=>v!=null?v.toLocaleString('es-AR'):'s/d';
+  const cmp=(v,max)=>{
+    if(v==null)return{t:'s/d',c:''};
+    const falta=Math.round((max-v)*100)/100;
+    const pct=objPctOcupacion(v,max);
+    const pt=pct!=null?` (${pct.toLocaleString('es-AR')}%)`:'';
+    return falta<=0?{t:'✓ completo'+pt,c:'verde'}:{t:falta.toLocaleString('es-AR')+pt,c:'rojo'};
+  };
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
   <title>Objetivo de stock — ${nm}</title>
   <style>
@@ -13275,39 +13415,34 @@ function pdfObjetivoStock(){
     .hdr-title{font-size:14pt;font-weight:700;color:#1B3A6B}
     .hdr-sub{font-size:9pt;color:#555;margin-top:3px}
     .hdr-fecha{font-size:8pt;color:#888;text-align:right}
-    table{width:100%;border-collapse:collapse;font-size:8.5pt}
-    th{background:#1B3A6B;color:#fff;padding:5px 7px;text-align:left;border:1px solid #1B3A6B}
+    table{width:100%;border-collapse:collapse;font-size:8pt}
+    th{background:#1B3A6B;color:#fff;padding:4px 5px;text-align:left;border:1px solid #1B3A6B}
     th.r{text-align:right}
-    td{padding:4px 7px;border:1px solid #d0d0d0}
+    td{padding:3px 5px;border:1px solid #d0d0d0}
     td.r{text-align:right}
     tr:nth-child(even) td{background:#f8f8f8}
     .verde{color:#0F6E56;font-weight:700}
     .rojo{color:#A32D2D;font-weight:700}
     .area-tit{font-size:10.5pt;font-weight:700;color:#1B3A6B;margin:10px 0 4px;padding-bottom:2px;border-bottom:1px solid #1B3A6B}
-    .area-tit:first-of-type{margin-top:0}
-    @media print{@page{size:A4;margin:8mm 10mm}body{padding:0}.area-block{break-inside:avoid}}
+    @media print{@page{size:A4 landscape;margin:8mm 10mm}body{padding:0}.area-block{break-inside:avoid}}
   </style></head><body>
   <div class="hdr">
     <div><div class="hdr-title">🎯 Objetivo de stock</div><div class="hdr-sub">${nm}</div></div>
-    <div class="hdr-fecha">Stock real al: ${fechaTxt}</div>
+    <div class="hdr-fecha">Stock Flexxus al: ${fechaTxt}${objetivoManualFecha?'<br/>Stock manual: conteo del '+objetivoManualFecha.split('-').reverse().join('/'):''}</div>
   </div>
   ${objAgruparPorArea(filas).map(g=>{
     const t=objTotalesArea(g.filas);
-    const totalRealTxt=t.totalReal.toLocaleString('es-AR')+(t.sinDato?` (${t.sinDato} s/d)`:'');
-    const totalPct=objPctOcupacion(t.totalReal,t.totalMax);
+    const hayMan=t.sinManual<g.filas.length;
+    const pF=objPctOcupacion(t.totalReal,t.totalMax),pM=objPctOcupacion(t.totalManual,t.totalMax);
     return`
   <div class="area-block">
     <div class="area-tit">${g.area} (${g.filas.length})</div>
-    <table><thead><tr><th style="width:90px">Código</th><th>Producto</th><th class="r">Stock Máximo</th><th class="r">Stock Real</th><th class="r">Falta (% ocup.)</th></tr></thead><tbody>
+    <table><thead><tr><th style="width:70px">Código</th><th>Producto</th><th class="r">Stock Máx.</th><th class="r">Stock manual</th><th class="r">Stock Flexxus</th><th class="r">Máx. vs manual</th><th class="r">Máx. vs Flexxus</th></tr></thead><tbody>
     ${g.filas.map(f=>{
-      const pct=objPctOcupacion(f.realCajas,f.stockMax);
-      const pctTxt=pct!=null?` (${pct.toLocaleString('es-AR')}%)`:'';
-      const realTxt=f.realCajas!=null?f.realCajas.toLocaleString('es-AR'):'s/d';
-      const faltaTxt=f.realCajas==null?'s/d':(f.falta<=0?'✓ completo'+pctTxt:f.falta.toLocaleString('es-AR')+pctTxt);
-      const faltaCls=f.realCajas!=null&&f.falta<=0?'verde':(f.realCajas!=null?'rojo':'');
-      return`<tr><td>${f.codigo||''}</td><td>${f.producto}</td><td class="r">${f.stockMax.toLocaleString('es-AR')}</td><td class="r">${realTxt}</td><td class="r ${faltaCls}">${faltaTxt}</td></tr>`;
+      const m=cmp(f.manualCajas,f.stockMax),x=cmp(f.realCajas,f.stockMax);
+      return`<tr><td>${f.codigo||''}</td><td>${f.producto}</td><td class="r">${f.stockMax.toLocaleString('es-AR')}</td><td class="r">${num(f.manualCajas)}</td><td class="r">${num(f.realCajas)}</td><td class="r ${m.c}">${m.t}</td><td class="r ${x.c}">${x.t}</td></tr>`;
     }).join('')}
-    <tr style="font-weight:700;background:#eef1f6"><td></td><td>Total</td><td class="r">${t.totalMax.toLocaleString('es-AR')}</td><td class="r">${totalRealTxt}</td><td class="r">${totalPct!=null?totalPct.toLocaleString('es-AR')+'%':''}</td></tr>
+    <tr style="font-weight:700;background:#eef1f6"><td></td><td>Total</td><td class="r">${t.totalMax.toLocaleString('es-AR')}</td><td class="r">${hayMan?t.totalManual.toLocaleString('es-AR'):''}</td><td class="r">${t.totalReal.toLocaleString('es-AR')}${t.sinDato?` (${t.sinDato} s/d)`:''}</td><td class="r">${pM!=null&&hayMan?pM.toLocaleString('es-AR')+'%':''}</td><td class="r">${pF!=null?pF.toLocaleString('es-AR')+'%':''}</td></tr>
     </tbody></table>
   </div>`;
   }).join('')}
