@@ -294,7 +294,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.371</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.372</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -12733,7 +12733,10 @@ async function objFilasParaPlanilla(eid){
     const stockMax=cajasMap[`${p.empresa_id}||${area}||${p.nombre}`];
     if(!stockMax)return;
     const real=stockRealCajasProducto(p,area,vacio);
-    filas.push({producto:p.nombre,area,codigo:real.codigo||'',stockMax});
+    // v4.372: alias del artículo terminado (Maestro), sin "Caja/Unidad" (ej. "BP Caja" -> "BP").
+    const mpA=mpData.find(m=>m.tipo==='terminado'&&real.codigo&&String(m.codigo)===String(real.codigo));
+    const alias=mpA?(remAliasLimpio(mpA.alias||'')||mpA.sigla||''):'';
+    filas.push({producto:p.nombre,area,codigo:real.codigo||'',alias,stockMax});
   });
   filas.sort((a,b)=>a.area.localeCompare(b.area,'es')||a.producto.localeCompare(b.producto,'es'));
   return filas;
@@ -12742,39 +12745,42 @@ function objHtmlPlanillaToma(filas,empresaNombre,fechaTxt){
   const esc=x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
   const bloques=objAgruparPorArea(filas).map((g,i,arr)=>{
     const tot=Math.round(g.filas.reduce((a,f)=>a+f.stockMax,0)*100)/100;
-    return`<div class="area-block${i<arr.length-1?' brk':''}">
+    // A4 horizontal: ~165 mm útiles para la tabla -> alto de fila ajustado para que el área entre en una hoja (mín. 5.2 mm).
+    const rh=Math.max(5.2,Math.min(9,Math.floor(1000*158/(g.filas.length+2))/1000)).toFixed(2);
+    return`<div class="area-block${i<arr.length-1?' brk':''}" style="--rh:${rh}mm">
       <div class="area-tit">${esc(g.area)} <span class="n">(${g.filas.length} productos)</span></div>
-      <table><thead><tr><th class="cod">Código</th><th>Producto</th><th class="num">Stock máx.<br/>(cajas)</th><th class="wr">Contado<br/>(cajas)</th><th class="wr">Falta</th></tr></thead><tbody>
-      ${g.filas.map(f=>`<tr><td class="cod">${esc(f.codigo)}</td><td class="nom">${esc(f.producto)}</td><td class="num">${f.stockMax.toLocaleString('es-AR')}</td><td class="wr"></td><td class="wr"></td></tr>`).join('')}
-      <tr class="tot"><td></td><td>Total ${esc(g.area)}</td><td class="num">${tot.toLocaleString('es-AR')}</td><td class="wr"></td><td class="wr"></td></tr>
+      <table><thead><tr><th class="cod">Código</th><th class="ali">Alias</th><th>Producto</th><th class="num">Stock máx.<br/>(cajas)</th><th class="wr">Contado (cajas)</th><th class="wr">Falta</th></tr></thead><tbody>
+      ${g.filas.map(f=>`<tr><td class="cod">${esc(f.codigo)}</td><td class="ali">${esc(f.alias)}</td><td class="nom">${esc(f.producto)}</td><td class="num">${f.stockMax.toLocaleString('es-AR')}</td><td class="wr"></td><td class="wr"></td></tr>`).join('')}
+      <tr class="tot"><td></td><td></td><td>Total ${esc(g.area)}</td><td class="num">${tot.toLocaleString('es-AR')}</td><td class="wr"></td><td class="wr"></td></tr>
       </tbody></table></div>`;
   }).join('');
   return`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Toma de stock — ${esc(empresaNombre)}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:Arial,sans-serif;font-size:9pt;color:#1a1a1a;padding:8mm 10mm}
-    .hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid #1B3A6B}
-    .hdr-title{font-size:14pt;font-weight:700;color:#1B3A6B}.hdr-sub{font-size:9pt;color:#555;margin-top:2px}
-    .firma{font-size:9pt;color:#333;text-align:right;line-height:1.7}
-    .area-tit{font-size:11pt;font-weight:700;color:#1B3A6B;margin:8px 0 4px;padding-bottom:2px;border-bottom:1px solid #1B3A6B}
+    body{font-family:Arial,sans-serif;font-size:9pt;color:#1a1a1a;padding:6mm 8mm}
+    .hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:4px;padding-bottom:4px;border-bottom:2px solid #1B3A6B}
+    .hdr-title{font-size:13pt;font-weight:700;color:#1B3A6B}.hdr-sub{font-size:8.5pt;color:#555;margin-top:1px}
+    .firma{font-size:9pt;color:#333;text-align:right;line-height:1.5}
+    .area-tit{font-size:11pt;font-weight:700;color:#1B3A6B;margin:4px 0 3px;padding-bottom:2px;border-bottom:1px solid #1B3A6B}
     .area-tit .n{font-size:8.5pt;font-weight:400;color:#666}
     table{width:100%;border-collapse:collapse}
     thead{display:table-header-group}
     tr{break-inside:avoid}
-    th{background:#1B3A6B;color:#fff;padding:4px 6px;font-size:8pt;text-align:left;border:1px solid #1B3A6B}
+    th{background:#1B3A6B;color:#fff;padding:3px 6px;font-size:8pt;text-align:left;border:1px solid #1B3A6B}
     th.num,th.wr{text-align:center}
-    td{border:1px solid #999;padding:0 6px;height:8.5mm;font-size:9pt}
+    td{border:1px solid #999;padding:0 6px;height:var(--rh,8mm);font-size:9pt}
     td.cod{width:24mm;font-family:monospace;font-size:8.5pt;color:#444}
-    td.num{width:22mm;text-align:center;font-weight:700}
-    td.wr{width:30mm}
+    td.ali{width:22mm;font-weight:700;font-size:9.5pt}
+    td.num{width:24mm;text-align:center;font-weight:700}
+    td.wr{width:40mm}
     td.nom{font-weight:600}
     tr.tot td{background:#eef1f6;font-weight:700;border-top:2px solid #333}
     .brk{break-after:page}
-    @media print{@page{size:A4;margin:8mm 10mm}body{padding:0}}
+    @media print{@page{size:A4 landscape;margin:6mm 8mm}body{padding:0}}
   </style></head><body>
   <div class="hdr">
     <div><div class="hdr-title">Planilla de toma de stock</div><div class="hdr-sub">${esc(empresaNombre)} · según Objetivo de stock</div></div>
-    <div class="firma">Fecha: ____ / ____ / ________<br/>Contó: ______________________</div>
+    <div class="firma">Fecha: ____ / ____ / ________ &nbsp;&nbsp; Contó: ______________________</div>
   </div>
   ${bloques||'<p style="padding:20px">No hay productos con objetivo de depósito calculado para esta empresa.</p>'}
   <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
