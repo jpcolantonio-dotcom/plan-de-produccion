@@ -294,7 +294,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.369</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.370</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1049,6 +1049,15 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
          productos asignados a ese depósito (por materias_primas.deposito_id o por mp_depositos). -->
     <div id="cm-impresion" style="display:none">
       <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Elegí un depósito para imprimir una hoja de toma de stock físico con todos sus productos (código, nombre y una columna vacía para anotar la cantidad).</div>
+      <div class="grid-card" style="margin-bottom:1rem">
+        <div style="font-weight:700;font-size:13px;margin-bottom:4px"><i class="ti ti-target-arrow"></i> Planilla de toma de stock según Objetivo de stock</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:8px">Una hoja por área con los productos del objetivo: código, producto, Stock Máximo (capacidad de las cámaras) y columnas vacías para anotar lo contado y lo que falta.</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="impobj-esel" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
+          <button class="btn btn-primary btn-sm" onclick="imprimirPlanillaTomaObjetivo()"><i class="ti ti-printer"></i> Imprimir planilla</button>
+          <span id="impobj-msg" style="font-size:12px;color:var(--text3)"></span>
+        </div>
+      </div>
       <div id="impresion-depositos-content"></div>
     </div>
   </div>
@@ -12711,13 +12720,105 @@ function showStockSubTab(t){
   if(t==='objetivo')initObjetivoStock();
 }
 
+// v4.370: "en el conteo de stock manual se pueda imprimir la planilla para la toma de stock según el Objetivo de stock":
+// mismas filas y mismo Stock Máximo que la pantalla Objetivo de stock (calcCajasDeposito), con columnas en blanco
+// para anotar lo contado a mano. Agrupado por área, una hoja A4 por área larga se corta sola.
+async function objFilasParaPlanilla(eid){
+  await loadDepositos_eid(eid);
+  const[freshMix,freshCajas]=await Promise.all([
+    get('mix_ventas',`order=area.asc,producto.asc&empresa_id=eq.${eid}`),
+    get('cajas_producto',`empresa_id=eq.${eid}`)
+  ]);
+  if(freshMix.length)mixData=freshMix;
+  if(freshCajas.length)cajasData=freshCajas;
+  const cajasMap=calcCajasDeposito();
+  const vacio=new Map();
+  const filas=[];
+  st.Pr.filter(p=>p.empresa_id===eid).forEach(p=>{
+    const area=st.A.find(a=>a.id===p.area_id)?.nombre||'SA';
+    const stockMax=cajasMap[`${p.empresa_id}||${area}||${p.nombre}`];
+    if(!stockMax)return;
+    const real=stockRealCajasProducto(p,area,vacio);
+    filas.push({producto:p.nombre,area,codigo:real.codigo||'',stockMax});
+  });
+  filas.sort((a,b)=>a.area.localeCompare(b.area,'es')||a.producto.localeCompare(b.producto,'es'));
+  return filas;
+}
+function objHtmlPlanillaToma(filas,empresaNombre,fechaTxt){
+  const esc=x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const bloques=objAgruparPorArea(filas).map((g,i,arr)=>{
+    const tot=Math.round(g.filas.reduce((a,f)=>a+f.stockMax,0)*100)/100;
+    return`<div class="area-block${i<arr.length-1?' brk':''}">
+      <div class="area-tit">${esc(g.area)} <span class="n">(${g.filas.length} productos)</span></div>
+      <table><thead><tr><th class="cod">Código</th><th>Producto</th><th class="num">Stock máx.<br/>(cajas)</th><th class="wr">Contado<br/>(cajas)</th><th class="wr">Falta</th></tr></thead><tbody>
+      ${g.filas.map(f=>`<tr><td class="cod">${esc(f.codigo)}</td><td class="nom">${esc(f.producto)}</td><td class="num">${f.stockMax.toLocaleString('es-AR')}</td><td class="wr"></td><td class="wr"></td></tr>`).join('')}
+      <tr class="tot"><td></td><td>Total ${esc(g.area)}</td><td class="num">${tot.toLocaleString('es-AR')}</td><td class="wr"></td><td class="wr"></td></tr>
+      </tbody></table></div>`;
+  }).join('');
+  return`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Toma de stock — ${esc(empresaNombre)}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:9pt;color:#1a1a1a;padding:8mm 10mm}
+    .hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;padding-bottom:6px;border-bottom:2px solid #1B3A6B}
+    .hdr-title{font-size:14pt;font-weight:700;color:#1B3A6B}.hdr-sub{font-size:9pt;color:#555;margin-top:2px}
+    .firma{font-size:9pt;color:#333;text-align:right;line-height:1.7}
+    .area-tit{font-size:11pt;font-weight:700;color:#1B3A6B;margin:8px 0 4px;padding-bottom:2px;border-bottom:1px solid #1B3A6B}
+    .area-tit .n{font-size:8.5pt;font-weight:400;color:#666}
+    table{width:100%;border-collapse:collapse}
+    thead{display:table-header-group}
+    tr{break-inside:avoid}
+    th{background:#1B3A6B;color:#fff;padding:4px 6px;font-size:8pt;text-align:left;border:1px solid #1B3A6B}
+    th.num,th.wr{text-align:center}
+    td{border:1px solid #999;padding:0 6px;height:8.5mm;font-size:9pt}
+    td.cod{width:24mm;font-family:monospace;font-size:8.5pt;color:#444}
+    td.num{width:22mm;text-align:center;font-weight:700}
+    td.wr{width:30mm}
+    td.nom{font-weight:600}
+    tr.tot td{background:#eef1f6;font-weight:700;border-top:2px solid #333}
+    .brk{break-after:page}
+    @media print{@page{size:A4;margin:8mm 10mm}body{padding:0}}
+  </style></head><body>
+  <div class="hdr">
+    <div><div class="hdr-title">Planilla de toma de stock</div><div class="hdr-sub">${esc(empresaNombre)} · según Objetivo de stock</div></div>
+    <div class="firma">Fecha: ____ / ____ / ________<br/>Contó: ______________________</div>
+  </div>
+  ${bloques||'<p style="padding:20px">No hay productos con objetivo de depósito calculado para esta empresa.</p>'}
+  <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
+  </body></html>`;
+}
+async function imprimirPlanillaTomaObjetivo(){
+  const sel=document.getElementById('impobj-esel');
+  const msg=document.getElementById('impobj-msg');
+  const eid=sel&&sel.value;
+  if(!eid){alert('Elegí la empresa.');return}
+  if(msg)msg.textContent='Armando planilla…';
+  try{
+    if(!st.Pr.length){const[ar,pr]=await Promise.all([get('areas','order=nombre.asc'),get('productos','order=nombre.asc')]);st.A=ar||[];st.Pr=pr||[];}
+    const filas=await objFilasParaPlanilla(eid);
+    if(!filas.length){if(msg)msg.textContent='';alert('No hay productos con objetivo de depósito calculado para esta empresa. Revisá Configuración stock → Depósitos → Cálculo de stock.');return}
+    const html=objHtmlPlanillaToma(filas,en(eid),'');
+    const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const w=window.open(url,'_blank');
+    setTimeout(()=>URL.revokeObjectURL(url),15000);
+    if(!w)alert('Habilitá popups para este sitio para imprimir.');
+    if(msg)msg.textContent=filas.length+' productos';
+  }catch(e){if(msg){msg.textContent='Error: '+String((e&&e.message)||e).slice(0,160);msg.style.color='var(--red)';}}
+}
+function poblarImpObjEmpresas(){
+  const se=document.getElementById('impobj-esel');
+  if(!se||se.options.length)return;
+  st.E.forEach(e=>{const o=document.createElement('option');o.value=e.id;o.textContent=e.nombre;se.appendChild(o)});
+  const pl=st.E.find(e=>/PLANETA/i.test(e.nombre||''));
+  if(pl)se.value=pl.id;
+}
 function showConteoManualTab(t){
   ['cargar','impresion'].forEach(id=>{
     document.getElementById('cm-'+id).style.display=id===t?'block':'none';
     document.getElementById('cmtab-'+id).classList.toggle('active',id===t);
   });
   if(t==='cargar')loadStockConteo();
-  if(t==='impresion')renderImpresionDepositos();
+  if(t==='impresion'){poblarImpObjEmpresas();renderImpresionDepositos();}
 }
 
 function showConfigStockTab(t){
