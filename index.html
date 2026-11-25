@@ -294,7 +294,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.372</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.374</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1043,10 +1043,10 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <div id="impresion-depositos-content"></div>
     </div>
     <div id="cm-impresionpt" style="display:none">
-      <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Imprime la planilla para contar a mano los productos terminados: por área, con código, producto y Stock Máximo, y columnas vacías para anotar lo contado. Después lo cargás en "Cargar conteo".</div>
+      <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Imprime la planilla para contar a mano los productos terminados: una sola hoja A4 horizontal con una caja por área, el alias de cada producto, su Stock Máximo y una columna vacía para anotar lo contado. Después lo cargás en "Cargar conteo".</div>
       <div class="grid-card" style="margin-bottom:1rem">
         <div style="font-weight:700;font-size:13px;margin-bottom:4px"><i class="ti ti-target-arrow"></i> Planilla de toma de stock según Objetivo de stock</div>
-        <div style="font-size:12px;color:var(--text2);margin-bottom:8px">Una hoja por área con los productos del objetivo: código, producto, Stock Máximo (capacidad de las cámaras) y columnas vacías para anotar lo contado y lo que falta.</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:8px">Una hoja con todas las áreas del objetivo (letra de 12 pt o más): alias, Stock Máximo (capacidad de las cámaras) y una columna vacía para anotar lo contado.</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <select id="impobj-esel" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"></select>
           <button class="btn btn-primary btn-sm" onclick="imprimirPlanillaTomaObjetivo()"><i class="ti ti-printer"></i> Imprimir planilla</button>
@@ -12741,48 +12741,70 @@ async function objFilasParaPlanilla(eid){
   filas.sort((a,b)=>a.area.localeCompare(b.area,'es')||a.producto.localeCompare(b.producto,'es'));
   return filas;
 }
+// v4.373: "sacale la columna de producto, solo dejale el alias, letra mínimo 12, fijate si entra todo en una hoja, podés poner
+// rectángulos con cada área": una sola hoja A4 horizontal, áreas como cajas en 3 (o 4) columnas, en el mismo orden; un área larga
+// sigue en la columna siguiente ("cont."). Alias, Stock máx. y Contado, todo a 12 pt o más.
+function objPlanillaRepartir(grupos,ncols){
+  const total=grupos.reduce((a,g)=>a+g.filas.length+2,0);
+  const cap=Math.ceil(total/ncols);
+  const cols=[[]];let usado=0;
+  grupos.forEach(g=>{
+    let desde=0;
+    while(desde<g.filas.length){
+      let libre=cap-usado;
+      if(libre<3&&cols.length<ncols){cols.push([]);usado=0;libre=cap;}
+      const quedan=g.filas.length-desde;
+      let n=Math.min(quedan,Math.max(1,libre-2));
+      if(quedan-n>0&&quedan-n<=2)n=quedan; // no dejar 1-2 filas sueltas en la columna siguiente
+      if(cols.length>=ncols)n=quedan; // última columna: lo que falte va todo acá
+      cols[cols.length-1].push({area:g.area,filas:g.filas.slice(desde,desde+n),cont:desde>0,total:g.filas.length});
+      usado+=n+2;desde+=n;
+      if(desde<g.filas.length&&cols.length<ncols){cols.push([]);usado=0;}
+    }
+  });
+  const filasCol=cols.map(c=>c.reduce((a,x)=>a+x.filas.length+2,0));
+  return{cols,maxFilas:Math.max(...filasCol)};
+}
 function objHtmlPlanillaToma(filas,empresaNombre,fechaTxt){
   const esc=x=>String(x==null?'':x).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const bloques=objAgruparPorArea(filas).map((g,i,arr)=>{
-    const tot=Math.round(g.filas.reduce((a,f)=>a+f.stockMax,0)*100)/100;
-    // A4 horizontal: ~165 mm útiles para la tabla -> alto de fila ajustado para que el área entre en una hoja (mín. 5.2 mm).
-    const rh=Math.max(5.2,Math.min(9,Math.floor(1000*158/(g.filas.length+2))/1000)).toFixed(2);
-    return`<div class="area-block${i<arr.length-1?' brk':''}" style="--rh:${rh}mm">
-      <div class="area-tit">${esc(g.area)} <span class="n">(${g.filas.length} productos)</span></div>
-      <table><thead><tr><th class="cod">Código</th><th class="ali">Alias</th><th>Producto</th><th class="num">Stock máx.<br/>(cajas)</th><th class="wr">Contado (cajas)</th><th class="wr">Falta</th></tr></thead><tbody>
-      ${g.filas.map(f=>`<tr><td class="cod">${esc(f.codigo)}</td><td class="ali">${esc(f.alias)}</td><td class="nom">${esc(f.producto)}</td><td class="num">${f.stockMax.toLocaleString('es-AR')}</td><td class="wr"></td><td class="wr"></td></tr>`).join('')}
-      <tr class="tot"><td></td><td></td><td>Total ${esc(g.area)}</td><td class="num">${tot.toLocaleString('es-AR')}</td><td class="wr"></td><td class="wr"></td></tr>
-      </tbody></table></div>`;
-  }).join('');
+  const grupos=objAgruparPorArea(filas);
+  const altoUtil=168; // mm disponibles para las columnas en A4 horizontal (con el encabezado de la hoja)
+  let ncols=3,rep=objPlanillaRepartir(grupos,ncols);
+  if(altoUtil/rep.maxFilas<5.2){ncols=4;rep=objPlanillaRepartir(grupos,ncols);}
+  const rh=Math.max(5.2,Math.min(9,Math.floor(altoUtil/rep.maxFilas*10)/10)).toFixed(1);
+  const aliasDe=f=>f.alias||String(f.producto||'').slice(0,14);
+  const cajas=rep.cols.map(col=>`<div class="col">${col.map(seg=>`<div class="box">
+      <div class="area-tit">${esc(seg.area)}${seg.cont?' <span class="n">(cont.)</span>':` <span class="n">(${seg.total})</span>`}</div>
+      <table><thead><tr><th class="ali">Alias</th><th class="num">Máx.</th><th class="wr">Contado</th></tr></thead><tbody>
+      ${seg.filas.map(f=>`<tr><td class="ali">${esc(aliasDe(f))}</td><td class="num">${f.stockMax.toLocaleString('es-AR')}</td><td class="wr"></td></tr>`).join('')}
+      </tbody></table></div>`).join('')}</div>`).join('');
   return`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Toma de stock — ${esc(empresaNombre)}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:Arial,sans-serif;font-size:9pt;color:#1a1a1a;padding:6mm 8mm}
-    .hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:4px;padding-bottom:4px;border-bottom:2px solid #1B3A6B}
-    .hdr-title{font-size:13pt;font-weight:700;color:#1B3A6B}.hdr-sub{font-size:8.5pt;color:#555;margin-top:1px}
-    .firma{font-size:9pt;color:#333;text-align:right;line-height:1.5}
-    .area-tit{font-size:11pt;font-weight:700;color:#1B3A6B;margin:4px 0 3px;padding-bottom:2px;border-bottom:1px solid #1B3A6B}
-    .area-tit .n{font-size:8.5pt;font-weight:400;color:#666}
-    table{width:100%;border-collapse:collapse}
-    thead{display:table-header-group}
-    tr{break-inside:avoid}
-    th{background:#1B3A6B;color:#fff;padding:3px 6px;font-size:8pt;text-align:left;border:1px solid #1B3A6B}
+    body{font-family:Arial,sans-serif;font-size:12pt;color:#111;padding:5mm 7mm}
+    .hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:3mm;padding-bottom:2mm;border-bottom:2px solid #1B3A6B}
+    .hdr-title{font-size:14pt;font-weight:700;color:#1B3A6B}.hdr-sub{font-size:12pt;color:#444}
+    .firma{font-size:12pt;color:#222;text-align:right}
+    .cols{display:flex;gap:4mm;align-items:flex-start}
+    .col{flex:1;min-width:0}
+    .box{border:1.5px solid #1B3A6B;border-radius:2mm;margin-bottom:3mm;overflow:hidden;break-inside:avoid}
+    .area-tit{font-size:12pt;font-weight:700;color:#fff;background:#1B3A6B;padding:1mm 2mm;line-height:1.2}
+    .area-tit .n{font-weight:400}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
+    th{background:#dfe6f2;color:#1B3A6B;padding:0 1.5mm;font-size:12pt;text-align:left;border-bottom:1px solid #1B3A6B;height:${rh}mm}
     th.num,th.wr{text-align:center}
-    td{border:1px solid #999;padding:0 6px;height:var(--rh,8mm);font-size:9pt}
-    td.cod{width:24mm;font-family:monospace;font-size:8.5pt;color:#444}
-    td.ali{width:22mm;font-weight:700;font-size:9.5pt}
-    td.num{width:24mm;text-align:center;font-weight:700}
-    td.wr{width:40mm}
-    td.nom{font-weight:600}
-    tr.tot td{background:#eef1f6;font-weight:700;border-top:2px solid #333}
-    .brk{break-after:page}
-    @media print{@page{size:A4 landscape;margin:6mm 8mm}body{padding:0}}
+    td{border-top:1px solid #999;border-left:1px solid #999;padding:0 1.5mm;height:${rh}mm;font-size:12pt;line-height:1}
+    td:first-child{border-left:0}
+    th.ali,td.ali{width:30%}th.num,td.num{width:20%}th.wr,td.wr{width:50%}
+    td.ali{font-weight:700;font-size:13pt;white-space:nowrap;overflow:hidden}
+    td.num{text-align:center;font-weight:700}
+    @media print{@page{size:A4 landscape;margin:5mm 7mm}body{padding:0}}
   </style></head><body>
   <div class="hdr">
-    <div><div class="hdr-title">Planilla de toma de stock</div><div class="hdr-sub">${esc(empresaNombre)} · según Objetivo de stock</div></div>
-    <div class="firma">Fecha: ____ / ____ / ________ &nbsp;&nbsp; Contó: ______________________</div>
+    <div><span class="hdr-title">Planilla de toma de stock</span> <span class="hdr-sub">· ${esc(empresaNombre)} · cajas</span></div>
+    <div class="firma">Fecha: ____ / ____ / ________ &nbsp; Contó: ____________________</div>
   </div>
-  ${bloques||'<p style="padding:20px">No hay productos con objetivo de depósito calculado para esta empresa.</p>'}
+  ${filas.length?`<div class="cols">${cajas}</div>`:'<p style="padding:20px">No hay productos con objetivo de depósito calculado para esta empresa.</p>'}
   <script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>
   </body></html>`;
 }
