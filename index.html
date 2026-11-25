@@ -294,7 +294,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.364</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.366</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -21540,13 +21540,57 @@ async function remSetCantidadRecibida(itemId,valor){
 // cumplimiento + Firma del responsable) a pedido de Juan Pablo, con la nota de almacenamiento en frío.
 // "Diferencias" y "Porcentaje de cumplimiento" quedan en blanco para completar a mano tras el conteo
 // físico en el local -- el sistema no tiene datos de pedido/recepción real para calcularlos.
-function remResumenInferiorHtml(resumenFilas){
+// v4.366: "para todos los clientes que no son los 5 que tenés en la base de datos, todo lo que se les remite sea por
+// cajas (clásicas, premium, planetarias, todo)". Los 5 clientes de siempre siguen con Bandejas/Unidades (empanadas en
+// docenas); cualquier otro cliente sale en CAJAS tanto en el listado como en el resumen de Cantidades (impreso y mail).
+// Cliente vacío (el PDF no lo trajo) = formato de siempre. Si cambian los 5 clientes, se edita esta lista.
+const REM_CLIENTES_POR_BANDEJA=['COLASANTI NATALIO Y BERMEJO CAROLINA','BERMEJO MARCELO PATRICIO','COLASANTI NATALIO GABRIEL','SANCHEZ ALDUVINO NICOLAS','DEPOSITO LAMADRID'];
+function remClientePorCajas(cliente){
+  const c=normTxt(String(cliente==null?'':cliente));
+  if(!c||c==='NULL')return false;
+  return!REM_CLIENTES_POR_BANDEJA.some(x=>normTxt(x)===c);
+}
+// Cajas = unidades reales / unidades por caja ("CAJA POR XXU." en la descripción de Flexxus); sin ese texto, la cantidad tal cual.
+function remCajasDeItem(it){
+  const ur=it.unidades_reales!=null?it.unidades_reales:(it.cantidad_mostrada||0);
+  const m=String(it.descripcion||'').match(/CAJA\s+POR\s+(\d+)\s*U\.?/i);
+  return m&&parseInt(m[1],10)>0?ur/parseInt(m[1],10):ur;
+}
+function remResumenCajasPorCategoria(items){
+  const agrupado=remAgruparPorCategoria(items);
+  const por={};
+  agrupado.forEach(g=>{por[g.categoria]=Math.round(g.items.reduce((a,it)=>a+remCajasDeItem(it),0)*100)/100;});
+  const conocidas=CATEGORIAS_PRODUCTO_SUGERIDAS.map(categoria=>({categoria,cajas:por[categoria]||0}));
+  const extra=agrupado.filter(g=>!CATEGORIAS_PRODUCTO_SUGERIDAS.includes(g.categoria)).map(g=>({categoria:g.categoria,cajas:por[g.categoria]}));
+  return[...conocidas,...extra];
+}
+function remBloquesHtml(grupos,porCajas){
+  return grupos.map(g=>`
+    <div class="catblock">
+      <div class="cath">${remEsc(g.categoria)}</div>
+      <table>
+        ${porCajas?'<tr><th>Producto</th><th class="num">Cajas</th></tr>':'<tr><th>Producto</th><th class="num">Bandejas</th><th class="num">Unidades</th></tr>'}
+        ${g.items.map(it=>{
+          const info=remAliasInfo(it.codigo);
+          const nombre=remAliasLimpio(info.alias)||remNombreLimpio(it.descripcion);
+          if(porCajas){
+            const cj=Math.round(remCajasDeItem(it)*100)/100;
+            return `<tr><td>${remEsc(nombre+remCantidadPorCajaTexto(it.descripcion))}</td><td class="num">${cj?cj:''}</td></tr>`;
+          }
+          const porCaja=it.tipo==='empanada'?'':remCantidadPorCajaTexto(it.descripcion);
+          const bu=remBandejasUnidades(it);
+          return `<tr><td>${remEsc(nombre+porCaja)}</td><td class="num">${bu.bandejas?bu.bandejas:''}</td><td class="num">${bu.sueltas?bu.sueltas:''}</td></tr>`;
+        }).join('')}
+      </table>
+    </div>`).join('');
+}
+function remResumenInferiorHtml(resumenFilas,porCajas){
   const filasVacias=Array(6).fill('<tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>').join('');
   return `
     <div class="resumen-wrap">
       <div class="resumen-col resumen-cant">
         <h2>Cantidades</h2>
-        <table><tr><th>Concepto</th><th class="num">Docenas</th><th class="num">Unidades</th></tr>${resumenFilas}</table>
+        <table>${porCajas?'<tr><th>Concepto</th><th class="num">Cajas</th></tr>':'<tr><th>Concepto</th><th class="num">Docenas</th><th class="num">Unidades</th></tr>'}${resumenFilas}</table>
       </div>
       <div class="resumen-col resumen-dif">
         <h2>Diferencias</h2>
@@ -21569,24 +21613,13 @@ function remImprimir(remito,items,opts){
   // variedades siempre, en cero si no vinieron en este remito. El RESUMEN de abajo sigue recibiendo
   // los `items` reales sin completar (confirmado por AskUserQuestion: solo pidió esto para el
   // listado de arriba, el resumen de Cantidades sigue sumando solo lo que vino).
+  const porCajas=remClientePorCajas(remito&&remito.cliente);
+  const itemsResumenCajas=items;
   const grupos=remAgruparPorCategoria(remCompletarVariedades(items));
   const resumen=remResumenPorCategoria(items);
   // v4: se sacó la columna "Cód." del impreso a pedido de Juan Pablo -- queda solo Producto/Cantidad.
-  const bloquesHtml=grupos.map(g=>`
-    <div class="catblock">
-      <div class="cath">${remEsc(g.categoria)}</div>
-      <table>
-        <tr><th>Producto</th><th class="num">Bandejas</th><th class="num">Unidades</th></tr>
-        ${g.items.map(it=>{
-          const info=remAliasInfo(it.codigo);
-          const nombre=remAliasLimpio(info.alias)||remNombreLimpio(it.descripcion);
-          const porCaja=it.tipo==='empanada'?'':remCantidadPorCajaTexto(it.descripcion);
-          const bu=remBandejasUnidades(it);
-          return `<tr><td>${remEsc(nombre+porCaja)}</td><td class="num">${bu.bandejas?bu.bandejas:''}</td><td class="num">${bu.sueltas?bu.sueltas:''}</td></tr>`;
-        }).join('')}
-      </table>
-    </div>`).join('');
-  const resumenFilas=resumen.map(r=>`<tr><td>${remEsc(r.categoria)}</td><td class="num">${r.docenas||0}</td><td class="num">${r.unidades||0}</td></tr>`).join('');
+  const bloquesHtml=remBloquesHtml(grupos,porCajas);
+  const resumenFilas=porCajas?remResumenCajasPorCategoria(itemsResumenCajas).map(r=>`<tr><td>${remEsc(r.categoria)}</td><td class="num">${r.cajas||0}</td></tr>`).join(''):resumen.map(r=>`<tr><td>${remEsc(r.categoria)}</td><td class="num">${r.docenas||0}</td><td class="num">${r.unidades||0}</td></tr>`).join('');
   const fechaImpresion=new Date().toLocaleString('es-AR');
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
   <title>${esNC?'Nota de crédito':'Remito'} ${remEsc(remito.numero||'')}</title>
@@ -21628,7 +21661,7 @@ function remImprimir(remito,items,opts){
       <div><span style="color:#666">Cliente</span><b>${remEsc(remito.cliente||'-')}</b></div>
     </div>
     <div class="catgrid">${bloquesHtml}</div>
-    ${remResumenInferiorHtml(resumenFilas)}
+    ${remResumenInferiorHtml(resumenFilas,porCajas)}
   ${opts&&opts.soloHtml?'':'<script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>'}
   </body></html>`;
   if(opts&&opts.soloHtml)return html; // v4.331: para armar el PDF adjunto del correo
@@ -21646,23 +21679,12 @@ function remImprimirCombinado(guardados,opts){
   const itemsCombinados=remConsolidarItems(docs);
   // v4.282: mismo criterio que remImprimir -- el listado de arriba se completa con las variedades
   // en cero, el resumen de abajo sigue recibiendo los ítems reales netos sin completar.
+  const porCajas=remClientePorCajas(guardados[0]&&guardados[0].remito&&guardados[0].remito.cliente);
+  const itemsResumenCajas=itemsCombinados;
   const grupos=remAgruparPorCategoria(remCompletarVariedades(itemsCombinados));
   const resumen=remResumenPorCategoria(itemsCombinados);
-  const bloquesHtml=grupos.map(g=>`
-    <div class="catblock">
-      <div class="cath">${remEsc(g.categoria)}</div>
-      <table>
-        <tr><th>Producto</th><th class="num">Bandejas</th><th class="num">Unidades</th></tr>
-        ${g.items.map(it=>{
-          const info=remAliasInfo(it.codigo);
-          const nombre=remAliasLimpio(info.alias)||remNombreLimpio(it.descripcion);
-          const porCaja=it.tipo==='empanada'?'':remCantidadPorCajaTexto(it.descripcion);
-          const bu=remBandejasUnidades(it);
-          return `<tr><td>${remEsc(nombre+porCaja)}</td><td class="num">${bu.bandejas?bu.bandejas:''}</td><td class="num">${bu.sueltas?bu.sueltas:''}</td></tr>`;
-        }).join('')}
-      </table>
-    </div>`).join('');
-  const resumenFilas=resumen.map(r=>`<tr><td>${remEsc(r.categoria)}</td><td class="num">${r.docenas||0}</td><td class="num">${r.unidades||0}</td></tr>`).join('');
+  const bloquesHtml=remBloquesHtml(grupos,porCajas);
+  const resumenFilas=porCajas?remResumenCajasPorCategoria(itemsResumenCajas).map(r=>`<tr><td>${remEsc(r.categoria)}</td><td class="num">${r.cajas||0}</td></tr>`).join(''):resumen.map(r=>`<tr><td>${remEsc(r.categoria)}</td><td class="num">${r.docenas||0}</td><td class="num">${r.unidades||0}</td></tr>`).join('');
   const fechaImpresion=new Date().toLocaleString('es-AR');
   const primero=guardados[0].remito;
   const numerosHtml=guardados.map(g=>`${remEsc(g.remito.numero||'-')}${g.doc.esNC?' (NC)':''}`).join(', ');
@@ -21707,7 +21729,7 @@ function remImprimirCombinado(guardados,opts){
       <div><span style="color:#666">Cliente</span><b>${remEsc(primero.cliente||'-')}</b></div>
     </div>
     <div class="catgrid">${bloquesHtml}</div>
-    ${remResumenInferiorHtml(resumenFilas)}
+    ${remResumenInferiorHtml(resumenFilas,porCajas)}
   ${opts&&opts.soloHtml?'':'<script>window.onload=function(){setTimeout(function(){window.print()},400)};<\/script>'}
   </body></html>`;
   if(opts&&opts.soloHtml)return html;
