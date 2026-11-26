@@ -294,7 +294,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.385</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.386</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div id="acc-chip" style="display:none;font-size:12px;color:var(--text2);border:.5px solid var(--border2);border-radius:999px;padding:3px 10px"></div>
@@ -21151,11 +21151,16 @@ const ACC_PARTES={
   rem:[['subir','Subir remito','remtab-subir'],['historial','Historial','remtab-historial'],['envios','Envío a locales','remtab-envios'],['difped','Entrega vs pedido','remtab-difped'],['config','Configuración remitos','remtab-config']],
   comes:[['lista','Lista del día','comestab-lista'],['personas','Personas','comestab-personas']]
 };
-// permisos[area] = 'ver'|'editar' (formato viejo) o {nivel, partes:[claves]|null}; partes null = el área completa
+// permisos[area] = 'ver'|'editar' (formato viejo) o {nivel, partes:[claves]|null, niveles:{parte:'ver'|'editar'}}
+// partes null = el área completa; niveles (opcional) = nivel propio de cada parte (si falta, todas usan `nivel`).
 function accPerm(u,area){
   const p=(u.permisos||{})[area];if(!p)return null;
-  if(typeof p==='string')return{nivel:p==='ver'?'ver':'editar',partes:null};
-  return{nivel:p.nivel==='ver'?'ver':'editar',partes:(Array.isArray(p.partes)&&p.partes.length)?p.partes:null};
+  if(typeof p==='string')return{nivel:p==='ver'?'ver':'editar',partes:null,niveles:null};
+  const partes=(Array.isArray(p.partes)&&p.partes.length)?p.partes:null;
+  let niveles=null;
+  if(partes&&p.niveles&&typeof p.niveles==='object'){niveles={};partes.forEach(k=>{niveles[k]=p.niveles[k]==='ver'?'ver':(p.niveles[k]==='editar'?'editar':(p.nivel==='ver'?'ver':'editar'));});}
+  const nivel=niveles?(Object.values(niveles).includes('editar')?'editar':'ver'):(p.nivel==='ver'?'ver':'editar');
+  return{nivel,partes,niveles};
 }
 const ACC_SQL_TABLAS=`create table if not exists sope_accesos (
   id text primary key,
@@ -21184,7 +21189,7 @@ create table if not exists sope_accesos_log (
   created_at timestamptz default now()
 );`;
 const ACC_SQL_RLS=['alter table sope_accesos disable row level security;','alter table sope_acceso_config disable row level security;','alter table sope_accesos_log disable row level security;'];
-var accSt={listo:false,falta:false,err:'',users:[],areas:{},desb:{},maestro:null,ult:Date.now(),tab:'prod',lastLog:{},prom:null,log:[],idleMin:30,logFiltro:{u:'',a:''}};
+var accSt={red:{ips:[],areas:{}},ip:null,enRed:null,ipTs:0,listo:false,falta:false,err:'',users:[],areas:{},desb:{},maestro:null,ult:Date.now(),tab:'prod',lastLog:{},prom:null,log:[],idleMin:30,logFiltro:{u:'',a:''}};
 
 // --- SHA-256 en JS puro (no depende de https) + clave con sal e iteraciones ---
 const ACC_K=[],ACC_H0=[];
@@ -21216,8 +21221,9 @@ function accClaveEnUso(clave,exceptId){return accSt.users.some(u=>u.id!==exceptI
 function accCargar(){
   accSt.prom=(async()=>{
     try{
-      const[us,cf]=await Promise.all([get('sope_accesos','select=*&order=nombre.asc'),get('sope_acceso_config','id=eq.areas')]);
-      accSt.users=us;accSt.areas=(cf[0]&&cf[0].datos)||{};accSt.falta=false;accSt.err='';accSt.listo=true;
+      const[us,cf,rd]=await Promise.all([get('sope_accesos','select=*&order=nombre.asc'),get('sope_acceso_config','id=eq.areas'),get('sope_acceso_config','id=eq.red')]);
+      accSt.users=us;accSt.areas=(cf[0]&&cf[0].datos)||{};
+      const rr=(rd[0]&&rd[0].datos)||{};accSt.red={ips:Array.isArray(rr.ips)?rr.ips:[],areas:rr.areas||{}};accIpActual();accSt.falta=false;accSt.err='';accSt.listo=true;
       try{localStorage.setItem('sope_acc_prod',accRequiere('prod')?'1':'0');}catch(e2){}
       if(!accSt.inicio){accSt.inicio=true;if(accRequiere('prod')&&!accNivel('prod')&&accSt.tab==='prod'&&!document.getElementById('acc-lock'))accLockScreen('prod');}
     }catch(e){
@@ -21251,7 +21257,38 @@ function accAplicarPartes(t){
   });
   if(bloqueada&&primero)primero.click();
 }
-function accNivelActual(){return accRequiere(accSt.tab)?accNivel(accSt.tab):'editar';}
+// Nivel de la pantalla que se está viendo: si el usuario tiene nivel propio por sub-pestaña, se mira la sub-pestaña abierta.
+function accParteActiva(t){
+  const reg=ACC_PARTES[t];if(!reg)return null;
+  for(const [k,l,id] of reg){const b=document.getElementById(id);if(b&&b.classList.contains('active'))return k;}
+  return null;
+}
+// --- Red del trabajo: áreas que solo se pueden EDITAR desde la(s) red(es) registradas (se compara la IP pública) ---
+async function accIpActual(forzar){
+  if(!forzar&&accSt.ip&&Date.now()-accSt.ipTs<300000)return accSt.ip;
+  const urls=['https://api.ipify.org?format=json','https://api64.ipify.org?format=json','https://ipinfo.io/json'];
+  for(const u of urls){
+    try{const r=await fetch(u,{cache:'no-store'});if(!r.ok)continue;const j=await r.json();const ip=String(j.ip||'').trim();if(ip){accSt.ip=ip;accSt.ipTs=Date.now();accSt.enRed=accSt.red.ips.some(x=>x.ip===ip);return ip;}}catch(e){}
+  }
+  accSt.ip=null;accSt.enRed=null;return null;
+}
+// true = esta pantalla es solo de lectura porque estás fuera de la red del trabajo (Configuración nunca se restringe por red)
+function accRedBloquea(t){
+  if(!accSt||t==='cfg'||!accSt.red||!accSt.red.areas[t]||!accSt.red.ips.length)return false;
+  if(accSt.ip&&accSt.red.ips.some(x=>x.ip===accSt.ip))return false;
+  return true;
+}
+function accNivelActual(){
+  if(accRedBloquea(accSt.tab))return'ver';
+  return accNivelPermiso();
+}
+function accNivelPermiso(){
+  const t=accSt.tab;if(!accRequiere(t))return'editar';
+  if(accSt.maestro)return'editar';
+  const d=accSt.desb[t];if(!d)return null;
+  if(d.niveles){const k=accParteActiva(t);return k&&d.niveles[k]?d.niveles[k]:'ver';}
+  return d.nivel;
+}
 // Se llama al principio de T(): true = puede entrar; false = pidió clave (o está verificando) y vuelve a llamar a T() si entra bien.
 function accGuardia(t){
   if(typeof accSt==='undefined'||!accSt)return true;
@@ -21279,10 +21316,11 @@ function accToast(msg){
 }
 function accBanner(){
   let b=document.getElementById('acc-banner');
-  const ver=accRequiere(accSt.tab)&&accNivel(accSt.tab)==='ver';
+  const ver=accEsSoloVer();const porRed=accRedBloquea(accSt.tab);
+  try{document.body.classList.toggle('acc-ver',!!ver);}catch(e){}
   if(!ver){if(b)b.remove();return;}
   if(!b){b=document.createElement('div');b.id='acc-banner';b.style.cssText='position:fixed;right:16px;bottom:16px;background:#b45309;color:#fff;padding:8px 14px;border-radius:10px;z-index:150;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.25)';document.body.appendChild(b);}
-  b.innerHTML='<i class="ti ti-eye"></i> Acceso de solo lectura: no se pueden guardar cambios';
+  b.innerHTML='<i class="ti ti-eye"></i> '+(porRed?(accSt.ip?'Estás fuera de la red del trabajo: solo lectura':'No pude verificar la red del trabajo: solo lectura'):'Solo lectura: no se puede guardar, imprimir ni exportar');
 }
 function accChip(){
   const el=document.getElementById('acc-chip');if(!el)return;
@@ -21307,16 +21345,47 @@ function accVigilar(){
 }
 ['mousemove','keydown','click','touchstart','scroll'].forEach(ev=>document.addEventListener(ev,()=>{accSt.ult=Date.now();},{passive:true,capture:true}));
 setInterval(accVigilar,20000);
-setInterval(()=>{try{accAplicarPartes(accSt.tab);}catch(e){}},1000);
+setInterval(()=>{try{accAplicarPartes(accSt.tab);accBanner();accVerBloqueos();}catch(e){}},1000);
+setInterval(()=>{if(accSt.red&&accSt.red.ips.length)accIpActual(true);},300000);
 try{if(localStorage.getItem('sope_acc_prod')==='1')setTimeout(()=>{if(!document.getElementById('acc-lock')&&!accNivel('prod'))accLockScreen('prod',true);},0);}catch(e){}
+// "Solo ver": además de no guardar, no deja imprimir, exportar, descargar ni subir archivos.
+const ACC_RE_SALIDA=/imprimir|print|pdf|descargar|exportar|export|excel|xlsx|csv|bajar/i;
+function accEsSoloVer(){try{return !!accSt&&(accRedBloquea(accSt.tab)||(accRequiere(accSt.tab)&&accNivelActual()==='ver'));}catch(e){return false;}}
+function accVerBloqueos(){
+  const v=accEsSoloVer();
+  document.querySelectorAll('[onclick]').forEach(el=>{
+    const oc=el.getAttribute('onclick')||'';
+    if(el.closest('#acc-lock,#modal-acc,#modal-accp,#modal-accu,#acc-chip'))return;
+    if(ACC_RE_SALIDA.test(oc)||ACC_RE_SALIDA.test(el.title||'')){
+      if(v){if(el.dataset.accOcult==null){el.dataset.accOcult=el.style.display||'';el.style.display='none';}}
+      else if(el.dataset.accOcult!=null){el.style.display=el.dataset.accOcult;delete el.dataset.accOcult;}
+    }
+  });
+}
+(function(){
+  const aviso=()=>accToast('Solo lectura: no se puede imprimir, exportar ni subir archivos.');
+  const p0=window.print.bind(window);window.print=function(){if(accEsSoloVer()){aviso();return;}return p0();};
+  const o0=window.open.bind(window);window.open=function(){if(accEsSoloVer()){aviso();return null;}return o0.apply(window,arguments);};
+  document.addEventListener('click',e=>{
+    if(!accEsSoloVer())return;
+    const t=e.target.closest&&e.target.closest('[onclick],a[download],input[type=file],label');
+    if(!t||t.closest('#acc-lock,#modal-acc,#modal-accp,#modal-accu,#acc-chip'))return;
+    const oc=t.getAttribute&&t.getAttribute('onclick')||'';
+    const esFile=t.matches&&(t.matches('input[type=file]')||t.matches('a[download]')||(t.tagName==='LABEL'&&t.querySelector&&t.querySelector('input[type=file]')));
+    if(esFile||ACC_RE_SALIDA.test(oc)){e.preventDefault();e.stopPropagation();aviso();}
+  },true);
+  document.addEventListener('keydown',e=>{if(accEsSoloVer()&&(e.ctrlKey||e.metaKey)&&String(e.key).toLowerCase()==='p'){e.preventDefault();aviso();}},true);
+  document.addEventListener('drop',e=>{if(accEsSoloVer()){e.preventDefault();e.stopPropagation();aviso();}},true);
+  const st=document.createElement('style');st.textContent='@media print{body.acc-ver *{display:none!important}}';document.head.appendChild(st);
+})();
 // "Solo ver": mientras la pestaña activa sea de solo lectura, no se deja guardar nada en la base (salvo el registro de accesos).
 (function(){
   const f0=window.fetch.bind(window);let ultAviso=0;
   window.fetch=function(url,opts){
     try{
       const m=String((opts&&opts.method)||'GET').toUpperCase();
-      if(m!=='GET'&&m!=='HEAD'&&typeof url==='string'&&url.indexOf('/rest/v1/')>=0&&url.indexOf('/rest/v1/sope_')<0&&accNivelActual()==='ver'){
-        if(Date.now()-ultAviso>3000){ultAviso=Date.now();accToast('Tu acceso a '+accNombreArea(accSt.tab)+' es de solo lectura: no se guardó.');}
+      if(m!=='GET'&&m!=='HEAD'&&typeof url==='string'&&url.indexOf('/rest/v1/')>=0&&url.indexOf('/rest/v1/sope_')<0&&accEsSoloVer()){
+        if(Date.now()-ultAviso>3000){ultAviso=Date.now();accToast(accRedBloquea(accSt.tab)?(accNombreArea(accSt.tab)+' solo se edita desde la red del trabajo: no se guardó.'):('Tu acceso a '+accNombreArea(accSt.tab)+' es de solo lectura: no se guardó.'));}
         return Promise.resolve(new Response(JSON.stringify({message:'Solo lectura'}),{status:403,headers:{'Content-Type':'application/json'}}));
       }
     }catch(e){}
@@ -21361,7 +21430,7 @@ async function accIntentar(t,clave){
     if(!accPerm(u,t)){accLog('fallido',t,'sin permiso',yo);return{err:'Esa clave no tiene permiso para '+accNombreArea(t)+'.'};}
   }
   if(u.es_maestro)accSt.maestro=yo;
-  else Object.keys(u.permisos||{}).forEach(a=>{const p=accPerm(u,a);if(p)accSt.desb[a]={uid:u.id,nombre:u.nombre,nivel:p.nivel,partes:p.partes};});
+  else Object.keys(u.permisos||{}).forEach(a=>{const p=accPerm(u,a);if(p)accSt.desb[a]={uid:u.id,nombre:u.nombre,nivel:p.nivel,partes:p.partes,niveles:p.niveles};});
   accSt.ult=Date.now();if(t)accSt.lastLog[u.id+'|'+t]=Date.now();
   accLog('ingreso',t||'*',u.es_maestro?'clave maestra':'clave',yo);
   accChip();
@@ -21443,6 +21512,7 @@ function accAdminRender(){
     ${ACC_AREAS.filter(a=>a[0]!=='cfg').map(a=>`<label style="display:flex;gap:6px;align-items:center"><input type="checkbox"${accSt.areas[a[0]]?' checked':''} onchange="accSetArea('${a[0]}',this.checked)"/>${remEsc(a[1])}</label>`).join('')}
   </div>
   <div style="font-size:12px;color:var(--text2);margin-bottom:16px">Configuración siempre pide la clave maestra. Si tildás un área y nadie tiene permiso, solo entra la clave maestra. Si tildás Producción (la pantalla de inicio), el sistema entero pide clave al abrirse.</div>`;
+  h+=accRedHtml();
   const ult={};accSt.log.filter(l=>l.accion==='ingreso'||l.accion==='visita').forEach(l=>{if(l.usuario_id&&!ult[l.usuario_id])ult[l.usuario_id]=l;});
   h+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:14px;font-weight:600">Usuarios con clave</span><button class="btn btn-primary btn-sm" onclick="accEditarUsuario('')"><i class="ti ti-user-plus"></i> Nuevo usuario</button><button class="btn btn-sm" onclick="accAdminInit()"><i class="ti ti-refresh"></i> Actualizar</button></div>
   <div style="overflow-x:auto"><table class="plan-grid"><thead><tr><th class="left">Usuario</th><th class="left">Permisos</th><th class="left">Último ingreso</th><th>Activo</th><th></th></tr></thead><tbody>`;
@@ -21481,6 +21551,37 @@ async function accCrearMaestro(){
   accLog('config','cfg','creó la clave maestra',accSt.maestro);accChip();
   await accAdminInit();
 }
+function accRedHtml(){
+  const r=accSt.red,IN='padding:6px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)';
+  const ahora=accSt.ip?`<b>${remEsc(accSt.ip)}</b>`+(r.ips.some(x=>x.ip===accSt.ip)?' <span style="color:var(--green)">· es una red registrada</span>':''):'<span style="color:var(--text3)">no pude detectarla</span>';
+  return `<div style="border:.5px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:16px">
+    <div style="font-size:14px;font-weight:600;margin-bottom:4px"><i class="ti ti-wifi"></i> Red del trabajo</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:8px">Las áreas que tildes abajo solo se pueden <b>editar</b> desde una red registrada; desde cualquier otra (tu casa, el celular con datos) quedan en solo lectura. Se reconoce por la IP pública de internet. Registrá la red estando en la planta.</div>
+    <div style="font-size:13px;margin-bottom:6px">Tu IP en este momento: ${ahora} <button class="btn btn-sm" onclick="accRedRefrescar()" style="margin-left:6px"><i class="ti ti-refresh"></i></button></div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px"><input id="acc-red-n" type="text" placeholder="Nombre (ej. Planta Bahía)" style="${IN};width:190px"/><button class="btn btn-primary btn-sm" onclick="accRedRegistrar()"${accSt.ip?'':' disabled'}><i class="ti ti-plus"></i> Registrar esta red como del trabajo</button></div>
+    ${r.ips.length?`<table class="plan-grid" style="margin-bottom:8px"><thead><tr><th class="left">Red</th><th class="left">IP</th><th class="left">Registrada</th><th></th></tr></thead><tbody>${r.ips.map((x,i)=>`<tr><td class="left">${remEsc(x.nombre||'Trabajo')}</td><td class="left">${remEsc(x.ip)}</td><td class="left" style="font-size:12px">${remEsc(x.fecha||'')}</td><td><button class="btn btn-sm" onclick="accRedQuitar(${i})" title="Quitar"><i class="ti ti-trash"></i></button></td></tr>`).join('')}</tbody></table>`:'<div style="font-size:12px;color:var(--text3);margin-bottom:8px">Todavía no hay redes registradas: mientras no registres una, la restricción no se aplica.</div>'}
+    <div style="font-size:13px;font-weight:600;margin-bottom:4px">Solo se edita desde la red del trabajo:</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:4px 14px;font-size:13px">${ACC_AREAS.filter(a=>a[0]!=='cfg').map(a=>`<label style="display:flex;gap:6px;align-items:center"><input type="checkbox"${r.areas[a[0]]?' checked':''} onchange="accRedArea('${a[0]}',this.checked)"/>${remEsc(a[1])}</label>`).join('')}</div>
+    <div style="font-size:11.5px;color:var(--text3);margin-top:6px">Si la IP del trabajo cambia (algunos proveedores la renuevan), volvé a registrarla acá. Configuración nunca se restringe por red, para que no te quedes afuera.</div></div>`;
+}
+async function accRedGuardar(nuevo,det){
+  try{
+    const r=await fetch(`${SB}/rest/v1/sope_acceso_config?on_conflict=id`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:'red',datos:nuevo,updated_at:new Date().toISOString()})});
+    if(!r.ok)throw new Error(await r.text());
+    accSt.red=nuevo;accSt.enRed=accSt.ip?nuevo.ips.some(x=>x.ip===accSt.ip):null;accLog('config','*',det,accSt.maestro);
+  }catch(e){alert('No pude guardar: '+String((e&&e.message)||e).slice(0,200));}
+  accAdminRender();accBanner();
+}
+async function accRedRefrescar(){await accIpActual(true);accAdminRender();}
+function accRedRegistrar(){
+  if(!accSt.ip)return;
+  if(accSt.red.ips.some(x=>x.ip===accSt.ip)){accToast('Esa red ya está registrada.');return;}
+  const n=(document.getElementById('acc-red-n')||{}).value||'Trabajo';
+  const f=new Date().toLocaleDateString('es-AR');
+  accRedGuardar({...accSt.red,ips:[...accSt.red.ips,{ip:accSt.ip,nombre:n.trim()||'Trabajo',fecha:f}]},'registró la red del trabajo ('+accSt.ip+')');
+}
+function accRedQuitar(i){const x=accSt.red.ips[i];if(!x||!confirm('¿Quitar la red "'+(x.nombre||x.ip)+'"?'))return;accRedGuardar({...accSt.red,ips:accSt.red.ips.filter((_,j)=>j!==i)},'quitó la red '+x.ip);}
+function accRedArea(k,on){accRedGuardar({...accSt.red,areas:{...accSt.red.areas,[k]:!!on}},(on?'solo edita desde la red del trabajo: ':'edita desde cualquier red: ')+accNombreArea(k));}
 async function accSetArea(k,on){
   const nuevo={...accSt.areas,[k]:!!on};
   try{
@@ -21491,11 +21592,14 @@ async function accSetArea(k,on){
   accAdminRender();
 }
 function accResumenPerm(u){
+  const nv=n=>n==='ver'?'solo ver':'ver y editar';
   const l=Object.keys(u.permisos||{}).map(a=>{
     const p=accPerm(u,a);if(!p)return '';
     const reg=ACC_PARTES[a]||[];
-    const partes=p.partes?' ('+p.partes.map(k=>{const x=reg.find(r=>r[0]===k);return x?x[1]:k;}).join(', ')+')':'';
-    return `<div style="font-size:12px"><b>${remEsc(accNombreArea(a))}</b>: ${p.nivel==='ver'?'solo ver':'ver y editar'}${p.partes?remEsc(partes):' · todo'}${accSt.areas[a]?'':' <span style="color:var(--text3)">(hoy no pide clave)</span>'}</div>`;
+    let det;
+    if(!p.partes)det=nv(p.nivel)+' · todo';
+    else det=p.partes.map(k=>{const x=reg.find(r=>r[0]===k);return (x?x[1]:k)+': '+nv(p.niveles?p.niveles[k]:p.nivel);}).join(' · ');
+    return `<div style="font-size:12px"><b>${remEsc(accNombreArea(a))}</b>: ${remEsc(det)}${accSt.areas[a]?'':' <span style="color:var(--text3)">(hoy no pide clave)</span>'}</div>`;
   }).filter(Boolean);
   return l.join('')||'<span style="color:var(--text3);font-size:12px">sin permisos todavía</span>';
 }
@@ -21503,7 +21607,12 @@ var accEdP=null;
 function accPermisosModal(id){
   const u=accSt.users.find(x=>x.id===id);if(!u||u.es_maestro)return;
   const perm={};
-  ACC_AREAS.forEach(a=>{const p=accPerm(u,a[0]);if(p)perm[a[0]]={nivel:p.nivel,partes:p.partes?[...p.partes]:null};});
+  ACC_AREAS.forEach(([k])=>{
+    const p=accPerm(u,k);const reg=ACC_PARTES[k];
+    if(!reg){perm[k]={nivel:p?p.nivel:''};return;}
+    const n={};reg.forEach(([pk])=>{n[pk]=p?((!p.partes||p.partes.includes(pk))?(p.niveles?p.niveles[pk]:p.nivel):''):'';});
+    perm[k]={n};
+  });
   accEdP={id,nombre:u.nombre,perm};accPermisosRender();
 }
 function accPermisosRender(){
@@ -21511,30 +21620,40 @@ function accPermisosRender(){
   let ov=document.getElementById('modal-accp');
   if(!ov){ov=document.createElement('div');ov.className='modal-overlay';ov.id='modal-accp';ov.addEventListener('mousedown',x=>{if(x.target===ov)ov.remove();});document.body.appendChild(ov);}
   const IN='padding:5px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)';
-  const areas=ACC_AREAS.filter(a=>a[0]!=='cfg'&&(accSt.areas[a[0]]||e.perm[a[0]]));
+  const opts=v=>`<option value="">Sin acceso</option><option value="ver"${v==='ver'?' selected':''}>Solo ver</option><option value="editar"${v==='editar'?' selected':''}>Ver y editar</option>`;
+  const tieneAlgo=k=>{const p=e.perm[k];return p&&(p.n?Object.values(p.n).some(Boolean):!!p.nivel);};
+  const areas=ACC_AREAS.filter(a=>a[0]!=='cfg'&&(accSt.areas[a[0]]||tieneAlgo(a[0])));
   const filas=areas.map(([k,nom])=>{
     const p=e.perm[k],reg=ACC_PARTES[k];
-    let h=`<div style="border:.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="min-width:120px">${remEsc(nom)}</b>
-      <select style="${IN}" onchange="accPNivel('${k}',this.value)"><option value="">Sin acceso</option><option value="ver"${p&&p.nivel==='ver'?' selected':''}>Solo ver</option><option value="editar"${p&&p.nivel==='editar'?' selected':''}>Ver y editar</option></select>
-      ${p&&reg?`<label style="font-size:12px;display:flex;gap:4px;align-items:center"><input type="radio" name="m-${k}"${!p.partes?' checked':''} onchange="accPModo('${k}',false)"/> Todo el área</label><label style="font-size:12px;display:flex;gap:4px;align-items:center"><input type="radio" name="m-${k}"${p.partes?' checked':''} onchange="accPModo('${k}',true)"/> Solo algunas partes</label>`:''}
-      ${accSt.areas[k]?'':'<span style="font-size:11px;color:var(--text3)">(esta área hoy no pide clave)</span>'}</div>`;
-    if(p&&reg&&p.partes)h+=`<div style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:3px 10px;font-size:12.5px">${reg.map(([pk,pn])=>`<label style="display:flex;gap:5px;align-items:center"><input type="checkbox"${p.partes.includes(pk)?' checked':''} onchange="accPParte('${k}','${pk}',this.checked)"/>${remEsc(pn)}</label>`).join('')}</div>`;
-    if(p&&!reg)h+='<div style="margin-top:4px;font-size:11.5px;color:var(--text3)">Esta área no tiene partes: se da completa.</div>';
-    return h+'</div>';
+    const noPide=accSt.areas[k]?'':'<span style="font-size:11px;color:var(--text3)">(hoy no pide clave)</span>';
+    if(!reg)return `<div style="border:.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="min-width:150px">${remEsc(nom)}</b><select style="${IN};width:150px;flex:none" onchange="accPArea('${k}',this.value)">${opts(p.nivel)}</select>${noPide}</div><div style="margin-top:4px;font-size:11.5px;color:var(--text3)">Esta área no tiene sub-pestañas: se da completa.</div></div>`;
+    const vals=reg.map(([pk])=>p.n[pk]||'');const uni=vals.every(v=>v===vals[0])?vals[0]:'mixto';
+    const todo=`<option value="">Sin acceso</option><option value="ver"${uni==='ver'?' selected':''}>Solo ver</option><option value="editar"${uni==='editar'?' selected':''}>Ver y editar</option>${uni==='mixto'?'<option value="mixto" selected disabled>Mixto (cada una distinta)</option>':''}`;
+    const filasP=reg.map(([pk,pn])=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:2px 0"><span style="font-size:13px">${remEsc(pn)}</span><select style="${IN};padding:3px 6px;font-size:12.5px;width:150px;flex:none" onchange="accPParte('${k}','${pk}',this.value)">${opts(p.n[pk]||'')}</select></div>`).join('');
+    return `<div style="border:.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><b style="min-width:150px;font-size:15px">${remEsc(nom)}</b><span style="font-size:12px;color:var(--text2)">Todas las sub-pestañas:</span><select style="${IN};width:210px;flex:none" onchange="accPTodas('${k}',this.value)">${todo}</select>${noPide}</div><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:2px 22px;border-top:.5px solid var(--border);padding-top:4px">${filasP}</div></div>`;
   }).join('');
-  ov.innerHTML=`<div class="modal" style="width:640px;max-height:88vh;overflow-y:auto"><div class="modal-title"><i class="ti ti-adjustments"></i> Permisos de ${remEsc(e.nombre)}</div>
-    <div class="modal-sub">Elegí a qué áreas entra y, si querés, solo a algunas partes (sub-pestañas) de cada una.</div>
+  ov.innerHTML=`<div class="modal" style="width:700px;max-height:88vh;overflow-y:auto"><div class="modal-title"><i class="ti ti-adjustments"></i> Permisos de ${remEsc(e.nombre)}</div>
+    <div class="modal-sub">Para cada área elegí, sub-pestaña por sub-pestaña: sin acceso, solo ver (no guarda, no imprime, no exporta) o ver y editar.</div>
     <div style="margin:10px 0">${filas||'<div style="color:var(--text3)">Tildá primero qué áreas piden clave.</div>'}</div>
     <div id="accp-err" style="color:var(--red);font-size:12px;min-height:16px"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-sm" onclick="document.getElementById('modal-accp').remove()">Cancelar</button><button class="btn btn-primary btn-sm" onclick="accPGuardar()"><i class="ti ti-check"></i> Guardar</button></div></div>`;
 }
-function accPNivel(k,v){if(!v)delete accEdP.perm[k];else{const p=accEdP.perm[k]||{partes:null};p.nivel=v;accEdP.perm[k]=p;}accPermisosRender();}
-function accPModo(k,algunas){accEdP.perm[k].partes=algunas?[]:null;accPermisosRender();}
-function accPParte(k,pk,on){const p=accEdP.perm[k];p.partes=on?[...new Set([...(p.partes||[]),pk])]:(p.partes||[]).filter(x=>x!==pk);}
+function accPArea(k,v){accEdP.perm[k].nivel=v;accPermisosRender();}
+function accPTodas(k,v){if(v==='mixto')return;ACC_PARTES[k].forEach(([pk])=>{accEdP.perm[k].n[pk]=v;});accPermisosRender();}
+function accPParte(k,pk,v){accEdP.perm[k].n[pk]=v;accPermisosRender();}
 async function accPGuardar(){
   const e=accEdP,er=document.getElementById('accp-err');
-  for(const k of Object.keys(e.perm)){if(e.perm[k].partes&&!e.perm[k].partes.length){er.textContent='En '+accNombreArea(k)+' tildá al menos una parte (o elegí "Todo el área").';return;}}
-  const permisos={};Object.entries(e.perm).forEach(([k,p])=>{permisos[k]={nivel:p.nivel,partes:p.partes};});
+  const permisos={};
+  Object.entries(e.perm).forEach(([k,p])=>{
+    const reg=ACC_PARTES[k];
+    if(!reg){if(p.nivel)permisos[k]={nivel:p.nivel,partes:null};return;}
+    const con=reg.filter(([pk])=>p.n[pk]);if(!con.length)return;
+    const nv=con.map(([pk])=>p.n[pk]);
+    const uniforme=nv.every(x=>x===nv[0]);
+    if(uniforme&&con.length===reg.length)permisos[k]={nivel:nv[0],partes:null};
+    else if(uniforme)permisos[k]={nivel:nv[0],partes:con.map(x=>x[0])};
+    else{const niveles={};con.forEach(([pk])=>{niveles[pk]=p.n[pk];});permisos[k]={nivel:'editar',partes:con.map(x=>x[0]),niveles};}
+  });
   const u=accSt.users.find(x=>x.id===e.id);
   try{await pat('sope_accesos',e.id,{permisos});u.permisos=permisos;accLog('config','*','permisos de '+e.nombre+' actualizados',accSt.maestro);}
   catch(x){er.textContent='No pude guardar: '+String((x&&x.message)||x).slice(0,200);return;}
