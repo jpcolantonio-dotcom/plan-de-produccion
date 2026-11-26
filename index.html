@@ -294,7 +294,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.374</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.375</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -20455,11 +20455,25 @@ function pedBannerSQL(){
     <div style="margin-top:8px;font-size:12px;color:var(--text2)">Paso 1 — tabla:</div><pre style="${pre}">${remEsc(PED_SQL_TABLA)}</pre>
     <div style="font-size:12px;color:var(--text2)">Paso 2 — sin RLS (línea sola):</div><pre style="${pre}">${remEsc(PED_SQL_RLS)}</pre></div>`;
 }
-// Entregado de una fila/local: lo que escribió a mano en "env." tiene prioridad; si no, la planilla Envío a locales.
+// v4.375: los locales piden en BANDEJAS (o cajas), pero Envío a locales se carga en UNIDADES. Para comparar, lo pedido se pasa a
+// unidades: bandeja de empanada = 24 u., bandeja de jamón y queso = 36 u., atún y sin sal por caja de 48 u. El resto (cajas de
+// burritos, pizzetas, zen, salsas, hojaldre 13) se compara tal cual, sin multiplicar.
+function pedFactorMp(mp){
+  if(!mp||mp._extra)return 1;
+  const n=normTxt(mp.nombre||'');
+  if(!/^EMPANADA/.test(n))return 1;
+  if(/\bATUN\b|SIN SAL/.test(n))return 48;
+  if(/CAJA POR/.test(n)||mp.unidad_tipo==='caja')return 1;
+  if(/^EMPANADA DE JAMON Y QUESO\b/.test(n))return 36;
+  return 24;
+}
+function pedFactor(i){return pedFactorMp(ped.items[i]);}
+function pedPedidoU(i,ci){const p=pedPedido(i,ci);return p==null?null:Math.round(p*pedFactor(i)*1000)/1000;}
+// Entregado de una fila/local (en unidades): lo que escribió a mano en "env." (en bandejas, como el pedido) tiene prioridad; si no, la planilla Envío a locales.
 // Sin planilla cargada para la fecha (y sin dato tipeado) devuelve undefined = no se puede comparar.
 function pedEntregado(i,ci){
   const d=pedCeldaPintada(i,ci);
-  if(d&&d.e!=null)return d.e;
+  if(d&&d.e!=null)return Math.round(d.e*pedFactor(i)*1000)/1000;
   if(!ped.envCant)return undefined;
   const ids=ped.hermanos[i]||[];
   if(!ids.length)return undefined;
@@ -20468,21 +20482,22 @@ function pedEntregado(i,ci){
 function pedCmp(i,ci){
   const ent=pedEntregado(i,ci);
   if(ent===undefined)return{ent:null,dif:null,ok:false};
-  const pd=pedPedido(i,ci);
-  return{ent:(ent===0&&pd==null)?null:ent,dif:(pd==null&&ent===0)?null:pedDif(pd,ent),ok:true};
+  const pd=pedPedidoU(i,ci);
+  return{ent:(ent===0&&pd==null)?null:ent,dif:(pd==null&&ent===0)?null:pedDif(pd,ent),ok:true,pd,f:pedFactor(i)};
 }
+function pedTitleDif(m){return m&&m.ok&&m.pd!=null?(m.f!==1?`Pedido × ${m.f} = ${pedFmt(m.pd)} u.`:`Pedido ${pedFmt(m.pd)}`):'';}
 function pedCmpTds(i){
   return ENV_COLS.map((c,ci)=>{
     const m=pedCmp(i,ci);
     const bl=ci===0?'border-left:2px solid var(--border2);':'';
-    return`<td id="ped-en-${i}-${ci}" style="${bl}text-align:center;width:52px;font-size:13px">${m.ent!=null?pedFmt(m.ent):''}</td><td id="ped-df-${i}-${ci}" style="text-align:center;width:52px;font-size:13px;font-weight:700;color:${pedColorDif(m.dif)}">${pedFmtDif(m.dif)}</td>`;
+    return`<td id="ped-en-${i}-${ci}" style="${bl}text-align:center;width:52px;font-size:13px">${m.ent!=null?pedFmt(m.ent):''}</td><td id="ped-df-${i}-${ci}" title="${pedTitleDif(m)}" style="text-align:center;width:52px;font-size:13px;font-weight:700;color:${pedColorDif(m.dif)}">${pedFmtDif(m.dif)}</td>`;
   }).join('');
 }
 function pedActualizarCmpFila(i,ci){
   const m=pedCmp(i,ci);
   const a=document.getElementById(`ped-en-${i}-${ci}`),b=document.getElementById(`ped-df-${i}-${ci}`);
   if(a)a.textContent=m.ent!=null?pedFmt(m.ent):'';
-  if(b){b.textContent=pedFmtDif(m.dif);b.style.color=pedColorDif(m.dif);}
+  if(b){b.textContent=pedFmtDif(m.dif);b.style.color=pedColorDif(m.dif);b.title=pedTitleDif(m);}
 }
 function pedPedido(i,ci){const d=pedCeldaPintada(i,ci);return d&&d.p!=null?d.p:null;}
 function pedCeldaPintada(i,ci){
@@ -20540,7 +20555,7 @@ function pedRender(){
     h+=`<div class="stock-card" style="margin-bottom:16px">
       <div style="padding:10px 14px;background:var(--bg2);border-bottom:.5px solid var(--border);border-radius:var(--radius-lg) var(--radius-lg) 0 0;font-weight:700">${remEsc(g.titulo)} <span style="font-weight:400;font-size:12px;color:var(--text2)">· ${g.idxs.length} artículo${g.idxs.length!==1?'s':''}</span></div>
       <div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
-        <th rowspan="2" style="width:110px">ID</th><th rowspan="2" style="width:160px">Alias</th><th colspan="${ENV_COLS.length}" style="text-align:center">PEDIDO</th><th rowspan="2" style="text-align:right">Pedido</th><th colspan="${ENV_COLS.length*2}" style="text-align:center;border-left:2px solid var(--border2)">ENTREGADO / DIFERENCIA (+ de más, − de menos)</th>
+        <th rowspan="2" style="width:110px">ID</th><th rowspan="2" style="width:160px">Alias</th><th colspan="${ENV_COLS.length}" style="text-align:center">PEDIDO</th><th rowspan="2" style="text-align:right">Pedido</th><th colspan="${ENV_COLS.length*2}" style="text-align:center;border-left:2px solid var(--border2)">ENTREGADO / DIFERENCIA en unidades (+ de más, − de menos) · pedido × 24 u. por bandeja (jamón y queso 36 u., atún y sin sal 48 u. por caja)</th>
       </tr><tr>${ENV_COLS.map(c=>`<th style="text-align:center">${remEsc(c)}</th>`).join('')}${ENV_COLS.map((c,ci)=>`<th colspan="2" style="text-align:center;font-size:11px;${ci===0?'border-left:2px solid var(--border2)':''}">${remEsc(c)}<div style="font-weight:400;font-size:10px;color:var(--text3)">Entr. · Dif.</div></th>`).join('')}</tr></thead><tbody>${filas}</tbody>
       <tfoot><tr style="background:var(--bg2)"><td></td><td style="font-weight:700">Total</td>${ENV_COLS.map((c,ci)=>`<td id="ped-tc-${gi}-${ci}" style="text-align:center;font-weight:700"></td>`).join('')}<td id="ped-tg-${gi}" style="text-align:right;font-weight:700"></td>${ENV_COLS.map((c,ci)=>`<td id="ped-ten-${gi}-${ci}" style="text-align:center;font-weight:700;${ci===0?'border-left:2px solid var(--border2);':''}"></td><td id="ped-tdf-${gi}-${ci}" style="text-align:center;font-weight:700"></td>`).join('')}</tr></tfoot></table></div>
     </div>`;
@@ -20582,7 +20597,7 @@ function pedActualizarTotales(){
 function pedActualizarTotalesCmp(gi,g){
   ENV_COLS.forEach((c,ci)=>{
     let ent=0,pd=0,hay=false;
-    g.idxs.forEach(i=>{const m=pedCmp(i,ci);if(!m.ok)return;hay=true;pd+=pedPedido(i,ci)||0;ent+=(pedEntregado(i,ci)||0);});
+    g.idxs.forEach(i=>{const m=pedCmp(i,ci);if(!m.ok)return;hay=true;pd+=pedPedidoU(i,ci)||0;ent+=(pedEntregado(i,ci)||0);});
     const a=document.getElementById(`ped-ten-${gi}-${ci}`),b=document.getElementById(`ped-tdf-${gi}-${ci}`);
     const dif=hay?Math.round((ent-pd)*1000)/1000:null;
     if(a)a.textContent=hay&&ent?pedFmt(Math.round(ent*1000)/1000):'';
@@ -20726,7 +20741,7 @@ function pedHtmlImpresion(){
     const idxs=g.idxs.filter(i=>ENV_COLS.some((c,ci)=>{const d=pedCeldaPintada(i,ci);const m=pedCmp(i,ci);return (d&&(d.p!=null||d.e!=null||d.c))||(m.ok&&m.ent);}));
     if(!idxs.length)return '';
     const tot=ENV_COLS.map((c,ci)=>idxs.reduce((a,i)=>a+(pedPedido(i,ci)||0),0));
-    const cmpTot=ENV_COLS.map((c,ci)=>{let e=0,pd=0,ok=false;idxs.forEach(i=>{const m=pedCmp(i,ci);if(!m.ok)return;ok=true;pd+=pedPedido(i,ci)||0;e+=pedEntregado(i,ci)||0;});return ok?{e:Math.round(e*1000)/1000,d:Math.round((e-pd)*1000)/1000}:null;});
+    const cmpTot=ENV_COLS.map((c,ci)=>{let e=0,pd=0,ok=false;idxs.forEach(i=>{const m=pedCmp(i,ci);if(!m.ok)return;ok=true;pd+=pedPedidoU(i,ci)||0;e+=pedEntregado(i,ci)||0;});return ok?{e:Math.round(e*1000)/1000,d:Math.round((e-pd)*1000)/1000}:null;});
     const cmpTd=(m,top)=>{
       const dc=m&&m.dif!=null?`<td class="c-df" style="color:${pedColorDif(m.dif)}">${pedFmtDif(m.dif)}</td>`:'<td class="c-df"></td>';
       return`<td class="c-en${top}">${m&&m.ent!=null?pedFmt(m.ent):''}</td>${dc}`;
@@ -20745,7 +20760,7 @@ function pedHtmlImpresion(){
     const cmpFoot=hayCmp?cmpTot.map((m,ci)=>`<td class="c-en${ci===0?' sep':''}">${m&&m.e?pedFmt(m.e):''}</td><td class="c-df" style="color:${pedColorDif(m?m.d:null)}">${m?pedFmtDif(m.d):''}</td>`).join(''):'';
     return`<div class="hoja hoja-brk">
       <h1>Pedidos de locales — ${remEsc(g.titulo)}</h1>
-      <div class="sub">Pedido del ${fechaTxt}${hayCmp?' · entregado según planilla Envío a locales · diferencia: + de más, − de menos':''} · colores: verde enviado / amarillo menos / rojo no se envió</div>
+      <div class="sub">Pedido del ${fechaTxt}${hayCmp?' · entregado y diferencia en unidades (pedido × 24 u. por bandeja, jamón y queso 36, atún y sin sal 48 por caja) según planilla Envío a locales · + de más, − de menos':''} · colores: verde enviado / amarillo menos / rojo no se envió</div>
       <table><thead><tr><th class="th-alias" rowspan="2">Alias</th><th colspan="${ENV_COLS.length}">PEDIDO</th><th class="th-tot" rowspan="2">TOTAL</th>${hayCmp?`<th colspan="${ENV_COLS.length*2}" class="sep">ENTREGADO / DIFERENCIA</th>`:''}</tr>
       <tr>${ENV_COLS.map(c=>`<th class="th-suc">${remEsc(c)}</th>`).join('')}${hayCmp?ENV_COLS.map((c,ci)=>`<th colspan="2" class="th-cmp${ci===0?' sep':''}">${remEsc(c)}</th>`).join(''):''}</tr></thead>
       <tbody>${filas}</tbody>
