@@ -294,7 +294,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.382</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.383</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1492,6 +1492,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <div class="proy-subtabs">
     <button class="proy-tab active" id="cfgtab-ids" onclick="showCfgSubTab('ids')"><i class="ti ti-id"></i> ID / Descripción / Depósito</button>
     <button class="proy-tab" id="cfgtab-prod" onclick="showCfgSubTab('prod')"><i class="ti ti-package"></i> Producción</button>
+    <button class="proy-tab" id="cfgtab-carga" onclick="showCfgSubTab('carga')"><i class="ti ti-user-check"></i> Usuarios de carga</button>
   </div>
 
   <!-- SUB-TAB ID / DESCRIPCIÓN / DEPÓSITO (ex Maestro > Configuración + Maestro > Depósitos + Maestro 2) -->
@@ -1550,6 +1551,9 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   </div>
 
   <!-- SUB-TAB PRODUCCIÓN (ex Maestro > Productos) -->
+  <!-- SUB-TAB USUARIOS DE CARGA (v4.383): quién carga producción desde la app aparte carga.html -->
+  <div id="cfg-sub-carga" style="display:none"><div id="cu-content"></div></div>
+
   <div id="cfg-sub-prod" style="display:none">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap">
       <span style="font-size:13px;color:var(--text2)">Familia de empresas &rarr; familia de areas por empresa &rarr; productos que se elaboran en cada area (con su ID vinculado).</span>
@@ -8860,12 +8864,13 @@ function mostrarResultadoSyncIds(linkados,sinCodigo,sinProducto,totalFilas){
 }
 
 function showCfgSubTab(t){
-  ['ids','prod'].forEach(x=>{
+  ['ids','prod','carga'].forEach(x=>{
     document.getElementById('cfg-sub-'+x).style.display=x===t?'':'none';
     document.getElementById('cfgtab-'+x).classList.toggle('active',x===t);
   });
   if(t==='ids')renderMPList();
   if(t==='prod')rMae();
+  if(t==='carga')cuInit();
 }
 function toggleCfgDepositos(){
   const p=document.getElementById('cfg-depositos-panel');
@@ -20946,6 +20951,178 @@ function pedImprimir(){
 function pedRefrescarLista(){
   const _pr=document.getElementById('ped-root');if(!_pr||!_pr.offsetParent)return;
   pedArmarItems();pedRefresh();
+}
+
+// ===== Usuarios de carga (v4.383) =====
+// App aparte "carga.html" (mismo Supabase): cada persona entra con usuario + PIN, ve los productos de la carga que
+// se le asignó acá (empresa + área; todos / solo calientes / solo fríos / productos puntuales) y lo que carga va
+// directo a Producción Real (misma tabla produccion_real) y al stock del día. Todo lo cargado queda registrado en carga_registros.
+const CU_SQL_TABLAS=`create table if not exists carga_usuarios (
+  id text primary key,
+  nombre text not null,
+  pin text not null,
+  cargas jsonb not null default '[]'::jsonb,
+  activo boolean not null default true,
+  created_at timestamptz default now()
+);
+
+create table if not exists carga_registros (
+  id bigint generated always as identity primary key,
+  fecha date,
+  semana text,
+  usuario_id text,
+  usuario text,
+  empresa_id text,
+  area text,
+  producto text,
+  clave text,
+  cantidad numeric,
+  anterior numeric,
+  created_at timestamptz default now()
+);`;
+const CU_SQL_RLS1='alter table carga_usuarios disable row level security;';
+const CU_SQL_RLS2='alter table carga_registros disable row level security;';
+let cu={users:[],regs:[],falta:false,err:'',edit:null};
+async function cuInit(){
+  const cont=document.getElementById('cu-content');if(!cont)return;
+  cont.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
+  if(!st.E.length||!st.A.length)await init();
+  cu.falta=false;cu.err='';
+  try{cu.users=await get('carga_usuarios','order=nombre.asc');}
+  catch(e){cu.users=[];cu.falta=true;cu.err=String((e&&e.message)||e);}
+  try{cu.regs=cu.falta?[]:await get('carga_registros','order=created_at.desc&limit=40');}catch(e){cu.regs=[];}
+  cuRender();
+}
+function cuNombreCarga(c){
+  const e=st.E.find(x=>x.id===c.empresa_id);
+  const m={todos:'todos los productos',caliente:'🔥 solo calientes',frio:'❄️ solo fríos',elegir:((c.productos||[]).length)+' productos elegidos'}[c.modo||'todos'];
+  return `${e?e.nombre:'?'} › ${c.area} — ${m}`;
+}
+function cuRender(){
+  const cont=document.getElementById('cu-content');if(!cont)return;
+  const pre='background:var(--bg2);padding:10px;border-radius:6px;overflow:auto;font-size:12px;margin:4px 0';
+  const url=new URL('carga.html',location.href).href;
+  let h='';
+  if(cu.falta){
+    h+=`<div class="alert alert-info" style="display:block;margin-bottom:12px"><b>Falta crear las tablas en Supabase.</b> Corré este SQL en el SQL Editor (en tres pasos) y después tocá actualizar.
+      <div style="margin-top:8px;font-size:12px;color:var(--text2)">Paso 1 — tablas:</div><pre style="${pre}">${remEsc(CU_SQL_TABLAS)}</pre>
+      <div style="font-size:12px;color:var(--text2)">Paso 2 — sin RLS (línea sola):</div><pre style="${pre}">${remEsc(CU_SQL_RLS1)}</pre>
+      <div style="font-size:12px;color:var(--text2)">Paso 3 — sin RLS (línea sola):</div><pre style="${pre}">${remEsc(CU_SQL_RLS2)}</pre>
+      <div style="margin-top:6px;font-size:11px;color:var(--text3)">${remEsc(cu.err.slice(0,200))}</div></div>`;
+  }
+  h+=`<div class="alert alert-info" style="display:block;margin-bottom:12px"><i class="ti ti-device-mobile"></i> <b>App de carga para el personal:</b> <a href="${remEsc(url)}" target="_blank" style="word-break:break-all">${remEsc(url)}</a><div style="margin-top:4px;font-size:12px;color:var(--text2)">Es el archivo <b>carga.html</b>, que va en el mismo lugar que este (mismo repositorio). Cada persona entra con su nombre y PIN una sola vez y queda abierta en su celular. Lo que cargan aparece solo en Producción › Prod. Real.</div></div>`;
+  h+=`<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap"><button class="btn btn-primary btn-sm" onclick="cuEditar('')"${cu.falta?' disabled':''}><i class="ti ti-user-plus"></i> Nuevo usuario</button><button class="btn btn-sm" onclick="cuInit()"><i class="ti ti-refresh"></i> Actualizar</button></div>`;
+  if(!cu.users.length&&!cu.falta)h+='<div class="empty">Todavía no hay usuarios de carga.</div>';
+  else if(cu.users.length){
+    h+=`<div style="overflow-x:auto"><table class="plan-grid"><thead><tr><th class="left">Usuario</th><th>PIN</th><th class="left">Carga asignada</th><th>Activo</th><th></th></tr></thead><tbody>`;
+    cu.users.forEach(u=>{
+      h+=`<tr${u.activo===false?' style="opacity:.55"':''}><td class="left" style="font-weight:600">${remEsc(u.nombre)}</td><td style="font-family:monospace">${remEsc(u.pin)}</td>
+        <td class="left" style="font-size:12px">${(u.cargas||[]).map(c=>remEsc(cuNombreCarga(c))).join('<br>')||'<span style="color:var(--red)">sin carga asignada</span>'}</td>
+        <td>${u.activo===false?'no':'sí'}</td>
+        <td style="white-space:nowrap"><button class="btn btn-sm" onclick="cuEditar('${remEsc(u.id)}')"><i class="ti ti-pencil"></i></button> <button class="btn btn-sm" onclick="cuEliminar('${remEsc(u.id)}')" title="Eliminar"><i class="ti ti-trash"></i></button></td></tr>`;
+    });
+    h+='</tbody></table></div>';
+  }
+  if(cu.regs.length){
+    h+=`<div style="font-size:14px;font-weight:600;margin:18px 0 6px">Últimas cargas</div><div style="overflow-x:auto"><table class="plan-grid"><thead><tr><th class="left">Cuándo</th><th class="left">Usuario</th><th class="left">Producto</th><th>Antes</th><th>Ahora</th></tr></thead><tbody>`;
+    cu.regs.forEach(r=>{
+      const d=new Date(r.created_at);
+      h+=`<tr><td class="left" style="font-size:12px;white-space:nowrap">${d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'})} ${d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}</td><td class="left">${remEsc(r.usuario||'')}</td><td class="left" style="font-size:12px">${remEsc(r.producto||'')} <span style="color:var(--text3)">· ${remEsc(r.area||'')}</span></td><td>${r.anterior==null?'':fmt(r.anterior)}</td><td style="font-weight:600">${fmt(r.cantidad)}</td></tr>`;
+    });
+    h+='</tbody></table></div>';
+  }
+  cont.innerHTML=h;
+}
+function cuEditar(id){
+  const u=cu.users.find(x=>x.id===id);
+  cu.edit=u?JSON.parse(JSON.stringify(u)):{id:'',nombre:'',pin:'',cargas:[],activo:true};
+  if(!(cu.edit.cargas||[]).length)cu.edit.cargas=[cuCargaNueva()];
+  cuModal();
+}
+function cuCargaNueva(){
+  const e=st.E[0]||{};const a=st.A.find(x=>x.empresa_id===e.id)||{};
+  return {empresa_id:e.id||'',area_id:a.id||'',area:a.nombre||'',modo:'todos',productos:[]};
+}
+function cuModal(){
+  const u=cu.edit;if(!u)return;
+  let ov=document.getElementById('modal-cu');
+  if(!ov){ov=document.createElement('div');ov.className='modal-overlay';ov.id='modal-cu';ov.addEventListener('mousedown',e=>{if(e.target===ov)ov.remove();});document.body.appendChild(ov);}
+  const IN='padding:6px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)';
+  const cargas=u.cargas.map((c,i)=>{
+    const areas=st.A.filter(a=>a.empresa_id===c.empresa_id);
+    const prods=st.Pr.filter(p=>p.area_id===c.area_id).sort((a,b)=>(a.orden||0)-(b.orden||0));
+    const el=new Set((c.productos||[]).map(normTxt));
+    return `<div style="border:.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <select style="${IN}" onchange="cuSetCarga(${i},'empresa_id',this.value)">${st.E.map(e=>`<option value="${remEsc(e.id)}"${e.id===c.empresa_id?' selected':''}>${remEsc(e.nombre)}</option>`).join('')}</select>
+        <select style="${IN}" onchange="cuSetCarga(${i},'area_id',this.value)">${areas.map(a=>`<option value="${remEsc(a.id)}"${a.id===c.area_id?' selected':''}>${remEsc(a.nombre)}</option>`).join('')}</select>
+        <select style="${IN}" onchange="cuSetCarga(${i},'modo',this.value)">
+          <option value="todos"${c.modo==='todos'?' selected':''}>Todos los productos</option>
+          <option value="caliente"${c.modo==='caliente'?' selected':''}>🔥 Solo calientes</option>
+          <option value="frio"${c.modo==='frio'?' selected':''}>❄️ Solo fríos</option>
+          <option value="elegir"${c.modo==='elegir'?' selected':''}>Elegir productos…</option></select>
+        ${u.cargas.length>1?`<button class="btn btn-sm" onclick="cuQuitarCarga(${i})" title="Quitar esta carga"><i class="ti ti-x"></i></button>`:''}
+      </div>
+      ${c.modo==='elegir'?`<div style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:2px 10px;max-height:180px;overflow:auto;font-size:12.5px">${prods.map(p=>`<label style="display:flex;gap:5px;align-items:center"><input type="checkbox"${el.has(normTxt(p.nombre))?' checked':''} onchange="cuToggleProd(${i},'${remEsc(p.id)}',this.checked)"/>${remEsc(p.nombre)}</label>`).join('')||'<span style="color:var(--text3)">El área no tiene productos.</span>'}</div>`:''}
+      ${(c.modo==='caliente'||c.modo==='frio')?`<div style="margin-top:6px;font-size:11.5px;color:var(--text2)">Toma los productos del área que tengan marcado ${c.modo==='caliente'?'"Caliente"':'"Frío"'} en Configuración › Producción › Elaboración (hoy: ${prods.filter(p=>p.elaboracion===c.modo).length} de ${prods.length}). Si el relleno no lo tiene marcado, usá "Elegir productos".</div>`:''}
+    </div>`;
+  }).join('');
+  ov.innerHTML=`<div class="modal" style="width:640px;max-height:88vh;overflow-y:auto">
+    <div class="modal-title"><i class="ti ti-user-check"></i> ${u.id?'Editar':'Nuevo'} usuario de carga</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0">
+      <label style="font-size:12px;color:var(--text2);flex:1;min-width:200px">Nombre<br><input id="cu-nombre" type="text" value="${remEsc(u.nombre)}" style="${IN};width:100%" placeholder="Ej. Marcos"/></label>
+      <label style="font-size:12px;color:var(--text2);width:130px">PIN (4 a 8 números)<br><input id="cu-pin" type="text" inputmode="numeric" maxlength="8" value="${remEsc(u.pin)}" style="${IN};width:100%;font-family:monospace"/></label>
+      <label style="font-size:12px;color:var(--text2);display:flex;align-items:flex-end;gap:5px;padding-bottom:6px"><input type="checkbox" id="cu-activo"${u.activo!==false?' checked':''}/> Activo</label>
+    </div>
+    <div style="font-size:13px;font-weight:600;margin-bottom:4px">Qué carga</div>
+    ${cargas}
+    <button class="btn btn-sm" onclick="cuAgregarCarga()"><i class="ti ti-plus"></i> Agregar otra carga</button>
+    <div id="cu-err" style="color:var(--red);font-size:12px;margin-top:8px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px"><button class="btn btn-sm" onclick="document.getElementById('modal-cu').remove()">Cancelar</button><button class="btn btn-primary btn-sm" onclick="cuGuardar()"><i class="ti ti-check"></i> Guardar</button></div>
+  </div>`;
+}
+function cuLeerCampos(){
+  const u=cu.edit;if(!u)return;
+  const n=document.getElementById('cu-nombre'),p=document.getElementById('cu-pin'),a=document.getElementById('cu-activo');
+  if(n)u.nombre=n.value;if(p)u.pin=p.value;if(a)u.activo=a.checked;
+}
+function cuSetCarga(i,campo,val){
+  cuLeerCampos();const c=cu.edit.cargas[i];c[campo]=val;
+  if(campo==='empresa_id'){const a=st.A.find(x=>x.empresa_id===val);c.area_id=a?a.id:'';c.area=a?a.nombre:'';c.productos=[];}
+  if(campo==='area_id'){const a=st.A.find(x=>x.id===val);c.area=a?a.nombre:'';c.productos=[];}
+  cuModal();
+}
+function cuToggleProd(i,pid,on){
+  const pr=st.Pr.find(x=>x.id===pid);if(!pr)return;const nombre=pr.nombre;
+  const c=cu.edit.cargas[i];const l=c.productos||[];
+  const k=normTxt(nombre);const sin=l.filter(x=>normTxt(x)!==k);
+  c.productos=on?sin.concat([nombre]):sin;
+}
+function cuAgregarCarga(){cuLeerCampos();cu.edit.cargas.push(cuCargaNueva());cuModal();}
+function cuQuitarCarga(i){cuLeerCampos();cu.edit.cargas.splice(i,1);cuModal();}
+async function cuGuardar(){
+  cuLeerCampos();const u=cu.edit;const er=document.getElementById('cu-err');
+  const nombre=(u.nombre||'').trim(),pin=(u.pin||'').trim();
+  if(!nombre){er.textContent='Poné el nombre.';return;}
+  if(!/^\d{4,8}$/.test(pin)){er.textContent='El PIN tiene que ser de 4 a 8 números.';return;}
+  if(cu.users.some(x=>x.id!==u.id&&x.nombre.trim().toLowerCase()===nombre.toLowerCase())){er.textContent='Ya hay un usuario con ese nombre.';return;}
+  const cargas=u.cargas.filter(c=>c.empresa_id&&c.area_id);
+  if(!cargas.length){er.textContent='Elegí al menos una carga (empresa y área).';return;}
+  if(cargas.some(c=>c.modo==='elegir'&&!(c.productos||[]).length)){er.textContent='En "Elegir productos" tildá al menos uno.';return;}
+  const id=u.id||('u'+Date.now().toString(36));
+  const body={id,nombre,pin,cargas:cargas.map(c=>({empresa_id:c.empresa_id,area_id:c.area_id,area:c.area,modo:c.modo||'todos',productos:c.modo==='elegir'?(c.productos||[]):[]})),activo:u.activo!==false};
+  try{
+    const r=await fetch(`${SB}/rest/v1/carga_usuarios?on_conflict=id`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(body)});
+    if(!r.ok)throw new Error(await r.text());
+  }catch(e){er.textContent='No pude guardar: '+String((e&&e.message)||e).slice(0,200);return;}
+  document.getElementById('modal-cu').remove();cu.edit=null;
+  await cuInit();
+}
+async function cuEliminar(id){
+  const u=cu.users.find(x=>x.id===id);if(!u)return;
+  if(!confirm('¿Eliminar a "'+u.nombre+'"? Ya no va a poder entrar a la app de carga (lo que cargó antes queda en Producción Real).'))return;
+  try{await del('carga_usuarios',id);}catch(e){alert('No pude eliminar: '+String((e&&e.message)||e).slice(0,200));return;}
+  await cuInit();
 }
 
 // Consumo de MP Semanal (Planillas, v4.201): planilla que muestra cuánta materia prima se va a
