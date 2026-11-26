@@ -294,7 +294,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.376</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.382</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
@@ -1434,7 +1434,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <div style="font-size:16px;font-weight:600">Pedidos de sucursales</div>
       <div style="font-size:13px;color:var(--text2)">Pedidos recibidos — tomá los confirmados para planificar</div>
     </div>
-    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <div id="ped-toolbar-ctl" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       <input type="date" id="ped-fecha" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
       <select id="ped-esel" style="padding:6px 10px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"><option value="all">Todas las empresas</option></select>
       <button class="btn" onclick="loadPedidos()"><i class="ti ti-refresh"></i> Actualizar</button>
@@ -1444,6 +1444,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <div style="display:flex;gap:0;border-bottom:.5px solid var(--border);margin-bottom:1.25rem">
     <button class="proy-tab active" id="ptab-recibidos" onclick="showPedTab('recibidos')"><i class="ti ti-inbox"></i> Recibidos</button>
     <button class="proy-tab" id="ptab-consolidado" onclick="showPedTab('consolidado')"><i class="ti ti-list-check"></i> Consolidado</button>
+    <button class="proy-tab" id="ptab-locales" onclick="showPedTab('locales')"><i class="ti ti-clipboard-list"></i> Pedidos de locales</button>
     <button class="proy-tab" id="ptab-sucursales" onclick="showPedTab('sucursales')"><i class="ti ti-building-store"></i> Sucursales</button>
   </div>
   <!-- Recibidos -->
@@ -1458,6 +1459,10 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
       <button class="btn" id="btnExportarPedidosExcel" onclick="exportarPedidosExcel()"><i class="ti ti-file-spreadsheet"></i> Exportar Excel</button>
       <button class="btn btn-primary" onclick="importarAlPlan()"><i class="ti ti-calendar-plus"></i> Importar al plan semanal</button>
     </div>
+  </div>
+  <!-- Pedidos de locales (v4.381: antes estaba en Remitos): planillas xlsm de cada local -->
+  <div id="psub-locales" style="display:none">
+    <div id="ped-locales-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
   </div>
   <!-- Sucursales config -->
   <div id="psub-sucursales" style="display:none">
@@ -1708,7 +1713,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab active" id="remtab-subir" onclick="remIrVista('subir')"><i class="ti ti-upload"></i> Subir remito</button>
     <button class="proy-tab" id="remtab-historial" onclick="remIrVista('historial')"><i class="ti ti-history"></i> Historial</button>
     <button class="proy-tab" id="remtab-envios" onclick="remIrVista('envios')"><i class="ti ti-truck-delivery"></i> Envío a locales</button>
-    <button class="proy-tab" id="remtab-pedidos" onclick="remIrVista('pedidos')"><i class="ti ti-clipboard-list"></i> Pedidos de locales</button>
+    <button class="proy-tab" id="remtab-difped" onclick="remIrVista('difped')"><i class="ti ti-arrows-diff"></i> Entrega vs pedido</button>
     <button class="proy-tab" id="remtab-config" onclick="remIrVista('config')"><i class="ti ti-settings"></i> Configuración</button>
   </div>
   <div id="rem-content"><div class="empty"><span class="spinner spinner-dark"></span></div></div>
@@ -17303,6 +17308,7 @@ async function initPedidos(){
   document.getElementById('ped-fecha').onchange=()=>loadPedidos();
   document.getElementById('ped-esel').onchange=()=>renderPedidosRecibidos();
   await Promise.all([loadPedidos(),loadSucursales()]);
+  if(pedSubActivo==='locales')pedInit('pedido');
 }
 
 async function loadPedidos(){
@@ -17324,13 +17330,19 @@ async function loadSucursales(){
   }catch{}
 }
 
+let pedSubActivo='recibidos';
 function showPedTab(t){
-  ['recibidos','consolidado','sucursales'].forEach(x=>{
+  pedSubActivo=t;
+  ['recibidos','consolidado','locales','sucursales'].forEach(x=>{
     document.getElementById('psub-'+x).style.display=x===t?'block':'none';
     document.getElementById('ptab-'+x).classList.toggle('active',x===t);
   });
+  // v4.381: la fecha/empresa/Actualizar de arriba son de los pedidos de sucursales; "Pedidos de locales" trae su propia fecha.
+  const ctl=document.getElementById('ped-toolbar-ctl');
+  if(ctl)ctl.style.display=t==='locales'?'none':'flex';
   if(t==='consolidado')renderConsolidado();
   if(t==='sucursales')renderSucursalesList();
+  if(t==='locales')pedInit('pedido');
 }
 
 function renderPedidosRecibidos(){
@@ -20070,7 +20082,42 @@ async function envCargarDia(fecha){
   }catch(e){
     env.cant={};env.notas='';env.puedeGuardar=false;env.errTabla=String((e&&e.message)||e);
   }
+  // v4.379: pedidos de los locales de la misma fecha (Remitos > Pedidos de locales) para pintar los casilleros.
+  env.pedidos={};
+  try{
+    const pr=await get('pedidos_locales','fecha=eq.'+encodeURIComponent(fecha));
+    pr.forEach(r=>{if(r.items&&typeof r.items==='object')env.pedidos[r.local]=r.items;});
+  }catch(e){env.pedidos={};}
 }
+// v4.379: "si le pongo la cantidad que me pide el local, el casillero en verde; si es menor, amarillo; si no entregó nada, gris oscuro".
+// Pedido en bandejas/cajas -> unidades con el mismo factor de Entrega vs pedido (24 / 36 jamón y queso criolla / 48 atún y sin sal).
+const ENV_COLOR_PEDIDO={verde:{bg:'#C0DD97',fg:'#1b2a0a'},amarillo:{bg:'#FAC775',fg:'#3b2400'},gris:{bg:'#5F6672',fg:'#ffffff'}};
+function envPedidoU(mp,local){
+  const k=pedKeyAlias(mp.alias||'');
+  const its=env.pedidos&&env.pedidos[local];
+  if(!k||!its||!its[k]||its[k].p==null||!(its[k].p>0))return null;
+  const sib=env.items.filter(m=>pedKeyAlias(m.alias||'')===k);
+  const f=(sib.map(pedFactorMp).find(x=>x!==1))||1;
+  return{u:its[k].p*f,sib};
+}
+function envColorCelda(i,ci){
+  const mp=env.items[i];if(!mp)return null;
+  const c=ENV_COLS[ci];
+  const r=envPedidoU(mp,c);
+  if(!r)return null;
+  let sent=0;r.sib.forEach(m=>{const n=envNum((env.cant[String(m.id)]||{})[c]);if(n!=null)sent+=n;});
+  if(sent<=0)return 'gris';
+  return sent+1e-9>=r.u?'verde':'amarillo';
+}
+function envPintarCelda(i,ci){
+  const el=document.getElementById(`env-in-${i}-${ci}`);if(!el)return;
+  const col=envColorCelda(i,ci),cc=col&&ENV_COLOR_PEDIDO[col];
+  el.style.background=cc?cc.bg:'';el.style.color=cc?cc.fg:'';
+  const r=envPedidoU(env.items[i],ENV_COLS[ci]);
+  el.title=r?`Pedido: ${envFmt(r.u)} unidades`:'';
+}
+function envPintarCol(ci){env.items.forEach((m,i)=>envPintarCelda(i,ci));}
+function envPintarTodo(){ENV_COLS.forEach((c,ci)=>envPintarCol(ci));}
 async function envCargarGuardados(){
   env.guardados=[];
   if(!env.puedeGuardar)return;
@@ -20117,14 +20164,14 @@ function envRender(){
     h+=`<div class="empty"><i class="ti ti-list"></i> La lista de productos está vacía. Tocá "Editar productos" para agregar por código (ID).</div></div>`;
     cont.innerHTML=h;return;
   }
-  h+=`<div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Cargá la cantidad de cada producto para cada local (Enter o ↓ baja a la fila siguiente). Se guarda sola por fecha. La lista de productos es la misma de Planillas &gt; Distribución Planeta.</div>`;
+  h+=`<div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Cargá la cantidad de cada producto para cada local (Enter o ↓ baja a la fila siguiente). Se guarda sola por fecha. Si el local tiene pedido cargado para esa fecha, el casillero se pinta: <b style="background:#C0DD97;padding:0 5px;border-radius:3px">verde</b> = igual o más de lo pedido, <b style="background:#FAC775;padding:0 5px;border-radius:3px">amarillo</b> = menos, <b style="background:#5F6672;color:#fff;padding:0 5px;border-radius:3px">gris oscuro</b> = no se entregó nada. La lista de productos es la misma de Planillas &gt; Distribución Planeta.</div>`;
   env.grupos.forEach((g,gi)=>{
     const filas=g.idxs.map((i,pos)=>{
       const mp=env.items[i];const d=env.cant[String(mp.id)]||{};
       return`<tr>
         <td class="muted" style="font-size:11px">${remEsc(mp.codigo||'')}</td>
         <td style="font-weight:600">${remEsc(mp.alias||mp.nombre||'')}</td>
-        ${ENV_COLS.map((c,ci)=>{const n=envNum(d[c]);return`<td style="padding:3px 4px;width:96px"><input class="env-in" type="number" min="0" step="any" inputmode="decimal" data-c="${ci}" value="${n==null?'':n}" oninput="envSet(${i},${ci},this.value)" onkeydown="envKey(event,this)" onfocus="this.select()" style="width:100%;padding:5px 4px;font-size:13px;text-align:center;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)"/></td>`;}).join('')}
+        ${ENV_COLS.map((c,ci)=>{const n=envNum(d[c]);return`<td style="padding:3px 4px;width:96px"><input id="env-in-${i}-${ci}" class="env-in" type="number" min="0" step="any" inputmode="decimal" data-c="${ci}" value="${n==null?'':n}" oninput="envSet(${i},${ci},this.value)" onkeydown="envKey(event,this)" onfocus="this.select()" style="width:100%;padding:5px 4px;font-size:13px;text-align:center;border:.5px solid var(--border2);border-radius:6px;background:var(--bg);color:var(--text)"/></td>`;}).join('')}
         <td id="env-tr-${i}" style="text-align:right;font-weight:700;width:80px"></td>
       </tr>`;
     }).join('');
@@ -20140,6 +20187,7 @@ function envRender(){
     <textarea id="env-notas" rows="2" oninput="envSetNotas(this.value)" style="width:100%;margin-top:4px;padding:8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);font-family:inherit">${remEsc(env.notas||'')}</textarea></div></div>`;
   cont.innerHTML=h;
   envActualizarTotales();
+  envPintarTodo();
 }
 function envActualizarTotales(){
   env.grupos.forEach((g,gi)=>{
@@ -20159,6 +20207,7 @@ function envSet(i,ci,val){
     (env.cant[k]=env.cant[k]||{})[c]=n;
   }
   envActualizarTotales();
+  envPintarCol(ci);
   envGuardarDebounced();
 }
 function envSetNotas(v){env.notas=v;envGuardarDebounced();}
@@ -20289,6 +20338,14 @@ let ped={fecha:'',filas:{},items:[],keys:[],hermanos:[],envCant:null,grupos:[],f
 
 // ---- puro ----
 // <ped-puro>
+// v4.377: "eliminar el sub-total": renglones de subtotal/total (y títulos de bloque) de la planilla del local NO son productos,
+// ni al leer el archivo ni al mostrar/imprimir lo ya guardado. Se compara sin puntos ni espacios ("Sub. Total", "SUBTOTAL", "Sub total").
+function pedEsEtiqueta(alias){
+  const n=normTxt(String(alias==null?'':alias)).replace(/[^A-Z]/g,'');
+  if(!n)return true;
+  if(/^(SUB|TOTAL|TOTALES)/.test(n)&&/TOTAL|^SUB$/.test(n))return true;
+  return ['BURRITOS','PIZZETAS','ZEN','PEDIDO','VARIEDAD'].includes(n);
+}
 function pedKeyAlias(a){return normTxt(String(a==null?'':a).replace(/\s*-?\s*(unidad|caja)\s*$/i,'').trim());}
 function pedNum(v){
   if(v==null)return null;
@@ -20344,7 +20401,7 @@ function pedLeerHoja(cell,maxFila){
     const a=cell('A'+r),b=cell('B'+r);
     if(!a||a.v==null)continue;
     const alias=String(a.v).trim();
-    if(!alias||PED_IGNORAR.includes(normTxt(alias)))continue;
+    if(!alias||pedEsEtiqueta(alias))continue;
     const q=b&&typeof b.v==='number'?b.v:pedNum(b&&b.v);
     if(q==null||!(q>0))continue;
     const k=pedKeyAlias(alias);
@@ -20402,15 +20459,19 @@ function pedArmarItems(){
   });
   const conocidas=new Set(keys);
   const extras={};
-  Object.values(ped.filas).forEach(f=>Object.entries(f.items||{}).forEach(([k,v])=>{if(!conocidas.has(k)&&!extras[k])extras[k]=v.a||k;}));
+  Object.values(ped.filas).forEach(f=>Object.entries(f.items||{}).forEach(([k,v])=>{if(!conocidas.has(k)&&!extras[k]&&!pedEsEtiqueta(v.a||k))extras[k]=v.a||k;}));
   Object.keys(extras).sort((a,b)=>a.localeCompare(b,'es',{numeric:true})).forEach(k=>{
     items.push({id:'x:'+k,alias:extras[k],nombre:extras[k],codigo:'',_extra:true});keys.push(k);
   });
   ped.items=items;ped.keys=keys;ped.hermanos=hermanos.concat(Object.keys(extras).map(()=>[]));
 }
-async function pedInit(){
-  const cont=document.getElementById('rem-content');
+async function pedInit(modo){
+  ped.modo=modo||ped.modo||'pedido';
+  const cont=pedCont();
   if(!cont)return;
+  // v4.381: un solo #ped-root a la vez (Pedidos de locales vive en Pedidos; Entrega vs pedido, en Remitos).
+  const otro=document.getElementById(ped.modo==='dif'?'ped-locales-content':'rem-content');
+  if(otro&&otro.querySelector('#ped-root'))otro.innerHTML='';
   if(!ped.fecha)ped.fecha=envHoy();
   cont.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
   try{await cargarDistribucionPlaneta();}
@@ -20421,8 +20482,10 @@ async function pedInit(){
   await pedCargarFechas();
   if(ped.fechas.length&&!ped.fechas.includes(ped.fecha)&&!ped.tocoFecha)ped.fecha=ped.fechas[0];
   await pedCargarDia(ped.fecha);
-  pedRender();
+  pedRefresh();
 }
+function pedCont(){return document.getElementById(ped.modo==='dif'?'rem-content':'ped-locales-content');}
+function pedRefresh(){if(ped.modo==='dif')pedRenderDif();else pedRender();}
 async function pedCargarFechas(){
   try{
     const rows=await get('pedidos_locales','select=fecha&order=fecha.desc&limit=1000');
@@ -20458,8 +20521,11 @@ function pedBannerSQL(){
 // v4.375: los locales piden en BANDEJAS (o cajas), pero Envío a locales se carga en UNIDADES. Para comparar, lo pedido se pasa a
 // unidades: bandeja de empanada = 24 u., bandeja de jamón y queso criolla (J) = 36 u. (JH, hojaldre, va por 24), atún y sin sal por caja de 48 u. El resto (cajas de
 // burritos, pizzetas, zen, salsas, hojaldre 13) se compara tal cual, sin multiplicar.
+// Artículos que se piden por caja de 48 u. (códigos confirmados): 60100105 carne sin sal, 60100521 atún.
+const PED_CODIGOS_CAJA48=['60100105','60100521'];
 function pedFactorMp(mp){
   if(!mp||mp._extra)return 1;
+  if(PED_CODIGOS_CAJA48.includes(String(mp.codigo||'')))return 48;
   const n=normTxt(mp.nombre||'');
   if(!/^EMPANADA/.test(n))return 1;
   if(/\bATUN\b|SIN SAL/.test(n))return 48;
@@ -20515,14 +20581,23 @@ function pedLimpiarCelda(i,ci){
   const k=ped.keys[i],c=f.items[k];
   if(c&&c.p==null&&c.e==null&&!c.c)delete f.items[k];
 }
+// v4.378: totales de bandejas (empanadas, factor 24/36) y de cajas (el resto) por local, para un conjunto de filas.
+function pedEsBandeja(i){const f=pedFactor(i);return f===24||f===36;}
+function pedSumasLocal(idxs){
+  const r=ENV_COLS.map(()=>({b:0,c:0}));
+  idxs.forEach(i=>{const eb=pedEsBandeja(i);ENV_COLS.forEach((c,ci)=>{const q=pedPedido(i,ci);if(q==null)return;if(eb)r[ci].b+=q;else r[ci].c+=q;});});
+  r.forEach(x=>{x.b=Math.round(x.b*1000)/1000;x.c=Math.round(x.c*1000)/1000;});
+  return r;
+}
+function pedTotalFila(i){let t=0;ENV_COLS.forEach((c,ci)=>{const q=pedPedido(i,ci);if(q!=null)t+=q;});return Math.round(t*1000)/1000;}
 function pedRender(){
-  const cont=document.getElementById('rem-content');
+  const cont=pedCont();
   if(!cont)return;
   ped.grupos=envArmarGrupos(ped.items);
   const IN='padding:5px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)';
   const opts=ped.fechas.map(f=>`<option value="${f}"${f===ped.fecha?' selected':''}>${envFechaFmt(f)}</option>`).join('');
   const hayLocales=ENV_COLS.filter(c=>ped.filas[c]&&Object.keys(ped.filas[c].items||{}).length);
-  let h=`<div id="ped-root">
+  let h=`<div id="ped-root" ondragover="event.preventDefault()" ondrop="pedSoltarArchivos(event)">
   ${ped.errTabla?pedBannerSQL():''}
   <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
     <label style="font-size:13px;color:var(--text2)">Fecha del pedido:</label>
@@ -20530,17 +20605,21 @@ function pedRender(){
     ${ped.fechas.length?`<select onchange="if(this.value)pedCambiarFecha(this.value)" style="${IN}" title="Pedidos guardados"><option value="">Pedidos guardados…</option>${opts}</select>`:''}
     <span id="ped-msg" style="font-size:12px;color:var(--text3)"></span>
     <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
-      <label class="btn btn-primary btn-sm" style="cursor:pointer"><i class="ti ti-upload"></i> Subir pedido de un local<input type="file" accept=".xlsm,.xlsx,.xls" multiple style="display:none" onchange="pedSubirArchivos(this)"/></label>
-      <button class="btn btn-sm" onclick="pedImprimir()"><i class="ti ti-printer"></i> Imprimir</button>
+      <label class="btn btn-primary btn-sm" style="cursor:pointer"><i class="ti ti-upload"></i> Subir pedidos (podés elegir los 5 juntos)<input type="file" accept=".xlsm,.xlsx,.xls" multiple style="display:none" onchange="pedSubirArchivos(this)"/></label>
+      <button class="btn btn-sm" onclick="pedImprimir()"><i class="ti ti-printer"></i> Imprimir (A4 vertical)</button>
     </div>
   </div>
-  <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Subí la planilla de pedido de cada local (el nombre del archivo tiene que empezar con el local, ej. DONADO_23-11-2026.xlsm). Cada casillero muestra lo que PIDIÓ el local (empanadas en bandejas, 0,5 = una docena; burritos, pizzetas, zen y salsas en cajas). <b>Doble click</b> en el casillero cambia el color: verde (enviado), amarillo (menos), rojo (no se envió). Abajo de cada número podés cargar lo que <b>enviaste</b>: se pinta solo (verde si es igual o más, amarillo si es menos, rojo si es 0) y lo pedido no se pierde.</div>
-  ${ped.envCant?'':`<div class="alert alert-info" style="display:block;margin-bottom:10px"><i class="ti ti-info-circle"></i> No hay planilla de <b>Envío a locales</b> cargada para el ${envFechaFmt(ped.fecha)}, así que la comparación a la derecha queda vacía (salvo lo que escribas en "env."). La comparación usa la misma fecha del pedido.</div>`}
+  <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Subí las planillas de pedido de los locales, todas juntas (elegí varios archivos o arrastralos acá; el nombre del archivo tiene que empezar con el local, ej. DONADO_23-11-2026.xlsm). Cada casillero muestra lo que PIDIÓ el local (empanadas en bandejas, 0,5 = una docena; burritos, pizzetas, zen, salsas, atún y sin sal en cajas). <b>Doble click</b> en un casillero cambia el color: verde (enviado), amarillo (menos), rojo (no se envió). La comparación con lo entregado está en <b>Remitos › Entrega vs pedido</b>.</div>
   <div style="font-size:12px;color:var(--text2);margin-bottom:10px">${hayLocales.length?'Con pedido cargado: <b>'+hayLocales.map(remEsc).join(', ')+'</b>':'Todavía no hay pedidos cargados para esta fecha.'}${ENV_COLS.filter(c=>!hayLocales.includes(c)).length&&hayLocales.length?' · Faltan: '+ENV_COLS.filter(c=>!hayLocales.includes(c)).map(remEsc).join(', '):''}</div>`;
   if(!ped.items.length){
     h+=`<div class="empty"><i class="ti ti-list"></i> La lista de productos está vacía (se arma en "Envío a locales" > Editar productos).</div></div>`;
     cont.innerHTML=h;return;
   }
+  const fm=n=>n?pedFmt(n):'';
+  const filaSub=(lbl,sums,key,bg)=>{
+    const tot=Math.round(sums.reduce((a,x)=>a+x[key],0)*1000)/1000;
+    return`<tr style="background:${bg};font-weight:700"><td></td><td>${lbl}</td>${sums.map(x=>`<td style="text-align:center">${fm(x[key])}</td>`).join('')}<td style="text-align:right">${fm(tot)}</td></tr>`;
+  };
   ped.grupos.forEach((g,gi)=>{
     const filas=g.idxs.map(i=>{
       const mp=ped.items[i];
@@ -20548,28 +20627,69 @@ function pedRender(){
         <td class="muted" style="font-size:11px">${remEsc(mp.codigo||'')}</td>
         <td style="font-weight:600">${remEsc(mp.alias||mp.nombre||'')}</td>
         ${ENV_COLS.map((c,ci)=>pedCeldaHtml(i,ci)).join('')}
-        <td id="ped-tr-${i}" style="text-align:right;font-weight:700;width:70px"></td>
-        ${pedCmpTds(i)}
+        <td style="text-align:right;font-weight:700;width:70px">${fm(pedTotalFila(i))}</td>
       </tr>`;
     }).join('');
+    const sums=pedSumasLocal(g.idxs);
+    const hayB=g.idxs.some(pedEsBandeja),hayC=g.idxs.some(i=>!pedEsBandeja(i));
     h+=`<div class="stock-card" style="margin-bottom:16px">
       <div style="padding:10px 14px;background:var(--bg2);border-bottom:.5px solid var(--border);border-radius:var(--radius-lg) var(--radius-lg) 0 0;font-weight:700">${remEsc(g.titulo)} <span style="font-weight:400;font-size:12px;color:var(--text2)">· ${g.idxs.length} artículo${g.idxs.length!==1?'s':''}</span></div>
       <div style="overflow-x:auto"><table class="stock-tbl"><thead><tr>
-        <th rowspan="2" style="width:110px">ID</th><th rowspan="2" style="width:160px">Alias</th><th colspan="${ENV_COLS.length}" style="text-align:center">PEDIDO</th><th rowspan="2" style="text-align:right">Pedido</th><th colspan="${ENV_COLS.length*2}" style="text-align:center;border-left:2px solid var(--border2)">ENTREGADO / DIFERENCIA en unidades (+ de más, − de menos) · pedido × 24 u. por bandeja (jamón y queso criolla 36 u., atún y sin sal 48 u. por caja)</th>
-      </tr><tr>${ENV_COLS.map(c=>`<th style="text-align:center">${remEsc(c)}</th>`).join('')}${ENV_COLS.map((c,ci)=>`<th colspan="2" style="text-align:center;font-size:11px;${ci===0?'border-left:2px solid var(--border2)':''}">${remEsc(c)}<div style="font-weight:400;font-size:10px;color:var(--text3)">Entr. · Dif.</div></th>`).join('')}</tr></thead><tbody>${filas}</tbody>
-      <tfoot><tr style="background:var(--bg2)"><td></td><td style="font-weight:700">Total</td>${ENV_COLS.map((c,ci)=>`<td id="ped-tc-${gi}-${ci}" style="text-align:center;font-weight:700"></td>`).join('')}<td id="ped-tg-${gi}" style="text-align:right;font-weight:700"></td>${ENV_COLS.map((c,ci)=>`<td id="ped-ten-${gi}-${ci}" style="text-align:center;font-weight:700;${ci===0?'border-left:2px solid var(--border2);':''}"></td><td id="ped-tdf-${gi}-${ci}" style="text-align:center;font-weight:700"></td>`).join('')}</tr></tfoot></table></div>
+        <th style="width:110px">ID</th><th style="width:160px">Alias</th>${ENV_COLS.map(c=>`<th style="text-align:center">${remEsc(c)}</th>`).join('')}<th style="text-align:right">Total</th>
+      </tr></thead><tbody>${filas}</tbody>
+      <tfoot>${hayB?filaSub('Subtotal bandejas',sums,'b','var(--bg2)'):''}${hayC?filaSub('Subtotal cajas',sums,'c','var(--bg2)'):''}</tfoot></table></div>
     </div>`;
   });
+  const all=pedSumasLocal(ped.items.map((m,i)=>i));
+  h+=`<div class="stock-card" style="margin-bottom:16px"><div style="overflow-x:auto"><table class="stock-tbl"><thead><tr><th style="width:110px"></th><th style="width:160px">Totales generales</th>${ENV_COLS.map(c=>`<th style="text-align:center">${remEsc(c)}</th>`).join('')}<th style="text-align:right">Total</th></tr></thead><tbody>${filaSub('TOTAL BANDEJAS',all,'b','#E6F1FB')}${filaSub('TOTAL CAJAS',all,'c','#EEEDFE')}</tbody></table></div></div>`;
   h+='</div>';
   cont.innerHTML=h;
-  pedActualizarTotales();
+}
+
+// v4.378: "lo que es entrega/diferencia en otra pestaña": comparación pedido (en unidades) vs entregado (planilla Envío a locales).
+function pedRenderDif(){
+  const cont=pedCont();
+  if(!cont)return;
+  ped.grupos=envArmarGrupos(ped.items);
+  const IN='padding:5px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)';
+  const opts=ped.fechas.map(f=>`<option value="${f}"${f===ped.fecha?' selected':''}>${envFechaFmt(f)}</option>`).join('');
+  let h=`<div id="ped-root">
+  ${ped.errTabla?pedBannerSQL():''}
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:1rem;flex-wrap:wrap">
+    <label style="font-size:13px;color:var(--text2)">Fecha del pedido:</label>
+    <input type="date" value="${ped.fecha}" onchange="pedCambiarFecha(this.value)" style="${IN}"/>
+    ${ped.fechas.length?`<select onchange="if(this.value)pedCambiarFecha(this.value)" style="${IN}" title="Pedidos guardados"><option value="">Pedidos guardados…</option>${opts}</select>`:''}
+    <div style="margin-left:auto"><button class="btn btn-sm" onclick="pedImprimirDif()"><i class="ti ti-printer"></i> Imprimir (A4 horizontal)</button></div>
+  </div>
+  <div class="alert alert-info" style="margin-bottom:1rem"><i class="ti ti-info-circle"></i> Compara lo <b>pedido</b> (pasado a unidades: bandeja × 24, jamón y queso criolla × 36, atún y sin sal por caja × 48) contra lo <b>entregado</b> en la planilla de Envío a locales de la misma fecha. Diferencia = entregado − pedido (<b style="color:#185FA5">+</b> de más, <b style="color:#B3261E">−</b> de menos). Solo se listan los productos con pedido o entrega.</div>
+  ${ped.envCant?'':`<div class="alert alert-info" style="display:block;margin-bottom:10px"><i class="ti ti-info-circle"></i> No hay planilla de <b>Envío a locales</b> cargada para el ${envFechaFmt(ped.fecha)}: no se puede comparar todavía.</div>`}`;
+  let hay=false;
+  ped.grupos.forEach(g=>{
+    const idxs=g.idxs.filter(i=>ENV_COLS.some((c,ci)=>{const m=pedCmp(i,ci);return pedPedido(i,ci)!=null||(m.ok&&m.ent);}));
+    if(!idxs.length)return;
+    hay=true;
+    const tot=ENV_COLS.map((c,ci)=>{let pd=0,en=0,ok=false;idxs.forEach(i=>{const m=pedCmp(i,ci);pd+=pedPedidoU(i,ci)||0;if(m.ok){ok=true;en+=pedEntregado(i,ci)||0;}});return{pd:Math.round(pd*1000)/1000,en:Math.round(en*1000)/1000,dif:ok?Math.round((en-pd)*1000)/1000:null,ok};});
+    const celdas=(i)=>ENV_COLS.map((c,ci)=>{
+      const m=pedCmp(i,ci);const bl=ci>0?'border-left:1px solid var(--border2);':'';
+      return`<td style="${bl}text-align:center;color:var(--text2)">${pedPedidoU(i,ci)!=null?pedFmt(pedPedidoU(i,ci)):''}</td><td style="text-align:center">${m.ent!=null?pedFmt(m.ent):''}</td><td title="${pedTitleDif(m)}" style="text-align:center;font-weight:700;color:${pedColorDif(m.dif)}">${pedFmtDif(m.dif)}</td>`;
+    }).join('');
+    h+=`<div class="stock-card" style="margin-bottom:16px">
+      <div style="padding:10px 14px;background:var(--bg2);border-bottom:.5px solid var(--border);border-radius:var(--radius-lg) var(--radius-lg) 0 0;font-weight:700">${remEsc(g.titulo)}</div>
+      <div style="overflow-x:auto"><table class="stock-tbl"><thead><tr><th rowspan="2" style="width:90px">ID</th><th rowspan="2" style="width:120px">Alias</th>${ENV_COLS.map((c,ci)=>`<th colspan="3" style="text-align:center;${ci>0?'border-left:1px solid var(--border2)':''}">${remEsc(c)}</th>`).join('')}</tr>
+      <tr>${ENV_COLS.map((c,ci)=>`<th style="text-align:center;font-size:11px;font-weight:400;${ci>0?'border-left:1px solid var(--border2)':''}">Ped. u.</th><th style="text-align:center;font-size:11px;font-weight:400">Entr.</th><th style="text-align:center;font-size:11px;font-weight:400">Dif.</th>`).join('')}</tr></thead>
+      <tbody>${idxs.map(i=>{const mp=ped.items[i];return`<tr><td class="muted" style="font-size:11px">${remEsc(mp.codigo||'')}</td><td style="font-weight:600">${remEsc(mp.alias||mp.nombre||'')}</td>${celdas(i)}</tr>`;}).join('')}</tbody>
+      <tfoot><tr style="background:var(--bg2);font-weight:700"><td></td><td>Total</td>${tot.map((t,ci)=>`<td style="${ci>0?'border-left:1px solid var(--border2);':''}text-align:center">${t.pd?pedFmt(t.pd):''}</td><td style="text-align:center">${t.ok&&t.en?pedFmt(t.en):''}</td><td style="text-align:center;color:${pedColorDif(t.dif)}">${pedFmtDif(t.dif)}</td>`).join('')}</tr></tfoot></table></div>
+    </div>`;
+  });
+  if(!hay)h+='<div class="empty"><i class="ti ti-arrows-diff"></i> No hay pedidos ni entregas para esta fecha.</div>';
+  h+='</div>';
+  cont.innerHTML=h;
 }
 function pedCeldaHtml(i,ci){
   const d=pedCeldaPintada(i,ci);
   const bg=d&&d.c?PED_COLORES[d.c]:'';
-  return`<td id="ped-td-${i}-${ci}" ondblclick="pedCiclo(${i},${ci})" title="Doble click: cambia el color" style="padding:3px 4px;width:96px;text-align:center;cursor:pointer;user-select:none${bg?';background:'+bg+';color:#222':''}">
+  return`<td id="ped-td-${i}-${ci}" ondblclick="pedCiclo(${i},${ci})" title="Doble click: cambia el color" style="padding:6px 4px;width:96px;text-align:center;cursor:pointer;user-select:none${bg?';background:'+bg+';color:#222':''}">
     <div id="ped-p-${i}-${ci}" style="font-weight:700;font-size:14px;min-height:20px">${d&&d.p!=null?pedFmt(d.p):''}</div>
-    <input type="text" inputmode="decimal" placeholder="env." value="${d&&d.e!=null?pedFmt(d.e):''}" onchange="pedSetEnviado(${i},${ci},this.value)" ondblclick="event.stopPropagation()" style="width:58px;text-align:center;font-size:11px;padding:2px 3px;border:.5px solid var(--border2);border-radius:4px;background:rgba(255,255,255,.7);color:#222"/>
   </td>`;
 }
 function pedPintar(i,ci){
@@ -20578,22 +20698,7 @@ function pedPintar(i,ci){
   td.style.background=d&&d.c?PED_COLORES[d.c]:'';
   td.style.color=d&&d.c?'#222':'';
 }
-function pedActualizarTotales(){
-  const sumPed=(idxs,ci)=>idxs.reduce((a,i)=>{const d=pedCeldaPintada(i,ci);return a+(d&&d.p!=null?d.p:0);},0);
-  ped.grupos.forEach((g,gi)=>{
-    let tot=0;
-    ENV_COLS.forEach((c,ci)=>{
-      const s=sumPed(g.idxs,ci);tot+=s;
-      const el=document.getElementById(`ped-tc-${gi}-${ci}`);if(el)el.textContent=pedFmt(s)||'';
-    });
-    pedActualizarTotalesCmp(gi,g);
-    const eg=document.getElementById(`ped-tg-${gi}`);if(eg)eg.textContent=pedFmt(tot)||'';
-    g.idxs.forEach(i=>{
-      let s=0;ENV_COLS.forEach((c,ci)=>{const d=pedCeldaPintada(i,ci);if(d&&d.p!=null)s+=d.p;});
-      const el=document.getElementById(`ped-tr-${i}`);if(el)el.textContent=pedFmt(s)||'';
-    });
-  });
-}
+function pedActualizarTotales(){} // v4.378: los totales se calculan al dibujar (pedRender)
 function pedActualizarTotalesCmp(gi,g){
   ENV_COLS.forEach((c,ci)=>{
     let ent=0,pd=0,hay=false;
@@ -20646,7 +20751,7 @@ async function pedCambiarFecha(v){
   await pedGuardarPendientes();
   ped.fecha=v;ped.tocoFecha=true;
   await pedCargarDia(v);
-  pedRender();
+  pedRefresh();
 }
 // ---- subir archivos ----
 async function pedAsegurarXLSX(){
@@ -20665,6 +20770,12 @@ async function pedLeerArchivo(file){
   if(!ws)throw new Error('El archivo no tiene hojas.');
   const r=pedLeerHoja(a=>ws[a],150);
   return{nombre:file.name,local:pedLocalDeArchivo(file.name,ENV_COLS),fecha:pedFechaDeArchivo(file.name)||r.fecha||ped.fecha,fechaCelda:r.fecha,items:r.items,n:r.nTotal};
+}
+// v4.382: también se pueden arrastrar los archivos (uno o varios) sobre la pantalla de Pedidos de locales.
+function pedSoltarArchivos(ev){
+  ev.preventDefault();
+  const fs=[...((ev.dataTransfer&&ev.dataTransfer.files)||[])].filter(f=>/\.(xlsm|xlsx|xls)$/i.test(f.name));
+  if(fs.length)pedSubirArchivos({files:fs,value:''});
 }
 async function pedSubirArchivos(inp){
   const files=[...(inp.files||[])];inp.value='';
@@ -20729,70 +20840,99 @@ async function pedConfirmarCarga(){
   ped.fecha=ult;ped.tocoFecha=true;
   await pedCargarFechas();
   await pedCargarDia(ped.fecha);
-  pedRender();
+  pedRefresh();
   pedMsg('Pedidos guardados ✓');
 }
 // ---- imprimir ----
 function pedHtmlImpresion(){
-  const grupos=envArmarGrupos(ped.items);
   const fechaTxt=envFechaFmt(ped.fecha);
-  const hayCmp=!!ped.envCant||ENV_COLS.some((c,ci)=>ped.items.some((m,i)=>pedCmp(i,ci).ok));
-  const hojas=grupos.map((g,gi)=>{
-    const idxs=g.idxs.filter(i=>ENV_COLS.some((c,ci)=>{const d=pedCeldaPintada(i,ci);const m=pedCmp(i,ci);return (d&&(d.p!=null||d.e!=null||d.c))||(m.ok&&m.ent);}));
-    if(!idxs.length)return '';
-    const tot=ENV_COLS.map((c,ci)=>idxs.reduce((a,i)=>a+(pedPedido(i,ci)||0),0));
-    const cmpTot=ENV_COLS.map((c,ci)=>{let e=0,pd=0,ok=false;idxs.forEach(i=>{const m=pedCmp(i,ci);if(!m.ok)return;ok=true;pd+=pedPedidoU(i,ci)||0;e+=pedEntregado(i,ci)||0;});return ok?{e:Math.round(e*1000)/1000,d:Math.round((e-pd)*1000)/1000}:null;});
-    const cmpTd=(m,top)=>{
-      const dc=m&&m.dif!=null?`<td class="c-df" style="color:${pedColorDif(m.dif)}">${pedFmtDif(m.dif)}</td>`:'<td class="c-df"></td>';
-      return`<td class="c-en${top}">${m&&m.ent!=null?pedFmt(m.ent):''}</td>${dc}`;
-    };
-    const filas=idxs.map(i=>{
+  const fm=n=>n?pedFmt(n):'';
+  const grupos=envArmarGrupos(ped.items).map(g=>({titulo:g.titulo,idxs:g.idxs.filter(i=>ENV_COLS.some((c,ci)=>{const d=pedCeldaPintada(i,ci);return d&&(d.p!=null||d.c);}))})).filter(g=>g.idxs.length);
+  // cantidad de renglones para repartir el alto de la hoja (A4 vertical, ~262 mm útiles)
+  let nR=2; // encabezado + total general (2 renglones)
+  grupos.forEach(g=>{nR+=1+g.idxs.length+(g.idxs.some(pedEsBandeja)?1:0)+(g.idxs.some(i=>!pedEsBandeja(i))?1:0);});
+  const rh=Math.max(3.8,Math.min(7,Math.floor(262/nR*10)/10));
+  const fs=rh>=5.6?10:rh>=4.8?9:8;
+  const sub=(lbl,sums,key,cls)=>{const t=Math.round(sums.reduce((a,x)=>a+x[key],0)*1000)/1000;return`<tr class="${cls}"><td class="al">${lbl}</td>${sums.map(x=>`<td>${fm(x[key])}</td>`).join('')}<td class="tt">${fm(t)}</td></tr>`;};
+  let filas='';
+  grupos.forEach(g=>{
+    const sums=pedSumasLocal(g.idxs);
+    filas+=`<tr class="area"><td colspan="${ENV_COLS.length+2}">${remEsc(g.titulo)}</td></tr>`;
+    g.idxs.forEach(i=>{
       const mp=ped.items[i];
-      let s=0;
-      const celdas=ENV_COLS.map((c,ci)=>{
-        const d=pedCeldaPintada(i,ci);
-        if(d&&d.p!=null)s+=d.p;
-        return`<td class="c-suc" style="${d&&d.c?'background:'+PED_COLORES[d.c]+';':''}">${d&&d.p!=null?pedFmt(d.p):''}</td>`;
-      }).join('');
-      const cmp=hayCmp?ENV_COLS.map((c,ci)=>cmpTd(pedCmp(i,ci),ci===0?' sep':'')).join(''):'';
-      return`<tr><td class="c-alias">${remEsc(mp.alias||mp.nombre||'')}</td>${celdas}<td class="c-tot">${pedFmt(s)}</td>${cmp}</tr>`;
-    }).join('');
-    const cmpFoot=hayCmp?cmpTot.map((m,ci)=>`<td class="c-en${ci===0?' sep':''}">${m&&m.e?pedFmt(m.e):''}</td><td class="c-df" style="color:${pedColorDif(m?m.d:null)}">${m?pedFmtDif(m.d):''}</td>`).join(''):'';
-    return`<div class="hoja hoja-brk">
-      <h1>Pedidos de locales — ${remEsc(g.titulo)}</h1>
-      <div class="sub">Pedido del ${fechaTxt}${hayCmp?' · entregado y diferencia en unidades (pedido × 24 u. por bandeja, jamón y queso 36, atún y sin sal 48 por caja) según planilla Envío a locales · + de más, − de menos':''} · colores: verde enviado / amarillo menos / rojo no se envió</div>
-      <table><thead><tr><th class="th-alias" rowspan="2">Alias</th><th colspan="${ENV_COLS.length}">PEDIDO</th><th class="th-tot" rowspan="2">TOTAL</th>${hayCmp?`<th colspan="${ENV_COLS.length*2}" class="sep">ENTREGADO / DIFERENCIA</th>`:''}</tr>
-      <tr>${ENV_COLS.map(c=>`<th class="th-suc">${remEsc(c)}</th>`).join('')}${hayCmp?ENV_COLS.map((c,ci)=>`<th colspan="2" class="th-cmp${ci===0?' sep':''}">${remEsc(c)}</th>`).join(''):''}</tr></thead>
-      <tbody>${filas}</tbody>
-      <tfoot><tr><td class="c-alias">TOTAL</td>${tot.map(t=>`<td class="c-suc">${pedFmt(t)}</td>`).join('')}<td class="c-tot">${pedFmt(tot.reduce((a,v)=>a+v,0))}</td>${cmpFoot}</tr></tfoot></table>
-    </div>`;
-  }).join('');
+      filas+=`<tr><td class="al">${remEsc(mp.alias||mp.nombre||'')}</td>${ENV_COLS.map((c,ci)=>{const d=pedCeldaPintada(i,ci);return`<td style="${d&&d.c?'background:'+PED_COLORES[d.c]+';':''}">${d&&d.p!=null?pedFmt(d.p):''}</td>`;}).join('')}<td class="tt">${fm(pedTotalFila(i))}</td></tr>`;
+    });
+    if(g.idxs.some(pedEsBandeja))filas+=sub('Subtotal bandejas',sums,'b','sub');
+    if(g.idxs.some(i=>!pedEsBandeja(i)))filas+=sub('Subtotal cajas',sums,'c','sub');
+  });
+  const all=pedSumasLocal(grupos.flatMap(g=>g.idxs));
+  filas+=sub('TOTAL BANDEJAS',all,'b','gran')+sub('TOTAL CAJAS',all,'c','gran');
   return`<!DOCTYPE html><html><head><meta charset="UTF-8"/>
   <title>Pedidos de locales ${fechaTxt}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-    body{font-family:Arial,sans-serif;color:#111}
-    .hoja{width:281mm;margin:0 auto;padding:4mm}
-    .hoja-brk{page-break-after:always}
-    h1{font-size:12pt;text-align:center;margin-bottom:1mm;text-transform:uppercase;letter-spacing:1px}
-    .sub{font-size:8pt;text-align:center;color:#444;margin-bottom:3mm}
-    table{width:100%;border-collapse:collapse}
-    thead{display:table-header-group}
-    tr{page-break-inside:avoid}
-    th{background:#1B3A6B;color:#fff;padding:3px 4px;font-size:7.5pt;text-align:center;border:1px solid #1B3A6B}
-    th.th-alias{width:34mm;text-align:left}th.th-tot{width:14mm}
-    th.sep,td.sep{border-left:2px solid #333}
-    td{border:1px solid #999;height:7.5mm;font-size:9pt;padding:0 3px}
-    td.c-alias{font-weight:600}
-    td.c-suc{text-align:center;font-size:10pt;width:17mm}
-    td.c-tot{text-align:center;font-weight:700;font-size:10pt;background:#eef1f6}
-    td.c-en{text-align:center;width:13mm}
-    td.c-df{text-align:center;font-weight:700;width:13mm}
-    tfoot td{border-top:2px solid #333;font-weight:700;background:#eef1f6}
-    @media print{@page{size:A4 landscape;margin:8mm}body{margin:0}.hoja{width:100%;padding:0}}
-  </style></head><body>${hojas||'<p style="padding:20px">No hay pedidos cargados para esta fecha.</p>'}
+    body{font-family:Arial,sans-serif;color:#111;padding:5mm 6mm}
+    h1{font-size:11pt;margin-bottom:1.5mm}
+    h1 span{font-weight:400;font-size:8.5pt;color:#444}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
+    th{background:#1B3A6B;color:#fff;font-size:${fs-1}pt;padding:0 1mm;height:${rh}mm;border:1px solid #1B3A6B}
+    td{border:1px solid #888;text-align:center;font-size:${fs}pt;height:${rh}mm;line-height:1;padding:0 1mm}
+    th.al,td.al{width:34mm;text-align:left;font-weight:700}
+    td.tt{width:16mm;font-weight:700;background:#eef1f6}
+    th.tt{width:16mm}
+    tr.area td{background:#cfd8e8;font-weight:700;text-align:left;font-size:${fs}pt;border-color:#1B3A6B}
+    tr.sub td{background:#f0f2f6;font-weight:700}
+    tr.gran td{background:#dfe6f2;font-weight:700;border-top:2px solid #333}
+    @media print{@page{size:A4 portrait;margin:5mm 6mm}body{padding:0}}
+  </style></head><body>
+  <h1>Pedidos de locales <span>· ${fechaTxt} · empanadas en bandejas, resto en cajas</span></h1>
+  ${grupos.length?`<table><thead><tr><th class="al">Alias</th>${ENV_COLS.map(c=>`<th>${remEsc(c)}</th>`).join('')}<th class="tt">TOTAL</th></tr></thead><tbody>${filas}</tbody></table>`:'<p style="padding:20px">No hay pedidos cargados para esta fecha.</p>'}
   <script>window.onload=function(){setTimeout(function(){window.print()},350)};<\/script>
   </body></html>`;
+}
+// Impresión de Entrega vs pedido (A4 horizontal).
+function pedHtmlImpresionDif(){
+  const fechaTxt=envFechaFmt(ped.fecha);
+  const grupos=envArmarGrupos(ped.items).map(g=>({titulo:g.titulo,idxs:g.idxs.filter(i=>ENV_COLS.some((c,ci)=>{const m=pedCmp(i,ci);return pedPedido(i,ci)!=null||(m.ok&&m.ent);}))})).filter(g=>g.idxs.length);
+  let nR=2;grupos.forEach(g=>{nR+=2+g.idxs.length;});
+  const rh=Math.max(4,Math.min(7,Math.floor(165/nR*10)/10));
+  const fs=rh>=5.4?9:8;
+  let filas='';
+  grupos.forEach(g=>{
+    const tot=ENV_COLS.map((c,ci)=>{let pd=0,en=0,ok=false;g.idxs.forEach(i=>{const m=pedCmp(i,ci);pd+=pedPedidoU(i,ci)||0;if(m.ok){ok=true;en+=pedEntregado(i,ci)||0;}});return{pd:Math.round(pd*1000)/1000,en:Math.round(en*1000)/1000,dif:ok?Math.round((en-pd)*1000)/1000:null,ok};});
+    filas+=`<tr class="area"><td colspan="${1+ENV_COLS.length*3}">${remEsc(g.titulo)}</td></tr>`;
+    g.idxs.forEach(i=>{
+      const mp=ped.items[i];
+      filas+=`<tr><td class="al">${remEsc(mp.alias||mp.nombre||'')}</td>${ENV_COLS.map((c,ci)=>{const m=pedCmp(i,ci);return`<td class="sep">${pedPedidoU(i,ci)!=null?pedFmt(pedPedidoU(i,ci)):''}</td><td>${m.ent!=null?pedFmt(m.ent):''}</td><td style="font-weight:700;color:${pedColorDif(m.dif)}">${pedFmtDif(m.dif)}</td>`;}).join('')}</tr>`;
+    });
+    filas+=`<tr class="sub"><td class="al">Total</td>${tot.map(t=>`<td class="sep">${t.pd?pedFmt(t.pd):''}</td><td>${t.ok&&t.en?pedFmt(t.en):''}</td><td style="color:${pedColorDif(t.dif)}">${pedFmtDif(t.dif)}</td>`).join('')}</tr>`;
+  });
+  return`<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>Entrega vs pedido ${fechaTxt}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{font-family:Arial,sans-serif;color:#111;padding:5mm 6mm}
+    h1{font-size:11pt;margin-bottom:1.5mm}h1 span{font-weight:400;font-size:8.5pt;color:#444}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}
+    th{background:#1B3A6B;color:#fff;font-size:${fs-1}pt;padding:0 1mm;height:${rh}mm;border:1px solid #1B3A6B}
+    td{border:1px solid #888;text-align:center;font-size:${fs}pt;height:${rh}mm;line-height:1;padding:0 1mm}
+    th.al,td.al{width:26mm;text-align:left;font-weight:700}
+    td.sep{border-left:2px solid #333}
+    tr.area td{background:#cfd8e8;font-weight:700;text-align:left;border-color:#1B3A6B}
+    tr.sub td{background:#eef1f6;font-weight:700;border-top:2px solid #333}
+    @media print{@page{size:A4 landscape;margin:5mm 6mm}body{padding:0}}
+  </style></head><body>
+  <h1>Entrega vs pedido <span>· ${fechaTxt} · en unidades (bandeja × 24, jamón y queso criolla × 36, atún y sin sal × 48) · dif. = entregado − pedido</span></h1>
+  ${grupos.length?`<table><thead><tr><th class="al" rowspan="2">Alias</th>${ENV_COLS.map(c=>`<th colspan="3" style="border-left:2px solid #fff">${remEsc(c)}</th>`).join('')}</tr><tr>${ENV_COLS.map(()=>'<th style="border-left:2px solid #fff">Ped.</th><th>Entr.</th><th>Dif.</th>').join('')}</tr></thead><tbody>${filas}</tbody></table>`:'<p style="padding:20px">No hay pedidos ni entregas para esta fecha.</p>'}
+  <script>window.onload=function(){setTimeout(function(){window.print()},350)};<\/script>
+  </body></html>`;
+}
+function pedImprimirDif(){
+  if(!ped.items.length){alert('La lista de productos está vacía.');return}
+  const blob=new Blob([pedHtmlImpresionDif()],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),15000);
+  if(!w)alert('Habilitá popups para este sitio para imprimir.');
 }
 function pedImprimir(){
   if(!ped.items.length){alert('La lista de productos está vacía.');return}
@@ -20804,8 +20944,8 @@ function pedImprimir(){
 }
 // Si se agregan/quitan productos en el modal de Distribución Planeta mientras esta pantalla está abierta.
 function pedRefrescarLista(){
-  if(typeof remVista==='undefined'||remVista!=='pedidos'||!document.getElementById('ped-root'))return;
-  pedArmarItems();pedRender();
+  const _pr=document.getElementById('ped-root');if(!_pr||!_pr.offsetParent)return;
+  pedArmarItems();pedRefresh();
 }
 
 // Consumo de MP Semanal (Planillas, v4.201): planilla que muestra cuánta materia prima se va a
@@ -21971,15 +22111,15 @@ let remFiltroHist='';
 
 function initRemitos(){
   if(remVista==='envios'){envInit();return;}
-  if(remVista==='pedidos'){pedInit();return;}
+  if(remVista==='difped'){pedInit('dif');return;}
   if(remVista==='config'){remCorreoCfgInit();return;}
   remRender();
 }
 function remIrVista(v){
   remVista=v;
-  ['subir','historial','envios','pedidos','config'].forEach(x=>document.getElementById('remtab-'+x).classList.toggle('active',x===v));
+  ['subir','historial','envios','difped','config'].forEach(x=>document.getElementById('remtab-'+x).classList.toggle('active',x===v));
   if(v==='envios'){envInit();return;}
-  if(v==='pedidos'){pedInit();return;}
+  if(v==='difped'){pedInit('dif');return;}
   if(v==='config'){remCorreoCfgInit();return;}
   if(v==='historial'){remDetalle=null;remCargarHistorial();}
   remRender();
@@ -21988,7 +22128,7 @@ function remRender(){
   const cont=document.getElementById('rem-content');
   if(!cont)return;
   if(remVista==='config')return; // v4.331: Configuración se dibuja sola (remCorreoCfgRender)
-  if(remVista==='pedidos')return; // v4.367: se dibuja sola (pedRender)
+  if(remVista==='difped')return; // v4.367: se dibuja sola (pedRender)
   if(remVista==='envios')return; // v4.330: la pantalla "Envío a locales" se dibuja sola (envRender)
   if(remVista==='subir')cont.innerHTML=remRenderSubir();
   else if(remDetalle)cont.innerHTML=remRenderDetalle();
