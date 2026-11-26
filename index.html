@@ -294,9 +294,10 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.383</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.384</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
+    <div id="acc-chip" style="display:none;font-size:12px;color:var(--text2);border:.5px solid var(--border2);border-radius:999px;padding:3px 10px"></div>
     <div style="font-size:12px;color:var(--text2)" id="hdate"></div>
   </div>
 </header>
@@ -1493,6 +1494,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
     <button class="proy-tab active" id="cfgtab-ids" onclick="showCfgSubTab('ids')"><i class="ti ti-id"></i> ID / Descripción / Depósito</button>
     <button class="proy-tab" id="cfgtab-prod" onclick="showCfgSubTab('prod')"><i class="ti ti-package"></i> Producción</button>
     <button class="proy-tab" id="cfgtab-carga" onclick="showCfgSubTab('carga')"><i class="ti ti-user-check"></i> Usuarios de carga</button>
+    <button class="proy-tab" id="cfgtab-acc" onclick="showCfgSubTab('acc')"><i class="ti ti-lock"></i> Accesos</button>
   </div>
 
   <!-- SUB-TAB ID / DESCRIPCIÓN / DEPÓSITO (ex Maestro > Configuración + Maestro > Depósitos + Maestro 2) -->
@@ -1553,6 +1555,8 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
   <!-- SUB-TAB PRODUCCIÓN (ex Maestro > Productos) -->
   <!-- SUB-TAB USUARIOS DE CARGA (v4.383): quién carga producción desde la app aparte carga.html -->
   <div id="cfg-sub-carga" style="display:none"><div id="cu-content"></div></div>
+  <!-- SUB-TAB ACCESOS (v4.384): claves por pestaña, usuarios y registro de ingresos (solo clave maestra) -->
+  <div id="cfg-sub-acc" style="display:none"><div id="acc-content"></div></div>
 
   <div id="cfg-sub-prod" style="display:none">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:1rem;flex-wrap:wrap">
@@ -2035,6 +2039,7 @@ function showProdSubTab(t){
   if(t==='rell')initRellenos();
 }
 function T(t){
+  if(!accGuardia(t))return; // v4.384: pestañas con clave
   document.querySelectorAll('.tab').forEach(el=>{
     const m=el.getAttribute('onclick')||'';
     el.classList.toggle('active',m.includes("'"+t+"'"));
@@ -8864,13 +8869,14 @@ function mostrarResultadoSyncIds(linkados,sinCodigo,sinProducto,totalFilas){
 }
 
 function showCfgSubTab(t){
-  ['ids','prod','carga'].forEach(x=>{
+  ['ids','prod','carga','acc'].forEach(x=>{
     document.getElementById('cfg-sub-'+x).style.display=x===t?'':'none';
     document.getElementById('cfgtab-'+x).classList.toggle('active',x===t);
   });
   if(t==='ids')renderMPList();
   if(t==='prod')rMae();
   if(t==='carga')cuInit();
+  if(t==='acc')accAdminInit();
 }
 function toggleCfgDepositos(){
   const p=document.getElementById('cfg-depositos-panel');
@@ -21125,6 +21131,343 @@ async function cuEliminar(id){
   await cuInit();
 }
 
+// ===== Accesos con clave (v4.384) =====
+// Pestañas que piden clave (las elige el usuario maestro en Configuración › Accesos) + usuarios con su propia clave y
+// permiso por área ("solo ver" / "ver y editar") + registro de quién entró a qué y cuándo. Configuración es SOLO de la clave maestra.
+// OJO: es una barrera de la pantalla (el SOPE es un HTML con la base abierta), no seguridad de servidor.
+const ACC_AREAS=[['prod','Producción'],['cmp','Comparación'],['inf','Informes'],['stock','Stock'],['rec','Recetas'],['rrhh','RRHH'],['ped','Pedidos'],['cfg','Configuración'],['etq','Etiquetas'],['rem','Remitos'],['comes','A comer'],['planillas','Planillas']];
+const accNombreArea=k=>{const a=ACC_AREAS.find(x=>x[0]===k);return a?a[1]:(k==='*'?'todo':k);};
+const ACC_SQL_TABLAS=`create table if not exists sope_accesos (
+  id text primary key,
+  nombre text not null,
+  salt text not null,
+  clave_hash text not null,
+  es_maestro boolean not null default false,
+  activo boolean not null default true,
+  permisos jsonb not null default '{}'::jsonb,
+  created_at timestamptz default now()
+);
+
+create table if not exists sope_acceso_config (
+  id text primary key,
+  datos jsonb not null default '{}'::jsonb,
+  updated_at timestamptz default now()
+);
+
+create table if not exists sope_accesos_log (
+  id bigint generated always as identity primary key,
+  usuario_id text,
+  usuario text,
+  area text,
+  accion text,
+  detalle text,
+  created_at timestamptz default now()
+);`;
+const ACC_SQL_RLS=['alter table sope_accesos disable row level security;','alter table sope_acceso_config disable row level security;','alter table sope_accesos_log disable row level security;'];
+var accSt={listo:false,falta:false,err:'',users:[],areas:{},desb:{},maestro:null,ult:Date.now(),tab:'prod',lastLog:{},prom:null,log:[],idleMin:30,logFiltro:{u:'',a:''}};
+
+// --- SHA-256 en JS puro (no depende de https) + clave con sal e iteraciones ---
+const ACC_K=[],ACC_H0=[];
+(function(){let n=2,c=0;while(c<64){let p=true;for(let i=2;i*i<=n;i++)if(n%i===0){p=false;break;}if(p){if(c<8)ACC_H0.push(Math.floor((Math.sqrt(n)%1)*4294967296)>>>0);ACC_K.push(Math.floor((Math.cbrt(n)%1)*4294967296)>>>0);c++;}n++;}})();
+function accSha256(str){
+  const b=new TextEncoder().encode(str),l=b.length,nb=((l+9+63)>>6)<<6,m=new Uint8Array(nb);
+  m.set(b);m[l]=0x80;const dv=new DataView(m.buffer);dv.setUint32(nb-4,(l*8)>>>0);dv.setUint32(nb-8,Math.floor(l*8/4294967296));
+  const h=ACC_H0.slice(),w=new Array(64);
+  for(let o=0;o<nb;o+=64){
+    for(let i=0;i<16;i++)w[i]=dv.getUint32(o+i*4);
+    for(let i=16;i<64;i++){const a=w[i-15],c=w[i-2];const s0=((a>>>7)|(a<<25))^((a>>>18)|(a<<14))^(a>>>3);const s1=((c>>>17)|(c<<15))^((c>>>19)|(c<<13))^(c>>>10);w[i]=(w[i-16]+s0+w[i-7]+s1)|0;}
+    let [a,b2,c,d,e,f,g,hh]=h;
+    for(let i=0;i<64;i++){
+      const S1=((e>>>6)|(e<<26))^((e>>>11)|(e<<21))^((e>>>25)|(e<<7));
+      const t1=(hh+S1+((e&f)^(~e&g))+ACC_K[i]+w[i])|0;
+      const S0=((a>>>2)|(a<<30))^((a>>>13)|(a<<19))^((a>>>22)|(a<<10));
+      const t2=(S0+((a&b2)^(a&c)^(b2&c)))|0;
+      hh=g;g=f;f=e;e=(d+t1)|0;d=c;c=b2;b2=a;a=(t1+t2)|0;
+    }
+    h[0]=(h[0]+a)|0;h[1]=(h[1]+b2)|0;h[2]=(h[2]+c)|0;h[3]=(h[3]+d)|0;h[4]=(h[4]+e)|0;h[5]=(h[5]+f)|0;h[6]=(h[6]+g)|0;h[7]=(h[7]+hh)|0;
+  }
+  return h.map(x=>(x>>>0).toString(16).padStart(8,'0')).join('');
+}
+function accClaveHash(salt,clave){let x=salt+'|'+clave;for(let i=0;i<1500;i++)x=accSha256(x+salt);return x;}
+function accNuevaSal(){const a=new Uint8Array(12);if(window.crypto&&crypto.getRandomValues)crypto.getRandomValues(a);else for(let i=0;i<a.length;i++)a[i]=Math.floor(Math.random()*256);return[...a].map(x=>x.toString(16).padStart(2,'0')).join('');}
+function accClaveEnUso(clave,exceptId){return accSt.users.some(u=>u.id!==exceptId&&accClaveHash(u.salt,clave)===u.clave_hash);}
+
+// --- carga de usuarios/config ---
+function accCargar(){
+  accSt.prom=(async()=>{
+    try{
+      const[us,cf]=await Promise.all([get('sope_accesos','select=*&order=nombre.asc'),get('sope_acceso_config','id=eq.areas')]);
+      accSt.users=us;accSt.areas=(cf[0]&&cf[0].datos)||{};accSt.falta=false;accSt.err='';accSt.listo=true;
+    }catch(e){
+      const m=String((e&&e.message)||e);
+      if(/PGRST205|42P01|Could not find the table|does not exist|schema cache/i.test(m)){accSt.falta=true;accSt.listo=true;accSt.users=[];accSt.areas={};accSt.err='';}
+      else{accSt.err=m;accSt.listo=false;}
+    }
+  })();
+  return accSt.prom;
+}
+const accHayMaestro=()=>accSt.users.some(u=>u.es_maestro&&u.activo!==false);
+function accRequiere(t){
+  if(!accSt||accSt.falta)return false;
+  if(!accSt.listo)return t!=='prod';
+  if(t==='prod')return false;
+  if(t==='cfg')return accHayMaestro();
+  return !!accSt.areas[t]&&accSt.users.some(u=>u.activo!==false);
+}
+function accNivel(t){if(accSt.maestro)return'editar';const d=accSt.desb[t];return d?d.nivel:null;}
+function accNivelActual(){return accRequiere(accSt.tab)?accNivel(accSt.tab):'editar';}
+// Se llama al principio de T(): true = puede entrar; false = pidió clave (o está verificando) y vuelve a llamar a T() si entra bien.
+function accGuardia(t){
+  if(typeof accSt==='undefined'||!accSt)return true;
+  if(!accSt.listo&&accSt.prom&&!accSt.err){accSt.prom.then(()=>T(t));return false;}
+  if(!accRequiere(t)){accSt.tab=t;accBanner();return true;}
+  if(accNivel(t)){accSt.tab=t;accBanner();accLogVisita(t);return true;}
+  accPedirClave(t);return false;
+}
+function accUsuarioActivo(t){if(accSt.maestro)return accSt.maestro;const d=accSt.desb[t];return d?{id:d.uid,nombre:d.nombre}:null;}
+function accLog(accion,area,detalle,u){
+  try{
+    fetch(`${SB}/rest/v1/sope_accesos_log`,{method:'POST',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify({usuario_id:u?u.id:null,usuario:u?u.nombre:null,area,accion,detalle:detalle||null})}).catch(()=>{});
+  }catch(e){}
+}
+function accLogVisita(t){
+  const u=accUsuarioActivo(t);if(!u)return;
+  const k=u.id+'|'+t,now=Date.now();
+  if(accSt.lastLog[k]&&now-accSt.lastLog[k]<10*60000)return;
+  accSt.lastLog[k]=now;accLog('visita',t,null,u);
+}
+function accToast(msg){
+  const d=document.createElement('div');
+  d.style.cssText='position:fixed;left:50%;top:18px;transform:translateX(-50%);background:#1a1a6b;color:#fff;padding:10px 18px;border-radius:10px;z-index:400;font-size:13px;box-shadow:0 4px 18px rgba(0,0,0,.3)';
+  d.textContent=msg;document.body.appendChild(d);setTimeout(()=>d.remove(),4500);
+}
+function accBanner(){
+  let b=document.getElementById('acc-banner');
+  const ver=accRequiere(accSt.tab)&&accNivel(accSt.tab)==='ver';
+  if(!ver){if(b)b.remove();return;}
+  if(!b){b=document.createElement('div');b.id='acc-banner';b.style.cssText='position:fixed;right:16px;bottom:16px;background:#b45309;color:#fff;padding:8px 14px;border-radius:10px;z-index:150;font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,.25)';document.body.appendChild(b);}
+  b.innerHTML='<i class="ti ti-eye"></i> Acceso de solo lectura: no se pueden guardar cambios';
+}
+function accChip(){
+  const el=document.getElementById('acc-chip');if(!el)return;
+  const nombres=[...new Set([...(accSt.maestro?[accSt.maestro.nombre+' (maestra)']:[]),...Object.values(accSt.desb).map(d=>d.nombre)])];
+  if(!nombres.length){el.style.display='none';return;}
+  el.style.display='';
+  el.innerHTML=`<i class="ti ti-lock-open"></i> ${remEsc(nombres.join(', '))} <a href="#" onclick="accBloquear('manual');return false" style="margin-left:6px;color:var(--blue)">Bloquear</a>`;
+}
+function accBloquear(motivo){
+  Object.entries(accSt.desb).forEach(([a,d])=>accLog('bloqueo',a,motivo,{id:d.uid,nombre:d.nombre}));
+  if(accSt.maestro)accLog('bloqueo','*',motivo,accSt.maestro);
+  const hubo=accSt.maestro||Object.keys(accSt.desb).length;
+  accSt.desb={};accSt.maestro=null;accChip();
+  if(hubo&&accRequiere(accSt.tab)){T('prod');}
+  accBanner();
+  if(hubo)accToast(motivo==='inactividad'?'Se bloqueó por inactividad. Volvé a ingresar la clave.':'Bloqueado.');
+}
+function accVigilar(){
+  if(!(accSt.maestro||Object.keys(accSt.desb).length))return;
+  if(Date.now()-accSt.ult<accSt.idleMin*60000)return;
+  accBloquear('inactividad');
+}
+['mousemove','keydown','click','touchstart','scroll'].forEach(ev=>document.addEventListener(ev,()=>{accSt.ult=Date.now();},{passive:true,capture:true}));
+setInterval(accVigilar,20000);
+// "Solo ver": mientras la pestaña activa sea de solo lectura, no se deja guardar nada en la base (salvo el registro de accesos).
+(function(){
+  const f0=window.fetch.bind(window);let ultAviso=0;
+  window.fetch=function(url,opts){
+    try{
+      const m=String((opts&&opts.method)||'GET').toUpperCase();
+      if(m!=='GET'&&m!=='HEAD'&&typeof url==='string'&&url.indexOf('/rest/v1/')>=0&&url.indexOf('/rest/v1/sope_')<0&&accNivelActual()==='ver'){
+        if(Date.now()-ultAviso>3000){ultAviso=Date.now();accToast('Tu acceso a '+accNombreArea(accSt.tab)+' es de solo lectura: no se guardó.');}
+        return Promise.resolve(new Response(JSON.stringify({message:'Solo lectura'}),{status:403,headers:{'Content-Type':'application/json'}}));
+      }
+    }catch(e){}
+    return f0(url,opts);
+  };
+})();
+
+// --- pantalla de clave ---
+function accPedirClave(t){
+  let ov=document.getElementById('modal-acc');if(ov)ov.remove();
+  ov=document.createElement('div');ov.className='modal-overlay';ov.id='modal-acc';ov.style.zIndex=500;
+  ov.addEventListener('mousedown',e=>{if(e.target===ov)ov.remove();});
+  const sinConexion=!accSt.listo&&accSt.err;
+  ov.innerHTML=`<div class="modal" style="width:360px">
+    <div class="modal-title"><i class="ti ti-lock"></i> ${remEsc(accNombreArea(t))}</div>
+    <div class="modal-sub">${t==='cfg'?'Configuración es solo para la clave maestra.':'Ingresá tu clave para entrar.'}</div>
+    ${sinConexion?'<div style="color:var(--red);font-size:12px;margin-bottom:8px">No pude verificar los accesos (¿sin internet?). Reintentá.</div>':''}
+    <input id="acc-clave" type="password" autocomplete="off" placeholder="Clave" style="width:100%;padding:10px 12px;font-size:16px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)"/>
+    <div id="acc-err" style="color:var(--red);font-size:12px;min-height:16px;margin-top:6px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px"><button class="btn btn-sm" onclick="document.getElementById('modal-acc').remove()">Cancelar</button><button class="btn btn-primary btn-sm" id="acc-ok"><i class="ti ti-lock-open"></i> Entrar</button></div>
+  </div>`;
+  document.body.appendChild(ov);
+  const go=async()=>{
+    const v=document.getElementById('acc-clave').value;if(!v)return;
+    const b=document.getElementById('acc-ok');b.disabled=true;
+    const r=await accIntentar(t,v);
+    if(r.ok){ov.remove();T(t);return;}
+    b.disabled=false;document.getElementById('acc-err').textContent=r.err;const i=document.getElementById('acc-clave');i.value='';i.focus();
+  };
+  document.getElementById('acc-ok').onclick=go;
+  document.getElementById('acc-clave').onkeydown=e=>{if(e.key==='Enter')go();};
+  setTimeout(()=>{const i=document.getElementById('acc-clave');if(i)i.focus();},50);
+}
+async function accIntentar(t,clave){
+  await accCargar();
+  if(!accSt.listo)return{err:'No pude verificar los accesos. Revisá internet y probá de nuevo.'};
+  const cand=accSt.users.filter(u=>u.activo!==false&&(u.es_maestro||(t!=='cfg'&&u.permisos&&u.permisos[t])));
+  for(const u of cand){
+    if(accClaveHash(u.salt,clave)!==u.clave_hash)continue;
+    if(u.es_maestro)accSt.maestro={id:u.id,nombre:u.nombre};
+    else accSt.desb[t]={uid:u.id,nombre:u.nombre,nivel:u.permisos[t]==='ver'?'ver':'editar'};
+    accSt.ult=Date.now();accSt.lastLog[u.id+'|'+t]=Date.now();
+    accLog('ingreso',t,u.es_maestro?'clave maestra':(u.permisos[t]==='ver'?'solo ver':'ver y editar'),{id:u.id,nombre:u.nombre});
+    accChip();
+    return{ok:true};
+  }
+  accLog('fallido',t,'clave incorrecta',null);
+  return{err:'Clave incorrecta.'};
+}
+
+// --- Configuración › Accesos (solo clave maestra) ---
+async function accAdminInit(){
+  const cont=document.getElementById('acc-content');if(!cont)return;
+  cont.innerHTML='<div class="empty"><span class="spinner spinner-dark"></span></div>';
+  await accCargar();
+  accSt.log=[];
+  if(accSt.listo&&!accSt.falta){try{accSt.log=await get('sope_accesos_log','order=created_at.desc&limit=300');}catch(e){}}
+  accAdminRender();
+}
+function accAdminRender(){
+  const cont=document.getElementById('acc-content');if(!cont)return;
+  const pre='background:var(--bg2);padding:10px;border-radius:6px;overflow:auto;font-size:12px;margin:4px 0';
+  const IN='padding:6px 9px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)';
+  let h='';
+  if(accSt.falta){
+    h+=`<div class="alert alert-info" style="display:block"><b>Falta crear las tablas en Supabase.</b> Corré este SQL en el SQL Editor (en cuatro pasos) y después tocá Actualizar.
+      <div style="margin-top:8px;font-size:12px;color:var(--text2)">Paso 1 — tablas:</div><pre style="${pre}">${remEsc(ACC_SQL_TABLAS)}</pre>
+      ${ACC_SQL_RLS.map((l,i)=>`<div style="font-size:12px;color:var(--text2)">Paso ${i+2} — sin RLS (línea sola):</div><pre style="${pre}">${remEsc(l)}</pre>`).join('')}</div>
+      <button class="btn btn-sm" onclick="accAdminInit()"><i class="ti ti-refresh"></i> Actualizar</button>`;
+    cont.innerHTML=h;return;
+  }
+  if(!accSt.listo){cont.innerHTML=`<div class="alert alert-info" style="display:block">No pude leer los accesos: ${remEsc(accSt.err.slice(0,200))}</div><button class="btn btn-sm" onclick="accAdminInit()">Reintentar</button>`;return;}
+  if(!accHayMaestro()){
+    cont.innerHTML=`<div class="alert alert-info" style="display:block;margin-bottom:12px"><i class="ti ti-key"></i> <b>Primero creá la clave maestra.</b> Es la tuya: con ella entrás a todo, y es la única que entra a Configuración (donde se definen las demás claves). Hasta que la crees, el sistema sigue abierto como siempre.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;max-width:560px">
+      <label style="font-size:12px;color:var(--text2)">Tu nombre<br><input id="acc-m-nombre" type="text" value="Juan Pablo" style="${IN};width:160px"/></label>
+      <label style="font-size:12px;color:var(--text2)">Clave maestra (mín. 4)<br><input id="acc-m-c1" type="password" style="${IN};width:150px" autocomplete="new-password"/></label>
+      <label style="font-size:12px;color:var(--text2)">Repetila<br><input id="acc-m-c2" type="password" style="${IN};width:150px" autocomplete="new-password"/></label>
+      <button class="btn btn-primary btn-sm" onclick="accCrearMaestro()"><i class="ti ti-check"></i> Crear clave maestra</button></div>
+    <div id="acc-m-err" style="color:var(--red);font-size:12px;margin-top:8px"></div>
+    <div style="font-size:12px;color:var(--text2);margin-top:10px">Anotala en un lugar seguro. Si se pierde, hay que borrarla desde Supabase (tabla sope_accesos) y crear otra.</div>`;
+    return;
+  }
+  const prot=ACC_AREAS.filter(a=>a[0]!=='prod'&&a[0]!=='cfg'&&accSt.areas[a[0]]);
+  h+=`<div style="font-size:14px;font-weight:600;margin-bottom:6px">Áreas que piden clave</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:4px 14px;margin-bottom:6px;font-size:13px">
+    ${ACC_AREAS.filter(a=>a[0]!=='prod'&&a[0]!=='cfg').map(a=>`<label style="display:flex;gap:6px;align-items:center"><input type="checkbox"${accSt.areas[a[0]]?' checked':''} onchange="accSetArea('${a[0]}',this.checked)"/>${remEsc(a[1])}</label>`).join('')}
+  </div>
+  <div style="font-size:12px;color:var(--text2);margin-bottom:16px">Configuración siempre pide la clave maestra. Producción es la pantalla de inicio y queda abierta. Si tildás un área y nadie tiene permiso, solo entra la clave maestra.</div>`;
+  const ult={};accSt.log.filter(l=>l.accion==='ingreso'||l.accion==='visita').forEach(l=>{if(l.usuario_id&&!ult[l.usuario_id])ult[l.usuario_id]=l;});
+  h+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:14px;font-weight:600">Usuarios con clave</span><button class="btn btn-primary btn-sm" onclick="accEditarUsuario('')"><i class="ti ti-user-plus"></i> Nuevo usuario</button><button class="btn btn-sm" onclick="accAdminInit()"><i class="ti ti-refresh"></i> Actualizar</button></div>
+  <div style="overflow-x:auto"><table class="plan-grid"><thead><tr><th class="left">Usuario</th><th class="left">Permisos</th><th class="left">Último ingreso</th><th>Activo</th><th></th></tr></thead><tbody>`;
+  accSt.users.forEach(u=>{
+    const l=ult[u.id];const d=l?new Date(l.created_at):null;
+    const perm=u.es_maestro?'<span style="color:var(--text2)">Maestra: entra a todo, incluida Configuración</span>':(prot.length?prot.map(a=>`<label style="display:inline-flex;gap:4px;align-items:center;margin:2px 10px 2px 0;font-size:12px">${remEsc(a[1])} <select style="${IN};padding:3px 6px;font-size:12px" onchange="accSetPermiso('${u.id}','${a[0]}',this.value)"><option value="">sin acceso</option><option value="ver"${(u.permisos||{})[a[0]]==='ver'?' selected':''}>solo ver</option><option value="editar"${(u.permisos||{})[a[0]]==='editar'?' selected':''}>ver y editar</option></select></label>`).join(''):'<span style="color:var(--text3);font-size:12px">tildá áreas arriba para darle permisos</span>');
+    h+=`<tr${u.activo===false?' style="opacity:.55"':''}><td class="left" style="font-weight:600">${remEsc(u.nombre)}${u.es_maestro?' <span style="font-size:10px;background:var(--blue)18;color:var(--blue);border-radius:4px;padding:1px 5px">MAESTRA</span>':''}</td><td class="left">${perm}</td>
+      <td class="left" style="font-size:12px;white-space:nowrap">${d?d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})+' · '+remEsc(accNombreArea(l.area)):'—'}</td>
+      <td>${u.es_maestro?'—':`<input type="checkbox"${u.activo!==false?' checked':''} onchange="accSetActivo('${u.id}',this.checked)"/>`}</td>
+      <td style="white-space:nowrap"><button class="btn btn-sm" onclick="accEditarUsuario('${u.id}')" title="Cambiar clave / nombre"><i class="ti ti-key"></i></button>${u.es_maestro?'':` <button class="btn btn-sm" onclick="accEliminar('${u.id}')" title="Eliminar"><i class="ti ti-trash"></i></button>`}</td></tr>`;
+  });
+  h+='</tbody></table></div>';
+  const fu=accSt.logFiltro.u,fa=accSt.logFiltro.a;
+  const nombres=[...new Set(accSt.log.map(l=>l.usuario).filter(Boolean))].sort();
+  const filas=accSt.log.filter(l=>(!fu||l.usuario===fu)&&(!fa||l.area===fa)).slice(0,150);
+  const ACC_TXT={ingreso:'Ingresó',visita:'Volvió a entrar',fallido:'Clave incorrecta',bloqueo:'Se bloqueó',config:'Cambió accesos'};
+  h+=`<div style="display:flex;align-items:center;gap:8px;margin:20px 0 6px;flex-wrap:wrap"><span style="font-size:14px;font-weight:600">Registro de ingresos</span>
+    <select style="${IN}" onchange="accSt.logFiltro.u=this.value;accAdminRender()"><option value="">Todos los usuarios</option>${nombres.map(n=>`<option${n===fu?' selected':''}>${remEsc(n)}</option>`).join('')}</select>
+    <select style="${IN}" onchange="accSt.logFiltro.a=this.value;accAdminRender()"><option value="">Todas las áreas</option>${ACC_AREAS.map(a=>`<option value="${a[0]}"${a[0]===fa?' selected':''}>${remEsc(a[1])}</option>`).join('')}</select></div>
+  <div style="overflow-x:auto"><table class="plan-grid"><thead><tr><th class="left">Cuándo</th><th class="left">Usuario</th><th class="left">Área</th><th class="left">Qué pasó</th></tr></thead><tbody>${filas.map(l=>{const d=new Date(l.created_at);return`<tr><td class="left" style="font-size:12px;white-space:nowrap">${d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'})} ${d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})}</td><td class="left">${remEsc(l.usuario||'—')}</td><td class="left">${remEsc(accNombreArea(l.area))}</td><td class="left" style="font-size:12px${l.accion==='fallido'?';color:var(--red)':''}">${remEsc(ACC_TXT[l.accion]||l.accion)}${l.detalle&&l.accion!=='fallido'?' · '+remEsc(l.detalle):''}</td></tr>`;}).join('')||'<tr><td colspan="4" class="left" style="color:var(--text3)">Sin registros todavía.</td></tr>'}</tbody></table></div>`;
+  cont.innerHTML=h;
+}
+async function accGuardarUsuario(u){
+  const r=await fetch(`${SB}/rest/v1/sope_accesos?on_conflict=id`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(u)});
+  if(!r.ok)throw new Error(await r.text());
+}
+async function accCrearMaestro(){
+  const n=(document.getElementById('acc-m-nombre').value||'').trim(),c1=document.getElementById('acc-m-c1').value,c2=document.getElementById('acc-m-c2').value,er=document.getElementById('acc-m-err');
+  if(!n){er.textContent='Poné tu nombre.';return;}
+  if(c1.length<4){er.textContent='La clave tiene que tener al menos 4 caracteres.';return;}
+  if(c1!==c2){er.textContent='Las dos claves no coinciden.';return;}
+  const salt=accNuevaSal();
+  const u={id:'maestro',nombre:n,salt,clave_hash:accClaveHash(salt,c1),es_maestro:true,activo:true,permisos:{}};
+  try{await accGuardarUsuario(u);}catch(e){er.textContent='No pude guardar: '+String((e&&e.message)||e).slice(0,200);return;}
+  accSt.maestro={id:u.id,nombre:u.nombre};accSt.ult=Date.now();
+  accLog('config','cfg','creó la clave maestra',accSt.maestro);accChip();
+  await accAdminInit();
+}
+async function accSetArea(k,on){
+  const nuevo={...accSt.areas,[k]:!!on};
+  try{
+    const r=await fetch(`${SB}/rest/v1/sope_acceso_config?on_conflict=id`,{method:'POST',headers:{...H,'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({id:'areas',datos:nuevo,updated_at:new Date().toISOString()})});
+    if(!r.ok)throw new Error(await r.text());
+    accSt.areas=nuevo;accLog('config',k,(on?'pidió clave':'dejó de pedir clave'),accSt.maestro);
+  }catch(e){alert('No pude guardar: '+String((e&&e.message)||e).slice(0,200));}
+  accAdminRender();
+}
+async function accSetPermiso(id,area,val){
+  const u=accSt.users.find(x=>x.id===id);if(!u)return;
+  const p={...(u.permisos||{})};if(val)p[area]=val;else delete p[area];
+  try{await pat('sope_accesos',id,{permisos:p});u.permisos=p;accLog('config',area,'permiso de '+u.nombre+': '+(val==='ver'?'solo ver':val==='editar'?'ver y editar':'sin acceso'),accSt.maestro);}
+  catch(e){alert('No pude guardar: '+String((e&&e.message)||e).slice(0,200));}
+  accAdminRender();
+}
+async function accSetActivo(id,on){
+  const u=accSt.users.find(x=>x.id===id);if(!u)return;
+  try{await pat('sope_accesos',id,{activo:!!on});u.activo=!!on;accLog('config','*',(on?'activó a ':'desactivó a ')+u.nombre,accSt.maestro);}
+  catch(e){alert('No pude guardar: '+String((e&&e.message)||e).slice(0,200));}
+  accAdminRender();
+}
+async function accEliminar(id){
+  const u=accSt.users.find(x=>x.id===id);if(!u||u.es_maestro)return;
+  if(!confirm('¿Eliminar a "'+u.nombre+'"? Ya no va a poder entrar. Su historial de ingresos queda en el registro.'))return;
+  try{await del('sope_accesos',id);accLog('config','*','eliminó a '+u.nombre,accSt.maestro);}catch(e){alert('No pude eliminar: '+String((e&&e.message)||e).slice(0,200));return;}
+  await accAdminInit();
+}
+function accEditarUsuario(id){
+  const u=accSt.users.find(x=>x.id===id);
+  let ov=document.getElementById('modal-accu');if(ov)ov.remove();
+  ov=document.createElement('div');ov.className='modal-overlay';ov.id='modal-accu';ov.addEventListener('mousedown',e=>{if(e.target===ov)ov.remove();});
+  const IN='padding:7px 10px;font-size:14px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);width:100%';
+  ov.innerHTML=`<div class="modal" style="width:380px"><div class="modal-title"><i class="ti ti-key"></i> ${u?(u.es_maestro?'Clave maestra':'Editar usuario'):'Nuevo usuario'}</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin:10px 0">
+      <label style="font-size:12px;color:var(--text2)">Nombre<br><input id="accu-n" type="text" value="${u?remEsc(u.nombre):''}" style="${IN}" placeholder="Ej. Juancito"/></label>
+      <label style="font-size:12px;color:var(--text2)">${u?'Clave nueva (dejala vacía para no cambiarla)':'Clave (mín. 4 caracteres)'}<br><input id="accu-c" type="password" autocomplete="new-password" style="${IN}"/></label>
+      ${u&&u.es_maestro?'<label style="font-size:12px;color:var(--text2)">Repetí la clave nueva<br><input id="accu-c2" type="password" autocomplete="new-password" style="'+IN+'"/></label>':''}
+    </div>
+    ${u?'':'<div style="font-size:12px;color:var(--text2)">Los permisos por área se eligen después, en la tabla de usuarios.</div>'}
+    <div id="accu-err" style="color:var(--red);font-size:12px;min-height:16px;margin-top:6px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px"><button class="btn btn-sm" onclick="document.getElementById('modal-accu').remove()">Cancelar</button><button class="btn btn-primary btn-sm" onclick="accGuardarModal('${u?u.id:''}')"><i class="ti ti-check"></i> Guardar</button></div></div>`;
+  document.body.appendChild(ov);
+}
+async function accGuardarModal(id){
+  const u=accSt.users.find(x=>x.id===id);const er=document.getElementById('accu-err');
+  const nombre=(document.getElementById('accu-n').value||'').trim(),clave=document.getElementById('accu-c').value;
+  const c2=document.getElementById('accu-c2');
+  if(!nombre){er.textContent='Poné el nombre.';return;}
+  if(accSt.users.some(x=>x.id!==id&&x.nombre.trim().toLowerCase()===nombre.toLowerCase())){er.textContent='Ya hay alguien con ese nombre.';return;}
+  if(!u&&clave.length<4){er.textContent='La clave tiene que tener al menos 4 caracteres.';return;}
+  if(clave&&clave.length<4){er.textContent='La clave tiene que tener al menos 4 caracteres.';return;}
+  if(c2&&clave&&c2.value!==clave){er.textContent='Las dos claves no coinciden.';return;}
+  if(clave&&accClaveEnUso(clave,id)){er.textContent='Esa clave ya la usa otra persona. Elegí otra.';return;}
+  const nuevo=u?{...u,nombre}:{id:'a'+Date.now().toString(36),nombre,salt:'',clave_hash:'',es_maestro:false,activo:true,permisos:{}};
+  if(clave){nuevo.salt=accNuevaSal();nuevo.clave_hash=accClaveHash(nuevo.salt,clave);}
+  try{await accGuardarUsuario(nuevo);}catch(e){er.textContent='No pude guardar: '+String((e&&e.message)||e).slice(0,200);return;}
+  accLog('config','*',(u?(clave?'cambió la clave de ':'editó a '):'creó a ')+nombre,accSt.maestro);
+  document.getElementById('modal-accu').remove();
+  await accAdminInit();
+}
+
 // Consumo de MP Semanal (Planillas, v4.201): planilla que muestra cuánta materia prima se va a
 // consumir CADA DÍA de la semana, calculado solo (no se edita a mano) a partir del plan de la
 // semana que esté abierta en Planificación (st.w) y las recetas ya cargadas (st.Rec/st.RecTanda) --
@@ -23415,6 +23758,7 @@ async function comesEliminarUsuario(id,nombre){
   }catch(e){alert('Error al eliminar: '+e.message);console.error(e)}
 }
 
+accCargar();
 init();
 </script>
 </body>
