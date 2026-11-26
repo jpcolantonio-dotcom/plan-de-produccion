@@ -294,7 +294,7 @@ header{background:var(--bg);border-bottom:.5px solid var(--border);padding:0 1.5
 <body>
 <div id="etq-print-area"></div>
 <header>
-  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.384</span></div>
+  <div class="logo"><svg class="logo-s" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#1a1a6b"/><g transform="translate(32 32) rotate(-18)"><ellipse rx="27" ry="7" fill="none" stroke="#8fa6ff" stroke-width="3.5"/><circle r="14" fill="#f0a030"/><path d="M-27 0a27 7 0 0 0 54 0" fill="none" stroke="#c4d1ff" stroke-width="3.5"/></g></svg><span>SOPE</span><span class="sub">Sistema Online Planeta Empanada</span><span style="font-size:11px;color:var(--text3);margin-left:4px">v4.385</span></div>
   <div style="display:flex;align-items:center;gap:16px">
     <div class="status-label" onclick="reintentarConexion()" style="cursor:pointer" title="Si se quedó colgado en 'Conectando...' o dice 'Sin conexión', tocá acá para reintentar"><span class="status-dot" id="sdot"></span><span id="stxt">Conectando...</span></div>
     <div id="acc-chip" style="display:none;font-size:12px;color:var(--text2);border:.5px solid var(--border2);border-radius:999px;padding:3px 10px"></div>
@@ -2060,6 +2060,7 @@ function T(t){
   if(t==='rem')initRemitos();
   if(t==='comes')initComes();
   if(t==='planillas')initPlanillas();
+  accAplicarPartes(t); // v4.385: sub-pestañas permitidas
 }
 // Sub-pestaña activa dentro de Informes (Desvíos/Dashboard/Rendimiento/Producción del Día, unificadas
 // en una sola pestaña) -- se recuerda para que volver a "Informes" desde otra pestaña principal
@@ -21137,6 +21138,25 @@ async function cuEliminar(id){
 // OJO: es una barrera de la pantalla (el SOPE es un HTML con la base abierta), no seguridad de servidor.
 const ACC_AREAS=[['prod','Producción'],['cmp','Comparación'],['inf','Informes'],['stock','Stock'],['rec','Recetas'],['rrhh','RRHH'],['ped','Pedidos'],['cfg','Configuración'],['etq','Etiquetas'],['rem','Remitos'],['comes','A comer'],['planillas','Planillas']];
 const accNombreArea=k=>{const a=ACC_AREAS.find(x=>x[0]===k);return a?a[1]:(k==='*'?'todo':k);};
+// Sub-pestañas de cada área que se pueden dar o quitar por usuario: [clave, nombre, id del botón]
+const ACC_PARTES={
+  prod:[['plan','Planificación','prodtab-plan'],['rell','Rellenos','prodtab-rell'],['real','Prod. Real','prodtab-real']],
+  cmp:[['semanal','Semanal','ctab-semanal'],['mensual','Producción mensual','ctab-mensual']],
+  inf:[['desv','Desvíos','inftab-desv'],['dash','Dashboard','inftab-dash'],['rend','Rendimiento','inftab-rend'],['diario','Producción del Día','inftab-diario'],['rango','Producción por Rango','inftab-rango'],['pdad','Productividad','inftab-pdad'],['tiempos','Producción con tiempos','inftab-tiempos'],['sim','Simulación','inftab-sim'],['vsp','Real vs Promedio','inftab-vsp'],['sal','Salidas','inftab-sal']],
+  stock:[['conteomanual','Conteo de stock manual','stab-conteomanual'],['flexxus','Conteo stock Flexxus','stab-flexxus'],['hist','Historial','stab-hist'],['config','Configuración stock','stab-config'],['objetivo','Objetivo de stock','stab-objetivo']],
+  rec:[['recetas','Recetas','rtab-recetas'],['consumo','Consumo MP','rtab-consumo'],['consumostock','MP en Stock de Proceso','rtab-consumostock'],['buscarmp','Búsqueda de PT según MP','rtab-buscarmp']],
+  rrhh:[['horarios','Horarios','rrhhtab-horarios'],['vacaciones','Vacaciones','rrhhtab-vacaciones'],['indumentaria','Indumentaria','rrhhtab-indumentaria'],['configuracion','Configuración RRHH','rrhhtab-configuracion'],['entrenamiento','Entrenamiento','rrhhtab-entrenamiento'],['controlhoras','Control de horas','rrhhtab-controlhoras']],
+  ped:[['recibidos','Recibidos','ptab-recibidos'],['consolidado','Consolidado','ptab-consolidado'],['locales','Pedidos de locales','ptab-locales'],['sucursales','Sucursales','ptab-sucursales']],
+  etq:[['nueva','Nueva caja','etab-nueva'],['pend','Pendientes de imprimir','etab-pend'],['stock','Stock congelado','etab-stock']],
+  rem:[['subir','Subir remito','remtab-subir'],['historial','Historial','remtab-historial'],['envios','Envío a locales','remtab-envios'],['difped','Entrega vs pedido','remtab-difped'],['config','Configuración remitos','remtab-config']],
+  comes:[['lista','Lista del día','comestab-lista'],['personas','Personas','comestab-personas']]
+};
+// permisos[area] = 'ver'|'editar' (formato viejo) o {nivel, partes:[claves]|null}; partes null = el área completa
+function accPerm(u,area){
+  const p=(u.permisos||{})[area];if(!p)return null;
+  if(typeof p==='string')return{nivel:p==='ver'?'ver':'editar',partes:null};
+  return{nivel:p.nivel==='ver'?'ver':'editar',partes:(Array.isArray(p.partes)&&p.partes.length)?p.partes:null};
+}
 const ACC_SQL_TABLAS=`create table if not exists sope_accesos (
   id text primary key,
   nombre text not null,
@@ -21198,9 +21218,11 @@ function accCargar(){
     try{
       const[us,cf]=await Promise.all([get('sope_accesos','select=*&order=nombre.asc'),get('sope_acceso_config','id=eq.areas')]);
       accSt.users=us;accSt.areas=(cf[0]&&cf[0].datos)||{};accSt.falta=false;accSt.err='';accSt.listo=true;
+      try{localStorage.setItem('sope_acc_prod',accRequiere('prod')?'1':'0');}catch(e2){}
+      if(!accSt.inicio){accSt.inicio=true;if(accRequiere('prod')&&!accNivel('prod')&&accSt.tab==='prod'&&!document.getElementById('acc-lock'))accLockScreen('prod');}
     }catch(e){
       const m=String((e&&e.message)||e);
-      if(/PGRST205|42P01|Could not find the table|does not exist|schema cache/i.test(m)){accSt.falta=true;accSt.listo=true;accSt.users=[];accSt.areas={};accSt.err='';}
+      if(/PGRST205|42P01|Could not find the table|does not exist|schema cache/i.test(m)){accSt.falta=true;accSt.listo=true;accSt.users=[];accSt.areas={};accSt.err='';try{localStorage.setItem('sope_acc_prod','0');}catch(e2){}}
       else{accSt.err=m;accSt.listo=false;}
     }
   })();
@@ -21210,11 +21232,25 @@ const accHayMaestro=()=>accSt.users.some(u=>u.es_maestro&&u.activo!==false);
 function accRequiere(t){
   if(!accSt||accSt.falta)return false;
   if(!accSt.listo)return t!=='prod';
-  if(t==='prod')return false;
   if(t==='cfg')return accHayMaestro();
   return !!accSt.areas[t]&&accSt.users.some(u=>u.activo!==false);
 }
 function accNivel(t){if(accSt.maestro)return'editar';const d=accSt.desb[t];return d?d.nivel:null;}
+function accPartes(t){if(accSt.maestro)return null;const d=accSt.desb[t];return d&&d.partes?d.partes:null;}
+// Muestra solo las sub-pestañas permitidas; si la que está abierta no corresponde, pasa a la primera permitida.
+function accAplicarPartes(t){
+  const reg=ACC_PARTES[t];if(!reg)return;
+  const p=accRequiere(t)?accPartes(t):null;
+  let primero=null,bloqueada=false;
+  reg.forEach(([k,lbl,id])=>{
+    const b=document.getElementById(id);if(!b)return;
+    const ok=!p||p.includes(k);
+    b.style.display=ok?'':'none';
+    if(ok&&!primero)primero=b;
+    if(!ok&&b.classList.contains('active'))bloqueada=true;
+  });
+  if(bloqueada&&primero)primero.click();
+}
 function accNivelActual(){return accRequiere(accSt.tab)?accNivel(accSt.tab):'editar';}
 // Se llama al principio de T(): true = puede entrar; false = pidió clave (o está verificando) y vuelve a llamar a T() si entra bien.
 function accGuardia(t){
@@ -21260,8 +21296,8 @@ function accBloquear(motivo){
   if(accSt.maestro)accLog('bloqueo','*',motivo,accSt.maestro);
   const hubo=accSt.maestro||Object.keys(accSt.desb).length;
   accSt.desb={};accSt.maestro=null;accChip();
-  if(hubo&&accRequiere(accSt.tab)){T('prod');}
   accBanner();
+  if(hubo&&accRequiere(accSt.tab))accLockScreen(accSt.tab);
   if(hubo)accToast(motivo==='inactividad'?'Se bloqueó por inactividad. Volvé a ingresar la clave.':'Bloqueado.');
 }
 function accVigilar(){
@@ -21271,6 +21307,8 @@ function accVigilar(){
 }
 ['mousemove','keydown','click','touchstart','scroll'].forEach(ev=>document.addEventListener(ev,()=>{accSt.ult=Date.now();},{passive:true,capture:true}));
 setInterval(accVigilar,20000);
+setInterval(()=>{try{accAplicarPartes(accSt.tab);}catch(e){}},1000);
+try{if(localStorage.getItem('sope_acc_prod')==='1')setTimeout(()=>{if(!document.getElementById('acc-lock')&&!accNivel('prod'))accLockScreen('prod',true);},0);}catch(e){}
 // "Solo ver": mientras la pestaña activa sea de solo lectura, no se deja guardar nada en la base (salvo el registro de accesos).
 (function(){
   const f0=window.fetch.bind(window);let ultAviso=0;
@@ -21315,20 +21353,57 @@ function accPedirClave(t){
 async function accIntentar(t,clave){
   await accCargar();
   if(!accSt.listo)return{err:'No pude verificar los accesos. Revisá internet y probá de nuevo.'};
-  const cand=accSt.users.filter(u=>u.activo!==false&&(u.es_maestro||(t!=='cfg'&&u.permisos&&u.permisos[t])));
-  for(const u of cand){
-    if(accClaveHash(u.salt,clave)!==u.clave_hash)continue;
-    if(u.es_maestro)accSt.maestro={id:u.id,nombre:u.nombre};
-    else accSt.desb[t]={uid:u.id,nombre:u.nombre,nivel:u.permisos[t]==='ver'?'ver':'editar'};
-    accSt.ult=Date.now();accSt.lastLog[u.id+'|'+t]=Date.now();
-    accLog('ingreso',t,u.es_maestro?'clave maestra':(u.permisos[t]==='ver'?'solo ver':'ver y editar'),{id:u.id,nombre:u.nombre});
-    accChip();
-    return{ok:true};
+  const u=accSt.users.find(x=>x.activo!==false&&accClaveHash(x.salt,clave)===x.clave_hash);
+  if(!u){accLog('fallido',t||'*','clave incorrecta',null);return{err:'Clave incorrecta.'};}
+  const yo={id:u.id,nombre:u.nombre};
+  if(t&&!u.es_maestro){
+    if(t==='cfg'){accLog('fallido','cfg','sin permiso',yo);return{err:'Configuración es solo para la clave maestra.'};}
+    if(!accPerm(u,t)){accLog('fallido',t,'sin permiso',yo);return{err:'Esa clave no tiene permiso para '+accNombreArea(t)+'.'};}
   }
-  accLog('fallido',t,'clave incorrecta',null);
-  return{err:'Clave incorrecta.'};
+  if(u.es_maestro)accSt.maestro=yo;
+  else Object.keys(u.permisos||{}).forEach(a=>{const p=accPerm(u,a);if(p)accSt.desb[a]={uid:u.id,nombre:u.nombre,nivel:p.nivel,partes:p.partes};});
+  accSt.ult=Date.now();if(t)accSt.lastLog[u.id+'|'+t]=Date.now();
+  accLog('ingreso',t||'*',u.es_maestro?'clave maestra':'clave',yo);
+  accChip();
+  return{ok:true};
 }
-
+// Después de ingresar por la pantalla de bloqueo: se queda donde estaba si puede; si no, va a la primera área que le toca.
+function accTrasLogin(t){
+  let dest=(t&&(!accRequiere(t)||accNivel(t)))?t:null;
+  if(!dest){const a=ACC_AREAS.find(x=>x[0]!=='cfg'&&accRequiere(x[0])&&accNivel(x[0]))||ACC_AREAS.find(x=>x[0]!=='cfg'&&!accRequiere(x[0]));dest=a?a[0]:null;}
+  if(dest)T(dest);
+  else accToast('Tu usuario todavía no tiene áreas asignadas.');
+}
+function accLockScreen(t,esperando){
+  let ov=document.getElementById('acc-lock');if(ov)ov.remove();
+  ov=document.createElement('div');ov.id='acc-lock';
+  ov.style.cssText='position:fixed;inset:0;background:var(--bg);z-index:900;display:flex;align-items:center;justify-content:center;padding:16px';
+  document.body.appendChild(ov);
+  const dibujar=()=>{
+    const sinConexion=!accSt.listo&&accSt.err;
+    ov.innerHTML=`<div class="modal" style="width:340px;text-align:center">
+      <div style="font-size:22px;font-weight:700;margin-bottom:2px">SOPE</div>
+      <div class="modal-sub" style="margin-bottom:12px">Ingresá tu clave para entrar</div>
+      ${sinConexion?'<div style="color:var(--red);font-size:12px;margin-bottom:8px">No pude verificar los accesos (¿sin internet?).</div>':''}
+      <input id="acc-lk-clave" type="password" autocomplete="off" placeholder="Clave" style="width:100%;padding:10px 12px;font-size:16px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text);text-align:center"/>
+      <div id="acc-lk-err" style="color:var(--red);font-size:12px;min-height:16px;margin:6px 0"></div>
+      <button class="btn btn-primary" id="acc-lk-ok" style="width:100%"><i class="ti ti-lock-open"></i> Entrar</button></div>`;
+    const go=async()=>{
+      const v=document.getElementById('acc-lk-clave').value;if(!v)return;
+      const b=document.getElementById('acc-lk-ok');b.disabled=true;
+      const r=await accIntentar(t,v);
+      if(r.ok){ov.remove();accTrasLogin(t);return;}
+      b.disabled=false;document.getElementById('acc-lk-err').textContent=r.err;const i=document.getElementById('acc-lk-clave');i.value='';i.focus();
+    };
+    document.getElementById('acc-lk-ok').onclick=go;
+    document.getElementById('acc-lk-clave').onkeydown=e=>{if(e.key==='Enter')go();};
+    setTimeout(()=>{const i=document.getElementById('acc-lk-clave');if(i)i.focus();},50);
+  };
+  if(esperando&&!accSt.listo&&!accSt.err){
+    ov.innerHTML='<div style="text-align:center;color:var(--text2)"><span class="spinner spinner-dark"></span><div style="margin-top:10px;font-size:13px">Verificando accesos…</div></div>';
+    accSt.prom.then(()=>{if(!document.getElementById('acc-lock'))return;if(!accRequiere(t)||accNivel(t)){ov.remove();}else dibujar();});
+  }else dibujar();
+}
 // --- Configuración › Accesos (solo clave maestra) ---
 async function accAdminInit(){
   const cont=document.getElementById('acc-content');if(!cont)return;
@@ -21362,18 +21437,18 @@ function accAdminRender(){
     <div style="font-size:12px;color:var(--text2);margin-top:10px">Anotala en un lugar seguro. Si se pierde, hay que borrarla desde Supabase (tabla sope_accesos) y crear otra.</div>`;
     return;
   }
-  const prot=ACC_AREAS.filter(a=>a[0]!=='prod'&&a[0]!=='cfg'&&accSt.areas[a[0]]);
+  const prot=ACC_AREAS.filter(a=>a[0]!=='cfg'&&accSt.areas[a[0]]);
   h+=`<div style="font-size:14px;font-weight:600;margin-bottom:6px">Áreas que piden clave</div>
   <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:4px 14px;margin-bottom:6px;font-size:13px">
-    ${ACC_AREAS.filter(a=>a[0]!=='prod'&&a[0]!=='cfg').map(a=>`<label style="display:flex;gap:6px;align-items:center"><input type="checkbox"${accSt.areas[a[0]]?' checked':''} onchange="accSetArea('${a[0]}',this.checked)"/>${remEsc(a[1])}</label>`).join('')}
+    ${ACC_AREAS.filter(a=>a[0]!=='cfg').map(a=>`<label style="display:flex;gap:6px;align-items:center"><input type="checkbox"${accSt.areas[a[0]]?' checked':''} onchange="accSetArea('${a[0]}',this.checked)"/>${remEsc(a[1])}</label>`).join('')}
   </div>
-  <div style="font-size:12px;color:var(--text2);margin-bottom:16px">Configuración siempre pide la clave maestra. Producción es la pantalla de inicio y queda abierta. Si tildás un área y nadie tiene permiso, solo entra la clave maestra.</div>`;
+  <div style="font-size:12px;color:var(--text2);margin-bottom:16px">Configuración siempre pide la clave maestra. Si tildás un área y nadie tiene permiso, solo entra la clave maestra. Si tildás Producción (la pantalla de inicio), el sistema entero pide clave al abrirse.</div>`;
   const ult={};accSt.log.filter(l=>l.accion==='ingreso'||l.accion==='visita').forEach(l=>{if(l.usuario_id&&!ult[l.usuario_id])ult[l.usuario_id]=l;});
   h+=`<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:14px;font-weight:600">Usuarios con clave</span><button class="btn btn-primary btn-sm" onclick="accEditarUsuario('')"><i class="ti ti-user-plus"></i> Nuevo usuario</button><button class="btn btn-sm" onclick="accAdminInit()"><i class="ti ti-refresh"></i> Actualizar</button></div>
   <div style="overflow-x:auto"><table class="plan-grid"><thead><tr><th class="left">Usuario</th><th class="left">Permisos</th><th class="left">Último ingreso</th><th>Activo</th><th></th></tr></thead><tbody>`;
   accSt.users.forEach(u=>{
     const l=ult[u.id];const d=l?new Date(l.created_at):null;
-    const perm=u.es_maestro?'<span style="color:var(--text2)">Maestra: entra a todo, incluida Configuración</span>':(prot.length?prot.map(a=>`<label style="display:inline-flex;gap:4px;align-items:center;margin:2px 10px 2px 0;font-size:12px">${remEsc(a[1])} <select style="${IN};padding:3px 6px;font-size:12px" onchange="accSetPermiso('${u.id}','${a[0]}',this.value)"><option value="">sin acceso</option><option value="ver"${(u.permisos||{})[a[0]]==='ver'?' selected':''}>solo ver</option><option value="editar"${(u.permisos||{})[a[0]]==='editar'?' selected':''}>ver y editar</option></select></label>`).join(''):'<span style="color:var(--text3);font-size:12px">tildá áreas arriba para darle permisos</span>');
+    const perm=u.es_maestro?'<span style="color:var(--text2)">Maestra: entra a todo, incluida Configuración</span>':(prot.length||Object.keys(u.permisos||{}).length?accResumenPerm(u)+` <button class="btn btn-sm" onclick="accPermisosModal('${u.id}')" style="margin-left:4px"><i class="ti ti-adjustments"></i> Permisos</button>`:'<span style="color:var(--text3);font-size:12px">tildá áreas arriba para darle permisos</span>');
     h+=`<tr${u.activo===false?' style="opacity:.55"':''}><td class="left" style="font-weight:600">${remEsc(u.nombre)}${u.es_maestro?' <span style="font-size:10px;background:var(--blue)18;color:var(--blue);border-radius:4px;padding:1px 5px">MAESTRA</span>':''}</td><td class="left">${perm}</td>
       <td class="left" style="font-size:12px;white-space:nowrap">${d?d.toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit'})+' '+d.toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'})+' · '+remEsc(accNombreArea(l.area)):'—'}</td>
       <td>${u.es_maestro?'—':`<input type="checkbox"${u.activo!==false?' checked':''} onchange="accSetActivo('${u.id}',this.checked)"/>`}</td>
@@ -21415,12 +21490,55 @@ async function accSetArea(k,on){
   }catch(e){alert('No pude guardar: '+String((e&&e.message)||e).slice(0,200));}
   accAdminRender();
 }
-async function accSetPermiso(id,area,val){
-  const u=accSt.users.find(x=>x.id===id);if(!u)return;
-  const p={...(u.permisos||{})};if(val)p[area]=val;else delete p[area];
-  try{await pat('sope_accesos',id,{permisos:p});u.permisos=p;accLog('config',area,'permiso de '+u.nombre+': '+(val==='ver'?'solo ver':val==='editar'?'ver y editar':'sin acceso'),accSt.maestro);}
-  catch(e){alert('No pude guardar: '+String((e&&e.message)||e).slice(0,200));}
-  accAdminRender();
+function accResumenPerm(u){
+  const l=Object.keys(u.permisos||{}).map(a=>{
+    const p=accPerm(u,a);if(!p)return '';
+    const reg=ACC_PARTES[a]||[];
+    const partes=p.partes?' ('+p.partes.map(k=>{const x=reg.find(r=>r[0]===k);return x?x[1]:k;}).join(', ')+')':'';
+    return `<div style="font-size:12px"><b>${remEsc(accNombreArea(a))}</b>: ${p.nivel==='ver'?'solo ver':'ver y editar'}${p.partes?remEsc(partes):' · todo'}${accSt.areas[a]?'':' <span style="color:var(--text3)">(hoy no pide clave)</span>'}</div>`;
+  }).filter(Boolean);
+  return l.join('')||'<span style="color:var(--text3);font-size:12px">sin permisos todavía</span>';
+}
+var accEdP=null;
+function accPermisosModal(id){
+  const u=accSt.users.find(x=>x.id===id);if(!u||u.es_maestro)return;
+  const perm={};
+  ACC_AREAS.forEach(a=>{const p=accPerm(u,a[0]);if(p)perm[a[0]]={nivel:p.nivel,partes:p.partes?[...p.partes]:null};});
+  accEdP={id,nombre:u.nombre,perm};accPermisosRender();
+}
+function accPermisosRender(){
+  const e=accEdP;if(!e)return;
+  let ov=document.getElementById('modal-accp');
+  if(!ov){ov=document.createElement('div');ov.className='modal-overlay';ov.id='modal-accp';ov.addEventListener('mousedown',x=>{if(x.target===ov)ov.remove();});document.body.appendChild(ov);}
+  const IN='padding:5px 8px;font-size:13px;border:.5px solid var(--border2);border-radius:var(--radius);background:var(--bg);color:var(--text)';
+  const areas=ACC_AREAS.filter(a=>a[0]!=='cfg'&&(accSt.areas[a[0]]||e.perm[a[0]]));
+  const filas=areas.map(([k,nom])=>{
+    const p=e.perm[k],reg=ACC_PARTES[k];
+    let h=`<div style="border:.5px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="min-width:120px">${remEsc(nom)}</b>
+      <select style="${IN}" onchange="accPNivel('${k}',this.value)"><option value="">Sin acceso</option><option value="ver"${p&&p.nivel==='ver'?' selected':''}>Solo ver</option><option value="editar"${p&&p.nivel==='editar'?' selected':''}>Ver y editar</option></select>
+      ${p&&reg?`<label style="font-size:12px;display:flex;gap:4px;align-items:center"><input type="radio" name="m-${k}"${!p.partes?' checked':''} onchange="accPModo('${k}',false)"/> Todo el área</label><label style="font-size:12px;display:flex;gap:4px;align-items:center"><input type="radio" name="m-${k}"${p.partes?' checked':''} onchange="accPModo('${k}',true)"/> Solo algunas partes</label>`:''}
+      ${accSt.areas[k]?'':'<span style="font-size:11px;color:var(--text3)">(esta área hoy no pide clave)</span>'}</div>`;
+    if(p&&reg&&p.partes)h+=`<div style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:3px 10px;font-size:12.5px">${reg.map(([pk,pn])=>`<label style="display:flex;gap:5px;align-items:center"><input type="checkbox"${p.partes.includes(pk)?' checked':''} onchange="accPParte('${k}','${pk}',this.checked)"/>${remEsc(pn)}</label>`).join('')}</div>`;
+    if(p&&!reg)h+='<div style="margin-top:4px;font-size:11.5px;color:var(--text3)">Esta área no tiene partes: se da completa.</div>';
+    return h+'</div>';
+  }).join('');
+  ov.innerHTML=`<div class="modal" style="width:640px;max-height:88vh;overflow-y:auto"><div class="modal-title"><i class="ti ti-adjustments"></i> Permisos de ${remEsc(e.nombre)}</div>
+    <div class="modal-sub">Elegí a qué áreas entra y, si querés, solo a algunas partes (sub-pestañas) de cada una.</div>
+    <div style="margin:10px 0">${filas||'<div style="color:var(--text3)">Tildá primero qué áreas piden clave.</div>'}</div>
+    <div id="accp-err" style="color:var(--red);font-size:12px;min-height:16px"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-sm" onclick="document.getElementById('modal-accp').remove()">Cancelar</button><button class="btn btn-primary btn-sm" onclick="accPGuardar()"><i class="ti ti-check"></i> Guardar</button></div></div>`;
+}
+function accPNivel(k,v){if(!v)delete accEdP.perm[k];else{const p=accEdP.perm[k]||{partes:null};p.nivel=v;accEdP.perm[k]=p;}accPermisosRender();}
+function accPModo(k,algunas){accEdP.perm[k].partes=algunas?[]:null;accPermisosRender();}
+function accPParte(k,pk,on){const p=accEdP.perm[k];p.partes=on?[...new Set([...(p.partes||[]),pk])]:(p.partes||[]).filter(x=>x!==pk);}
+async function accPGuardar(){
+  const e=accEdP,er=document.getElementById('accp-err');
+  for(const k of Object.keys(e.perm)){if(e.perm[k].partes&&!e.perm[k].partes.length){er.textContent='En '+accNombreArea(k)+' tildá al menos una parte (o elegí "Todo el área").';return;}}
+  const permisos={};Object.entries(e.perm).forEach(([k,p])=>{permisos[k]={nivel:p.nivel,partes:p.partes};});
+  const u=accSt.users.find(x=>x.id===e.id);
+  try{await pat('sope_accesos',e.id,{permisos});u.permisos=permisos;accLog('config','*','permisos de '+e.nombre+' actualizados',accSt.maestro);}
+  catch(x){er.textContent='No pude guardar: '+String((x&&x.message)||x).slice(0,200);return;}
+  document.getElementById('modal-accp').remove();accAdminRender();
 }
 async function accSetActivo(id,on){
   const u=accSt.users.find(x=>x.id===id);if(!u)return;
