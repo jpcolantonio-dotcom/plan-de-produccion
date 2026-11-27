@@ -69,6 +69,26 @@ footer.save .btn{min-width:150px}
 .toast.err{background:var(--err)}
 .spin{display:inline-block;width:18px;height:18px;border:3px solid currentColor;border-right-color:transparent;border-radius:50%;animation:s .7s linear infinite;vertical-align:-3px}
 @keyframes s{to{transform:rotate(360deg)}}
+.tabs{display:flex;gap:0;margin:10px 0 4px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--card)}
+.tabs button{flex:1;border:0;background:transparent;color:var(--text);padding:11px 8px;font-weight:600;font-size:15px}
+.tabs button.on{background:var(--brand);color:var(--brand-ink)}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin:8px 0}
+.seg button{border:0;background:var(--card);color:var(--text);padding:8px 16px;font-weight:600;font-size:14px}
+.seg button.on{background:var(--accent);color:#fff}
+.sec{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text2);margin:16px 2px 6px}
+.pl{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:11px 14px}
+.pl b{font-size:16px;overflow-wrap:anywhere}.pl small{display:block;color:var(--text2);font-size:12.5px;font-weight:400}
+.pl .q{font-size:20px;font-weight:700;white-space:nowrap}.pl .q small{display:inline;font-size:12px;color:var(--text2);margin-left:3px}
+.tw{overflow-x:auto;border:1px solid var(--border);border-radius:12px;background:var(--card)}
+table.sm{border-collapse:collapse;width:100%;font-size:14px}
+table.sm th,table.sm td{padding:8px 8px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--border)}
+table.sm th{background:var(--bg);font-size:12px;color:var(--text2)}
+table.sm td:first-child,table.sm th:first-child{text-align:left;position:sticky;left:0;background:var(--card);white-space:normal;min-width:130px;max-width:170px;z-index:1}
+table.sm th:first-child{background:var(--bg)}
+table.sm .hoy{background:var(--warn-bg);font-weight:700}
+table.sm tr.ar td{background:var(--bg);font-weight:700;font-size:12px;text-transform:uppercase;color:var(--text2);text-align:left}
+.tag{display:inline-block;font-size:11px;font-weight:700;border-radius:6px;padding:1px 6px;margin-left:6px}
+.tag.c{background:var(--warn-bg);color:var(--warn)}.tag.f{background:var(--ok-bg);color:var(--ok)}
 </style>
 </head>
 <body>
@@ -97,7 +117,7 @@ async function apiPost(t,body,prefer){const r=await fetch(`${SB}/rest/v1/${t}`,{
 async function apiPatch(t,q,body){const r=await fetch(`${SB}/rest/v1/${t}?${q}`,{method:'PATCH',headers:{...H,'Prefer':'return=minimal'},body:JSON.stringify(body)});if(!r.ok)throw new Error(await r.text());}
 const tablaFaltante=e=>/PGRST205|42P01|Could not find the table|does not exist|schema cache/i.test(String((e&&e.message)||e));
 
-const S={user:null,fecha:hoy(),idx:0,cat:null,plan:[],datos:{},quien:{},filas:[],dirty:{},guardando:false,cargando:false};
+const S={vista:'cargar',planModo:'dia',rec:null,recTanda:{},planSig:[],dem:null,user:null,fecha:hoy(),idx:0,cat:null,plan:[],datos:{},quien:{},filas:[],dirty:{},guardando:false,cargando:false};
 
 function lsGet(){try{return JSON.parse(localStorage.getItem(LS)||'null');}catch(e){return null;}}
 function lsSet(v){try{if(v)localStorage.setItem(LS,JSON.stringify(v));else localStorage.removeItem(LS);}catch(e){}}
@@ -180,15 +200,20 @@ async function recargar(mostrar){
   if(mostrar)$('app').innerHTML=cabecera()+'<div class="wrap" style="padding:40px 0;text-align:center"><span class="spin"></span></div>';
   try{
     const f=S.fecha,k=semanaDe(f);
-    const [emp,areas,prods,mps,plan,real,regs]=await Promise.all([
+    const hayRell=(S.user.cargas||[]).some(c=>norm(c.area)==='RELLENOS')||true;
+    const [emp,areas,prods,mps,plan,real,regs,recs,planSig]=await Promise.all([
       api('empresas','select=id,nombre&order=nombre.asc'),
       api('areas','select=id,empresa_id,nombre&order=nombre.asc'),
       api('productos','order=orden.asc,nombre.asc'),
       api('materias_primas','select=id,codigo,nombre,alias&order=nombre.asc'),
       api('planes',`semana=eq.${k}&select=filas`),
       api('produccion_real',`semana=eq.${k}&select=datos`),
-      api('carga_registros',`fecha=eq.${f}&select=empresa_id,producto,usuario,created_at&order=created_at.desc&limit=500`).catch(()=>[])
+      api('carga_registros',`fecha=eq.${f}&select=empresa_id,producto,usuario,created_at&order=created_at.desc&limit=500`).catch(()=>[]),
+      S.rec?Promise.resolve(null):api('recetas','select=datos,tandas').catch(()=>[]),
+      api('planes',`semana=eq.${sumaDias(k,7)}&select=filas`).catch(()=>[])
     ]);
+    if(recs){S.rec=(recs[0]&&recs[0].datos)||{};S.recTanda=(recs[0]&&recs[0].tandas)||{};}
+    S.planSig=(planSig[0]&&planSig[0].filas)||[];
     S.cat={emp,areas,prods,mps};
     S.plan=(plan[0]&&plan[0].filas)||[];
     S.datos=(real[0]&&real[0].datos)||{};
@@ -243,7 +268,13 @@ function armarFilas(){
     rows.push({empresa_id:c.empresa_id,area:areaNom,producto:p.nombre,unidad:p.unidad||'',days:[],oi:null});
   });
   const elegidos=new Set((c.productos||[]).map(norm));
+  const esR=norm(areaNom)==='RELLENOS';
+  S.dem=esR?demandaRellenos(c.empresa_id):null;
+  const dmd=r=>S.dem?S.dem.por[norm(r.producto)]:null;
+  const calR=(r,p)=>{const g=dmd(r);return g?g.caliente:(!!p&&p.elaboracion==='caliente');};
   let out=rows.map((r,i)=>{const p=prodDe(r);return {r,p,i};}).filter(({r,p})=>{
+    if(esR&&c.modo==='caliente')return calR(r,p);
+    if(esR&&c.modo==='frio')return !calR(r,p);
     if(c.modo==='caliente')return !!p&&p.elaboracion==='caliente';
     if(c.modo==='frio')return !!p&&p.elaboracion==='frio';
     if(c.modo==='elegir')return elegidos.has(norm(r.producto));
@@ -252,7 +283,17 @@ function armarFilas(){
   out.sort((a,b)=>{const oa=a.p&&a.p.orden!=null?a.p.orden:1e9,ob=b.p&&b.p.orden!=null?b.p.orden:1e9;return oa!==ob?oa-ob:a.i-b.i;});
   S.filas=out.map(({r,p})=>{
     const mp=mpVinc(p);
-    return {...r,alias:(mp&&mp.alias)||r.producto,unidad:r.unidad||(p&&p.unidad)||'',plan:(r.days&&r.days[di])||0,actual:realArr(S.datos,r,r.oi)[di]||0};
+    const g=dmd(r);
+    let plan=(r.days&&r.days[di])||0,info='',unidad=r.unidad||(p&&p.unidad)||'';
+    if(g){
+      // lo mismo que SOPE > Producción > Rellenos: kg a elaborar ese día, redondeado a tandas (según el plan de las empanadas)
+      let kg=g.red[di+1]||0,extra=0;
+      if(di===5){extra=(S.dem.sig[norm(r.producto)]||0);kg+=extra;} // el sábado se elabora también lo caliente del lunes siguiente
+      plan=kg;unidad='kg';
+      const nT=g.tanda>0?Math.round(kg/g.tanda*100)/100:null;
+      info=(g.tanda>0&&kg>0?fmtN(nT)+' tanda'+(nT===1?'':'s')+' de '+fmtN(g.tanda)+' kg':(kg>0?'sin tanda definida':''))+(extra>0?' · incluye '+fmtN(extra)+' kg del lunes':'');
+    }
+    return {...r,alias:(mp&&mp.alias)||r.producto,unidad,plan,info,actual:realArr(S.datos,r,r.oi)[di]||0};
   });
 }
 function etiquetaCarga(c){
@@ -267,18 +308,174 @@ function render(){
   h+=`<div class="bar"><button class="nav" onclick="cambiarDia(-1)">‹</button><div class="fecha">${esc(fechaTxt)}${esHoy?' · hoy':''}</div><button class="nav" onclick="cambiarDia(1)">›</button><input type="date" value="${f}" onchange="irFecha(this.value)"></div>`;
   if(cargas.length>1)h+=`<div class="chips">${cargas.map((c,i)=>`<button class="chip${i===S.idx?' on':''}" onclick="cambiarCarga(${i})">${esc(etiquetaCarga(c))}</button>`).join('')}</div>`;
   else h+=`<div class="muted" style="margin-bottom:10px">${esc(etiquetaCarga(cargas[0]))}</div>`;
+  h+=`<div class="tabs"><button class="${S.vista==='cargar'?'on':''}" onclick="cambiarVista('cargar')">Cargar</button><button class="${S.vista==='plan'?'on':''}" onclick="cambiarVista('plan')">Plan</button></div>`;
+  if(S.vista==='plan'){h+=planHtml()+`</div>`;$('app').innerHTML=h;return;}
   if(!S.filas.length)h+=`<div class="alert warn">No hay productos para esta carga${cargas[S.idx].modo==='caliente'||cargas[S.idx].modo==='frio'?' (revisá que los productos tengan cargado si son calientes o fríos en SOPE, o pedí que te asignen productos puntuales)':''}.</div>`;
   h+=`<div class="list">`;
   S.filas.forEach((r,i)=>{
     const q=S.quien[r.empresa_id+'||'+norm(r.producto)];
     const hora=q&&q.created_at?new Date(q.created_at).toLocaleTimeString('es-AR',{hour:'2-digit',minute:'2-digit'}):'';
     h+=`<div class="card row${r.actual>0?' has':''}" id="row-${i}">
-      <div class="n"><b>${esc(r.alias)}</b><span>${r.plan>0?'Plan: '+fmtN(r.plan)+' · ':''}${r.actual>0?'Cargado: '+fmtN(r.actual):'Sin carga'}</span>${q&&r.actual>0?`<span class="quien"> · ${esc(q.usuario)} ${hora}</span>`:''}</div>
+      <div class="n"><b>${esc(r.alias)}</b><span>${r.plan>0?'Plan: '+fmtN(r.plan)+(r.unidad==='kg'?' kg':'')+(r.info?' ('+esc(r.info)+')':'')+' · ':''}${r.actual>0?'Cargado: '+fmtN(r.actual):'Sin carga'}</span>${q&&r.actual>0?`<span class="quien"> · ${esc(q.usuario)} ${hora}</span>`:''}</div>
       <input id="in-${i}" type="text" inputmode="decimal" autocomplete="off" placeholder="--" value="${r.actual>0?r.actual:''}" oninput="editar(${i},this.value)" onfocus="this.select()">
       <div class="u">${esc(r.unidad)}</div></div>`;
   });
   h+=`</div></div><footer class="save"><div class="wrap"><div class="st" id="st"></div><button class="btn" id="btnsave" onclick="guardar()">Guardar</button></div></footer>`;
   $('app').innerHTML=h;actualizarPie();
+}
+function cambiarVista(v){if(v===S.vista)return;if(v==='plan'&&!confirmarDescarte())return;if(v==='plan')S.dirty={};S.vista=v;render();}
+function setPlanModo(m){S.planModo=m;render();}
+
+/* ---------- rellenos: mismo cálculo que SOPE > Producción > Rellenos ---------- */
+const esRelP=p=>{const a=S.cat.areas.find(x=>x.id===p.area_id);return !!a&&norm(a.nombre)==='RELLENOS';};
+function recKey(p){
+  const R=S.rec||{};if(R[p.nombre])return p.nombre;
+  const M=S.cat.mps;
+  let m=null;
+  if(p.mp_id)m=M.find(x=>x.id===p.mp_id);
+  if(!m&&p.codigo_articulo)m=M.find(x=>String(x.codigo)===String(p.codigo_articulo));
+  if(!m)m=M.find(x=>norm(x.nombre)===norm(p.nombre));
+  const lc=t=>String(t||'').trim().toLowerCase();
+  let k=m?Object.keys(R).find(k=>lc(k)===lc(m.nombre)):null;
+  if(!k)k=Object.keys(R).find(k=>lc(k)===lc(p.nombre));
+  return k||p.nombre;
+}
+function rellenosDeProducto(p){
+  const out=[],vistos=new Set();
+  const add=(nombre,kgUd)=>{const k=norm(nombre);if(!k||vistos.has(k))return;vistos.add(k);out.push({nombre:String(nombre),key:k,kgUd});};
+  S.cat.prods.forEach(rp=>{
+    if(!rp.vinculo_productos||!esRelP(rp))return;
+    let v=[];try{v=typeof rp.vinculo_productos==='string'?JSON.parse(rp.vinculo_productos):rp.vinculo_productos;}catch(e){}
+    if(!Array.isArray(v))return;
+    const l=v.find(x=>x&&x.producto_id===p.id);
+    if(l){const g=parseFloat(l.gramos_por_unidad);add(rp.nombre,(isFinite(g)&&g>0)?g/1000:null);}
+  });
+  const rk=recKey(p),rec=(S.rec&&S.rec[rk])||[];
+  const tanda=Number((S.recTanda&&(S.recTanda[rk]||S.recTanda[p.nombre]))||1)||1;
+  const nomRell=new Set(S.cat.prods.filter(x=>esRelP(x)&&String(x.empresa_id)===String(p.empresa_id)).map(x=>norm(x.nombre)));
+  rec.forEach(si=>{
+    const n=norm(si.ingrediente);
+    if(!(nomRell.has(n)||/(^| )RELLENO( |$)/.test(n)))return;
+    let kg=null;const q=Number(si.cantidad),u=String(si.unidad||'').trim().toLowerCase();
+    if(isFinite(q)&&q>0){if(/^(kg|kilo)/.test(u))kg=q/tanda;else if(/^(g|gr|grs|gramo)/.test(u))kg=q/tanda/1000;}
+    add(si.ingrediente,kg);
+  });
+  return out;
+}
+const redT=(kg,t)=>{if(!(kg>1e-9))return 0;if(!(t>0))return kg;return Math.ceil(kg/t-1e-9)*t;};
+function calcRellenos(rows,empId){
+  const emp=S.cat.emp.find(e=>e.id===empId);
+  const esJ=!!emp&&/joselito/i.test(emp.nombre);
+  const copias={};
+  S.cat.prods.forEach(p=>{
+    if(String(p.empresa_id)!==String(empId))return;
+    const sinArea=!p.area_id&&/^RELLENO\b/.test(norm(p.nombre));
+    if(!esRelP(p)&&!sinArea)return;
+    (copias[norm(p.nombre)]=copias[norm(p.nombre)]||[]).push(p);
+  });
+  const relProd={};
+  Object.entries(copias).forEach(([k,l])=>{
+    l.sort((a,b)=>(esRelP(b)?1:0)-(esRelP(a)?1:0));
+    const main=l[0],t=l.find(x=>parseFloat(x.unidades_tanda)>0),e=l.find(x=>x.elaboracion);
+    relProd[k]={...main,unidades_tanda:t?t.unidades_tanda:null,elaboracion:e?e.elaboracion:main.elaboracion};
+  });
+  const por={};
+  rows.forEach(r=>{
+    if(String(r.empresa_id)!==String(empId)||norm(r.area)==='RELLENOS')return;
+    const dias=(r.days||[]).map(v=>Number(v)||0);
+    if(!dias.some(v=>v>0))return;
+    const p=S.cat.prods.find(x=>x.nombre===r.producto&&String(x.empresa_id)===String(r.empresa_id))||prodDe({producto:r.producto,empresa_id:r.empresa_id});
+    if(!p)return;
+    if(esJ&&!/RAVIOL|SORRENT/.test(norm(p.nombre+' '+(r.area||''))))return;
+    rellenosDeProducto(p).forEach(x=>{
+      if(x.kgUd==null)return;
+      const rp0=relProd[x.key]||null;
+      const cal=p.elaboracion?p.elaboracion==='caliente':!!(rp0&&rp0.elaboracion==='caliente');
+      const areaNom=r.area||'';
+      const k=x.key;
+      let g=por[k];
+      if(!g){const tanda=rp0&&parseFloat(rp0.unidades_tanda)>0?parseFloat(rp0.unidades_tanda):0;g=por[k]={key:k,nombre:(rp0&&rp0.nombre)||x.nombre,areas:new Set(),caliente:cal,tanda,dias:[0,0,0,0,0,0,0]};}
+      if(cal)g.caliente=true;
+      g.areas.add(areaNom);
+      for(let i=0;i<7;i++)g.dias[i]+=dias[i]*x.kgUd;
+    });
+  });
+  Object.values(por).forEach(g=>{
+    const ex=[0,0,0,0,0,0,0,0];
+    g.dias.forEach((v,di)=>{ex[g.caliente?di:di+1]+=v;});
+    g.red=ex.map(v=>redT(v,g.tanda));
+  });
+  return por;
+}
+function demandaRellenos(empId){
+  const por=calcRellenos(S.plan,empId);
+  const sigAll=calcRellenos(S.planSig,empId);
+  const sig={};Object.entries(sigAll).forEach(([k,g])=>{if(g.red[0]>0)sig[k]=g.red[0];});
+  const lista=Object.values(por).sort((a,b)=>a.nombre.localeCompare(b.nombre,'es',{numeric:true}));
+  return {por,sig,lista};
+}
+
+/* ---------- pestaña Plan ---------- */
+function planHtml(){
+  const c=S.user.cargas[S.idx],di=diaIdx(S.fecha);
+  const emp=S.cat.emp.find(e=>e.id===c.empresa_id);
+  const esR=norm(c.area)==='RELLENOS';
+  const dem=esR?(S.dem||demandaRellenos(c.empresa_id)):null;
+  let h=`<div class="seg"><button class="${S.planModo==='dia'?'on':''}" onclick="setPlanModo('dia')">Día</button><button class="${S.planModo==='sem'?'on':''}" onclick="setPlanModo('sem')">Semana</button></div>`;
+  const filas=S.plan.filter(r=>r.empresa_id===c.empresa_id&&norm(r.area)!=='RELLENOS'&&(r.days||[]).some(v=>Number(v)>0));
+  const aliasDe=r=>{const mp=mpVinc(prodDe(r));return (mp&&mp.alias)||r.producto;};
+  const ordenArea=a=>{const i=['PLANETA','BURRITOS','CRIOLLO 13','PIZZETA'].indexOf(norm(a));return i<0?99:i;};
+  const grupos={};filas.forEach(r=>{(grupos[r.area]=grupos[r.area]||[]).push(r);});
+  const areas=Object.keys(grupos).sort((a,b)=>ordenArea(a)-ordenArea(b)||a.localeCompare(b,'es',{numeric:true}));
+  const DN=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+  const fechaSem=semanaDe(S.fecha);
+  if(S.planModo==='dia'){
+    h+=`<div class="muted">Plan de producción del ${esc(parseYmd(S.fecha).toLocaleDateString('es-AR',{weekday:'long',day:'numeric',month:'long'}))} · ${esc(emp?emp.nombre:'')}</div>`;
+    if(esR&&dem){
+      const hoyR=dem.lista.map(g=>{let kg=g.red[di+1]||0;if(di===5)kg+=dem.sig[g.key]||0;return {g,kg};}).filter(x=>x.kg>0);
+      h+=`<div class="sec">Rellenos a elaborar hoy</div>`;
+      if(!hoyR.length)h+=`<div class="alert warn">No hay rellenos para elaborar este día según el plan.</div>`;
+      [['Calientes',true],['Fríos',false]].forEach(([t,cal])=>{
+        const l=hoyR.filter(x=>x.g.caliente===cal).sort((a,b)=>a.g.nombre.localeCompare(b.g.nombre,'es',{numeric:true}));
+        if(!l.length)return;
+        h+=`<div class="sec" style="margin-top:8px">${t}</div><div class="list" style="padding-bottom:0">`+l.map(({g,kg})=>`<div class="card pl"><div><b>${esc(g.nombre)}</b><small>${g.tanda>0?fmtN(Math.round(kg/g.tanda*100)/100)+' tandas de '+fmtN(g.tanda)+' kg':'sin tanda definida'} · para ${esc([...g.areas].join(', '))}</small></div><div class="q">${fmtN(kg)}<small>kg</small></div></div>`).join('')+`</div>`;
+      });
+    }
+    h+=`<div class="sec">${esR?'Producción de empanadas del día':'Producción del día'}</div>`;
+    let hay=false;
+    areas.forEach(a=>{
+      const l=grupos[a].filter(r=>Number((r.days||[])[di])>0).sort((x,y)=>aliasDe(x).localeCompare(aliasDe(y),'es',{numeric:true}));
+      if(!l.length)return;hay=true;
+      h+=`<div class="sec" style="margin-top:8px">${esc(a)}</div><div class="list" style="padding-bottom:0">`+l.map(r=>`<div class="card pl"><div><b>${esc(aliasDe(r))}</b></div><div class="q">${fmtN(r.days[di])}<small>${esc(r.unidad||'')}</small></div></div>`).join('')+`</div>`;
+    });
+    if(!hay)h+=`<div class="alert warn">No hay producción planificada para este día.</div>`;
+  }else{
+    h+=`<div class="muted">Plan de la semana del ${esc(parseYmd(fechaSem).toLocaleDateString('es-AR',{day:'numeric',month:'long'}))} · ${esc(emp?emp.nombre:'')}</div>`;
+    const th=(extra)=>DN.map((d,i)=>`<th class="${i===di?'hoy':''}">${d}</th>`).join('');
+    if(esR&&dem){
+      const sab=dem.lista.some(g=>g.red[0]>0);
+      h+=`<div class="sec">Rellenos a elaborar (kg, por día de elaboración)</div><div class="tw"><table class="sm"><thead><tr><th>Relleno</th>${sab?'<th>Sáb ant.</th>':''}${th()}</tr></thead><tbody>`;
+      [['Calientes',true],['Fríos',false]].forEach(([t,cal])=>{
+        const l=dem.lista.filter(g=>g.caliente===cal);if(!l.length)return;
+        h+=`<tr class="ar"><td colspan="${8+(sab?1:0)}">${t}</td></tr>`;
+        l.forEach(g=>{h+=`<tr><td>${esc(g.nombre)}</td>${sab?`<td>${g.red[0]?fmtN(g.red[0]):''}</td>`:''}${[1,2,3,4,5,6,7].map(j=>`<td class="${j-1===di?'hoy':''}">${g.red[j]?fmtN(g.red[j]):''}</td>`).join('')}</tr>`;});
+      });
+      h+=`</tbody></table></div>`;
+    }
+    h+=`<div class="sec">${esR?'Producción de empanadas':'Producción'} (por día)</div>`;
+    if(!areas.length)h+=`<div class="alert warn">No hay producción planificada esta semana.</div>`;
+    else{
+      h+=`<div class="tw"><table class="sm"><thead><tr><th>Producto</th>${th()}</tr></thead><tbody>`;
+      areas.forEach(a=>{
+        h+=`<tr class="ar"><td colspan="8">${esc(a)}</td></tr>`;
+        grupos[a].sort((x,y)=>aliasDe(x).localeCompare(aliasDe(y),'es',{numeric:true})).forEach(r=>{
+          h+=`<tr><td>${esc(aliasDe(r))}</td>${[0,1,2,3,4,5,6].map(i=>`<td class="${i===di?'hoy':''}">${Number(r.days[i])>0?fmtN(Number(r.days[i])):''}</td>`).join('')}</tr>`;
+        });
+      });
+      h+=`</tbody></table></div>`;
+    }
+  }
+  return h;
 }
 function parseNum(v){const s=String(v).trim().replace(',','.');if(s==='')return null;const n=Number(s);return isFinite(n)&&n>=0?n:NaN;}
 function editar(i,val){
